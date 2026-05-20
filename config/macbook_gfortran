@@ -1,0 +1,58 @@
+FC = gfortran
+
+# ajr: set NC_CROOT and NC_FROOT in .zshrc
+#NC_CROOT=/opt/homebrew/Cellar/netcdf/4.9.3
+#NC_FROOT=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_2
+INC_NC  = -I${NC_FROOT}/include
+LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf
+
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+FFTWROOT = fesm-utils/fftw-serial
+INC_FFTW = -I${FFTWROOT}/include
+LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 -lm
+
+LISROOT = fesm-utils/lis-serial
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib -llis
+
+ISOSTASYROOT = FastIsostasy
+INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
+LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
+
+YELMOROOT = yelmo
+INC_YELMO = -I${YELMOROOT}/libyelmo/include 
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+REMBOROOT = rembo1
+INC_REMBO = -I${REMBOROOT}/librembo/include 
+LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+
+FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
+
+ifeq ($(openmp), 1)
+    # Overwrite default choices with openmp relevant choices 
+
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
+
+    FFTWROOT = fesm-utils/fftw-omp
+    INC_FFTW = -I${FFTWROOT}/include
+    LIB_FFTW = -L${FFTWROOT}/lib -lfftw3_omp -lfftw3 -lm
+
+    LISROOT = fesm-utils/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -I$(objdir) -J$(objdir) -ffree-line-length-none -fomit-frame-pointer -fopenmp 
+
+endif 
+
+LFLAGS  = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW)
+
+DFLAGS_NODEBUG = -O2
+DFLAGS_DEBUG   = -w -g -ggdb -ffpe-trap=invalid,zero,overflow,underflow -fbacktrace -fcheck=all
+DFLAGS_PROFILE = -O2 -pg

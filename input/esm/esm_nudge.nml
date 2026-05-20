@@ -1,0 +1,716 @@
+&var1
+    filename    = "var_test.nc"
+    name        = "var1"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 1960, 1
+/
+
+! ====== ESM experiment definitions ======
+
+&ctrl
+    experiment      = "ctrl"
+/
+
+&1pctCO2
+    experiment      = "1pctCO2"
+/
+
+&ssp126
+    experiment      = "ssp126"
+/
+
+&ssp585
+    experiment      = "ssp585"
+/
+
+! =========== ATMOSPHERE ===========
+
+! ======== Reference period ========
+&gcm_ts_ref
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
+    name        = "t2m_dt"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 0.0
+    with_time   = True
+    time_par    = 1990.0, 2019.0, 1.0, 12.0
+/
+
+&gcm_pr_ref
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
+    name        = "precip_dt"
+    units_in    = "kg m-2 month-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 0.08333
+    unit_offset = 0.0
+    with_time   = True
+    time_par    = 1990.0, 2019.0, 1.0, 12.0
+/
+
+&gcm_zs_ref
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0         
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 2000, 2000, 0, 1
+/
+
+! ======== Variability =============
+
+&gcm_ts_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "t2m"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1979.0, 2022.0, 1.0, 12.0
+/
+
+&gcm_pr_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "precip"
+    units_in    = "kg m-2 month-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 0.08333         
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 1979.0, 2022.0, 1.0, 12.0
+/
+
+&gcm_zs_var
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_AWI_ESM_PIcontrol_surfelev.nc
+    name        = "OROMEA"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0         
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 2000, 2000, 0, 1
+/
+
+! ======== ESM Reference period ========
+&gcm_ts_esm_ref
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_temp2_4501to5000.nc"
+    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_temp2_4501to5000.nc"
+    name        = "temp2"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 4501, 5000, 1, 12
+/
+
+&gcm_pr_esm_ref
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_aprl_aprc_4501to5000.nc"
+    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_aprl_aprc_4501to5000.nc"
+    name        = "aprc"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 4501, 5000, 1, 12
+/
+
+! ======= Historical period =======
+&gcm_ts_hist
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_temp2_4501to5000.nc"
+    name        = "temp2"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 4501, 5000, 1, 12
+/
+
+&gcm_pr_hist
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_aprl_aprc_4501to5000.nc"
+    name        = "aprc"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 4501, 5000, 1, 12
+/
+
+! ======== Projection period ========
+&gcm_ts_proj
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_temp2_4501to5000.nc"
+    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_temp2_4501to5000.nc"
+    name        = "temp2"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 4501, 5000, 1, 12
+/
+
+&gcm_pr_proj
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_aprl_aprc_4501to5000.nc"
+    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_aprl_aprc_4501to5000.nc"
+    name        = "aprc"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 4501, 5000, 1, 12
+/
+
+! ========      OCEAN      =========
+
+! ======== Reference period ========
+&gcm_to_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1990-2019_DETRENDED.nc"
+    name        = "thetao_dt"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15
+    with_time   = True
+    time_par    = 1990, 2019, 1, 1
+/
+
+&gcm_so_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1990-2019_DETRENDED.nc"
+    name        = "so_dt"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0
+    unit_offset = 0.0
+    with_time   = True
+    time_par    = 1990, 2019, 1, 1
+/
+
+! ======== Variability period ========
+&gcm_to_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_thetao.nc"
+    name        = "thetao"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = True
+    time_par    = 1979, 2024, 1, 1
+/
+
+&gcm_so_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1979-2024_so.nc"
+    name        = "so"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 1979, 2024, 1, 1
+/
+
+! ======== ESM Reference period ========
+&gcm_to_esm_ref
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceantemp_4501to5000.nc"
+    name        = "temp"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15 
+    with_time   = True
+    time_par    = 4501, 5000, 1, 1
+/
+
+&gcm_so_esm_ref
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceansalt_4501to5000.nc"
+    name        = "salt"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 4501, 5000, 1, 1
+/
+
+! ======== Historical period ========
+&gcm_to_hist
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceantemp_4501to5000.nc"
+    name        = "temp"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15 
+    with_time   = True
+    time_par    = 4501, 5000, 1, 1
+/
+
+&gcm_so_hist
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceansalt_4501to5000.nc"
+    name        = "salt"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 4501, 5000, 1, 1
+/
+
+! ======== Projection period ========
+&gcm_to_proj
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceantemp_4501to5000.nc"
+    name        = "temp"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15 
+    with_time   = True
+    time_par    = 4501, 5000, 1, 1
+/
+
+&gcm_so_proj
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceansalt_4501to5000.nc"
+    name        = "salt"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True
+    time_par    = 4501, 5000, 1, 1
+/
+
+! === Other fields ===
+
+&basins
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
+    name        = "basin_reese"
+    units_in    = "1"
+    units_out   = "1"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False
+    time_par    = 2020, 2020, 0, 1
+/
+
+! =====================================================
+!
+! CMIP output variable list
+!
+! =====================================================
+
+&cmip_out_lithk
+    name            = "lithk"
+    long_name       = "Ice sheet thickness"
+    var_type        = "ST"
+    standard_name   = "land_ice_thickness"
+    units_in        = "m"
+    units_out       = "m"
+    unit_scale      = 1.0 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_orog
+    name            = "orog"
+    long_name       = "Ice sheet surface elevation"
+    var_type        = "ST"
+    standard_name   = "surface_altitude"
+    units_in        = "m"
+    units_out       = "m"
+    unit_scale      = 1.0 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_base
+    name            = "base"
+    long_name       = "Ice sheet base elevation"
+    var_type        = "ST"
+    standard_name   = "base_altitude"
+    units_in        = "m"
+    units_out       = "m"
+    unit_scale      = 1.0 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_topg
+    name            = "topg"
+    long_name       = "Bedrock elevation"
+    var_type        = "ST"
+    standard_name   = "bedrock_altitude"
+    units_in        = "m"
+    units_out       = "m"
+    unit_scale      = 1.0 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_hfgeoubed
+    name            = "hfgeoubed"
+    long_name       = "Geothermal heat flux"
+    var_type        = "CST"
+    standard_name   = "upward_geothermal_heat_flux_at_ground_level"
+    units_in        = "mW m^−2"
+    units_out       = "W m^-2"
+    unit_scale      = 1e-3 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_acabf
+    name            = "acabf"
+    long_name       = "Surface mass balance flux"
+    var_type        = "FL"
+    standard_name   = "land_ice_surface_specific_mass_balance_flux"
+    units_in        = "m i.e. yr^-1"
+    units_out       = "kg m^-2 s^-1"
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
+    unit_offset     = 0.0 
+/
+
+&cmip_out_libmassbfgr
+    name            = "libmassbfgr"
+    long_name       = "Basal mass balance flux beneath grounded ice"
+    var_type        = "FL"
+    standard_name   = "land_ice_basal_specific_mass_balance_flux"
+    units_in        = "m i.e. yr^-1"
+    units_out       = "kg m^-2 s^-1"
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
+    unit_offset     = 0.0 
+/
+
+&cmip_out_libmassbffl
+    name            = "libmassbffl"
+    long_name       = "Basal mass balance flux beneath floating ice"
+    var_type        = "FL"
+    standard_name   = "land_ice_basal_specific_mass_balance_flux"
+    units_in        = "m i.e. yr^-1"
+    units_out       = "kg m^-2 s^-1"
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
+    unit_offset     = 0.0 
+/
+
+&cmip_out_dlithkdt
+    name            = "dlithkdt"
+    long_name       = "Ice thickness imbalance"
+    var_type        = "FL"
+    standard_name   = "tendency_of_land_ice_thickness"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_xvelsurf
+    name            = "xvelsurf"
+    long_name       = "Surface velocity in x direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_surface_x_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_yvelsurf
+    name            = "yvelsurf"
+    long_name       = "Surface velocity in y direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_surface_y_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_zvelsurf
+    name            = "zvelsurf"
+    long_name       = "Surface velocity in z direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_surface_upward_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+
+&cmip_out_xvelbase
+    name            = "xvelbase"
+    long_name       = "Basal velocity in x direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_basal_x_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_yvelbase
+    name            = "yvelbase"
+    long_name       = "Basal velocity in y direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_basal_y_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_zvelbase
+    name            = "zvelbase"
+    long_name       = "Basal velocity in z direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_basal_upward_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_xvelmean
+    name            = "xvelmean"
+    long_name       = "Mean velocity in x direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_vertical_mean_x_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_yvelmean
+    name            = "yvelmean"
+    long_name       = "Mean velocity in y direction"
+    var_type        = "ST"
+    standard_name   = "land_ice_vertical_mean_y_velocity"
+    units_in        = "m yr^-1"
+    units_out       = "m s^-1"
+    unit_scale      =  3.168876e-08    ! == 1/31556926.0(ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_litemptop
+    name            = "litemptop"
+    long_name       = "Ice surface temperature"
+    var_type        = "ST"
+    standard_name   = "temperature_at_top_of_ice_sheet_model"
+    units_in        = "K"
+    units_out       = "K"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_litempbotgr
+    name            = "litempbotgr"
+    long_name       = "Basal temperature beneath grounded ice sheet"
+    var_type        = "ST"
+    standard_name   = "temperature_at_base_of_ice_sheet_model"
+    units_in        = "K"
+    units_out       = "K"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_litempbotfl
+    name            = "litempbotfl"
+    long_name       = "Basal temperature beneath floating ice sheet"
+    var_type        = "ST"
+    standard_name   = "temperature_at_base_of_ice_sheet_model"
+    units_in        = "K"
+    units_out       = "K"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_strbasemag
+    name            = "strbasemag"
+    long_name       = "Magnitude of basal drag"
+    var_type        = "ST"
+    standard_name   = "land_ice_basal_drag"
+    units_in        = "Pa"
+    units_out       = "Pa"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_licalvf
+    name            = "licalvf"
+    long_name       = "Land ice calving flux"
+    var_type        = "FL"
+    standard_name   = "land_ice_specific_mass_flux_due_to_calving"
+    units_in        = "m i.e. yr^-1"
+    units_out       = "kg m^-2 s^-1"
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
+    unit_offset     = 0.0 
+/
+
+&cmip_out_lifmassbf
+    name            = "lifmassbf"
+    long_name       = "Ice front melt and calving flux"
+    var_type        = "FL"
+    standard_name   = "land_ice_specific_mass_flux_due_to_calving_and_ice_front_melting"
+    units_in        = "m i.e. yr^-1"
+    units_out       = "kg m^-2 s^-1"
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
+    unit_offset     = 0.0 
+/
+&cmip_out_ligroundf
+    name            = "ligroundf"
+    long_name       = "Grounding line flux"
+    var_type        = "FL"
+    standard_name   = "land_ice_specific_mass_flux_at_grounding_line"
+    units_in        = "m i.e. yr^-1"
+    units_out       = "kg m^-2 s^-1"
+    unit_scale      = 2.90586e-05     ! 1/31556926.0*(917/1000)*1000
+    unit_offset     = 0.0 
+/
+
+&cmip_out_sftgif
+    name            = "sftgif"
+    long_name       = "Land ice area fraction"
+    var_type        = "ST"
+    standard_name   = "land_ice_area_fraction"
+    units_in        = "1"
+    units_out       = "1"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_sftgrf
+    name            = "sftgrf"
+    long_name       = "Grounded ice sheet area fraction"
+    var_type        = "ST"
+    standard_name   = "grounded_ice_sheet_area_fraction"
+    units_in        = "1"
+    units_out       = "1"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_sftflf
+    name            = "sftflf"
+    long_name       = "Floating ice sheet area fraction"
+    var_type        = "ST"
+    standard_name   = "floating_ice_shelf_area_fraction"
+    units_in        = "1"
+    units_out       = "1"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_lim
+    name            = "lim"
+    long_name       = "Total ice sheet mass"
+    var_type        = "ST"
+    standard_name   = "land_ice_mass"
+    units_in        = "kg"
+    units_out       = "kg"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_limnsw
+    name            = "limnsw"
+    long_name       = "Total ice sheet mass above flotation"
+    var_type        = "ST"
+    standard_name   = "land_ice_mass_not_displacing_sea_water"
+    units_in        = "kg"
+    units_out       = "kg"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_iareagr
+    name            = "iareagr"
+    long_name       = "Grounded ice area"
+    var_type        = "ST"
+    standard_name   = "grounded_ice_sheet_area"
+    units_in        = "m^2"
+    units_out       = "m^2"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_iareafl
+    name            = "iareafl"
+    long_name       = "Floating ice area"
+    var_type        = "ST"
+    standard_name   = "floating_ice_shelf_area"
+    units_in        = "m^2"
+    units_out       = "m^2"
+    unit_scale      = 1.0
+    unit_offset     = 0.0 
+/
+
+&cmip_out_tendacabf
+    name            = "tendacabf"
+    long_name       = "Total SMB flux"
+    var_type        = "FL"
+    standard_name   = "tendency_of_land_ice_mass_due_to_surface_mass_balance"
+    units_in        = "kg yr^-1"
+    units_out       = "kg s^-1"
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_tendlibmassbf
+    name            = "tendlibmassbf"
+    long_name       = "Total BMB flux"
+    var_type        = "FL"
+    standard_name   = "tendency_of_land_ice_mass_due_to_basal_mass_balance"
+    units_in        = "kg yr^-1"
+    units_out       = "kg s^-1"
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_tendlibmassbffl
+    name            = "tendlibmassbffl"
+    long_name       = "Total BMB flux beneath floating ice"
+    var_type        = "FL"
+    standard_name   = "tendency_of_land_ice_mass_due_to_basal_mass_balance"
+    units_in        = "kg yr^-1"
+    units_out       = "kg s^-1"
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_tendlicalvf
+    name            = "tendlicalvf"
+    long_name       = "Total calving flux"
+    var_type        = "FL"
+    standard_name   = "tendency_of_land_ice_mass_due_to_calving"
+    units_in        = "kg yr^-1"
+    units_out       = "kg s^-1"
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_tendlifmassbf
+    name            = "tendlifmassbf"
+    long_name       = "Total calving and ice front melting flux"
+    var_type        = "FL"
+    standard_name   = "tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting"
+    units_in        = "kg yr^-1"
+    units_out       = "kg s^-1"
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
+    unit_offset     = 0.0 
+/
+
+&cmip_out_tendligroundf
+    name            = "tendligroundf"
+    long_name       = "Total grounding line flux"
+    var_type        = "FL"
+    standard_name   = "tendency_of_grounded_ice_mass"
+    units_in        = "kg yr^-1"
+    units_out       = "kg s^-1"
+    unit_scale      = 3.168876e-08    ! == 1/31556926.0 (ISMIP standard) 
+    unit_offset     = 0.0 
+/
+

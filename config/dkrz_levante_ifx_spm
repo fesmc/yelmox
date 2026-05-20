@@ -1,0 +1,61 @@
+FC = ifx
+
+NETCDFC_ROOT = /sw/spack-levante/netcdf-c-4.8.1-2k3cmu
+NETCDFFI_ROOT = /sw/spack-levante/netcdf-fortran-4.5.3-k6xq5g
+INC_NC  = -I${NETCDFFI_ROOT}/include
+LIB_NC  = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${NETCDFC_ROOT}/lib -Wl\,-rpath=${NETCDFC_ROOT}/lib -lnetcdf
+# the -rpath options ensure that the same shared libraries are found at runtime
+
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+FFTWROOT = fesm-utils/fftw-serial
+INC_FFTW = -I${FFTWROOT}/include
+LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 
+
+LISROOT = fesm-utils/lis-serial
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+ISOSTASYROOT = FastIsostasy
+INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
+LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
+
+YELMOROOT = yelmo
+INC_YELMO = -I${YELMOROOT}/libyelmo/include 
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+REMBOROOT = rembo1
+INC_REMBO = -I${REMBOROOT}/librembo/include 
+LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+
+OBMROOT = libs/obm/
+INC_OBM = 
+LIB_OBM = -L${OBMROOT}/
+
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
+
+ifeq ($(openmp), 1)
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
+
+    FFTWROOT = fesm-utils/fftw-omp
+    INC_FFTW = -I${FFTWROOT}/include
+    LIB_FFTW = -L${FFTWROOT}/lib -lfftw3_omp -lfftw3
+
+    LISROOT = fesm-utils/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
+
+endif 
+
+LFLAGS  = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LIB_OBM) -Wl,-zmuldefs
+
+#DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_NODEBUG = -Ofast -march=core-avx2 -mtune=core-avx2 -traceback #-recursive
+DFLAGS_DEBUG   = -C -O0 -g -traceback -ftrapuv -fpe0 -check all,nouninit -fp-model precise -debug extended -gen-interfaces -warn interfaces -check arg_temp_created
+DFLAGS_PROFILE = -O2 -fp-model precise -pg

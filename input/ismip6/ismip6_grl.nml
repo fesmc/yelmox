@@ -1,0 +1,620 @@
+&access13_rcp85_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&access13_rcp85_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&access13_rcp85_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&access13_rcp85_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&access13_rcp85_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&access13_rcp85_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&access13_rcp85_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_ACCESS1.3-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&access13_rcp85_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_ACCESS1.3-rcp85_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+
+&csiromk36_rcp85_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&csiromk36_rcp85_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&csiromk36_rcp85_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&csiromk36_rcp85_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&csiromk36_rcp85_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&csiromk36_rcp85_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&csiromk36_rcp85_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_CSIRO-Mk3.6-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&csiromk36_rcp85_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_CSIRO-Mk3.6-rcp85_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&hadgem2es_rcp85_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&hadgem2es_rcp85_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&hadgem2es_rcp85_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&hadgem2es_rcp85_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&hadgem2es_rcp85_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&hadgem2es_rcp85_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&hadgem2es_rcp85_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_HadGEM2-ES-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&hadgem2es_rcp85_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_HadGEM2-ES-rcp85_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+
+&ipslcm5mr_rcp85_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&ipslcm5mr_rcp85_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&ipslcm5mr_rcp85_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&ipslcm5mr_rcp85_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&ipslcm5mr_rcp85_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&ipslcm5mr_rcp85_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&ipslcm5mr_rcp85_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_IPSL-CM5-MR-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&ipslcm5mr_rcp85_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_IPSL-CM5-MR-rcp85_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+
+&miroc5_rcp26_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&miroc5_rcp26_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&miroc5_rcp26_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&miroc5_rcp26_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp26_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp26_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp26_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp26_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp26_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_MIROC5-rcp26_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp85_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&miroc5_rcp85_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&miroc5_rcp85_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&miroc5_rcp85_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp85_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp85_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp85_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_MIROC5-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&miroc5_rcp85_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_MIROC5-rcp85_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+
+&noresm_rcp85_z_srf
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_CLIM_1960-1989.nc"
+    name        = "z_srf"
+    units_in    = "m"
+    units_out   = "m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&noresm_rcp85_ts_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_CLIM_1960-1989.nc"
+    name        = "tas"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&noresm_rcp85_smb_ref
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_CLIM_1960-1989.nc"
+    name        = "smb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1960, 1989, 0
+/
+
+&noresm_rcp85_ts_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_ANOM_1950-2100.nc"
+    name        = "atas"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&noresm_rcp85_smb_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&noresm_rcp85_dts_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_ANOM_1950-2100.nc"
+    name        = "dtasdz"
+    units_in    = "K/m"
+    units_out   = "K/m"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&noresm_rcp85_dsmb_dz_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Atmosphere/{grid_name}_NorESM1-rcp85_ANOM_1950-2100.nc"
+    name        = "asmb"
+    units_in    = "kg m-2 s-1 / m"
+    units_out   = "m i.e. yr-1 / m"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+
+&noresm_rcp85_tf_proj
+    filename    = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_NorESM1-rcp85_1950-2100.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 1.0 
+    with_time   = TRUE 
+    time_par    = 1950, 2100, 1
+/
+

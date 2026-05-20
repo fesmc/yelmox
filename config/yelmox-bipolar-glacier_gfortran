@@ -1,0 +1,53 @@
+FC = gfortran
+
+INC_NC = -I/usr/include
+LIB_NC = -L/usr/lib/x86_64-linux-gnu -lnetcdff -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now -lnetcdf -lnetcdf -ldl -lm
+
+YELMOROOT = yelmo
+INC_YELMO = -I${YELMOROOT}/libyelmo/include 
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+LISROOT = fesm-utils/lis-serial
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+FFTWROOT = fesm-utils/fftw-serial
+INC_FFTW = -I${FFTWROOT}/include
+LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 
+
+ISOSTASYROOT = FastIsostasy
+INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
+LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
+
+OBMROOT = libs/obm/
+INC_OBM = 
+LIB_OBM = -L${OBMROOT}/
+
+FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none
+
+ifeq ($(openmp), 1)
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
+
+    FFTWROOT = fesm-utils/fftw-omp
+    INC_FFTW = -I${FFTWROOT}/include
+    LIB_FFTW = -L${FFTWROOT}/lib -lfftw3_omp -lfftw3
+
+    LISROOT = fesm-utils/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp
+endif 
+
+# LFLAGS = $(LIB_NC) $(LIB_YELMO) $(LIB_LIS) $(LIB_ISOSTASY) $(LIB_FFTW) $(LIB_OBM) -Wl,-zmuldefs
+LFLAGS  = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LIB_OBM) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2
+DFLAGS_DEBUG = -w -g -p -ggdb -ffpe-trap=invalid,zero,overflow -fbacktrace -fcheck=all -Wall,-DDEBUG
+DFLAGS_PROFILE = -O2 -p -ggdb

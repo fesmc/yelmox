@@ -1,0 +1,328 @@
+&var1
+    filename    = "var_test.nc"
+    name        = "var1"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = TRUE 
+    time_par    = 1950, 1960, 1
+/
+
+! ====== ISMIP6-2300 experiment definitions ======
+
+&ctrlAE0
+    experiment      = "ctrl0"
+    shlf_collapse   = False
+/
+
+&ctrlAE
+    experiment      = "ctrl"
+    shlf_collapse   = False
+/
+
+&expAE01
+    experiment      = "NorESM1-M_RCP26-repeat"
+    shlf_collapse   = False
+/
+
+&expAE02
+    experiment      = "CCSM4_RCP85"
+    shlf_collapse   = False
+/
+
+&expAE03
+    experiment      = "HadGEM2-ES_RCP85"
+    shlf_collapse   = False
+/
+
+&expAE04
+    experiment      = "CESM2-WACCM_ssp585"
+    shlf_collapse   = False
+/
+
+&expAE05
+    experiment      = "UKESM1-0-LL_ssp585"
+    shlf_collapse   = False
+/
+
+&expAE06
+    experiment      = "UKESM1-0-LL_ssp585-repeat"
+    shlf_collapse   = False
+/
+
+&expAE07
+    experiment      = "NorESM1-M_RCP85-repeat"
+    shlf_collapse   = False
+/
+
+&expAE08
+    experiment      = "HadGEM2-ES_RCP85-repeat"
+    shlf_collapse   = False
+/
+
+&expAE09
+    experiment      = "CESM2-WACCM_ssp585-repeat"
+    shlf_collapse   = False
+/
+
+&expAE10
+    experiment      = "UKESM1-0-LL_ssp126"
+    shlf_collapse   = False
+/
+
+&expAE11
+    experiment      = "CCSM4_RCP85"
+    shlf_collapse   = True
+/
+
+&expAE12
+    experiment      = "HadGEM2-ES_RCP85"
+    shlf_collapse   = True
+/
+
+&expAE13
+    experiment      = "CESM2-WACCM_ssp585"
+    shlf_collapse   = True
+/
+
+&expAE14
+    experiment      = "UKESM1-0-LL_ssp585"
+    shlf_collapse   = True
+/
+
+! ====== ATMOSPHERE ================
+
+&gcm_ts_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
+    name        = "ts_clim"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1995, 2014, 0
+/
+
+&gcm_pr_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
+    name        = "pr_clim"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1995, 2014, 0
+/
+
+&gcm_smb_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
+    name        = "smb_clim"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
+    unit_offset = 0.0 
+    with_time   = FALSE 
+    time_par    = 1995, 2014, 0
+/
+
+&gcm_ts_hist
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    name        = "ts_anomaly"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1950, 1994, 1
+/
+
+&gcm_pr_hist
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    name        = "pr_anomaly"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1950, 1994, 1
+/
+
+&gcm_smb_hist
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
+    name        = "smb_anomaly"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1950, 1994, 1
+/
+
+&gcm_ts_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "ts_anomaly"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1995, 2300, 1
+/
+
+&gcm_pr_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "pr_anomaly"
+    units_in    = "kg m-2 s-1"
+    units_out   = "mm yr-1"
+    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1995, 2300, 1
+/
+
+&gcm_smb_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "smb_anomaly"
+    units_in    = "kg m-2 s-1"
+    units_out   = "m i.e. yr-1"
+    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1995, 2300, 1
+/
+
+! ====== OCEAN ================
+
+&imbie_basins
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
+    name        = "basinNumber"
+    units_in    = "1"
+    units_out   = "1"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 1995, 1
+/
+
+&to_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    name        = "to"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 273.15 
+    with_time   = False 
+    time_par    = 1995, 2017, 1
+/
+
+&so_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    name        = "so"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 2017, 1
+/
+
+&tf_ref
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    name        = "tf"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 2017, 1
+/
+
+&tf_cor
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    name        = "dT_nl"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = False 
+    time_par    = 1995, 2017, 1
+/
+
+&gcm_to_hist
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    name        = "temperature"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15 
+    with_time   = True 
+    time_par    = 1850, 1994, 1
+/
+
+&gcm_so_hist
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    name        = "salinity"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1850, 1994, 1
+/
+
+&gcm_tf_hist
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
+    name        = "thermal_forcing"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1850, 1994, 1
+/
+
+&gcm_to_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "temperature"
+    units_in    = "degrees C"
+    units_out   = "K"
+    unit_scale  = 1.0
+    unit_offset = 273.15 
+    with_time   = True 
+    time_par    = 1995, 2300, 1
+/
+
+&gcm_so_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "salinity"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1995, 2300, 1
+/
+&gcm_tf_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "thermal_forcing"
+    units_in    = "K"
+    units_out   = "K"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1995, 2300, 1
+/
+
+================== Ice shelf collapse mask =================
+
+&gcm_mask_shlf_proj
+    filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/ShelfCollapse_forcing/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
+    name        = "mask"
+    units_in    = "1"
+    units_out   = "1"
+    unit_scale  = 1.0
+    unit_offset = 0.0
+    with_time   = True
+    time_par    = 1995, 2300, 1
+/

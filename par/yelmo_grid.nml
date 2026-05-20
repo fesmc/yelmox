@@ -1,0 +1,214 @@
+
+! Note - all North projections now use the ESPG-3413
+! polar stereographic projection with (lambda=-45.d0,phi=70.d0)
+! Smaller Northern domains like Eurasia and Greenland use
+! the same projection for consistency. 
+! ESPG-3413 (lambda=-45.d0,phi=70.d0) is used for Greenland in 
+! model intercomparison exercises, eg ISMIP6. 
+
+! NORTH DOMAINS ======================= 
+
+&NH-40KM
+                x0 = -4900.0
+                y0 =  5400.0 
+                dx =    40.0 
+                dy =    40.0 
+                nx =   221 
+                ny =   221
+/
+
+&NH-20KM
+                x0 = -4900.0
+                y0 =  5400.0 
+                dx =    20.0 
+                dy =    20.0 
+                nx =   441 
+                ny =   441
+/
+
+&NH-10KM
+                x0 = -4900.0
+                y0 =  5400.0 
+                dx =    10.0 
+                dy =    10.0 
+                nx =   881 
+                ny =   881
+/
+
+&NH-5KM
+                x0 = -4900.0
+                y0 =  5400.0 
+                dx =     5.0 
+                dy =     5.0 
+                nx =  1761 
+                ny =  1761
+/
+
+! EURASIA DOMAINS ======================= 
+
+&EIS-40KM
+                x0 =   380.0
+                y0 = -5000.0 
+                dx =    40.0 
+                dy =    40.0 
+                nx =    89 
+                ny =   161
+/
+
+&EIS-20KM
+                x0 =   380.0
+                y0 = -5000.0 
+                dx =    20.0 
+                dy =    20.0 
+                nx =   177 
+                ny =   321
+/
+
+&EIS-10KM
+                x0 =   380.0
+                y0 = -5000.0 
+                dx =    10.0 
+                dy =    10.0 
+                nx =   353 
+                ny =   641
+/
+
+&EIS-5KM
+                x0 =   380.0
+                y0 = -5000.0 
+                dx =     5.0 
+                dy =     5.0 
+                nx =   705 
+                ny =  1281
+/
+
+! GREENLAND DOMAINS =======================
+
+&GRL-40KM
+                x0 =  -720.0
+                y0 = -3450.0 
+                dx =    40.0 
+                dy =    40.0 
+                nx =    43 
+                ny =    73
+/
+
+&GRL-20KM
+                x0 =  -720.0
+                y0 = -3450.0 
+                dx =    20.0 
+                dy =    20.0 
+                nx =    85 
+                ny =   145
+/
+
+&GRL-10KM
+                x0 =  -720.0
+                y0 = -3450.0 
+                dx =    10.0 
+                dy =    10.0 
+                nx =   169 
+                ny =   289
+/
+
+&GRL-5KM
+                x0 =  -720.0
+                y0 = -3450.0 
+                dx =     5.0 
+                dy =     5.0 
+                nx =   337 
+                ny =   577
+/
+
+&GRL-2KM
+                x0 =  -720.0
+                y0 = -3450.0 
+                dx =     2.0 
+                dy =     2.0 
+                nx =   841 
+                ny =  1441
+/
+
+&GRL-1KM
+                x0 =  -720.0
+                y0 = -3450.0 
+                dx =     1.0 
+                dy =     1.0 
+                nx =  1681 
+                ny =  2881
+            
+/
+
+&Bamber01-20KM
+                x0 =  -800.0
+                y0 = -3400.0  
+                dx =    20.0 
+                dy =    20.0 
+                nx =    76 
+                ny =   141
+/
+
+&Bamber01-10KM
+                x0 =  -800.0
+                y0 = -3400.0 
+                dx =    10.0 
+                dy =    10.0 
+                nx =   151 
+                ny =   281
+/
+
+! ANTARCTICA DOMAINS ======================= 
+
+&ANT-80KM
+                x0 = -9999.0
+                y0 = -9999.0 
+                dx =    80.0 
+                dy =    80.0 
+                nx =    79 
+                ny =    74
+/
+
+&ANT-40KM
+                x0 = -9999.0
+                y0 = -9999.0 
+                dx =    40.0 
+                dy =    40.0 
+                nx =   157 
+                ny =   147
+/
+
+&ANT-20KM
+                x0 = -9999.0
+                y0 = -9999.0 
+                dx =    20.0 
+                dy =    20.0 
+                nx =   313 
+                ny =   293
+/
+
+&ANT-10KM
+                x0 = -9999.0
+                y0 = -9999.0 
+                dx =    10.0 
+                dy =    10.0 
+                nx =   625 
+                ny =   585
+/
+
+&ANT-5KM
+                x0 = -9999.0
+                y0 = -9999.0 
+                dx =     5.0 
+                dy =     5.0 
+                nx =  1249 
+                ny =  1169
+/
+
+&ANT-1KM
+                x0 = -9999.0
+                y0 = -9999.0 
+                dx =     1.0 
+                dy =     1.0 
+                nx =  6241 
+                ny =  5841
+/

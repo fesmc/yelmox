@@ -1,0 +1,60 @@
+# Output year lists (in ka!)
+# Format requirements
+# First line: name = number
+#    where name=output name and number is the number of output years listed
+#    Valid output names are: out2d, restart
+# Second line: space-separated values of output years
+# NOTE: FINAL year of simulations will automatically be added to output,
+#       if it isn't present in the array, AND years outside of the
+#       simulations time will be removed from output
+
+# 2d output for PPS runs (Pliocene-Pleistocene)
+#out2d = -3200 -3100 -3000 -2900 -2800 -2700 -2600 -2500 -2400
+
+# 2d output for MIS5
+#out2d = 35
+-130 -129 -128 -127 -126 -125 -124 -123 -122
+-121 -120 -119 -118 -117 -116 -115 -25 -24 -23
+-22 -21 -20 -19 -15 -10 -9 -8 -7 -6 -5 -4 -3 -2 -1 0  
+
+#out2d = 10
+-134 -130 -126 -122 -118
+-16 -12 -8 -4 0  
+
+#out2d = 5
+-12 -10 -8 -6 0
+
+#out2d = 6
+-130 -126 -123 -122 -121 0  
+
+# 2d output for MIS11
+out2d = 60
+-420 -415   -413 -412   -411 -410.5 -410 -409.5 -409 -408.5
+-408 -407.5 -407 -406.5 -406 -405.5 -405 -404.5 -404 -403.5
+-403 -402.5 -402 -401.5 -401 -400.5 -400 -395   -390 -385   -380
+-130 -126   -124 -123.5 -123 -122.5 -122 -121.5 -121 -120.5 -120 -119 
+-118 -117   -116 -115   -114 -113   -112 -111   -110 -100   -90  -80
+-22  -12    -8   -4      0
+
+# TRACER TESTING 
+#out2d = 3
+-10, -5, 0 
+
+#out2d = 10
+-412 -411 -410 -409 -408 -407 -406 -405 -403 0
+
+# 2d output for transient sims
+#out2d = 23
+0 0.2 0.5 1 1.5 2 2.5 3 3.5 4 4.5 5 6 7 8 9 10
+15 20 40 60 80 100
+
+# 2D output for future scenarios
+#out2d = 8
+1.900 2.000 2.050 2.100 2.150 2.200 2.250 2.300
+
+#out2d = 10
+2.000 2.100 2.200 2.300 2.500 3.000 5.000 7.000 10.000 11.700
+
+# years for restart file writing
+restart = 7
+-135 -22 -16 -1 0 50 100

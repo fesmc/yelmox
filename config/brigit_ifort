@@ -1,0 +1,52 @@
+FC  = ifort
+
+INC_NC  = -I/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/include
+LIB_NC  = -L/opt/ohpc/pub/libs/intel/impi/netcdf-fortran/4.4.5/lib -lnetcdff -L/opt/ohpc/pub/libs/intel/impi/hdf5/1.10.5/lib -L/opt/ohpc/pub/libs/intel/impi/netcdf/4.6.3/lib -lnetcdf -lnetcdf -lhdf5_hl -lhdf5 -lz -lm
+
+FESMUTILSROOT=fesm-utils/utils
+INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
+LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+
+FFTWROOT = fesm-utils/fftw-serial
+INC_FFTW = -I${FFTWROOT}/include
+LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 
+
+LISROOT = fesm-utils/lis-serial
+INC_LIS = -I${LISROOT}/include 
+LIB_LIS = -L${LISROOT}/lib/ -llis
+
+ISOSTASYROOT = FastIsostasy
+INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
+LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
+
+YELMOROOT = yelmo
+INC_YELMO = -I${YELMOROOT}/libyelmo/include 
+LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
+
+REMBOROOT = rembo1
+INC_REMBO = -I${REMBOROOT}/librembo/include 
+LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+
+FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir)
+
+ifeq ($(openmp), 1)
+    FESMUTILSROOT=fesm-utils/utils
+    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
+    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
+
+    FFTWROOT = fesm-utils/fftw-omp
+    INC_FFTW = -I${FFTWROOT}/include
+    LIB_FFTW = -L${FFTWROOT}/lib -lfftw3_omp -lfftw3
+
+    LISROOT = fesm-utils/lis-omp
+    INC_LIS = -I${LISROOT}/include 
+    LIB_LIS = -L${LISROOT}/lib/ -llis
+
+    FFLAGS  = -no-wrap-margin -module $(objdir) -L$(objdir) -qopenmp 
+endif 
+
+LFLAGS  = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) -Wl,-zmuldefs
+
+DFLAGS_NODEBUG = -O2 -fp-model precise
+DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
+DFLAGS_PROFILE = -O2 -fp-model precise -pg
