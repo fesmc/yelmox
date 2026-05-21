@@ -420,6 +420,44 @@ def install_runme(state):
     print(f"  Note: edit {dst.name} by hand to change jobname, omp, mem, email, etc.")
 
 
+def install_runner(state):
+    """Install fesmc/runner via pip (provides the `job` command used by runme).
+    Skip if `job` is already on PATH. No-op when --no-config was passed."""
+    if not state.do_config_steps:
+        return
+    log_section(state, "runner (job command)")
+
+    url = "https://github.com/fesmc/runner/archive/refs/heads/master.zip"
+
+    if shutil.which("job"):
+        print(f"  - `job` already available at {shutil.which('job')}, skipping install")
+        log_raw(state, "# runner already installed: `job` command found on PATH")
+        log_raw(state, f"# To reinstall: pip install {url}")
+        return
+
+    print("  `job` command not found on PATH.")
+    if not ask_yn("  Install runner via pip from fesmc/runner", default=True):
+        print("  Skipping runner install — `job` command will not be available.")
+        log_raw(state, "# TODO: install runner manually:")
+        log_raw(state, f"# pip install {url}")
+        return
+
+    run(state, [sys.executable, "-m", "pip", "install", url])
+
+    job_path = shutil.which("job")
+    if job_path:
+        print(f"  + `job` is now available at {job_path}")
+    else:
+        print("  ! pip install succeeded but `job` is not on PATH.")
+        print("    The Python bin dir is probably missing from PATH.")
+        print("    Add to ~/.bashrc or ~/.profile:")
+        print('      PATH=${PATH}:${HOME}/.local/bin')
+        print('      export PATH')
+        log_raw(state, "# `job` not on PATH after install — add Python user bin to PATH:")
+        log_raw(state, '# PATH=${PATH}:${HOME}/.local/bin')
+        log_raw(state, "# export PATH")
+
+
 def install_fesm_utils(state):
     log_section(state, "fesm-utils")
     dest = clone_into(state, "fesm-utils", "fesmc", "fesm-utils")
@@ -544,8 +582,9 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps,
         print(f"  2. Configure each repo for the current system (default: {default_cfg})")
     print("  3. Create the symlinks needed for the build")
     if do_config_steps:
-        print("  4. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
-    print("  5. Write the equivalent bash to .install.sh for reproducibility")
+        print("  4. Install runner (fesmc/runner) via pip if `job` is not already on PATH")
+        print("  5. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
+    print("  6. Write the equivalent bash to .install.sh for reproducibility")
     print()
 
     if download == "no":
@@ -759,6 +798,9 @@ def main():
 
     print(f"\n=== Configuring yelmox ===")
     install_yelmox(state)
+
+    print(f"\n=== Installing runner (`job` command) ===")
+    install_runner(state)
 
     print(f"\n=== External data links ===")
     setup_data_links(state)
