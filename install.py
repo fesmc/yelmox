@@ -408,6 +408,14 @@ def install_fesm_utils(state):
     # not at the repo root. The generated Makefile also lives there. The
     # yelmox-side $(FESMUTILSROOT) points at fesm-utils/utils for this reason.
     do_config(state, "fesm-utils", dest / "utils")
+    # Reminder in .install.sh about the one-time external-deps build.
+    # Left as commented examples because the choice is machine/compiler-specific.
+    log_raw(state, "# One-time external deps (LIS + FFTW). Slow (~10-30 min).")
+    log_raw(state, "# Pick the script for your machine + compiler, e.g.:")
+    log_raw(state, '# (cd "$fesm_utils" && ./install.sh)                  # generic')
+    log_raw(state, '# (cd "$fesm_utils" && ./install_dkrz.sh ifx)         # DKRZ Levante')
+    log_raw(state, '# (cd "$fesm_utils" && ./install_awi.sh  gfortran)    # AWI albedo')
+    log_raw(state, '# (cd "$fesm_utils" && ./install_pik.sh  ifx)         # PIK HPC')
 
 
 def install_coordinates(state):
@@ -615,9 +623,15 @@ def print_summary(state):
 
     fesm = state.repo_paths["fesm-utils"]
     print("\nNext steps (build):")
-    print(f"  1. Prep fesm-utils external deps (LIS, FFTW):")
+    print(f"  1. Prep fesm-utils external deps (LIS + FFTW) — ONE-TIME, slow (~10-30 min):")
     print(f"       cd {fesm}")
-    print(f"       # ./install_<machine>.sh <compiler>   # see install_*.sh for options")
+    print(f"       # Pick the script for your machine + compiler, e.g.:")
+    print(f"       # ./install.sh                  # generic")
+    print(f"       # ./install_dkrz.sh ifx         # DKRZ Levante")
+    print(f"       # ./install_awi.sh  gfortran    # AWI albedo")
+    print(f"       # ./install_pik.sh  ifx         # PIK HPC")
+    print(f"     If you skip this, `make yelmox` will abort early with a")
+    print(f"     LIS/FFTW-not-built error (no half-built state).")
     extras = "fesm-utils, yelmo, FastIsostasy"
     if state.include_rembo:
         extras += ", coordinates, rembo1"

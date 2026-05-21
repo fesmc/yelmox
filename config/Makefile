@@ -41,8 +41,29 @@ include config/Makefile_yelmox.mk
 ##
 ###############################################
 
+# Sanity check: fail early if fesm-utils' external deps (LIS + FFTW) aren't
+# built yet. They are built one-time by ./install*.sh inside fesm-utils/,
+# which is kept as a manual step because compiling LIS + FFTW is slow
+# (~10-30 min) and machine/compiler-specific.
+fesmutils-deps-check:
+	@if [ ! -f $(LISROOT)/lib/liblis.a ]; then \
+	  echo ""; \
+	  echo "*** ERROR: LIS library not found at $(LISROOT)/lib/liblis.a"; \
+	  echo "    Run ./install_<machine>.sh <compiler> in fesm-utils to build LIS + FFTW."; \
+	  echo "    Available scripts: install.sh, install_dkrz.sh, install_awi.sh, install_pik.sh"; \
+	  echo ""; \
+	  exit 1; \
+	fi
+	@if [ ! -f $(FFTWROOT)/lib/libfftw3.a ]; then \
+	  echo ""; \
+	  echo "*** ERROR: FFTW library not found at $(FFTWROOT)/lib/libfftw3.a"; \
+	  echo "    Run ./install_<machine>.sh <compiler> in fesm-utils to build LIS + FFTW."; \
+	  echo ""; \
+	  exit 1; \
+	fi
+
 # Compile static library in its own directory
-fesmutils-static: 
+fesmutils-static: fesmutils-deps-check
 	$(MAKE) -C $(FESMUTILSROOT) fesmutils-static openmp=$(openmp)
 
 # Compile static library in its own directory
