@@ -613,13 +613,13 @@ def print_summary(state):
         print(f"\n.runme_config, current settings:")
         print(f"    hpc     = {state.hpc}")
         print(f"    account = {state.account}")
-        print(f"  (edit by hand to change jobname, omp, mem, email, etc.)")
+        print(f"  (edit by hand to change them, as well as jobname, omp, mem, email, etc.)")
     else:
         print(f"\nConfig steps skipped (--no-config). .runme_config and per-repo")
         print(f"  config.py invocations were NOT run.")
 
     fesm = state.repo_paths["fesm-utils"]
-    print("\nNext steps (build):")
+    print("\nNext steps:")
     print(f"  1. Prep fesm-utils external deps (LIS + FFTW) — ONE-TIME, slow (~10-30 min):")
     print(f"       cd {fesm}")
     print(f"       # Pick the script for your machine + compiler, e.g.:")
@@ -639,9 +639,10 @@ def print_summary(state):
     if state.include_rembo:
         print(f"       make yelmox_rembo    # REMBO-coupled build")
     if state.data_pending:
-        print(f"  3. Set up data links — needed at runtime (not for the build):")
+        print(f"  3. Set up data links — needed at runtime:")
         for label in state.data_pending:
-            print(f"       ln -s /path/to/{label} {state.yelmox_root / label}")
+            print(f"       ln -s /path/to/{label} ./")
+        print(f"")
 
 
 def main():
