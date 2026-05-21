@@ -17,7 +17,9 @@ next-step build commands at the end.
 
 Run from the yelmox repo root:
     python3 install.py
-    python3 install.py --https      # clone via HTTPS instead of SSH
+    python3 install.py -d clone-https        # clone via HTTPS instead of SSH
+    python3 install.py -d no                 # repos already under yelmox; just link
+    python3 install.py --no-config           # skip every config step (.runme + per-repo)
 """
 
 import argparse
@@ -40,8 +42,9 @@ DEFAULT_ACCOUNT = "ba1442"
 @dataclass
 class State:
     yelmox_root: Path
-    install_dir: Path
-    protocol: str
+    install_dir: Path                # ignored when download == "no"
+    download: str                    # "clone-ssh" | "clone-https" | "no"
+    do_config_steps: bool            # False when --no-config is passed
     default_cfg: str
     include_rembo: bool
     hpc: str
@@ -162,18 +165,32 @@ def list_configs(repo_dir):
     return out
 
 
+def _clone_url(state, name, org):
+    if state.download == "clone-https":
+        return f"https://github.com/{org}/{name}.git"
+    return f"git@github.com:{org}/{name}.git"
+
+
 def clone(state, name, org, dest):
+    """Clone <org>/<name> into <dest>. When download == 'no', do not clone:
+    only verify that <dest> exists (as a real dir or symlink) and record a
+    comment in .install.sh."""
+    if state.download == "no":
+        if not (dest.exists() or dest.is_symlink()):
+            raise FileNotFoundError(
+                f"{name}: -d no requires {dest} to already exist (as dir or symlink)")
+        print(f"  - {name}: using existing {dest} (no clone)")
+        log_raw(state,
+                f"# {name}: assumed already present at {dest} "
+                f"(provide via git clone, symlink, or extracted archive)")
+        return
+
+    url = _clone_url(state, name, org)
+    log_cmd(state, ["git", "clone", url], cwd=dest.parent)
     if dest.exists():
         print(f"  - {name}: already at {dest}, skipping clone")
-        # Still record the clone command so .install.sh is reproducible from scratch.
-        url = (f"git@github.com:{org}/{name}.git" if state.protocol == "ssh"
-               else f"https://github.com/{org}/{name}.git")
-        log_cmd(state, ["git", "clone", url], cwd=dest.parent)
         return
-    url = (f"git@github.com:{org}/{name}.git" if state.protocol == "ssh"
-           else f"https://github.com/{org}/{name}.git")
     print(f"  $ git clone {url}   (in {dest.parent})")
-    log_cmd(state, ["git", "clone", url], cwd=dest.parent)
     subprocess.run(["git", "clone", url], cwd=dest.parent, check=True)
 
 
@@ -201,15 +218,24 @@ def make_link(state, target, link_path):
 # ---------------------------------------------------------------- composed steps
 
 def clone_into(state, name, org, dirname):
-    """Clone <org>/<name> into <install_dir>/<dirname>, record in state, return path."""
-    dest = state.install_dir / dirname
+    """Resolve the path for <name>, clone if needed, record in state, return path.
+    When download == 'no', the canonical path is yelmox_root/<dirname> (which may
+    be a real dir or a symlink the user already arranged); otherwise it is
+    install_dir/<dirname>."""
+    if state.download == "no":
+        dest = state.yelmox_root / dirname
+    else:
+        dest = state.install_dir / dirname
     clone(state, name, org, dest)
     state.repo_paths[name] = dest
     return dest
 
 
 def do_config(state, repo_name, repo_dir):
-    """Prompt for a config name (numbered list); run config.py or queue as pending."""
+    """Prompt for a config name (numbered list); run config.py or queue as pending.
+    No-op when --no-config was passed."""
+    if not state.do_config_steps:
+        return
     configs = list_configs(repo_dir)
     print(f"\n  --- {repo_name} ({repo_dir}) ---")
     if not configs:
@@ -259,7 +285,10 @@ def do_config(state, repo_name, repo_dir):
 # Then add a call to install_<name>(state) from main() in the right order.
 
 def install_runme(state):
-    """First yelmox step: copy .runme/runme_config to .runme_config and set hpc/account."""
+    """First yelmox step: copy .runme/runme_config to .runme_config and set hpc/account.
+    No-op when --no-config was passed."""
+    if not state.do_config_steps:
+        return
     log_section(state, "yelmox runme_config")
     src = state.yelmox_root / ".runme" / "runme_config"
     dst = state.yelmox_root / ".runme_config"
@@ -337,12 +366,14 @@ def install_yelmox(state):
     log_section(state, "yelmox (config + root links)")
     do_config(state, "yelmox", state.yelmox_root)
 
-    # Root-level links to component repos
-    make_link(state, state.repo_paths["fesm-utils"],   state.yelmox_root / "fesm-utils")
-    make_link(state, state.repo_paths["yelmo"],        state.yelmox_root / "yelmo")
-    make_link(state, state.repo_paths["FastIsostasy"], state.yelmox_root / "FastIsostasy")
-    if state.include_rembo:
-        make_link(state, state.repo_paths["rembo1"], state.yelmox_root / "rembo1")
+    # Root-level links to component repos. With -d no the repo paths *are* the
+    # yelmox-root entries, so the links are no-ops; skip them.
+    if state.download != "no":
+        make_link(state, state.repo_paths["fesm-utils"],   state.yelmox_root / "fesm-utils")
+        make_link(state, state.repo_paths["yelmo"],        state.yelmox_root / "yelmo")
+        make_link(state, state.repo_paths["FastIsostasy"], state.yelmox_root / "FastIsostasy")
+        if state.include_rembo:
+            make_link(state, state.repo_paths["rembo1"], state.yelmox_root / "rembo1")
 
     # External data dir links
     for label, path in [("ice_data", state.ice_data_path),
@@ -370,41 +401,47 @@ def load_hpc_names(yelmox_root):
     return sorted(data.keys())
 
 
-def collect_initial_inputs(yelmox_root, https_flag):
+def collect_initial_inputs(yelmox_root, download, do_config_steps):
     print(f"YelmoX root: {yelmox_root}")
+    print(f"Download mode: {download}    Config steps: {'on' if do_config_steps else 'OFF (--no-config)'}")
     print()
     print("This script will:")
-    print("  1. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
-    print("  2. Clone the YelmoX component repositories")
-    print("  3. Configure each repo for the current system (machine config you pick)")
+    if do_config_steps:
+        print("  1. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
+    if download == "no":
+        print("  2. Use the component repos already present under yelmox/")
+    else:
+        print(f"  2. Clone the YelmoX component repositories ({download})")
+    if do_config_steps:
+        print("  3. Configure each repo for the current system (machine config you pick)")
     print("  4. Create the symlinks needed for the build")
     print("  5. Write the equivalent bash to .install.sh for reproducibility")
     print("Compilation is left to you. Next-step build commands print at the end.")
     print()
 
-    install_dir = Path(ask("Directory to clone component repos into",
-                           default=str(yelmox_root.parent))).expanduser().resolve()
-    install_dir.mkdir(parents=True, exist_ok=True)
+    if download == "no":
+        install_dir = yelmox_root  # not really used; repos live under yelmox/
+    else:
+        install_dir = Path(ask("Directory to clone component repos into",
+                               default=str(yelmox_root.parent))).expanduser().resolve()
+        install_dir.mkdir(parents=True, exist_ok=True)
 
     include_rembo = ask_yn("Include REMBO support (clones coordinates + rembo1)",
                            default=False)
 
-    protocol = "ssh"
-    if https_flag:
-        protocol = "https"
-    elif ask_yn("Use HTTPS for git clone (default is SSH)", default=False):
-        protocol = "https"
-
-    default_cfg = ask("Default machine config name (used as suggestion per repo)",
-                      default=DEFAULT_CONFIG)
-
-    print("\nHPCs defined in .runme/queues.json:")
-    hpcs = load_hpc_names(yelmox_root)
-    if hpcs:
-        hpc = pick_numbered("Default HPC for .runme_config", hpcs, DEFAULT_HPC)
-    else:
-        hpc = ask("Default HPC for .runme_config", default=DEFAULT_HPC)
-    account = ask("Account for .runme_config", default=DEFAULT_ACCOUNT)
+    default_cfg = DEFAULT_CONFIG
+    hpc = DEFAULT_HPC
+    account = DEFAULT_ACCOUNT
+    if do_config_steps:
+        default_cfg = ask("Default machine config name (used as suggestion per repo)",
+                          default=DEFAULT_CONFIG)
+        print("\nHPCs defined in .runme/queues.json:")
+        hpcs = load_hpc_names(yelmox_root)
+        if hpcs:
+            hpc = pick_numbered("Default HPC for .runme_config", hpcs, DEFAULT_HPC)
+        else:
+            hpc = ask("Default HPC for .runme_config", default=DEFAULT_HPC)
+        account = ask("Account for .runme_config", default=DEFAULT_ACCOUNT)
 
     ice_data_path = ask("Path to ice_data (Enter to skip and link later)",
                         default="", allow_empty=True)
@@ -414,7 +451,8 @@ def collect_initial_inputs(yelmox_root, https_flag):
     return State(
         yelmox_root=yelmox_root,
         install_dir=install_dir,
-        protocol=protocol,
+        download=download,
+        do_config_steps=do_config_steps,
         default_cfg=default_cfg,
         include_rembo=include_rembo,
         hpc=hpc,
@@ -463,8 +501,12 @@ def print_summary(state):
         for label in state.data_pending:
             print(f"  ln -s /path/to/{label} {label}")
 
-    print(f"\n.runme_config: hpc={state.hpc}, account={state.account} set.")
-    print(f"  Edit by hand to change jobname, omp, mem, email, etc.")
+    if state.do_config_steps:
+        print(f"\n.runme_config: hpc={state.hpc}, account={state.account} set.")
+        print(f"  Edit by hand to change jobname, omp, mem, email, etc.")
+    else:
+        print(f"\nConfig steps skipped (--no-config). .runme_config and per-repo")
+        print(f"  config.py invocations were NOT run.")
 
     fesm = state.repo_paths["fesm-utils"]
     print("\nNext steps (build):")
@@ -489,17 +531,35 @@ def print_summary(state):
 
 def main():
     parser = argparse.ArgumentParser(description="Interactive YelmoX installer.")
-    parser.add_argument("--https", action="store_true",
-                        help="Clone repos via HTTPS instead of SSH.")
+    parser.add_argument("-d", "--download",
+                        choices=["clone-ssh", "clone-https", "no", "none"],
+                        default="clone-ssh",
+                        help="How to obtain component repos. "
+                             "'clone-ssh' (default) and 'clone-https' do a git clone. "
+                             "'no'/'none' assumes each repo is already available at "
+                             "yelmox/<repo> (as a dir or symlink) and only sets up "
+                             "internal links + configs.")
+    parser.add_argument("--no-config",
+                        action="store_true",
+                        help="Skip all configuration steps: do not copy/edit "
+                             ".runme_config and do not run python3 config.py in "
+                             "any repo. Useful when you want to re-set up links "
+                             "without touching existing configuration.")
     args = parser.parse_args()
+    download = "no" if args.download == "none" else args.download
 
     yelmox_root = Path(__file__).resolve().parent
-    state = collect_initial_inputs(yelmox_root, args.https)
+    state = collect_initial_inputs(yelmox_root, download,
+                                   do_config_steps=not args.no_config)
 
-    print(f"\n=== Setting up yelmox runme_config ===")
-    install_runme(state)
+    if state.do_config_steps:
+        print(f"\n=== Setting up yelmox runme_config ===")
+        install_runme(state)
 
-    print(f"\n=== Installing components into {state.install_dir} ===")
+    if state.download == "no":
+        print(f"\n=== Using component repos already under {state.yelmox_root} ===")
+    else:
+        print(f"\n=== Installing components into {state.install_dir} ===")
     install_fesm_utils(state)
     if state.include_rembo:
         install_coordinates(state)
