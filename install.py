@@ -609,14 +609,11 @@ def print_summary(state):
             print(f"      edit {cfg_path}")
             print(f"      (cd {repo_dir} && python3 config.py config/{cfg})")
 
-    if state.data_pending:
-        print(f"\nPending data links (run from {state.yelmox_root}):")
-        for label in state.data_pending:
-            print(f"  ln -s /path/to/{label} {label}")
-
     if state.do_config_steps:
-        print(f"\n.runme_config: hpc={state.hpc}, account={state.account} set.")
-        print(f"  Edit by hand to change jobname, omp, mem, email, etc.")
+        print(f"\n.runme_config, current settings:")
+        print(f"    hpc     = {state.hpc}")
+        print(f"    account = {state.account}")
+        print(f"  (edit by hand to change jobname, omp, mem, email, etc.)")
     else:
         print(f"\nConfig steps skipped (--no-config). .runme_config and per-repo")
         print(f"  config.py invocations were NOT run.")
@@ -641,6 +638,10 @@ def print_summary(state):
     print(f"       make yelmox          # default build")
     if state.include_rembo:
         print(f"       make yelmox_rembo    # REMBO-coupled build")
+    if state.data_pending:
+        print(f"  3. Set up data links — needed at runtime (not for the build):")
+        for label in state.data_pending:
+            print(f"       ln -s /path/to/{label} {state.yelmox_root / label}")
 
 
 def main():
