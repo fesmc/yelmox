@@ -15,6 +15,7 @@ tmp
 tests/.DS_Store
 .DS_Store
 .runme_config
+.install.sh
 check_sim.x
 git_yelmo.txt
 maps/*.nc
