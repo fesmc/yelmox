@@ -610,17 +610,16 @@ def print_summary(state):
     fesm = state.repo_paths["fesm-utils"]
     print("\nNext steps (build):")
     step = 1
-    print(f"  {step}. Build fesm-utils:")
+    print(f"  {step}. Prep fesm-utils external deps (LIS, FFTW):")
     print(f"       cd {fesm}")
     print(f"       # ./install_<machine>.sh <compiler>   # see install_*.sh for options")
-    print(f"       cd utils && make clean && make fesmutils-static")
     step += 1
     if state.include_rembo:
         coord = state.repo_paths['coordinates']
         print(f"  {step}. Build coordinates:")
         print(f"       cd {coord} && make clean && make coord-static")
         step += 1
-    print(f"  {step}. Compile yelmox:")
+    print(f"  {step}. Compile yelmox (builds fesm-utils, yelmo, FastIsostasy too):")
     print(f"       cd {state.yelmox_root}")
     print(f"       make clean")
     print(f"       make yelmox          # default build")
