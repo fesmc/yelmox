@@ -2,26 +2,28 @@
 
 **YelmoX** is the driver framework around the [Yelmo](https://github.com/fesmc/yelmo) ice-sheet model. It bundles Yelmo together with the libraries needed to run realistic ice-sheet simulations: climate and ocean forcing modules, the [FastIsostasy](https://github.com/palma-ice/FastIsostasy) bedrock module, the [REMBOv1](https://github.com/alex-robinson/rembo1) energy/moisture-balance model, and shared utilities from [fesm-utils](https://github.com/fesmc/fesm-utils).
 
-The YelmoX code repository is here: [https://github.com/fesmc/yelmox](https://github.com/fesmc/yelmox).
-
 For documentation of the Yelmo ice-sheet model itself, see [the Yelmo docs](https://fesmc.github.io/yelmo/).
+
+## How to get YelmoX
+
+The YelmoX code repository is here: [https://github.com/fesmc/yelmox](https://github.com/fesmc/yelmox). To get a local copy:
+
+```bash
+git clone git@github.com:fesmc/yelmox.git
+cd yelmox
+```
 
 ## Super quick start
 
-Just clone the YelmoX repository and run the install script. You will be prompted on the way for several relevant choices. It will automatically clone relevant dependent repositories and configure them, so that you can make a yelmox program.
+Assuming you have cloned the YelmoX repository as above, just run the install script. You will be prompted on the way for several relevant choices. It will automatically clone relevant dependent repositories and configure them, so that you can make a yelmox program.
 
 ```bash
-# Clone yelmox repository
-git clone git@github.com:fesmc/yelmox.git
-
-# Enter yelmox path and run install script
-cd yelmox
 ./install.py
 ```
 
-This script will guide you through the installation steps. It will also produce a pure bash script `.install.sh`, which shows the exact commands that were called to configure the YelmoX directory.
+This script will guide you through the installation steps. See `./install.py -h` for some additional options. Once complete, it will also produce a pure bash script `.install.sh`, which shows the exact commands that were called to configure the YelmoX directory.
 
-Next you need to go into `fesm-utils` and run the install script there to install the `fftw` and `lis` libraries. It can take many minutes to compile them, which is why it's done separately:
+When the install script finishes, you next need to go into `fesm-utils` and run the install script there to install the `fftw` and `lis` libraries. It can take many minutes to compile these libraries, which is why it's done separately:
 
 ```bash
 cd fesm-utils
