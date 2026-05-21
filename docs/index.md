@@ -6,7 +6,31 @@ The YelmoX code repository is here: [https://github.com/fesmc/yelmox](https://gi
 
 For documentation of the Yelmo ice-sheet model itself, see [the Yelmo docs](https://fesmc.github.io/yelmo/).
 
-## Super-quick start
+## Super quick start
+
+Just clone the YelmoX repository and run the install script. You will be prompted on the way for several relevant choices. It will automatically clone relevant dependent repositories and configure them, so that you can make a yelmox program.
+
+```bash
+# Clone yelmox repository
+git clone git@github.com:fesmc/yelmox.git
+
+# Enter yelmox path and run install script
+cd yelmox
+./install.py
+```
+
+That's it!
+
+Note: this process will also produce a pure bash script `.install.sh`, which shows the exact commands that were called to configure the YelmoX directory.
+
+From here (if you have also installed `fftw` and `lis` via the fesm-utils repository that was downloaded), then you can try to make a program:
+
+```bash
+make clean
+make yelmox
+```
+
+## Quick start
 
 A summary of commands to get YelmoX running is given below. The example uses the `dkrz_levante_ifx` config — substitute your own config file from `config/` for a different system. Where data paths (`ice_data`, `isostasy_data`) appear, replace `/path/to/...` with the location on your system.
 
