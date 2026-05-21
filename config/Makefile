@@ -46,18 +46,22 @@ fesmutils-static:
 	$(MAKE) -C $(FESMUTILSROOT) fesmutils-static openmp=$(openmp)
 
 # Compile static library in its own directory
-yelmo-static: 
+yelmo-static: fesmutils-static
 	$(MAKE) -C $(YELMOROOT) yelmo-static openmp=$(openmp)
 	cp $(YELMOROOT)/git_yelmo.txt ./
 
 # Compile static library in its own directory
-isostasy-static: 
+isostasy-static: fesmutils-static
 	$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
 
-# Compile the static library libyelmo,
-# using Makefile located in $(YELMOROOT) directory 
-rembo-static: 
-	$(MAKE) -C $(REMBOROOT) rembo-static 
+# Compile static library in its own directory
+coord-static:
+	$(MAKE) -C $(COORDROOT) coord-static
+
+# Compile the static library librembo,
+# using Makefile located in $(REMBOROOT) directory
+rembo-static: coord-static
+	$(MAKE) -C $(REMBOROOT) rembo-static
 
 yelmox : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox.f90 \
@@ -169,4 +173,5 @@ cleanall: clean
 	$(MAKE) -C $(FESMUTILSROOT) clean
 	$(MAKE) -C $(ISOSTASYROOT) clean
 	$(MAKE) -C $(YELMOROOT) clean
+	$(MAKE) -C $(COORDROOT) clean
 	$(MAKE) -C $(REMBOROOT) clean

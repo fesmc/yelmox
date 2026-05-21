@@ -25,8 +25,11 @@ INC_YELMO = -I${YELMOROOT}/libyelmo/include
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
 REMBOROOT = rembo1
-INC_REMBO = -I${REMBOROOT}/librembo/include 
+INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+
+# coordinates is a build dependency of rembo1; only used by `make yelmox_rembo`.
+COORDROOT = coordinates
 
 FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
 

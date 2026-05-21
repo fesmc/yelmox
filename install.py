@@ -448,7 +448,10 @@ def install_yelmox(state):
         make_link(state, state.repo_paths["yelmo"],        state.yelmox_root / "yelmo")
         make_link(state, state.repo_paths["FastIsostasy"], state.yelmox_root / "FastIsostasy")
         if state.include_rembo:
-            make_link(state, state.repo_paths["rembo1"], state.yelmox_root / "rembo1")
+            # coordinates also needs a yelmox-root link: the parent Makefile's
+            # COORDROOT = coordinates points here for the coord-static build.
+            make_link(state, state.repo_paths["coordinates"], state.yelmox_root / "coordinates")
+            make_link(state, state.repo_paths["rembo1"],      state.yelmox_root / "rembo1")
 
     # External data dir links
     for label, path in [("ice_data", state.ice_data_path),
@@ -609,22 +612,18 @@ def print_summary(state):
 
     fesm = state.repo_paths["fesm-utils"]
     print("\nNext steps (build):")
-    step = 1
-    print(f"  {step}. Prep fesm-utils external deps (LIS, FFTW):")
+    print(f"  1. Prep fesm-utils external deps (LIS, FFTW):")
     print(f"       cd {fesm}")
     print(f"       # ./install_<machine>.sh <compiler>   # see install_*.sh for options")
-    step += 1
+    extras = "fesm-utils, yelmo, FastIsostasy"
     if state.include_rembo:
-        coord = state.repo_paths['coordinates']
-        print(f"  {step}. Build coordinates:")
-        print(f"       cd {coord} && make clean && make coord-static")
-        step += 1
-    print(f"  {step}. Compile yelmox (builds fesm-utils, yelmo, FastIsostasy too):")
+        extras += ", coordinates, rembo1"
+    print(f"  2. Compile yelmox (builds {extras} too):")
     print(f"       cd {state.yelmox_root}")
     print(f"       make clean")
     print(f"       make yelmox          # default build")
     if state.include_rembo:
-        print(f"       make yelmox_rembo    # REMBO-coupled build (uses rembo1 + coordinates)")
+        print(f"       make yelmox_rembo    # REMBO-coupled build")
 
 
 def main():

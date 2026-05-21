@@ -27,6 +27,9 @@ REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
+# coordinates is a build dependency of rembo1; only used by `make yelmox_rembo`.
+COORDROOT = coordinates
+
 FFLAGS = -I$(objdir) -J$(objdir) -m64 -ffree-line-length-none 
 
 ifeq ($(openmp), 1)
