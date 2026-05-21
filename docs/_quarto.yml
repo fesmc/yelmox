@@ -1,0 +1,29 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - "*.md"
+    - "!README.md"
+
+website:
+  title: "YelmoX"
+  description: "Documentation for the YelmoX ice-sheet modelling framework"
+  repo-url: https://github.com/fesmc/yelmox
+  repo-actions: [edit, issue]
+  page-navigation: true
+  navbar:
+    background: primary
+    search: true
+    left:
+      - href: index.md
+        text: Home
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-copy: true
+    code-overflow: wrap
+    html-math-method: katex
+    link-external-newwindow: true
