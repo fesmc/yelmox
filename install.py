@@ -404,7 +404,10 @@ def install_runme(state):
 def install_fesm_utils(state):
     log_section(state, "fesm-utils")
     dest = clone_into(state, "fesm-utils", "fesmc", "fesm-utils")
-    do_config(state, "fesm-utils", dest)
+    # fesm-utils is special: config.py and config/ live in the utils/ subdir,
+    # not at the repo root. The generated Makefile also lives there. The
+    # yelmox-side $(FESMUTILSROOT) points at fesm-utils/utils for this reason.
+    do_config(state, "fesm-utils", dest / "utils")
 
 
 def install_coordinates(state):
