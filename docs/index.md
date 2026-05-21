@@ -50,15 +50,13 @@ A summary of commands to get YelmoX running is given below. It assumes you have 
 set -euo pipefail
 
 # === Paths ===
-yelmox_root=$HOME/models/yelmox
+yelmox_root=/home/a/a271116/models/yelmox
 install_dir="$yelmox_root"
 fesm_utils="$yelmox_root/fesm-utils"
 coord="$yelmox_root/coordinates"
 yelmo="$yelmox_root/yelmo"
 fastiso="$yelmox_root/FastIsostasy"
 rembo1="$yelmox_root/rembo1"
-ice_data_src="$forclima/ice_data"
-isostasy_data_src="$forclima/isostasy_data"
 
 # === Settings ===
 hpc=dkrz_levante
@@ -72,7 +70,7 @@ python3 config.py config/dkrz_levante_ifx
 # One-time external deps (LIS + FFTW). Slow (~10-30 min).
 # Pick the script for your machine + compiler, e.g.:
 # (cd "$fesm_utils" && ./install.sh)                  # generic
-(cd "$fesm_utils" && ./install_dkrz.sh ifx)           # DKRZ Levante
+# (cd "$fesm_utils" && ./install_dkrz.sh ifx)         # DKRZ Levante
 # (cd "$fesm_utils" && ./install_awi.sh  gfortran)    # AWI albedo
 # (cd "$fesm_utils" && ./install_pik.sh  ifx)         # PIK HPC
 
@@ -113,9 +111,11 @@ ln -s "$fastiso" FastIsostasy
 ln -s "$coord" coordinates
 ln -s "$rembo1" rembo1
 
+# --- runner (job command) ---
+# runner already installed: `job` command found on PATH
+# To reinstall: pip install https://github.com/fesmc/runner/archive/refs/heads/master.zip
+
 # --- external data links ---
-ln -s "$ice_data_src" ice_data
-ln -s "$isostasy_data_src" isostasy_data
 
 # --- yelmox runme_config ---
 cp .runme/runme_config .runme_config
