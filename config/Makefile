@@ -46,18 +46,18 @@ include config/Makefile_yelmox.mk
 # which is kept as a manual step because compiling LIS + FFTW is slow
 # (~10-30 min) and machine/compiler-specific.
 fesmutils-deps-check:
-	@if [ ! -f $(LISROOT)/lib/liblis.a ]; then \
+	@_lis_ok=1; _fftw_ok=1; \
+	[ -f $(LISROOT)/lib/liblis.a ]   || _lis_ok=0; \
+	[ -f $(FFTWROOT)/lib/libfftw3.a ] || _fftw_ok=0; \
+	if [ $$_lis_ok -eq 0 ] || [ $$_fftw_ok -eq 0 ]; then \
 	  echo ""; \
-	  echo "*** ERROR: LIS library not found at $(LISROOT)/lib/liblis.a"; \
-	  echo "    Run ./install_<machine>.sh <compiler> in fesm-utils to build LIS + FFTW."; \
-	  echo "    Available scripts: install.sh, install_dkrz.sh, install_awi.sh, install_pik.sh"; \
+	  echo "*** ERROR: fesm-utils external deps not built:"; \
+	  [ $$_lis_ok  -eq 0 ] && echo "      LIS  missing at $(LISROOT)/lib/liblis.a"; \
+	  [ $$_fftw_ok -eq 0 ] && echo "      FFTW missing at $(FFTWROOT)/lib/libfftw3.a"; \
 	  echo ""; \
-	  exit 1; \
-	fi
-	@if [ ! -f $(FFTWROOT)/lib/libfftw3.a ]; then \
-	  echo ""; \
-	  echo "*** ERROR: FFTW library not found at $(FFTWROOT)/lib/libfftw3.a"; \
-	  echo "    Run ./install_<machine>.sh <compiler> in fesm-utils to build LIS + FFTW."; \
+	  echo "    Run ./install_<machine>.sh <compiler> in fesm-utils to build them."; \
+	  echo "    install.sh builds both LIS and FFTW (serial + omp variants)."; \
+	  echo "    Available helpers: install.sh, install_dkrz.sh, install_awi.sh, install_pik.sh"; \
 	  echo ""; \
 	  exit 1; \
 	fi
