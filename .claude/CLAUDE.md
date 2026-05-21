@@ -1,0 +1,4 @@
+- This is a production repository. 
+- Be very careful with changes here. 
+- Always ask when there are doubts or ambiguitites.
+- Work on a worktree.
