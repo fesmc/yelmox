@@ -20,3 +20,4 @@ check_sim.x
 git_yelmo.txt
 maps/*.nc
 .vscode
+.claude/worktrees
