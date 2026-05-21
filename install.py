@@ -36,6 +36,15 @@ DEFAULT_CONFIG = "macbook_gfortran"
 DEFAULT_HPC = "dkrz_levante"
 DEFAULT_ACCOUNT = "ba1442"
 
+# Mapping from clone-name to bash variable name used in .install.sh.
+REPO_VAR_NAMES = {
+    "fesm-utils":   "fesm_utils",
+    "yelmo":        "yelmo",
+    "FastIsostasy": "fastiso",
+    "coordinates":  "coord",
+    "rembo1":       "rembo1",
+}
+
 
 # ---------------------------------------------------------------- shared state
 
@@ -56,6 +65,12 @@ class State:
     data_pending: list = field(default_factory=list)
     bash_log: list = field(default_factory=list)
     bash_cwd: Path = None
+    # Ordered maps of bash variables emitted at the top of .install.sh.
+    # path_vars: name -> absolute Path (defined in clone order, used to substitute
+    #   paths in cd/ln commands).
+    # string_vars: name -> string (e.g. hpc, account).
+    path_vars: dict = field(default_factory=dict)
+    string_vars: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------- io helpers
@@ -117,6 +132,51 @@ def pick_numbered(prompt, options, default):
 
 # ---------------------------------------------------------------- bash log
 
+def path_to_bash(state, p):
+    """Render an absolute Path as a bash expression, using a defined path
+    variable when possible (longest exact match wins; otherwise longest prefix).
+    Falls back to a quoted absolute path."""
+    p = Path(p)
+    if not p.is_absolute():
+        return shlex.quote(str(p))
+    # Exact match wins
+    for name, pp in state.path_vars.items():
+        if pp == p:
+            return f'"${name}"'
+    # Otherwise longest-prefix wins
+    items = sorted(state.path_vars.items(),
+                   key=lambda kv: len(str(kv[1])), reverse=True)
+    for name, pp in items:
+        try:
+            rel = p.relative_to(pp)
+        except ValueError:
+            continue
+        return f'"${name}/{rel}"'
+    return shlex.quote(str(p))
+
+
+def _bash_rhs_for(state, current_name, abs_path):
+    """RHS for `current_name=<...>` in the .install.sh header. Considers only
+    variables registered before current_name so dependencies resolve left-to-right."""
+    abs_path = Path(abs_path)
+    for name, pp in state.path_vars.items():
+        if name == current_name:
+            break
+        if pp == abs_path:
+            return f'"${name}"'
+        try:
+            rel = abs_path.relative_to(pp)
+        except ValueError:
+            continue
+        return f'"${name}/{rel}"'
+    return shlex.quote(str(abs_path))
+
+
+def register_path_var(state, name, p):
+    """Register a path under a bash variable name (idempotent)."""
+    state.path_vars[name] = Path(p)
+
+
 def log_section(state, title):
     state.bash_log.append("")
     state.bash_log.append(f"# --- {title} ---")
@@ -127,7 +187,7 @@ def _log_cd(state, cwd):
         return
     cwd = Path(cwd)
     if cwd != state.bash_cwd:
-        state.bash_log.append(f"cd {shlex.quote(str(cwd))}")
+        state.bash_log.append(f"cd {path_to_bash(state, cwd)}")
         state.bash_cwd = cwd
 
 
@@ -181,7 +241,7 @@ def clone(state, name, org, dest):
                 f"{name}: -d no requires {dest} to already exist (as dir or symlink)")
         print(f"  - {name}: using existing {dest} (no clone)")
         log_raw(state,
-                f"# {name}: assumed already present at {dest} "
+                f"# {name}: assumed already present at {path_to_bash(state, dest)} "
                 f"(provide via git clone, symlink, or extracted archive)")
         return
 
@@ -196,13 +256,17 @@ def clone(state, name, org, dest):
 
 def make_link(state, target, link_path):
     """Relative symlink link_path -> target. Skip if link_path already exists.
-    Always logs the equivalent ln -s into the bash log so .install.sh is
-    reproducible from scratch."""
+    On disk we use a relative symlink (portable); in .install.sh we emit the
+    target via a bash variable when one matches, since variables make the
+    generated script easier to edit by hand."""
     target = Path(target)
     link_path = Path(link_path)
     cwd = link_path.parent
     rel = os.path.relpath(target, cwd)
-    log_cmd(state, ["ln", "-s", rel, link_path.name], cwd=cwd)
+
+    _log_cd(state, cwd)
+    state.bash_log.append(
+        f"ln -s {path_to_bash(state, target)} {shlex.quote(link_path.name)}")
 
     if link_path.is_symlink() or link_path.exists():
         print(f"  - link {link_path.name} already exists in {cwd}, skipping")
@@ -226,8 +290,13 @@ def clone_into(state, name, org, dirname):
         dest = state.yelmox_root / dirname
     else:
         dest = state.install_dir / dirname
-    clone(state, name, org, dest)
+    # Register the repo's path under a bash variable before logging the clone,
+    # so any subsequent log line (including the -d no `# assumed at ...` comment)
+    # can refer to it as $name.
+    if name in REPO_VAR_NAMES:
+        register_path_var(state, REPO_VAR_NAMES[name], dest)
     state.repo_paths[name] = dest
+    clone(state, name, org, dest)
     return dest
 
 
@@ -312,14 +381,20 @@ def install_runme(state):
         dst.write_text(new_text)
         print(f"  set hpc={state.hpc}, account={state.account} in {dst.name}")
 
-    # Equivalent sed commands in .install.sh (BSD/GNU-portable).
+    # Register hpc and account as string variables; the sed commands below
+    # reference them by name so they're easy to edit at the top of .install.sh.
+    state.string_vars["hpc"] = state.hpc
+    state.string_vars["account"] = state.account
+
+    # Equivalent sed commands in .install.sh (BSD/GNU-portable). Use bash
+    # double-quotes around the sed expression so ${hpc}/${account} expand.
     log_raw(state,
-            f"sed -i.bak -E 's/(\"hpc\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/"
-            f"\\1{state.hpc}\\2/' .runme_config",
+            'sed -i.bak -E "s/(\\"hpc\\"[[:space:]]*:[[:space:]]*\\")[^\\"]*(\\")/'
+            '\\1${hpc}\\2/" .runme_config',
             cwd=state.yelmox_root)
     log_raw(state,
-            f"sed -i.bak -E 's/(\"account\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/"
-            f"\\1{state.account}\\2/' .runme_config",
+            'sed -i.bak -E "s/(\\"account\\"[[:space:]]*:[[:space:]]*\\")[^\\"]*(\\")/'
+            '\\1${account}\\2/" .runme_config',
             cwd=state.yelmox_root)
     log_raw(state, "rm .runme_config.bak", cwd=state.yelmox_root)
 
@@ -448,7 +523,7 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps):
     iso_data_path = ask("Path to isostasy_data (Enter to skip and link later)",
                         default="", allow_empty=True)
 
-    return State(
+    state = State(
         yelmox_root=yelmox_root,
         install_dir=install_dir,
         download=download,
@@ -461,18 +536,42 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps):
         iso_data_path=iso_data_path,
     )
 
+    # Register the bash variables that will appear at the top of .install.sh.
+    # Order matters: later vars can be defined in terms of earlier ones.
+    register_path_var(state, "yelmox_root", yelmox_root)
+    if download != "no":
+        register_path_var(state, "install_dir", install_dir)
+    if ice_data_path:
+        register_path_var(state, "ice_data_src",
+                          Path(ice_data_path).expanduser().resolve())
+    if iso_data_path:
+        register_path_var(state, "isostasy_data_src",
+                          Path(iso_data_path).expanduser().resolve())
+
+    return state
+
 
 def write_install_sh(state):
     path = state.yelmox_root / ".install.sh"
-    header = [
+    out = [
         "#!/usr/bin/env bash",
         "# Generated by install.py.",
         "# Reproduces a YelmoX install with the choices made in the interactive run.",
-        "# Edit if your situation differs (e.g. machine config name, account, paths).",
+        "# Edit the variables below to retarget paths or change hpc/account.",
         "set -euo pipefail",
     ]
-    body = state.bash_log
-    path.write_text("\n".join(header + body) + "\n")
+    if state.path_vars:
+        out.append("")
+        out.append("# === Paths ===")
+        for name, p in state.path_vars.items():
+            out.append(f"{name}={_bash_rhs_for(state, name, p)}")
+    if state.string_vars:
+        out.append("")
+        out.append("# === Settings ===")
+        for name, v in state.string_vars.items():
+            out.append(f"{name}={shlex.quote(v)}")
+    out.extend(state.bash_log)
+    path.write_text("\n".join(out) + "\n")
     try:
         path.chmod(0o755)
     except OSError:
