@@ -20,6 +20,8 @@ Run from the yelmox repo root:
     python3 install.py -d clone-https        # clone via HTTPS instead of SSH
     python3 install.py -d no                 # repos already under yelmox; just link
     python3 install.py --no-config           # skip every config step (.runme + per-repo)
+    python3 install.py --config-default mymachine   # change the default machine config
+    python3 install.py --overwrite           # re-clone repos (existing -> outdated-repos/)
 """
 
 import argparse
@@ -27,6 +29,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -60,6 +63,7 @@ class State:
     account: str
     ice_data_path: str
     iso_data_path: str
+    overwrite: bool = False
     repo_paths: dict = field(default_factory=dict)
     pending_configs: list = field(default_factory=list)
     data_pending: list = field(default_factory=list)
@@ -246,6 +250,21 @@ def clone(state, name, org, dest):
         return
 
     url = _clone_url(state, name, org)
+
+    # --overwrite: move any existing copy aside before cloning fresh. Done
+    # silently (not logged to .install.sh) — it's a one-shot cleanup step, not
+    # part of the reproducible bash sequence.
+    if state.overwrite and (dest.exists() or dest.is_symlink()):
+        outdated = state.install_dir / "outdated-repos"
+        moved = outdated / dest.name
+        if moved.exists() or moved.is_symlink():
+            raise FileExistsError(
+                f"{moved} already exists from a previous --overwrite run; "
+                f"remove it manually before re-running install.py --overwrite.")
+        outdated.mkdir(exist_ok=True)
+        print(f"  - {name}: moving existing {dest} -> {moved}")
+        shutil.move(str(dest), str(moved))
+
     log_cmd(state, ["git", "clone", url], cwd=dest.parent)
     if dest.exists():
         print(f"  - {name}: already at {dest}, skipping clone")
@@ -269,7 +288,7 @@ def make_link(state, target, link_path):
         f"ln -s {path_to_bash(state, target)} {shlex.quote(link_path.name)}")
 
     if link_path.is_symlink() or link_path.exists():
-        print(f"  - link {link_path.name} already exists in {cwd}, skipping")
+        print(f"  - {link_path.name} already exists in {cwd}, skipping")
         return
     try:
         link_path.symlink_to(rel)
@@ -448,7 +467,8 @@ def install_rembo1(state):
 
 
 def install_yelmox(state):
-    """yelmox itself: config + root-level links to siblings + external data links."""
+    """yelmox itself: config + root-level links to siblings. External data
+    links (ice_data, isostasy_data) are handled separately by setup_data_links."""
     log_section(state, "yelmox (config + root links)")
     do_config(state, "yelmox", state.yelmox_root)
 
@@ -464,7 +484,25 @@ def install_yelmox(state):
             make_link(state, state.repo_paths["coordinates"], state.yelmox_root / "coordinates")
             make_link(state, state.repo_paths["rembo1"],      state.yelmox_root / "rembo1")
 
-    # External data dir links
+
+def setup_data_links(state):
+    """Prompt for ice_data and isostasy_data paths and create symlinks under
+    yelmox/. Either may be skipped (the summary will remind the user to wire
+    them up later). Run after the per-repo installs and before runme_config —
+    these are local-filesystem paths, separate from HPC settings."""
+    log_section(state, "external data links")
+    state.ice_data_path = ask("Path to ice_data (Enter to skip and link later)",
+                              default="", allow_empty=True)
+    state.iso_data_path = ask("Path to isostasy_data (Enter to skip and link later)",
+                              default="", allow_empty=True)
+
+    if state.ice_data_path:
+        register_path_var(state, "ice_data_src",
+                          Path(state.ice_data_path).expanduser().resolve())
+    if state.iso_data_path:
+        register_path_var(state, "isostasy_data_src",
+                          Path(state.iso_data_path).expanduser().resolve())
+
     for label, path in [("ice_data", state.ice_data_path),
                         ("isostasy_data", state.iso_data_path)]:
         if path:
@@ -490,52 +528,35 @@ def load_hpc_names(yelmox_root):
     return sorted(data.keys())
 
 
-def collect_initial_inputs(yelmox_root, download, do_config_steps):
+def collect_initial_inputs(yelmox_root, download, do_config_steps,
+                           default_cfg, overwrite):
     print(f"YelmoX root: {yelmox_root}")
     print(f"Download mode: {download}    Config steps: {'on' if do_config_steps else 'OFF (--no-config)'}")
+    if overwrite:
+        print("Overwrite mode: ON (existing repos move to install_dir/outdated-repos/)")
     print()
     print("This script will:")
-    if do_config_steps:
-        print("  1. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
     if download == "no":
-        print("  2. Use the component repos already present under yelmox/")
+        print("  1. Use the component repos already present under yelmox/")
     else:
-        print(f"  2. Clone the YelmoX component repositories ({download})")
+        print(f"  1. Clone the YelmoX component repositories ({download})")
     if do_config_steps:
-        print("  3. Configure each repo for the current system (machine config you pick)")
-    print("  4. Create the symlinks needed for the build")
+        print(f"  2. Configure each repo for the current system (default: {default_cfg})")
+    print("  3. Create the symlinks needed for the build")
+    if do_config_steps:
+        print("  4. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
     print("  5. Write the equivalent bash to .install.sh for reproducibility")
-    print("Compilation is left to you. Next-step build commands print at the end.")
     print()
 
     if download == "no":
         install_dir = yelmox_root  # not really used; repos live under yelmox/
     else:
         install_dir = Path(ask("Directory to clone component repos into",
-                               default=str(yelmox_root.parent))).expanduser().resolve()
+                               default=str(Path.cwd()))).expanduser().resolve()
         install_dir.mkdir(parents=True, exist_ok=True)
 
     include_rembo = ask_yn("Include REMBO support (clones coordinates + rembo1)",
                            default=False)
-
-    default_cfg = DEFAULT_CONFIG
-    hpc = DEFAULT_HPC
-    account = DEFAULT_ACCOUNT
-    if do_config_steps:
-        default_cfg = ask("Default machine config name (used as suggestion per repo)",
-                          default=DEFAULT_CONFIG)
-        print("\nHPCs defined in .runme/queues.json:")
-        hpcs = load_hpc_names(yelmox_root)
-        if hpcs:
-            hpc = pick_numbered("Default HPC for .runme_config", hpcs, DEFAULT_HPC)
-        else:
-            hpc = ask("Default HPC for .runme_config", default=DEFAULT_HPC)
-        account = ask("Account for .runme_config", default=DEFAULT_ACCOUNT)
-
-    ice_data_path = ask("Path to ice_data (Enter to skip and link later)",
-                        default="", allow_empty=True)
-    iso_data_path = ask("Path to isostasy_data (Enter to skip and link later)",
-                        default="", allow_empty=True)
 
     state = State(
         yelmox_root=yelmox_root,
@@ -544,25 +565,60 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps):
         do_config_steps=do_config_steps,
         default_cfg=default_cfg,
         include_rembo=include_rembo,
-        hpc=hpc,
-        account=account,
-        ice_data_path=ice_data_path,
-        iso_data_path=iso_data_path,
+        hpc=DEFAULT_HPC,
+        account=DEFAULT_ACCOUNT,
+        ice_data_path="",
+        iso_data_path="",
+        overwrite=overwrite,
     )
 
     # Register the bash variables that will appear at the top of .install.sh.
-    # Order matters: later vars can be defined in terms of earlier ones.
+    # Order matters: later vars can be defined in terms of earlier ones. The
+    # ice_data_src / isostasy_data_src vars are registered later from inside
+    # setup_data_links, after the user has provided the paths.
     register_path_var(state, "yelmox_root", yelmox_root)
     if download != "no":
         register_path_var(state, "install_dir", install_dir)
-    if ice_data_path:
-        register_path_var(state, "ice_data_src",
-                          Path(ice_data_path).expanduser().resolve())
-    if iso_data_path:
-        register_path_var(state, "isostasy_data_src",
-                          Path(iso_data_path).expanduser().resolve())
 
     return state
+
+
+def collect_runme_inputs(state):
+    """Prompt for runme_config hpc/account at the end of the install, after
+    clones and per-repo configs are done. Asks first whether the defaults are
+    acceptable, so users on a local machine can skip the HPC-specific prompts
+    entirely. No-op when --no-config was passed."""
+    if not state.do_config_steps:
+        return
+    print()
+    print(f"runme hpc configuration defaults ok? (hpc={DEFAULT_HPC}, account={DEFAULT_ACCOUNT})")
+    if ask_yn("  Use defaults", default=True):
+        return
+    print("\nHPCs defined in .runme/queues.json:")
+    hpcs = load_hpc_names(state.yelmox_root)
+    if hpcs:
+        state.hpc = pick_numbered("Default HPC for .runme_config", hpcs, DEFAULT_HPC)
+    else:
+        state.hpc = ask("Default HPC for .runme_config", default=DEFAULT_HPC)
+    state.account = ask("Account for .runme_config", default=DEFAULT_ACCOUNT)
+
+
+def cleanup_outdated_repos(state):
+    """If --overwrite moved existing repos into install_dir/outdated-repos,
+    ask at the very end whether to delete that folder. Not logged to
+    .install.sh — this is a one-shot cleanup step, not part of the
+    reproducible bash sequence."""
+    if not state.overwrite:
+        return
+    outdated = state.install_dir / "outdated-repos"
+    if not outdated.exists():
+        return
+    print()
+    if ask_yn(f"Delete {outdated} (pre-overwrite repos)", default=False):
+        shutil.rmtree(outdated)
+        print(f"  removed {outdated}")
+    else:
+        print(f"  kept {outdated}")
 
 
 def write_install_sh(state):
@@ -661,16 +717,33 @@ def main():
                              ".runme_config and do not run python3 config.py in "
                              "any repo. Useful when you want to re-set up links "
                              "without touching existing configuration.")
+    parser.add_argument("--config-default",
+                        default=DEFAULT_CONFIG,
+                        metavar="NAME",
+                        help=f"Default machine config name used as the per-repo "
+                             f"suggestion (default: {DEFAULT_CONFIG}). No "
+                             f"interactive prompt — set it here to skip that "
+                             f"question entirely.")
+    parser.add_argument("--overwrite",
+                        action="store_true",
+                        help="Re-clone every component repo. Any existing copy "
+                             "is moved to install_dir/outdated-repos/<name> "
+                             "before the fresh clone, and you are asked at the "
+                             "end whether to delete that folder. Not compatible "
+                             "with '-d no'/'-d none'. The mv/rm steps are NOT "
+                             "recorded in .install.sh.")
     args = parser.parse_args()
     download = "no" if args.download == "none" else args.download
 
+    if args.overwrite and download == "no":
+        parser.error("--overwrite is not compatible with -d no/-d none "
+                     "(no clone happens in that mode).")
+
     yelmox_root = Path(__file__).resolve().parent
     state = collect_initial_inputs(yelmox_root, download,
-                                   do_config_steps=not args.no_config)
-
-    if state.do_config_steps:
-        print(f"\n=== Setting up yelmox runme_config ===")
-        install_runme(state)
+                                   do_config_steps=not args.no_config,
+                                   default_cfg=args.config_default,
+                                   overwrite=args.overwrite)
 
     if state.download == "no":
         print(f"\n=== Using component repos already under {state.yelmox_root} ===")
@@ -687,10 +760,19 @@ def main():
     print(f"\n=== Configuring yelmox ===")
     install_yelmox(state)
 
+    print(f"\n=== External data links ===")
+    setup_data_links(state)
+
+    if state.do_config_steps:
+        print(f"\n=== Setting up yelmox runme_config ===")
+        collect_runme_inputs(state)
+        install_runme(state)
+
     print(f"\n=== Writing .install.sh ===")
     write_install_sh(state)
 
     print_summary(state)
+    cleanup_outdated_repos(state)
 
 
 if __name__ == "__main__":
