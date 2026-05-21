@@ -3,9 +3,10 @@
 Interactive installer for YelmoX.
 
 Each component repository has its own install_* function that performs the
-steps specific to that repo: clone, pick + apply config, plus any repo-local
-extras (e.g. internal symlinks, `make install`, etc.). To add a new dependency
-later, write a new install_<repo>(state) function and call it from main().
+steps specific to that repo: clone, configure for the current system, plus
+any repo-local extras (e.g. internal symlinks, `make install`, etc.). To add
+a new dependency later, write a new install_<repo>(state) function and call
+it from main().
 
 The script also writes a `.install.sh` that contains every bash command it
 ran, so the install can be reproduced or copied into the docs without re-
@@ -375,7 +376,7 @@ def collect_initial_inputs(yelmox_root, https_flag):
     print("This script will:")
     print("  1. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
     print("  2. Clone the YelmoX component repositories")
-    print("  3. Run config.py in each with a machine config you pick")
+    print("  3. Configure each repo for the current system (machine config you pick)")
     print("  4. Create the symlinks needed for the build")
     print("  5. Write the equivalent bash to .install.sh for reproducibility")
     print("Compilation is left to you. Next-step build commands print at the end.")
