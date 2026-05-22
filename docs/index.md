@@ -61,6 +61,8 @@ coord="$yelmox_root/coordinates"
 yelmo="$yelmox_root/yelmo"
 fastiso="$yelmox_root/FastIsostasy"
 rembo1="$yelmox_root/rembo1"
+ice_data_src=/work/ba1442/ice_data
+isostasy_data_src=/work/ba1442/isostasy_data
 
 # === Settings ===
 hpc=dkrz_levante
@@ -121,9 +123,11 @@ ln -s "$rembo1" rembo1
 # To reinstall: pip install git+https://github.com/fesmc/runme
 
 # --- external data links ---
+ln -s "$ice_data_src" ice_data
+ln -s "$isostasy_data_src" isostasy_data
 
 # --- yelmox runme_config ---
-runme --config
+# .runme_config already present; to regenerate: runme --config
 sed -i.bak -E "s/(\"hpc\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1${hpc}\2/" .runme_config
 sed -i.bak -E "s/(\"account\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1${account}\2/" .runme_config
 rm .runme_config.bak
