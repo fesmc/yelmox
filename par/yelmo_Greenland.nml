@@ -9,6 +9,7 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "none"            ! "none", "relax", "opt"
     kill_shelves    = False             ! Kill ice shelves beyond PD.
+    write_clim_and_kill = False
 /
 
 &tm_1D
