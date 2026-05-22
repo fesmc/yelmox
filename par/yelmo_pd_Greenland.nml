@@ -653,6 +653,7 @@
     dt_max = 10.0           ! [yr] Maximum dt. Only used if dt_method is "bs32" or "tsit54".
     rtol = 1e-4             ! Relative tol. Only used if dt_method is "bs32" or "tsit54".
     atol = 1e-2             ! Absolute tol. Only used if dt_method is "bs32" or "tsit54".
+    q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
 /
 
 &barysealevel
