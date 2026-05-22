@@ -273,11 +273,12 @@ def clone(state, name, org, dest):
     subprocess.run(["git", "clone", url], cwd=dest.parent, check=True)
 
 
-def make_link(state, target, link_path):
-    """Relative symlink link_path -> target. Skip if link_path already exists.
-    On disk we use a relative symlink (portable); in .install.sh we emit the
-    target via a bash variable when one matches, since variables make the
-    generated script easier to edit by hand."""
+def make_link(state, target, link_path, absolute=False):
+    """Symlink link_path -> target. Skip if link_path already exists.
+    By default the on-disk link is relative (portable); pass absolute=True to
+    force an absolute link regardless of how target was provided. In .install.sh
+    we emit the target via a bash variable when one matches, since variables make
+    the generated script easier to edit by hand."""
     target = Path(target)
     link_path = Path(link_path)
     cwd = link_path.parent
@@ -289,6 +290,10 @@ def make_link(state, target, link_path):
 
     if link_path.is_symlink() or link_path.exists():
         print(f"  - {link_path.name} already exists in {cwd}, skipping")
+        return
+    if absolute:
+        link_path.symlink_to(target)
+        print(f"  + {link_path} -> {target}")
         return
     try:
         link_path.symlink_to(rel)
@@ -556,7 +561,7 @@ def setup_data_links(state):
             p = Path(path).expanduser().resolve()
             if not p.exists():
                 print(f"  ! {label} path {p} does not exist — creating link anyway")
-            make_link(state, p, state.yelmox_root / label)
+            make_link(state, p, state.yelmox_root / label, absolute=True)
         else:
             state.data_pending.append(label)
 
