@@ -479,14 +479,15 @@ def install_fesm_utils(state):
     # not at the repo root. The generated Makefile also lives there. The
     # yelmox-side $(FESMUTILSROOT) points at fesm-utils/utils for this reason.
     do_config(state, "fesm-utils", dest / "utils")
-    # Reminder in .install.sh about the one-time external-deps build.
-    # Left as commented examples because the choice is machine/compiler-specific.
-    log_raw(state, "# One-time external deps (LIS + FFTW). Slow (~10-30 min).")
-    log_raw(state, "# Pick the script for your machine + compiler, e.g.:")
-    log_raw(state, '# (cd "$fesm_utils" && ./install.sh)                  # generic')
-    log_raw(state, '# (cd "$fesm_utils" && ./install_dkrz.sh ifx)         # DKRZ Levante')
-    log_raw(state, '# (cd "$fesm_utils" && ./install_awi.sh  gfortran)    # AWI albedo')
-    log_raw(state, '# (cd "$fesm_utils" && ./install_pik.sh  ifx)         # PIK HPC')
+    # Reminder in .install.sh about the one-time fesm-utils build.
+    # Left as a commented example because the machine/compiler is site-specific.
+    log_raw(state, "# One-time build of fesm-utils (LIS + FFTW + utils). Slow (~10-30 min).")
+    log_raw(state, "# Run build.py by hand with --variant both for your machine + compiler:")
+    log_raw(state, '# (cd "$fesm_utils" && ./build.py --variant both --machine <machine> --compiler <compiler>)')
+    log_raw(state, "# Supported machines + compilers (./build.py --list-machines for the live list):")
+    log_raw(state, "#   awi_albedo, dkrz_levante, generic, pik_hpc2024 : ifx, ifort, gfortran")
+    log_raw(state, "#   macbook                                        : gfortran")
+    log_raw(state, '# e.g. (cd "$fesm_utils" && ./build.py --variant both --machine dkrz_levante --compiler ifx)')
 
 
 def install_coordinates(state):
@@ -729,13 +730,14 @@ def print_summary(state):
 
     fesm = state.repo_paths["fesm-utils"]
     print("\nNext steps:")
-    print(f"  1. Prep fesm-utils external deps (LIS + FFTW) — ONE-TIME, slow (~10-30 min):")
+    print(f"  1. Build fesm-utils (LIS + FFTW + utils) — ONE-TIME, slow (~10-30 min):")
     print(f"       cd {fesm}")
-    print(f"       # Pick the script for your machine + compiler, e.g.:")
-    print(f"       # ./install.sh                  # generic")
-    print(f"       # ./install_dkrz.sh ifx         # DKRZ Levante")
-    print(f"       # ./install_awi.sh  gfortran    # AWI albedo")
-    print(f"       # ./install_pik.sh  ifx         # PIK HPC")
+    print(f"       # Run build.py by hand with --variant both, choosing your machine + compiler:")
+    print(f"       ./build.py --variant both --machine <machine> --compiler <compiler>")
+    print(f"       # Supported machines + compilers (./build.py --list-machines for the live list):")
+    print(f"       #   awi_albedo, dkrz_levante, generic, pik_hpc2024 : ifx, ifort, gfortran")
+    print(f"       #   macbook                                        : gfortran")
+    print(f"       # e.g. ./build.py --variant both --machine dkrz_levante --compiler ifx")
     print(f"     If you skip this, `make yelmox` will abort early with a")
     print(f"     LIS/FFTW-not-built error (no half-built state).")
     extras = "fesm-utils, yelmo, FastIsostasy"
