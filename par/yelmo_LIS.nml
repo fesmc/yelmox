@@ -564,6 +564,17 @@
     log10_viscosity_varname = "none"
     stddev_log10_viscosity_varname = "none"
     rheo_smoothing_radius = 40.0
+
+    ! Time stepping
+    dt_method = "tsit54"    ! Time stepping method, options: "euler", "rk4", "bs32", "tsit54"
+    dt_init = 1.0           ! [yr] Initial time step for time stepping method. If dt_method
+                            ! is "euler" or "rk4", this value is used throughout the simulation.
+                            ! If dt_method is "bs32" or "tsit54", the time step is adapted
+                            ! during the simulation, and this value is only used as an initial guess.
+    dt_min = 1e-10          ! [yr] Minimum dt. Only used if dt_method is "bs32" or "tsit54".
+    dt_max = 10.0           ! [yr] Maximum dt. Only used if dt_method is "bs32" or "tsit54".
+    rtol = 1e-4             ! Relative tol. Only used if dt_method is "bs32" or "tsit54".
+    atol = 1e-2             ! Absolute tol. Only used if dt_method is "bs32" or "tsit54".
 /
 
 &barysealevel
