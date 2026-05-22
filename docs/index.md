@@ -23,13 +23,17 @@ Assuming you have cloned the YelmoX repository as above, just run the install sc
 
 This script will guide you through the installation steps. See `./install.py -h` for some additional options. Once complete, it will also produce a pure bash script `.install.sh`, which shows the exact commands that were called to configure the YelmoX directory.
 
-When the install script finishes, you next need to go into `fesm-utils` and run the install script there to install the `fftw` and `lis` libraries. It can take many minutes to compile these libraries, which is why it's done separately:
+When the install script finishes, you next need to go into `fesm-utils` and build the `fftw` and `lis` libraries (plus `utils`). It can take many minutes to compile these, which is why it's done separately. Run `build.py` by hand with `--variant both`, choosing your machine and compiler:
 
 ```bash
 cd fesm-utils
-#./install.sh gfortran # Local install with gfortran
-./install_dkrz.sh ifx # Install on DKRZ Levante cluster with ifx
+./build.py --variant both --machine dkrz_levante --compiler ifx  # DKRZ Levante with ifx
 ```
+
+Supported machines and compilers (run `./build.py --list-machines` for the live list):
+
+- `awi_albedo`, `dkrz_levante`, `generic`, `pik_hpc2024`: `ifx`, `ifort`, `gfortran`
+- `macbook`: `gfortran`
 
 That's it, you should now be ready to compile and run any yelmox program flavor:
 
@@ -67,12 +71,13 @@ cd "$yelmox_root"
 git clone git@github.com:fesmc/fesm-utils.git
 cd "$fesm_utils/utils"
 python3 config.py config/dkrz_levante_ifx
-# One-time external deps (LIS + FFTW). Slow (~10-30 min).
-# Pick the script for your machine + compiler, e.g.:
-# (cd "$fesm_utils" && ./install.sh)                  # generic
-# (cd "$fesm_utils" && ./install_dkrz.sh ifx)         # DKRZ Levante
-# (cd "$fesm_utils" && ./install_awi.sh  gfortran)    # AWI albedo
-# (cd "$fesm_utils" && ./install_pik.sh  ifx)         # PIK HPC
+# One-time build of fesm-utils (LIS + FFTW + utils). Slow (~10-30 min).
+# Run build.py by hand with --variant both for your machine + compiler:
+# (cd "$fesm_utils" && ./build.py --variant both --machine <machine> --compiler <compiler>)
+# Supported machines + compilers (./build.py --list-machines for the live list):
+#   awi_albedo, dkrz_levante, generic, pik_hpc2024 : ifx, ifort, gfortran
+#   macbook                                        : gfortran
+# e.g. (cd "$fesm_utils" && ./build.py --variant both --machine dkrz_levante --compiler ifx)
 
 # --- coordinates ---
 cd "$yelmox_root"
