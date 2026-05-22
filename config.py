@@ -82,8 +82,8 @@ print(
 # make clean 
 # make benchmarks      # makes executable libyelmo/bin/yelmo_benchmarks.x 
 
-# # Run the program using runylmo (see runylmo -h for details) 
-# ./runylmo -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml 
+# # Run the program using runme (see runme -h for details)
+# runme -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml
 
 # # Check the output 
 # cd output/test 

@@ -111,14 +111,14 @@ ln -s "$fastiso" FastIsostasy
 ln -s "$coord" coordinates
 ln -s "$rembo1" rembo1
 
-# --- runner (job command) ---
-# runner already installed: `job` command found on PATH
-# To reinstall: pip install https://github.com/fesmc/runner/archive/refs/heads/master.zip
+# --- runme (runme command) ---
+# runme already installed: `runme` command found on PATH
+# To reinstall: pip install git+https://github.com/fesmc/runme
 
 # --- external data links ---
 
 # --- yelmox runme_config ---
-cp .runme/runme_config .runme_config
+runme --config
 sed -i.bak -E "s/(\"hpc\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1${hpc}\2/" .runme_config
 sed -i.bak -E "s/(\"account\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1${account}\2/" .runme_config
 rm .runme_config.bak

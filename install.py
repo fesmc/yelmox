@@ -373,8 +373,9 @@ def do_config(state, repo_name, repo_dir):
 # Then add a call to install_<name>(state) from main() in the right order.
 
 def install_runme(state):
-    """First yelmox step: copy .runme/runme_config to .runme_config and set hpc/account.
-    No-op when --no-config was passed."""
+    """Create the local .runme_config via `runme --config`, then set hpc/account.
+    `runme --config` copies .runme/runme_config to .runme_config (the canonical
+    first-clone step). No-op when --no-config was passed."""
     if not state.do_config_steps:
         return
     log_section(state, "yelmox runme_config")
@@ -384,11 +385,18 @@ def install_runme(state):
         print(f"  ! {src} missing — skipping runme_config setup")
         return
     if dst.exists():
-        print(f"  - {dst} already exists, leaving as-is (delete it to regenerate)")
+        print(f"  - {dst} already exists, leaving as-is (delete it and run `runme --config` to regenerate)")
+        log_raw(state, "# .runme_config already present; to regenerate: runme --config", cwd=state.yelmox_root)
+    elif shutil.which("runme"):
+        # On a fresh clone there is no local .runme_config yet, so `runme --config`
+        # copies the template silently (no interactive overwrite prompt).
+        run(state, ["runme", "--config"], cwd=state.yelmox_root)
     else:
+        print(f"  ! `runme` not on PATH — copying {src.name} to {dst.name} directly")
         print(f"  $ cp {src} {dst}")
         dst.write_bytes(src.read_bytes())
-    log_raw(state, "cp .runme/runme_config .runme_config", cwd=state.yelmox_root)
+        log_raw(state, "# runme not on PATH; equivalent of `runme --config`:", cwd=state.yelmox_root)
+        log_raw(state, "cp .runme/runme_config .runme_config", cwd=state.yelmox_root)
 
     # Patch hpc and account in place, preserving formatting.
     text = dst.read_text()
@@ -420,40 +428,41 @@ def install_runme(state):
     print(f"  Note: edit {dst.name} by hand to change jobname, omp, mem, email, etc.")
 
 
-def install_runner(state):
-    """Install fesmc/runner via pip (provides the `job` command used by runme).
-    Skip if `job` is already on PATH. No-op when --no-config was passed."""
+def install_runme_pkg(state):
+    """Install fesmc/runme via pip (provides the `runme` command used to stage,
+    run, and submit simulations and ensembles). Skip if `runme` is already on
+    PATH. No-op when --no-config was passed."""
     if not state.do_config_steps:
         return
-    log_section(state, "runner (job command)")
+    log_section(state, "runme (runme command)")
 
-    url = "https://github.com/fesmc/runner/archive/refs/heads/master.zip"
+    url = "git+https://github.com/fesmc/runme"
 
-    if shutil.which("job"):
-        print(f"  - `job` already available at {shutil.which('job')}, skipping install")
-        log_raw(state, "# runner already installed: `job` command found on PATH")
+    if shutil.which("runme"):
+        print(f"  - `runme` already available at {shutil.which('runme')}, skipping install")
+        log_raw(state, "# runme already installed: `runme` command found on PATH")
         log_raw(state, f"# To reinstall: pip install {url}")
         return
 
-    print("  `job` command not found on PATH.")
-    if not ask_yn("  Install runner via pip from fesmc/runner", default=True):
-        print("  Skipping runner install — `job` command will not be available.")
-        log_raw(state, "# TODO: install runner manually:")
+    print("  `runme` command not found on PATH.")
+    if not ask_yn("  Install runme via pip from fesmc/runme", default=True):
+        print("  Skipping runme install — `runme` command will not be available.")
+        log_raw(state, "# TODO: install runme manually:")
         log_raw(state, f"# pip install {url}")
         return
 
     run(state, [sys.executable, "-m", "pip", "install", url])
 
-    job_path = shutil.which("job")
-    if job_path:
-        print(f"  + `job` is now available at {job_path}")
+    runme_path = shutil.which("runme")
+    if runme_path:
+        print(f"  + `runme` is now available at {runme_path}")
     else:
-        print("  ! pip install succeeded but `job` is not on PATH.")
+        print("  ! pip install succeeded but `runme` is not on PATH.")
         print("    The Python bin dir is probably missing from PATH.")
         print("    Add to ~/.bashrc or ~/.profile:")
         print('      PATH=${PATH}:${HOME}/.local/bin')
         print('      export PATH')
-        log_raw(state, "# `job` not on PATH after install — add Python user bin to PATH:")
+        log_raw(state, "# `runme` not on PATH after install — add Python user bin to PATH:")
         log_raw(state, '# PATH=${PATH}:${HOME}/.local/bin')
         log_raw(state, "# export PATH")
 
@@ -582,8 +591,8 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps,
         print(f"  2. Configure each repo for the current system (default: {default_cfg})")
     print("  3. Create the symlinks needed for the build")
     if do_config_steps:
-        print("  4. Install runner (fesmc/runner) via pip if `job` is not already on PATH")
-        print("  5. Set up .runme_config (copy from .runme/runme_config, set hpc + account)")
+        print("  4. Install runme (fesmc/runme) via pip if `runme` is not already on PATH")
+        print("  5. Set up .runme_config (via `runme --config`, set hpc + account)")
     print("  6. Write the equivalent bash to .install.sh for reproducibility")
     print()
 
@@ -799,8 +808,8 @@ def main():
     print(f"\n=== Configuring yelmox ===")
     install_yelmox(state)
 
-    print(f"\n=== Installing runner (`job` command) ===")
-    install_runner(state)
+    print(f"\n=== Installing runme (`runme` command) ===")
+    install_runme_pkg(state)
 
     print(f"\n=== External data links ===")
     setup_data_links(state)
