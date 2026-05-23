@@ -111,7 +111,7 @@ ln -s "$coord" coordinates
 
 # --- yelmox (config + root links) ---
 cd "$yelmox_root"
-python3 config.py config/dkrz_levante_ifx
+python3 config.py dkrz_levante ifx   # or: python3 config.py --file dkrz_levante_ifx
 ln -s "$fesm_utils" fesm-utils
 ln -s "$yelmo" yelmo
 ln -s "$fastiso" FastIsostasy

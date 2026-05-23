@@ -1,109 +1,123 @@
 """
-Script to generate Makefile with the correct compiler
-configuration for a given machine.
+Generate the top-level Makefile with the correct build configuration.
+
+Usage:
+    python config.py <machine> <compiler>     # e.g. macbook gfortran
+    python config.py --file <legacy_config>    # e.g. --file macbook_gfortran
+
+In the two-axis form, three fragments are assembled into the Makefile
+template (config/Makefile), in this order:
+
+    config/compilers/<compiler>.mk   compiler flags (FC, FFLAGS, DFLAGS, ...)
+    config/machines/<machine>.mk     machine paths (NetCDF) and any overrides
+    config/common.mk                 shared dependency paths and link flags
+
+Order matters: common.mk references variables the other two fragments set,
+and a machine fragment may override a compiler default (e.g. DFLAGS_NODEBUG).
+
+The --file form reproduces the legacy behaviour, dropping a single
+self-contained config file (kept in config/legacy/) into the template.
 """
 
-from subprocess import *
 import argparse
-import sys
+import os
 import re
+import sys
+from glob import glob
+
+CONFIG_DIR = "config"
+COMPILERS_DIR = os.path.join(CONFIG_DIR, "compilers")
+MACHINES_DIR = os.path.join(CONFIG_DIR, "machines")
+LEGACY_DIR = os.path.join(CONFIG_DIR, "legacy")
+TEMPLATE = os.path.join(CONFIG_DIR, "Makefile")
+PLACEHOLDER = "<COMPILER_CONFIGURATION>"
+
 
 def parse_makefile(filename="Makefile"):
-    """
-    Parses a Makefile and prints a list of available `make` commands (targets).
-    
-    Args:
-        filename (str): The path to the Makefile. Defaults to "Makefile".
-    """
+    """Print the list of available `make` targets in a Makefile."""
     try:
-        with open(filename, 'r') as file:
+        with open(filename, "r") as file:
             lines = file.readlines()
-            
-        targets = []
-        for line in lines:
-            # Strip comments and whitespace
-            line = line.split('#')[0].strip()
-            
-            # Match lines with targets (e.g., target: dependencies)
-            match = re.match(r'^([a-zA-Z0-9_-]+)\s*:\s*(.*)', line)
-            if match and not line.startswith('\t'):
-                target = match.group(1)
-                targets.append(target)
-        
-        print("Available `make` commands (targets):")
-        for target in targets:
-            print(f"  - {target}")
-        print("")
-        
     except FileNotFoundError:
         print(f"Error: File '{filename}' not found.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        return
 
-# Manage command-line arguments to load compiler option
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "config",
-    metavar="CONFIG",
-    type=str,
-    help="Name of config file to use (e.g., config/aire_gfortran)",
-)
-args = parser.parse_args()
+    print("Available `make` commands (targets):")
+    for line in lines:
+        line = line.split("#")[0].strip()
+        match = re.match(r"^([a-zA-Z0-9_-]+)\s*:\s*(.*)", line)
+        if match and not line.startswith("\t"):
+            print(f"  - {match.group(1)}")
+    print("")
 
 
-# Determine locations
-target_dir = "./"
-config_dir = "config/"
-config_path = args.config
-
-# Load template Makefile and insert compiler configuration
-makefile0 = open(config_dir + "Makefile").read()
-compile_info = open(config_path).read()
-makefile1 = makefile0.replace("<COMPILER_CONFIGURATION>", compile_info)
-
-# Write the new Makefile to the main directory
-open(target_dir + "Makefile", "w").write(makefile1)
-
-print(
-    "".join(
-        [
-            "\n\nMakefile configuration complete for configuration file: ",
-            config_path,
-            "\n",
-        ]
+def available(directory):
+    """Return sorted base names of the *.mk fragments in a directory."""
+    return sorted(
+        os.path.splitext(os.path.basename(p))[0]
+        for p in glob(os.path.join(directory, "*.mk"))
     )
-)
-
-# instructions = """==== How to run yelmo ====\n
-# # Make a link to the ice_data path, if available.
-# ln -s path/to/ice_data ice_data 
-
-# # Compile a test program
-# make clean 
-# make benchmarks      # makes executable libyelmo/bin/yelmo_benchmarks.x 
-
-# # Run the program using runme (see runme -h for details)
-# runme -r -e benchmarks -o output/test -n par/yelmo_EISMINT.nml
-
-# # Check the output 
-# cd output/test 
-# ncview yelmo2D.nc 
-# """
-
-# print(instructions)
-
-# Print usage
-parse_makefile("Makefile")
 
 
-### Old script commands to automatically determine the config_path from host + compiler:
+def read(path, kind):
+    """Read a fragment, exiting with a helpful message if it is missing."""
+    if not os.path.isfile(path):
+        print(f"Error: {kind} config not found: {path}\n")
+        if kind == "compiler":
+            print("Available compilers:", ", ".join(available(COMPILERS_DIR)))
+        elif kind == "machine":
+            print("Available machines: ", ", ".join(available(MACHINES_DIR)))
+        sys.exit(1)
+    return open(path).read()
 
-# Determine the current hostname
-# proc = Popen("hostname",shell=True,stdout=PIPE,stderr=PIPE)
-# host = proc.communicate()[0].strip().decode("utf-8")
 
-# if host == "manager.cei.ucm.local": host = "eolo"
-# if host in ["login01","login02"]:   host = "pik"
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate the top-level Makefile build configuration.",
+    )
+    parser.add_argument("machine", nargs="?", help="Machine name, e.g. macbook")
+    parser.add_argument("compiler", nargs="?", help="Compiler name, e.g. gfortran")
+    parser.add_argument(
+        "--file",
+        metavar="LEGACY_CONFIG",
+        help="Use a single legacy config file from config/legacy/ instead "
+        "of assembling machine + compiler fragments.",
+    )
+    args = parser.parse_args()
 
-# print("{}{}_{}".format(config_dir,host,compiler))
+    if args.file:
+        config_path = os.path.join(LEGACY_DIR, args.file)
+        if not os.path.isfile(config_path):
+            print(f"Error: legacy config not found: {config_path}\n")
+            print("Available legacy configs:", ", ".join(available(LEGACY_DIR)))
+            sys.exit(1)
+        compile_info = open(config_path).read()
+        source_desc = config_path
+    else:
+        if not (args.machine and args.compiler):
+            parser.error(
+                "give both <machine> and <compiler> (or use --file). "
+                "Try: python config.py macbook gfortran"
+            )
+        compiler_mk = read(
+            os.path.join(COMPILERS_DIR, args.compiler + ".mk"), "compiler"
+        )
+        machine_mk = read(
+            os.path.join(MACHINES_DIR, args.machine + ".mk"), "machine"
+        )
+        common_mk = open(os.path.join(CONFIG_DIR, "common.mk")).read()
+        # Order matters: common.mk references vars set by the other two, and
+        # the machine fragment may override compiler defaults.
+        compile_info = "\n".join([compiler_mk, machine_mk, common_mk])
+        source_desc = f"machine={args.machine}, compiler={args.compiler}"
 
+    template = open(TEMPLATE).read()
+    makefile = template.replace(PLACEHOLDER, compile_info)
+    open("Makefile", "w").write(makefile)
+
+    print(f"\nMakefile configuration complete for: {source_desc}\n")
+    parse_makefile("Makefile")
+
+
+if __name__ == "__main__":
+    main()
