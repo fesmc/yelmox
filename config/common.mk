@@ -2,8 +2,8 @@
 #
 # Loaded *after* the compiler and machine fragments (config.py assembles them
 # in the order: compiler -> machine -> common). This file references variables
-# those fragments define: FFLAGS / FFLAGS_OPENMP (compiler), LIB_NC (machine),
-# and LFLAGS_EXTRA (compiler, optionally extended by a machine).
+# those fragments define: FFLAGS / FFLAGS_OPENMP (compiler) and LIB_NC (machine).
+# It also provides the default LFLAGS_EXTRA, which a machine fragment may disable.
 
 # Dependency paths (serial build by default).
 FESMUTILSROOT = fesm-utils/utils
@@ -50,5 +50,11 @@ ifeq ($(openmp), 1)
 
     FFLAGS += $(FFLAGS_OPENMP)
 endif
+
+# Extra link flags. -Wl,-zmuldefs works around duplicate symbols in the static
+# deps; it is the default for the Linux targets. A machine fragment can disable
+# it by setting `LFLAGS_EXTRA =` (macOS ld does not understand -zmuldefs, so
+# macbook does this). ?= leaves any such earlier machine setting in force.
+LFLAGS_EXTRA ?= -Wl,-zmuldefs
 
 LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
