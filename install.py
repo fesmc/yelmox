@@ -20,8 +20,12 @@ Run from the yelmox repo root:
     python3 install.py -d clone-https        # clone via HTTPS instead of SSH
     python3 install.py -d no                 # repos already under yelmox; just link
     python3 install.py --no-config           # skip every config step (.runme + per-repo)
-    python3 install.py --config-default mymachine   # change the default machine config
+    python3 install.py -c gfortran -m macbook  # set compiler + default machine, skip those prompts
     python3 install.py --overwrite           # re-clone repos (existing -> outdated-repos/)
+
+The same compiler is used for every repo (asked once). The machine is asked
+once for a default, then confirmed (or overridden) per repo, since the set of
+available machine configs differs between component repositories.
 """
 
 import argparse
@@ -35,7 +39,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_CONFIG = "macbook_gfortran"
+DEFAULT_COMPILER = "ifx"
+DEFAULT_MACHINE = "dkrz_levante"
 DEFAULT_HPC = "dkrz_levante"
 DEFAULT_ACCOUNT = "ba1442"
 
@@ -57,7 +62,8 @@ class State:
     install_dir: Path                # ignored when download == "no"
     download: str                    # "clone-ssh" | "clone-https" | "no"
     do_config_steps: bool            # False when --no-config is passed
-    default_cfg: str
+    compiler: str                    # one toolchain for all repos
+    default_machine: str             # default for the per-repo machine prompt
     include_rembo: bool
     hpc: str
     account: str
@@ -214,10 +220,35 @@ def run(state, cmd, cwd=None, check=True):
     return subprocess.run(cmd, cwd=cwd, check=check)
 
 
-def list_configs(repo_dir):
+def repo_uses_new_config(repo_dir):
+    """True if the repo uses the two-axis config layout (config/compilers/ +
+    config/machines/, driven by `config.py <machine> <compiler>`). Otherwise it
+    is a legacy repo with flat config/<machine>_<compiler> files driven by
+    `config.py config/<name>`."""
+    return (repo_dir / "config" / "compilers").is_dir()
+
+
+def list_compilers(repo_dir):
+    """Compiler names offered by a new-style repo (config/compilers/*.mk)."""
+    cd = repo_dir / "config" / "compilers"
+    if not cd.is_dir():
+        return []
+    return sorted(p.stem for p in cd.glob("*.mk"))
+
+
+def list_machines(repo_dir, compiler):
+    """Machine names available in a repo for the chosen compiler.
+
+    New-style repo: basenames of config/machines/*.mk (compiler-independent).
+    Legacy repo: flat config/<machine>_<compiler> files, with the trailing
+    _<compiler> stripped so only machines buildable with this compiler show."""
     cfg = repo_dir / "config"
     if not cfg.is_dir():
         return []
+    if repo_uses_new_config(repo_dir):
+        md = cfg / "machines"
+        return sorted(p.stem for p in md.glob("*.mk")) if md.is_dir() else []
+    suffix = f"_{compiler}"
     out = []
     for p in sorted(cfg.iterdir()):
         if not p.is_file():
@@ -225,7 +256,8 @@ def list_configs(repo_dir):
         name = p.name
         if name.startswith(".") or name.startswith("Makefile") or name.endswith(".mk"):
             continue
-        out.append(name)
+        if name.endswith(suffix) and len(name) > len(suffix):
+            out.append(name[: -len(suffix)])
     return out
 
 
@@ -325,45 +357,64 @@ def clone_into(state, name, org, dirname):
 
 
 def do_config(state, repo_name, repo_dir):
-    """Prompt for a config name (numbered list); run config.py or queue as pending.
-    No-op when --no-config was passed."""
+    """Prompt for the machine (compiler is fixed globally), then run config.py
+    or queue the step as pending. Handles both the new two-axis layout and the
+    legacy single-file layout. No-op when --no-config was passed."""
     if not state.do_config_steps:
         return
-    configs = list_configs(repo_dir)
     print(f"\n  --- {repo_name} ({repo_dir}) ---")
-    if not configs:
+    cfgdir = repo_dir / "config"
+    if not cfgdir.is_dir():
         print(f"  (no config/ directory found, skipping)")
         return
-    cfg = pick_numbered("Choose config", configs, state.default_cfg)
-    cfg_path = repo_dir / "config" / cfg
 
-    if cfg in configs:
-        run(state, ["python3", "config.py", f"config/{cfg}"], cwd=repo_dir)
+    new_style = repo_uses_new_config(repo_dir)
+    machines = list_machines(repo_dir, state.compiler)
+    machine = pick_numbered(f"Choose machine (compiler={state.compiler})",
+                            machines, state.default_machine)
+
+    # Resolve the config file path and the config.py invocation for this dialect.
+    if new_style:
+        cfg_path = cfgdir / "machines" / f"{machine}.mk"
+        run_cmd = ["python3", "config.py", machine, state.compiler]
+        target_rel = f"config/machines/{machine}.mk"
+    else:
+        cfg_name = f"{machine}_{state.compiler}"
+        cfg_path = cfgdir / cfg_name
+        run_cmd = ["python3", "config.py", f"config/{cfg_name}"]
+        target_rel = f"config/{cfg_name}"
+
+    if cfg_path.exists():
+        run(state, run_cmd, cwd=repo_dir)
         return
 
-    # Custom config: copy a template if file doesn't yet exist, then queue as pending.
-    if not cfg_path.exists():
-        tmpl = None
-        if state.default_cfg in configs:
-            tmpl = repo_dir / "config" / state.default_cfg
-        elif configs:
-            tmpl = repo_dir / "config" / configs[0]
-        if tmpl is not None:
-            print(f"  {repo_name}: creating {cfg_path.name} from template {tmpl.name}")
-            cfg_path.write_bytes(tmpl.read_bytes())
-            log_raw(state,
-                    f"cp {shlex.quote(f'config/{tmpl.name}')} {shlex.quote(f'config/{cfg}')}",
-                    cwd=repo_dir)
-        else:
-            print(f"  ! {repo_name}: no template available; create {cfg_path} yourself")
+    # Missing machine/compiler combo: copy a template, then queue as pending.
+    if new_style:
+        tmpl = cfgdir / "machines" / f"{state.default_machine}.mk"
+        if not tmpl.exists():
+            existing = sorted((cfgdir / "machines").glob("*.mk"))
+            tmpl = existing[0] if existing else None
     else:
-        print(f"  {repo_name}: {cfg_path.name} already exists, leaving as-is")
-    state.pending_configs.append((repo_name, repo_dir, cfg, cfg_path))
+        tmpl = cfgdir / f"{state.default_machine}_{state.compiler}"
+        if not tmpl.exists():
+            cand = [p for p in sorted(cfgdir.iterdir())
+                    if p.is_file() and p.name.endswith(f"_{state.compiler}")]
+            tmpl = cand[0] if cand else None
+
+    if tmpl is not None:
+        print(f"  {repo_name}: creating {cfg_path.name} from template {tmpl.name}")
+        cfg_path.write_bytes(tmpl.read_bytes())
+        tmpl_rel = (f"config/machines/{tmpl.name}" if new_style
+                    else f"config/{tmpl.name}")
+        log_raw(state,
+                f"cp {shlex.quote(tmpl_rel)} {shlex.quote(target_rel)}",
+                cwd=repo_dir)
+    else:
+        print(f"  ! {repo_name}: no template available; create {cfg_path} yourself")
+    state.pending_configs.append((repo_name, repo_dir, cfg_path, run_cmd))
     print(f"  (pending) edit {cfg_path}, then run config.py")
-    log_raw(state,
-            f"# TODO: edit config/{cfg} for your machine, then:",
-            cwd=repo_dir)
-    log_raw(state, f"# python3 config.py config/{cfg}", cwd=repo_dir)
+    log_raw(state, f"# TODO: edit {target_rel} for your machine, then:", cwd=repo_dir)
+    log_raw(state, "# " + " ".join(shlex.quote(c) for c in run_cmd), cwd=repo_dir)
 
 
 # ---------------------------------------------------------------- per-repo install funcs
@@ -582,19 +633,41 @@ def load_hpc_names(yelmox_root):
 
 
 def collect_initial_inputs(yelmox_root, download, do_config_steps,
-                           default_cfg, overwrite):
+                           compiler_arg, machine_arg, overwrite):
     print(f"YelmoX root: {yelmox_root}")
     print(f"Download mode: {download}    Config steps: {'on' if do_config_steps else 'OFF (--no-config)'}")
     if overwrite:
         print("Overwrite mode: ON (existing repos move to install_dir/outdated-repos/)")
     print()
+
+    # Toolchain: one compiler for all repos, plus a default machine the per-repo
+    # prompts start from. Skip these prompts entirely when not configuring.
+    compiler = compiler_arg or DEFAULT_COMPILER
+    default_machine = machine_arg or DEFAULT_MACHINE
+    if do_config_steps:
+        if compiler_arg is None:
+            compilers = list_compilers(yelmox_root)
+            if compilers:
+                compiler = pick_numbered("Compiler for all repos", compilers,
+                                         DEFAULT_COMPILER)
+            else:
+                compiler = ask("Compiler for all repos", default=DEFAULT_COMPILER)
+        if machine_arg is None:
+            machines = list_machines(yelmox_root, compiler)
+            if machines:
+                default_machine = pick_numbered(
+                    "Default machine (confirm or override per repo)",
+                    machines, DEFAULT_MACHINE)
+            else:
+                default_machine = ask("Default machine", default=DEFAULT_MACHINE)
+
     print("This script will:")
     if download == "no":
         print("  1. Use the component repos already present under yelmox/")
     else:
         print(f"  1. Clone the YelmoX component repositories ({download})")
     if do_config_steps:
-        print(f"  2. Configure each repo for the current system (default: {default_cfg})")
+        print(f"  2. Configure each repo (compiler={compiler}, default machine={default_machine})")
     print("  3. Create the symlinks needed for the build")
     if do_config_steps:
         print("  4. Install runme (fesmc/runme) via pip if `runme` is not already on PATH")
@@ -617,7 +690,8 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps,
         install_dir=install_dir,
         download=download,
         do_config_steps=do_config_steps,
-        default_cfg=default_cfg,
+        compiler=compiler,
+        default_machine=default_machine,
         include_rembo=include_rembo,
         hpc=DEFAULT_HPC,
         account=DEFAULT_ACCOUNT,
@@ -714,10 +788,10 @@ def print_summary(state):
 
     if state.pending_configs:
         print("\nPending custom configs — edit each file, then run config.py:")
-        for repo_name, repo_dir, cfg, cfg_path in state.pending_configs:
+        for repo_name, repo_dir, cfg_path, run_cmd in state.pending_configs:
             print(f"  - {repo_name}:")
             print(f"      edit {cfg_path}")
-            print(f"      (cd {repo_dir} && python3 config.py config/{cfg})")
+            print(f"      (cd {repo_dir} && {' '.join(run_cmd)})")
 
     if state.do_config_steps:
         print(f"\n.runme_config, current settings:")
@@ -772,13 +846,19 @@ def main():
                              ".runme_config and do not run python3 config.py in "
                              "any repo. Useful when you want to re-set up links "
                              "without touching existing configuration.")
-    parser.add_argument("--config-default",
-                        default=DEFAULT_CONFIG,
+    parser.add_argument("-c", "--compiler",
+                        default=None,
                         metavar="NAME",
-                        help=f"Default machine config name used as the per-repo "
-                             f"suggestion (default: {DEFAULT_CONFIG}). No "
-                             f"interactive prompt — set it here to skip that "
-                             f"question entirely.")
+                        help=f"Compiler to use for every repo (default prompt: "
+                             f"{DEFAULT_COMPILER}). Set it here to skip the "
+                             f"compiler prompt.")
+    parser.add_argument("-m", "--machine",
+                        default=None,
+                        metavar="NAME",
+                        help=f"Default machine for the per-repo prompts (default: "
+                             f"{DEFAULT_MACHINE}). Set it here to skip the "
+                             f"up-front machine prompt; each repo still prompts "
+                             f"with this as the default.")
     parser.add_argument("--overwrite",
                         action="store_true",
                         help="Re-clone every component repo. Any existing copy "
@@ -797,7 +877,8 @@ def main():
     yelmox_root = Path(__file__).resolve().parent
     state = collect_initial_inputs(yelmox_root, download,
                                    do_config_steps=not args.no_config,
-                                   default_cfg=args.config_default,
+                                   compiler_arg=args.compiler,
+                                   machine_arg=args.machine,
                                    overwrite=args.overwrite)
 
     if state.download == "no":
