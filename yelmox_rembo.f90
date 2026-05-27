@@ -293,7 +293,7 @@ program yelmox
         ! Increase ice thickness everywhere to start
         yelmo1%tpo%now%H_ice = yelmo1%tpo%now%H_ice*1.2
 
-        ! where(yelmo1%bnd%mask_ice /= -1 .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
+        ! where(yelmo1%bnd%mask_ice /= MASK_ICE_NONE .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
         !         .and. yelmo1%bnd%z_bed .gt. -500.0)
 
         !         yelmo1%tpo%now%H_ice = 800.0 
@@ -331,7 +331,7 @@ program yelmox
 
     ! Small 1D-2D yelmo-rembo file
     call yelmox_write_init(yelmo1,file_rembo,time_init=ts%time,units="years", &
-                    mask=(yelmo1%bnd%mask_ice /= -1),dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
+                    mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE),dT_min=hyst1%par%f_min,dT_max=hyst1%par%f_max)
 
     call timer_step(tmr,comp=1,label="initialization") 
     call timer_step(tmrs,comp=-1)

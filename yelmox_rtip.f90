@@ -363,7 +363,7 @@ program yelmox_rtip
 
     ! Set new boundary conditions: if desired kill ice shelves beyond present-day extent
     if (ctl%kill_shelves) then
-        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%mask_ice = -1
+        where(yelmo1%dta%pd%mask_bed .eq. mask_bed_ocean) yelmo1%bnd%mask_ice = MASK_ICE_NONE
     end if
 
 ! ================= RUN STEPS ===============================================
@@ -621,7 +621,7 @@ program yelmox_rtip
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
             call yelmo_write_init(yelmo1,file2D_ismip6,time_init=ts%time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
+            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE))
         end if
 
         call timer_step(tmr,comp=1,label="initialization")
@@ -644,7 +644,7 @@ program yelmox_rtip
 
                 if(ts%time .ge. 2015) then
                     !where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%tpo%now%H_ice = 0.0
-                    where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%bnd%mask_ice = -1
+                    where((yelmo1%tpo%now%f_grnd .eq. 0.0) .and. (ismp1%mask_shlf%var(:,:,1,1) .eq. 1.0)) yelmo1%bnd%mask_ice = MASK_ICE_NONE
                 end if
             end if
 
@@ -768,7 +768,7 @@ program yelmox_rtip
         ! Initialize hysteresis output files
         ! call yelmo_write_init(yelmo1, file1D, time_init=time, units="years")
         call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", &
-            mask=(yelmo1%bnd%mask_ice /= -1))
+            mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE))
         call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
         call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
             irange=[i1wais, i2wais], jrange=[j1wais, j2wais])

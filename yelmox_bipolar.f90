@@ -1337,12 +1337,12 @@ contains
                 ! Make sure to set mask_ice to prevent ice from growing in
                 ! Greenland (and on grid borders)
 
-                where(abs(yelmox%yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = -1
+                where(abs(yelmox%yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = MASK_ICE_NONE
 
-                yelmox%yelmo1%bnd%mask_ice(1,:)                       = -1
-                yelmox%yelmo1%bnd%mask_ice(yelmox%yelmo1%grd%nx,:)    = -1
-                yelmox%yelmo1%bnd%mask_ice(:,1)                       = -1
-                yelmox%yelmo1%bnd%mask_ice(:,yelmox%yelmo1%grd%ny)    = -1
+                yelmox%yelmo1%bnd%mask_ice(1,:)                       = MASK_ICE_NONE
+                yelmox%yelmo1%bnd%mask_ice(yelmox%yelmo1%grd%nx,:)    = MASK_ICE_NONE
+                yelmox%yelmo1%bnd%mask_ice(:,1)                       = MASK_ICE_NONE
+                yelmox%yelmo1%bnd%mask_ice(:,yelmox%yelmo1%grd%ny)    = MASK_ICE_NONE
                 
                 ! Initialize regions
                 call yelmo_regions_init(yelmox%yelmo1,n=1)
@@ -1378,9 +1378,9 @@ contains
                 ! Make sure to set mask_ice to prevent ice from growing in
                 ! Iceland and Svaalbard (on grid borders)
 
-                where(abs(yelmox%yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = -1
-                where(abs(yelmox%yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = -1
-                where(abs(yelmox%yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = -1
+                where(abs(yelmox%yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = MASK_ICE_NONE
+                where(abs(yelmox%yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = MASK_ICE_NONE
+                where(abs(yelmox%yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = MASK_ICE_NONE
                 
                 if (yelmox%yelmo1%dyn%par%till_method .eq. -1) then 
                     ! Initialize cb_ref to constant value to start
@@ -1603,7 +1603,7 @@ contains
                     ! Add extra ice-thickness over continental shelf to start with
                     ! an LGM-like state
 
-                    where(yelmox%yelmo1%bnd%mask_ice /= -1 .and. yelmox%yelmo1%tpo%now%H_ice .lt. 600.0 &
+                    where(yelmox%yelmo1%bnd%mask_ice /= MASK_ICE_NONE .and. yelmox%yelmo1%tpo%now%H_ice .lt. 600.0 &
                             .and. yelmox%yelmo1%bnd%z_bed .gt. -500.0)
 
                             yelmox%yelmo1%tpo%now%H_ice = 800.0 

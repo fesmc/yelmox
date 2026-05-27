@@ -529,7 +529,7 @@ program yelmox_ismip6
         if (ctl%ismip6_write_formatted) then
             ! Initialize output files for ISMIP6
             call yelmo_write_init(yelmo1,file2D_ismip6,time_init=ts%time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= -1))
+            call yelmo_write_reg_init(yelmo1,file1D_ismip6,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE))
         end if 
 
         call timer_step(tmr,comp=1,label="initialization") 

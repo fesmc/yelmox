@@ -205,12 +205,12 @@ program yelmox
             ! Make sure to set mask_ice to prevent ice from growing in
             ! Greenland (and on grid borders)
 
-            where(abs(yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmo1%bnd%mask_ice = -1
+            where(abs(yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
 
-            yelmo1%bnd%mask_ice(1,:)             = -1
-            yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = -1
-            yelmo1%bnd%mask_ice(:,1)             = -1
-            yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = -1
+            yelmo1%bnd%mask_ice(1,:)             = MASK_ICE_NONE
+            yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = MASK_ICE_NONE
+            yelmo1%bnd%mask_ice(:,1)             = MASK_ICE_NONE
+            yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = MASK_ICE_NONE
             
             ! Initialize regions
             call yelmo_regions_init(yelmo1,n=1)
@@ -250,9 +250,9 @@ end if
             ! Make sure to set mask_ice to prevent ice from growing in
             ! Iceland and Svaalbard (on grid borders)
 
-            where(abs(yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmo1%bnd%mask_ice = -1
-            where(abs(yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmo1%bnd%mask_ice = -1
-            where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%mask_ice = -1
+            where(abs(yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
+            where(abs(yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
+            where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
             
             if (yelmo1%dyn%par%till_method .eq. -1) then 
                 ! Initialize cb_ref to constant value to start
@@ -269,20 +269,20 @@ end if
 
                     ! Dynamically evolve ice where region mask == 1
                     where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
-                        yelmo1%bnd%mask_ice = 1
+                        yelmo1%bnd%mask_ice = MASK_ICE_DYNAMIC
                     elsewhere
-                        yelmo1%bnd%mask_ice = 0
+                        yelmo1%bnd%mask_ice = MASK_ICE_FIXED
                     end where
 
             else
                 ! Fix ice thickness to obs on the margins, relax to obs outside of masked region
 
                 ! Evolve ice everywhere except the domain borders
-                yelmo1%bnd%mask_ice                  = 1
-                yelmo1%bnd%mask_ice(1,:)             = 0
-                yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = 0
-                yelmo1%bnd%mask_ice(:,1)             = 0
-                yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = 0
+                yelmo1%bnd%mask_ice                  = MASK_ICE_DYNAMIC
+                yelmo1%bnd%mask_ice(1,:)             = MASK_ICE_FIXED
+                yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = MASK_ICE_FIXED
+                yelmo1%bnd%mask_ice(:,1)             = MASK_ICE_FIXED
+                yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = MASK_ICE_FIXED
 
                 where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
                     yelmo1%bnd%tau_relax = -1.0      ! inside icefield: free evolution
@@ -432,7 +432,7 @@ end if
                 ! Add extra ice-thickness over continental shelf to start with
                 ! an LGM-like state
 
-                where(yelmo1%bnd%mask_ice /= -1 .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
+                where(yelmo1%bnd%mask_ice /= MASK_ICE_NONE .and. yelmo1%tpo%now%H_ice .lt. 600.0 &
                         .and. yelmo1%bnd%z_bed .gt. -500.0)
 
                         yelmo1%tpo%now%H_ice = 800.0 
