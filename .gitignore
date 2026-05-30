@@ -14,7 +14,7 @@ output
 tmp
 tests/.DS_Store
 .DS_Store
-.runme_config
+.runme/config.toml
 .install.sh
 .upgrade.sh
 check_sim.x
