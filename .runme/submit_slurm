@@ -20,9 +20,5 @@ ulimit -v unlimited
 #ulimit -f unlimited
 ulimit -a
 
-export GMON_OUT_PREFIX=./gmon
-export LD_LIBRARY_PATH=${NETCDF_FORTRANROOT}/lib:${NETCDF_CROOT}/lib:$LD_LIBRARY_PATH
-module load cdo
-
 # Run the job
 srun <CMD> 
