@@ -484,8 +484,8 @@ program yelmox_esm
             call timer_step(tmrs,comp=0) 
             
             ! == ISOSTASY and SEA LEVEL ===========================================
-            ! jablasco: avoid to update bedrock during spinup
-            if (.False.) then
+            if (.True.) then
+                ! freeze isostasy during spinup?
                 call bsl_update(bsl, ts%time_rel)
                 call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
                 yelmo1%bnd%z_bed = isos1%out%z_bed
@@ -591,7 +591,6 @@ program yelmox_esm
             call timer_step(tmrs,comp=0) 
             
             ! == ISOSTASY and SEA LEVEL ===========================================
-            ! jablasco: avoid to update bedrock to check 16km error
             if (.True.) then
                 call bsl_update(bsl, ts%time_rel)
                 call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
@@ -694,9 +693,13 @@ contains
     
         ! Step 1: set the reference climatologies (for reference and variability reference)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,domain,grid_name)
-        ! extrapolate toward sinterior of ice shelf
-        call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
-        call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+        
+        ! extrapolate towards interior of ice shelf
+        if (.FALSE.) then
+            ! avoid for ismip7
+            call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
+            call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+        end if
 
         ! Step 2: Calculate anomaly fields (forcing)
         call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
@@ -755,6 +758,13 @@ contains
         mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto + esm%dto_var
         mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso + esm%dso_var
     
+        if (.FALSE.) then
+            ! remove for ismip7
+            ! Fill any remaining missing values
+            call fill_missing_2d(mshlf%now%T_shlf, mv)
+            call fill_missing_2d(mshlf%now%S_shlf, mv)
+        end if
+
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
                              ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
@@ -810,7 +820,6 @@ contains
 
         call nc_write(filename,"mask_ice",ylmo%bnd%mask_ice,units="",long_name="Ice mask", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
         call nc_write(filename,"mask_frnt",ylmo%tpo%now%mask_frnt,units="",long_name="Ice-front mask", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         
