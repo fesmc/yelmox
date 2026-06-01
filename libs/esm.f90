@@ -454,14 +454,6 @@ contains
         call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
         call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)  
 
-        ! Variability reference
-        ! === Atmospheric fields ===
-        call varslice_update(esm%ts_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
-        call varslice_update(esm%pr_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
-        ! ===   Oceanic fields   ===
-        call varslice_update(esm%to_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
-        call varslice_update(esm%so_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1) 
-
         ! Convert atmospheric fields to model elevation
         do m = 1,12 
             if(south) then ! Southern Hemisphere
@@ -513,6 +505,17 @@ contains
         esm%dto_var = 0.0_wp
         esm%dso_var = 0.0_wp
             
+        ! Variability reference
+        ! === Atmospheric fields ===
+        call varslice_update(esm%ts_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
+        call varslice_update(esm%pr_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
+        ! ===   Oceanic fields   ===
+        call varslice_update(esm%to_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
+        call varslice_update(esm%so_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1) 
+        
+        call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),H_ice,basins,-esm%to_var_ref%z,z_bed)
+        call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),H_ice,basins,-esm%so_var_ref%z,z_bed)
+
         ! Obtain reference year climatology
         select case(trim(clim_var))
             case("random","rand","white_noise")
@@ -528,6 +531,11 @@ contains
                 year_rand = INT(MOD(step_idx, INT(time_ref(2)-time_ref(1)+1))) + INT(time_ref(1))
                 write(*,*) "year_cyclic = ", year_rand  
 
+            case("snapshot","snap")
+                ! Cycle through the selected snapshot
+                year_rand = time
+                write(*,*) "year_snap = ", year_rand    
+
             case("red_noise")
                 ! Select a random year but based on red noise
                 ! TO DO
@@ -539,17 +547,17 @@ contains
         end select
 
         select case(trim(clim_var))
-            case("random","rand","white_noise","historic","hist","red_noise")
+            case("random","rand","white_noise","historic","hist","red_noise","snapshot","snap")
                 ! === Atmospheric fields === 
-                call varslice_update(esm%ts_var,[year_rand],method="interp",rep=12)
-                call varslice_update(esm%pr_var,[year_rand],method="interp",rep=12)
+                call varslice_update(esm%ts_var,[year_rand],method="extrap",rep=12)
+                call varslice_update(esm%pr_var,[year_rand],method="extrap",rep=12)
                 do m = 1, 12 
                     esm%dts_var(:,:,m) = esm%ts_var%var(:,:,m,1)-esm%ts_var_ref%var(:,:,m,1)
                     esm%dpr_var(:,:,m) = esm%pr_var%var(:,:,m,1)/(esm%pr_var_ref%var(:,:,m,1)+1e-8)
                 end do
                 ! ===   Oceanic fields   ===
-                call varslice_update(esm%to_var,[year_rand],method="interp",rep=1)
-                call varslice_update(esm%so_var,[year_rand],method="interp",rep=1)
+                call varslice_update(esm%to_var,[year_rand],method="extrap",rep=1)
+                call varslice_update(esm%so_var,[year_rand],method="extrap",rep=1)
 
                 ! Interpolate ocean data to the interior of ice shelves
                 call ocn_variable_extrapolation(esm%to_var%var(:,:,:,1),H_ice,basins,-esm%to_var%z,z_bed)
@@ -712,8 +720,8 @@ contains
                     end if
 
                 else ! Compute a spatially homogeneous anomaly
-                    select case(trim(esm%experiment))
-                        case("1pctCO2_transient")
+                    select case(trim(esm%scenario))
+                        case("1pctCO2")
                             ! jablasco: TO DO change
                             ! sergio test
                             if(time .lt. 1995.0) then !2020.0) then
@@ -728,13 +736,17 @@ contains
                                 esm%dto = esm%f_ocn*esm%f_polar*anomaly
                                 esm%dso = 0.0_wp
                             end if    
-                            
+                        
+                        case("ctrl")
+                                ! Do nothing
+
                         case DEFAULT
-                            write(*,*) "esm_forcing_update:: Error: transient experiment not recognized: "//trim(esm%experiment)
+                            write(*,*) "esm_forcing_update:: Error: transient experiment not recognized: "//trim(esm%scenario)
                             stop
+
                     end select
-                end if
-                    
+
+                end if        
     
             case DEFAULT
                 write(*,*) "esm_forcing_update:: Error: ctrl_run_type not recognized: "//trim(esm%ctrl_run_type)

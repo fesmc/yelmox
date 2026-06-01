@@ -2304,7 +2304,7 @@ contains
         where (H_ice .gt. 0.0_wp .or. var(:,:,1) .lt. (mv + 1.0_wp) .or. z_bed .gt. 0.0_wp)
             mask_border = 2.0_wp
         end where
-            
+
         ! Loop to set mask_border to 1.0_wp for ocean points in contact with mv
         do j = 2, ny-1
         do i = 2, nx-1
@@ -2367,5 +2367,57 @@ contains
         return
     
     end subroutine ocn_variable_extrapolation
+
+    subroutine fill_missing_2d(var, mv)
+        ! Fill any remaining missing values in a 2D field
+        ! by iteratively averaging surrounding valid points
+        
+        implicit none
+        
+        real(wp), intent(INOUT) :: var(:,:)
+        real(wp), intent(IN)    :: mv
+        
+        ! Local variables
+        integer  :: i, j, nx, ny
+        real(wp) :: tmp_sum, tmp_count
+        logical  :: mv_found
+        
+        nx = size(var, 1)
+        ny = size(var, 2)
+        
+        mv_found = .TRUE.
+        do while (mv_found)
+            mv_found = .FALSE.
+            do j = 2, ny-1
+            do i = 2, nx-1
+                if (var(i,j) .lt. (mv + 100.0_wp)) then
+                    mv_found = .TRUE.
+                    tmp_sum   = 0.0_wp
+                    tmp_count = 0.0_wp
+                    if (var(i+1,j) .gt. (mv + 100.0_wp)) then
+                        tmp_sum   = tmp_sum + var(i+1,j)
+                        tmp_count = tmp_count + 1.0_wp
+                    end if
+                    if (var(i-1,j) .gt. (mv + 100.0_wp)) then
+                        tmp_sum   = tmp_sum + var(i-1,j)
+                        tmp_count = tmp_count + 1.0_wp
+                    end if
+                    if (var(i,j+1) .gt. (mv + 100.0_wp)) then
+                        tmp_sum   = tmp_sum + var(i,j+1)
+                        tmp_count = tmp_count + 1.0_wp
+                    end if
+                    if (var(i,j-1) .gt. (mv + 100.0_wp)) then
+                        tmp_sum   = tmp_sum + var(i,j-1)
+                        tmp_count = tmp_count + 1.0_wp
+                    end if
+                    if (tmp_count .gt. 0.0_wp) var(i,j) = tmp_sum / tmp_count
+                end if
+            end do
+            end do
+        end do
+        
+        return
+        
+    end subroutine fill_missing_2d
 
 end module marine_shelf
