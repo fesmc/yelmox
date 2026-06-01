@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -74,7 +74,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="site_libs/bootstrap/bootstrap-6c645bba97489949a6ce198fa08f5136.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
@@ -137,9 +137,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#yelmox" id="toc-yelmox" class="nav-link active" data-scroll-target="#yelmox">YelmoX</a>
   <ul class="collapse">
-  <li><a href="#how-to-get-yelmox" id="toc-how-to-get-yelmox" class="nav-link" data-scroll-target="#how-to-get-yelmox">How to get YelmoX</a></li>
-  <li><a href="#install-configme-one-time" id="toc-install-configme-one-time" class="nav-link" data-scroll-target="#install-configme-one-time">Install configme (one time)</a></li>
   <li><a href="#quick-start" id="toc-quick-start" class="nav-link" data-scroll-target="#quick-start">Quick start</a></li>
+  <li><a href="#what-configme-install-yelmox-does" id="toc-what-configme-install-yelmox-does" class="nav-link" data-scroll-target="#what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</a></li>
+  <li><a href="#manual-clone-of-yelmox" id="toc-manual-clone-of-yelmox" class="nav-link" data-scroll-target="#manual-clone-of-yelmox">Manual clone of YelmoX</a></li>
+  <li><a href="#install-configme-one-time" id="toc-install-configme-one-time" class="nav-link" data-scroll-target="#install-configme-one-time">Install configme (one time)</a></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/index.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -154,35 +155,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h1>YelmoX</h1>
 <p><strong>YelmoX</strong> is the driver framework around the <a href="https://github.com/fesmc/yelmo">Yelmo</a> ice-sheet model. It bundles Yelmo together with the libraries needed to run realistic ice-sheet simulations: climate and ocean forcing modules, the <a href="https://github.com/palma-ice/FastIsostasy">FastIsostasy</a> bedrock module, the <a href="https://github.com/alex-robinson/rembo1">REMBOv1</a> energy/moisture-balance model, and shared utilities from <a href="https://github.com/fesmc/fesm-utils">fesm-utils</a>.</p>
 <p>For documentation of the Yelmo ice-sheet model itself, see <a href="https://fesmc.github.io/yelmo/">the Yelmo docs</a>.</p>
-<section id="how-to-get-yelmox" class="level2">
-<h2 class="anchored" data-anchor-id="how-to-get-yelmox">How to get YelmoX</h2>
-<p>The YelmoX code repository is here: <a href="https://github.com/fesmc/yelmox">https://github.com/fesmc/yelmox</a>. To get a local copy:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/yelmox.git</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="quick-start" class="level2">
+<h2 class="anchored" data-anchor-id="quick-start">Quick start</h2>
+<p>With <a href="https://github.com/fesmc/configme"><code>configme</code></a> installed (see <a href="#install-configme-one-time">Install configme</a> below), build the whole YelmoX stack with a single command from the directory where you want the checkout to live:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That’s it, you should now be ready to compile and run any yelmox program flavor:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> clean</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="what-configme-install-yelmox-does" class="level2">
+<h2 class="anchored" data-anchor-id="what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</h2>
+<p><code>configme install yelmox</code> clones YelmoX and its component repositories (<code>fesm-utils</code>, <code>coordinates</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>), configures each for your machine and compiler, links them into the YelmoX directory, and builds <code>fesm-utils</code> (LIS + FFTW + utils, which can take 10-30 min). If <code>configme</code> can detect your machine from the hostname it does so, otherwise it prompts you.</p>
+<p>The only system dependency you must install yourself is <strong>netCDF</strong> (see the <a href="https://fesmc.github.io/yelmo/getting-started.html#dependencies">Yelmo dependencies notes</a> for installation tips). Everything else — LIS, FFTW, the <code>fesm-utils</code> libraries, the component repositories, their links, and <code>runme</code> — is managed by <code>configme</code>.</p>
+<p>Common options:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx   <span class="co"># pick the machine + compiler explicitly</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-d</span> https                 <span class="co"># clone over HTTPS (no GitHub SSH key needed)</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--dir</span> ~/models/yelmox    <span class="co"># put the checkout here instead of ./yelmox</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--overwrite</span>              <span class="co"># re-clone over an existing checkout</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--build-deps</span>             <span class="co"># rebuild dependency packages without prompting</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Run <code>configme list</code> for the supported machines and compilers, and <code>configme --help</code> for the full command surface. The exact clone/configure/link/build commands <code>configme install yelmox</code> runs for you are recorded in a <code>.install.sh</code> script in the checkout, and are also shown for context on the <a href="./configme-install-details.html">configme install details</a> page — these are shown for reference only; <code>configme install</code> is the recommended path and you do not need to run them by hand.</p>
+</section>
+<section id="manual-clone-of-yelmox" class="level2">
+<h2 class="anchored" data-anchor-id="manual-clone-of-yelmox">Manual clone of YelmoX</h2>
+<p><code>configme install yelmox</code> already clones the repository for you, so most users do not need this step. If you want to fetch the YelmoX source tree by hand (for example, to inspect it before installing), the repository is here: <a href="https://github.com/fesmc/yelmox">https://github.com/fesmc/yelmox</a>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/yelmox.git</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="install-configme-one-time" class="level2">
 <h2 class="anchored" data-anchor-id="install-configme-one-time">Install configme (one time)</h2>
 <p>YelmoX is configured and built with <a href="https://github.com/fesmc/configme"><code>configme</code></a>, a small Python tool that detects your netCDF installation, configures every package in the stack for your machine and compiler, and clones/links/builds the whole thing with one command. It is installed once, globally, and provides the <code>configme</code> command on your <code>PATH</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/fesmc/configme</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>To upgrade it later, add <code>--upgrade</code> to the same command. If the <code>configme</code> command is not found afterwards, your Python user bin directory is probably not on your <code>PATH</code>; add it in your <code>~/.bashrc</code> / <code>~/.zshrc</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">PATH</span><span class="op">=</span><span class="st">"</span><span class="va">${PATH}</span><span class="st">:</span><span class="va">${HOME}</span><span class="st">/.local/bin"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The only system dependency you must install yourself is <strong>netCDF</strong> (see the <a href="https://fesmc.github.io/yelmo/getting-started.html#dependencies">Yelmo dependencies notes</a> for installation tips). Everything else — LIS, FFTW, the <code>fesm-utils</code> libraries, the component repositories, their links, and <code>runme</code> — is managed by <code>configme</code>.</p>
-</section>
-<section id="quick-start" class="level2">
-<h2 class="anchored" data-anchor-id="quick-start">Quick start</h2>
-<p>With <code>configme</code> installed, build the whole YelmoX stack with a single command from the directory where you want the checkout to live:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This clones YelmoX and its component repositories (<code>fesm-utils</code>, <code>coordinates</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>), configures each for your machine and compiler, links them into the YelmoX directory, and builds <code>fesm-utils</code> (LIS + FFTW + utils, which can take 10-30 min). If <code>configme</code> can detect your machine from the hostname it does so, otherwise it prompts you.</p>
-<p>Common options:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx   <span class="co"># pick the machine + compiler explicitly</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-d</span> https                 <span class="co"># clone over HTTPS (no GitHub SSH key needed)</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--dir</span> ~/models/yelmox    <span class="co"># put the checkout here instead of ./yelmox</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--overwrite</span>              <span class="co"># re-clone over an existing checkout</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--build-deps</span>             <span class="co"># rebuild dependency packages without prompting</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Run <code>configme list</code> for the supported machines and compilers, and <code>configme --help</code> for the full command surface. The exact clone/configure/link/build commands <code>configme install yelmox</code> runs for you are recorded in a <code>.install.sh</code> script in the checkout, and are also shown for context on the <a href="./configme-install-details.html">configme install details</a> page — these are shown for reference only; <code>configme install</code> is the recommended path and you do not need to run them by hand.</p>
-<p>That’s it, you should now be ready to compile and run any yelmox program flavor:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> clean</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/fesmc/configme</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>To upgrade it later, use its built-in update command:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> update</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If the <code>configme</code> command is not found after installation, your Python user bin directory is probably not on your <code>PATH</code>; add it in your <code>~/.bashrc</code> / <code>~/.zshrc</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">PATH</span><span class="op">=</span><span class="st">"</span><span class="va">${PATH}</span><span class="st">:</span><span class="va">${HOME}</span><span class="st">/.local/bin"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>
