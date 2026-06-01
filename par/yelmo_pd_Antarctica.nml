@@ -569,7 +569,6 @@
     correct_compression = .true.    ! Account for compression effects on relaxation time?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 1.0           ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
     pad         = 1024.             ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
@@ -598,6 +597,7 @@
     tau = 3000.0                ! [yr] Relaxation time used for "method" = 2
     rheo_smoothing_radius = 40.0! [km] Gaussian moothing radius for lithospheric thickness
                                 ! and mantle viscosity
+    litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
 
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus

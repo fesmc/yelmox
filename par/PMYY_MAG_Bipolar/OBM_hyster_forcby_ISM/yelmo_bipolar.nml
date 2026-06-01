@@ -893,7 +893,6 @@
     interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
     pad         = 512.              ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
@@ -915,6 +914,7 @@
                                     ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
                                     ! viscosity field is provided.
     tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
+    litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
 
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
@@ -941,7 +941,6 @@
     interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 1.            ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
     pad         = 512.              ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
@@ -963,6 +962,7 @@
                                     ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
                                     ! viscosity field is provided.
     tau         = 2000.0            ! [yr] Relaxation time. Only used if method=1 or 2.
+    litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
 
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus

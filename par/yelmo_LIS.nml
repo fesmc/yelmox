@@ -519,7 +519,6 @@
     correct_compression = .true.    ! Account for compression effects on relaxation time?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 0.1           ! [yr] Max. timestep to recalculate prognostics
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
     pad         = 512.              ! [km] Padding around domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
@@ -564,6 +563,7 @@
     log10_viscosity_varname = "none"
     stddev_log10_viscosity_varname = "none"
     rheo_smoothing_radius = 40.0
+    litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
 
     ! Time stepping
     dt_method = "tsit54"    ! Time stepping method, options: "euler", "rk4", "bs32", "tsit54"
