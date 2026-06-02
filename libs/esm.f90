@@ -44,6 +44,7 @@ module esm
         ! === Reference climatology ===
         ! Atmosphere
         type(varslice_class)   :: ts_ref
+        type(varslice_class)   :: smb_ref    
         type(varslice_class)   :: pr_ref
         
         ! Ocean
@@ -54,8 +55,10 @@ module esm
         ! Atmosphere
         type(varslice_class)   :: ts_var
         type(varslice_class)   :: pr_var
+        type(varslice_class)   :: smb_var
         type(varslice_class)   :: ts_var_ref
         type(varslice_class)   :: pr_var_ref
+        type(varslice_class)   :: smb_var_ref
 
         ! Ocean
         type(varslice_class)   :: to_var
@@ -67,12 +70,15 @@ module esm
         ! Atmospheric fields
         type(varslice_class)   :: ts_esm_ref 
         type(varslice_class)   :: pr_esm_ref 
+        type(varslice_class)   :: smb_esm_ref
 
         type(varslice_class)   :: ts_hist 
-        type(varslice_class)   :: pr_hist 
+        type(varslice_class)   :: pr_hist
+        type(varslice_class)   :: smb_hist 
 
         type(varslice_class)   :: ts_proj
         type(varslice_class)   :: pr_proj
+        type(varslice_class)   :: smb_proj
 
         ! Oceanic fields 
         type(varslice_class)   :: to_esm_ref
@@ -85,12 +91,8 @@ module esm
         type(varslice_class)   :: so_proj
 
         ! General fields 
-        type(varslice_class)   :: basins
         type(varslice_class)   :: zs_ref
-        type(varslice_class)   :: zs_var    
         type(varslice_class)   :: zs_esm_ref
-        type(varslice_class)   :: zs_hist
-        type(varslice_class)   :: zs_proj
         
         ! === Diagnostic fields ===
 
@@ -98,11 +100,15 @@ module esm
         ! Monthly fields (but right now constant anomaly between months)
         real(wp), allocatable :: t2m(:,:,:)       ! Monthly surface temperature [K]
         real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation [mm/yr]
+        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [m/yr]
+
         ! Anomalies
         real(wp), allocatable :: dts(:,:,:)       ! Surface temperature anomaly [K]
         real(wp), allocatable :: dpr(:,:,:)       ! Precipitation relative anomaly [%]
+        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [m/yr]
         real(wp), allocatable :: dts_var(:,:,:)   ! Surface temperature anomaly variability[K]
         real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation relative anomaly variability [%]
+        real(wp), allocatable :: dsmb_var(:,:,:)  ! SMB anomaly variability [m/yr]
 
         ! ===    Ocean   ===
         real(wp), allocatable :: dto(:,:)         ! Surface temperature anomaly [K]
@@ -114,6 +120,7 @@ module esm
         real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:)     ! Annual surface temperature [K]
         real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/yr]
+        real(wp), allocatable :: smb_ann(:,:)     ! Annual SMB [m/yr]
 
     end type
 
@@ -185,7 +192,8 @@ contains
         
     end subroutine esm_experiment_def
 
-    subroutine esm_forcing_init(esm,filename,domain,grid_name,gcm,scenario,experiment,use_esm,use_hist,use_proj)
+    subroutine esm_forcing_init(esm,filename,domain,grid_name,gcm,scenario,experiment, &
+                                use_esm,use_smb,use_var,use_hist,use_proj)
 
         implicit none 
     
@@ -196,7 +204,7 @@ contains
         character(len=*), intent(IN), optional :: gcm
         character(len=*), intent(IN), optional :: scenario
         character(len=*), intent(IN), optional :: experiment
-        logical,          intent(IN), optional :: use_esm, use_hist, use_proj
+        logical,          intent(IN), optional :: use_esm, use_smb, use_hist, use_proj, use_var
     
         ! Local variables 
         character(len=256) :: gcm_now
@@ -208,31 +216,33 @@ contains
         ! Reference climatology
         character(len=256) :: grp_ts_ref  
         character(len=256) :: grp_pr_ref
+        character(len=256) :: grp_smb_ref
         character(len=256) :: grp_zs_ref
         character(len=256) :: grp_to_ref 
         character(len=256) :: grp_so_ref
         ! Variability period
         character(len=256) :: grp_ts_var  
         character(len=256) :: grp_pr_var
-        character(len=256) :: grp_zs_var
+        character(len=256) :: grp_smb_var
         character(len=256) :: grp_to_var 
         character(len=256) :: grp_so_var
         ! ESM Reference period
         character(len=256) :: grp_ts_esm_ref  
         character(len=256) :: grp_pr_esm_ref
+        character(len=256) :: grp_smb_esm_ref
         character(len=256) :: grp_zs_esm_ref
         character(len=256) :: grp_to_esm_ref 
         character(len=256) :: grp_so_esm_ref
         ! ESM Historical period 
         character(len=256) :: grp_ts_hist 
         character(len=256) :: grp_pr_hist
-        character(len=256) :: grp_zs_hist
+        character(len=256) :: grp_smb_hist
         character(len=256) :: grp_to_hist 
         character(len=256) :: grp_so_hist
         ! ESM Projection period 
         character(len=256) :: grp_ts_proj 
         character(len=256) :: grp_pr_proj 
-        character(len=256) :: grp_zs_proj
+        character(len=256) :: grp_smb_proj
         character(len=256) :: grp_to_proj 
         character(len=256) :: grp_so_proj
 
@@ -354,7 +364,6 @@ contains
         ! Initialize variables at other grids if source grid is different
         call varslice_init_nml_esm(esm%to_ref_src, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%scenario)
 
-        ! jablasco: comment variability for now
         if (use_var) then
             ! Variability
             ! Transient dependent field
@@ -366,7 +375,6 @@ contains
             end if
             call varslice_init_nml_esm(esm%to_var, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
             call varslice_init_nml_esm(esm%so_var, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
-            call varslice_init_nml_esm(esm%zs_var, filename, trim(grp_zs_var), domain, grid_name, esm%gcm, esm%scenario)
             ! Reference period
             call varslice_init_nml_esm(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
             if (use_smb) then
@@ -415,6 +423,7 @@ contains
                     call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
                     call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
                 end if
+            end if
         end if
 
         ! Allocate objects (use a time independent field)
@@ -443,10 +452,11 @@ contains
         real(wp), parameter :: pi = 3.14159265359 
         character(len=56)   :: slice_method, ref_grid_name 
         !type(map_scrip_class) :: mps
-        logical  :: south 
+        logical  :: south, use_smb
 
         ! Get slices for current time
         slice_method = "extrap"
+        use_smb = .TRUE. ! jablasco: add to nml
 
         ! select domain
         south = .FALSE. 
@@ -489,13 +499,13 @@ contains
                 esm%smb(:,:,m) = esm%smb_ref%var(:,:,m,1) !No model elevation chanhges for SMB
             else
                 esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1) * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
-            end
+            end if
         end do
 
         ! Compute diagnostic fields
         esm%t2m_ann = sum(esm%t2m,dim=3) / 12.0
         if (use_smb) then
-            esm%smb_ann  = sum(esm%pr,dim=3) / 12.0
+            esm%smb_ann  = sum(esm%smb,dim=3) / 12.0
         else
             esm%pr_ann  = sum(esm%pr,dim=3) / 12.0
         end if

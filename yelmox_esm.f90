@@ -74,10 +74,15 @@ program yelmox_esm
 
         character(len=512)  :: esm_par_file
         character(len=56)   :: esm_experiment
-        logical             :: esm_use_esm
         character(len=56)   :: esm_name
         logical             :: esm_write_formatted
         real(wp)            :: esm_dt_formatted
+
+        logical             :: esm_use_esm
+        logical             :: esm_use_smb
+        logical             :: esm_use_var
+        logical             :: esm_use_proj
+        logical             :: esm_use_hist
 
         real(wp)            :: isos_tau_1 
         real(wp)            :: isos_tau_2 
@@ -106,6 +111,11 @@ program yelmox_esm
     call nml_read(path_par,"esm","experiment",       ctl%esm_experiment)
     call nml_read(path_par,"esm","esm_name",         ctl%esm_name)
     call nml_read(path_par,"esm","use_esm",          ctl%esm_use_esm)
+
+    call nml_read(path_par,"esm","use_smb",          ctl%esm_use_esm)
+    call nml_read(path_par,"esm","use_var",          ctl%esm_use_var)
+    call nml_read(path_par,"esm","use_proj",         ctl%esm_use_proj)
+    call nml_read(path_par,"esm","use_hist",         ctl%esm_use_hist)
 
     ! esm cmip conventions
     call nml_read(path_par,"esm","write_formatted",  ctl%esm_write_formatted)

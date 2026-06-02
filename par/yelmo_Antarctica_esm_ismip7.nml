@@ -14,6 +14,12 @@
     write_formatted = False             ! CMIP convention
     dt_formatted    = 1.0               ! CMIP output timestep
     
+    ! Climatic fields
+    use_smb         = True
+    use_var         = False
+    use_proj        = False
+    use_hist        = False
+
     ! Climatic variables
     use_smb         = True              ! Use SMB fields instead of SMB model
     lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
