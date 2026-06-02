@@ -20,4 +20,4 @@
 | 16 | calv_mask         | xc, yc      | -           | Locations where calving is not allowed                 |
 | 17 | H_ice_ref         | xc, yc      | m           | Reference ice thickness for relaxation routines        |
 | 18 | z_bed_ref         | xc, yc      | m           | Reference bedrock elevation for relaxation routines    |
-| 19 | mask_ice          | xc, yc      | -           | Ice mask (-1=zero, 0=imposed, 1=active)                |
+| 19 | mask_ice          | xc, yc      | -           | Ice mask (0=none, 1=fixed, 2=dynamic)                  |
