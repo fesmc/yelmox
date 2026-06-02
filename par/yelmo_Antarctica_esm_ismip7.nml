@@ -8,12 +8,14 @@
     experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
     use_esm         = False             ! use ESM snapshots?   
     esm_name        = "UKESM"           ! esm model, if homogeneous: applied homogeneous forcing
-    
+    use_var         = False
+
     ! CMIP conventions
     write_formatted = False             ! CMIP convention
     dt_formatted    = 1.0               ! CMIP output timestep
     
     ! Climatic variables
+    use_smb         = True              ! Use SMB fields instead of SMB model
     lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
     f_p             = 0.05              ! Claus-Cl. term
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
@@ -93,13 +95,14 @@
 /
 
 &opt
-    opt_cf          = True              ! Should basal friction be optimized?
-    cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
-    cf_time_end     = 20e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 5e-3              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
-    cf_min          = 1e-5              ! [--] Minimum allowed cf value
-    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
-    H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
+    opt_cf           = True              ! Should basal friction be optimized?
+    cf_time_init     = 0.0               ! [yr] When should optimization of basal friction start?
+    cf_time_end      = 20e3              ! [yr] When should optimization of basal friction stop?
+    cf_init          = 0.1               ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
+    use_yelmo_cf_min = True              ! If false, min friction is opt_cf_min
+    opt_cf_min       = 1e-3              ! [--] Minimum allowed cf value
+    tau_c            = 500.0             ! [yr] L21: Optimization relaxation timescale 
+    H0               = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
  
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
@@ -509,17 +512,19 @@
 
 /
 
-&sediments
+&sed
     use_obs   = False
     obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
     obs_name  = "z_sed"
 
 /
 
-&geothermal
+&ghf
     use_obs   = True 
     obs_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"
     obs_name  = "geothermal_heat_flux2"
+    obs_err_name = "geothermal_heat_flux2"
+    f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
 
 /

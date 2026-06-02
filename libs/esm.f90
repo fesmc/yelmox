@@ -305,6 +305,7 @@ contains
         ! Reference climatology
         grp_ts_ref       = trim(group_prefix)//"ts_ref"
         grp_pr_ref       = trim(group_prefix)//"pr_ref"
+        grp_smb_ref      = trim(group_prefix)//"smb_ref"
         grp_zs_ref       = trim(group_prefix)//"zs_ref"
         grp_to_ref       = trim(group_prefix)//"to_ref"
         grp_so_ref       = trim(group_prefix)//"so_ref"   
@@ -312,13 +313,14 @@ contains
         ! Variability climatology
         grp_ts_var       = trim(group_prefix)//"ts_var"
         grp_pr_var       = trim(group_prefix)//"pr_var"
-        grp_zs_var       = trim(group_prefix)//"zs_var"
+        grp_smb_var      = trim(group_prefix)//"smb_var"
         grp_to_var       = trim(group_prefix)//"to_var"
         grp_so_var       = trim(group_prefix)//"so_var"
 
         ! ESM Reference climatology (to compute anomalies)
         grp_ts_esm_ref   = trim(group_prefix)//"ts_esm_ref"
         grp_pr_esm_ref   = trim(group_prefix)//"pr_esm_ref"
+        grp_smb_esm_ref  = trim(group_prefix)//"smb_esm_ref"
         grp_zs_esm_ref   = trim(group_prefix)//"zs_esm_ref"
         grp_to_esm_ref   = trim(group_prefix)//"to_esm_ref"
         grp_so_esm_ref   = trim(group_prefix)//"so_esm_ref" 
@@ -326,25 +328,25 @@ contains
         ! ESM Historical sims 
         grp_ts_hist  = trim(group_prefix)//"ts_hist"
         grp_pr_hist  = trim(group_prefix)//"pr_hist"
-        grp_zs_hist  = trim(group_prefix)//"zs_hist"
+        grp_smb_hist = trim(group_prefix)//"smb_hist"
         grp_to_hist  = trim(group_prefix)//"to_hist"
         grp_so_hist  = trim(group_prefix)//"so_hist"
 
         ! ESM projected sims
         grp_ts_proj  = trim(group_prefix)//"ts_proj"
         grp_pr_proj  = trim(group_prefix)//"pr_proj"
-        grp_zs_proj  = trim(group_prefix)//"zs_proj"
+        grp_smb_proj = trim(group_prefix)//"smb_proj"
         grp_to_proj  = trim(group_prefix)//"to_proj"
         grp_so_proj  = trim(group_prefix)//"so_proj"         
- 
-        ! Initialize all variables from namelist entries 
-        ! General fields (needed? switch to reese basins?)
-        call varslice_init_nml_esm(esm%basins, filename, "basins", domain, grid_name, esm%gcm, esm%scenario)
-            
+     
         ! Climatology
         ! Reference period
         call varslice_init_nml_esm(esm%ts_ref, filename, trim(grp_ts_ref), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%pr_ref, filename, trim(grp_pr_ref), domain, grid_name, esm%gcm, esm%scenario)
+        if (use_smb) then
+            call varslice_init_nml_esm(esm%smb_ref, filename, trim(grp_smb_ref), domain, grid_name, esm%gcm, esm%scenario)
+        else
+            call varslice_init_nml_esm(esm%pr_ref, filename, trim(grp_pr_ref), domain, grid_name, esm%gcm, esm%scenario)
+        end if
         call varslice_init_nml_esm(esm%zs_ref, filename, trim(grp_zs_ref), domain, grid_name, esm%gcm, esm%scenario)
         call varslice_init_nml_esm(esm%to_ref, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%scenario)
         call varslice_init_nml_esm(esm%so_ref, filename, trim(grp_so_ref), domain, grid_name, esm%gcm, esm%scenario)
@@ -352,49 +354,66 @@ contains
         ! Initialize variables at other grids if source grid is different
         call varslice_init_nml_esm(esm%to_ref_src, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%scenario)
 
-        ! Variability
-        ! Transient dependent field
-        call varslice_init_nml_esm(esm%ts_var, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%pr_var, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%to_var, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%so_var, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%zs_var, filename, trim(grp_zs_var), domain, grid_name, esm%gcm, esm%scenario)
-        ! Reference period
-        call varslice_init_nml_esm(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%pr_var_ref, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%to_var_ref, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%so_var_ref, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
+        ! jablasco: comment variability for now
+        if (use_var) then
+            ! Variability
+            ! Transient dependent field
+            call varslice_init_nml_esm(esm%ts_var, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
+            if (use_smb) then
+                call varslice_init_nml_esm(esm%smb_var, filename, trim(grp_smb_var), domain, grid_name, esm%gcm, esm%scenario)
+            else
+                call varslice_init_nml_esm(esm%pr_var, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%scenario)
+            end if
+            call varslice_init_nml_esm(esm%to_var, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%so_var, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%zs_var, filename, trim(grp_zs_var), domain, grid_name, esm%gcm, esm%scenario)
+            ! Reference period
+            call varslice_init_nml_esm(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
+            if (use_smb) then
+                call varslice_init_nml_esm(esm%smb_var_ref, filename, trim(grp_smb_var), domain, grid_name, esm%gcm, esm%scenario)
+            else
+                call varslice_init_nml_esm(esm%pr_var_ref, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%scenario)
+            end if
+            call varslice_init_nml_esm(esm%to_var_ref, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%so_var_ref, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
+        end if
 
         ! Transient dependent fields
         if (trim(esm%ctrl_run_type) .eq. "transient") then
             ! ESM reference period
-            !if (esm%use_esm) then
-            if (use_esm .and. .TRUE.) then
+            if (use_esm) then
                 call varslice_init_nml_esm(esm%ts_esm_ref, filename, trim(grp_ts_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-                call varslice_init_nml_esm(esm%pr_esm_ref, filename, trim(grp_pr_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                if (use_smb) then
+                    call varslice_init_nml_esm(esm%smb_esm_ref, filename, trim(grp_smb_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                else
+                    call varslice_init_nml_esm(esm%pr_esm_ref, filename, trim(grp_pr_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                end if
                 call varslice_init_nml_esm(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
                 call varslice_init_nml_esm(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-                !call varslice_init_nml_esm(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-            end if
-            ! ESM historical period
-            !if(trim(esm%use_hist)) then
-            if (.FALSE.) then
-                call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, esm%gcm, esm%scenario)
-                call varslice_init_nml_esm(esm%pr_hist, filename,trim(grp_pr_hist), domain, grid_name, esm%gcm, esm%scenario)
-                call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%scenario)
-                call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%scenario)
-                !call varslice_init_nml_esm(esm%zs_hist, filename,trim(grp_zs_hist), domain, grid_name, esm%gcm, esm%scenario)
-            end if
-            ! ESM projection period
-            !if(trim(esm%use_proj)) then
-            ! jablasco
-            if (use_esm .and. .TRUE.) then
-            !if (.TRUE.) then    
-                call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
-                call varslice_init_nml_esm(esm%pr_proj, filename,trim(grp_pr_proj), domain,grid_name,esm%gcm,esm%scenario)
-                call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
-                call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
-                !call varslice_init_nml_esm(esm%zs_proj, filename,trim(grp_zs_proj), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+            
+                ! ESM historical period
+                if (use_hist) then
+                    call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    if (use_smb) then
+                        call varslice_init_nml_esm(esm%smb_hist, filename, trim(grp_smb_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    else
+                        call varslice_init_nml_esm(esm%pr_hist, filename, trim(grp_pr_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    end if
+                    call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%scenario)
+                end if
+                
+                ! ESM projection period
+                if (use_proj) then
+                    call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
+                    if (use_smb) then
+                        call varslice_init_nml_esm(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, esm%gcm, esm%scenario)
+                    else
+                        call varslice_init_nml_esm(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, esm%gcm, esm%scenario)
+                    end if
+                    call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
+                    call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
                 end if
         end if
 
@@ -436,7 +455,11 @@ contains
         ! Climatology reference
         ! === Atmospheric fields ===
         call varslice_update(esm%ts_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
-        call varslice_update(esm%pr_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
+        if (use_smb) then
+            call varslice_update(esm%smb_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
+        else
+            call varslice_update(esm%pr_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
+        end if
         ! ===   Oceanic fields   ===
         !call nc_read_attr(esm%to_ref,"grid_name", ref_grid_name)
         !if (trim(file_grid_name) .eq. trim(grid_name) ) then
@@ -462,12 +485,21 @@ contains
                 lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
             end if    
             esm%t2m(:,:,m) = esm%ts_ref%var(:,:,m,1) + lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
-            esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1) * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
+            if (use_smb) then
+                esm%smb(:,:,m) = esm%smb_ref%var(:,:,m,1) !No model elevation chanhges for SMB
+            else
+                esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1) * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
+            end
         end do
 
         ! Compute diagnostic fields
         esm%t2m_ann = sum(esm%t2m,dim=3) / 12.0
-        esm%pr_ann  = sum(esm%pr,dim=3) / 12.0 
+        if (use_smb) then
+            esm%smb_ann  = sum(esm%pr,dim=3) / 12.0
+        else
+            esm%pr_ann  = sum(esm%pr,dim=3) / 12.0
+        end if
+
         if(south) then
             esm%t2m_sum = (esm%t2m(:,:,1)+esm%t2m(:,:,2)+esm%t2m(:,:,12)) / 3.0
         else
@@ -504,7 +536,9 @@ contains
         esm%dpr_var = 1.0_wp
         esm%dto_var = 0.0_wp
         esm%dso_var = 0.0_wp
-            
+
+        ! jablasco: skip for ismip7 (improve)
+        if (.FALSE.) then 
         ! Variability reference
         ! === Atmospheric fields ===
         call varslice_update(esm%ts_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
@@ -605,7 +639,8 @@ contains
             write(*,*) "maxval dso_vcar", maxval(esm%dso_var)
                         
         end if
-    
+        end if
+
         return 
     
     end subroutine esm_variability_update
@@ -629,16 +664,20 @@ contains
         integer  :: k, m 
         real(wp) :: tmp, anomaly
         character(len=56) :: slice_method 
+        logical  :: extrap_shlf, use_smb
     
         ! Get slices for current time
         slice_method = "extrap" 
         anomaly = 0.0_wp
+        extrap_shlf = .FALSE. ! parameter, to do (jablasco)
+        use_smb = .TRUE.
             
         ! Initialize anomalies
-        esm%dts = 0.0_wp
-        esm%dpr = 1.0_wp
-        esm%dto = 0.0_wp
-        esm%dso = 0.0_wp 
+        esm%dts  = 0.0_wp
+        esm%dpr  = 1.0_wp
+        esm%dsmb = 1.0_wp
+        esm%dto  = 0.0_wp
+        esm%dso  = 0.0_wp 
 
         select case(trim(esm%ctrl_run_type))
             
@@ -650,7 +689,11 @@ contains
                     ! === Reference period   ===
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=12)
-                    call varslice_update(esm%pr_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=12)
+                    if (use_smb) then
+                        call varslice_update(esm%smb_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=12)
+                    else
+                        call varslice_update(esm%pr_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=12)
+                    end if
                     ! === Oceanic fields ===
                     call varslice_update(esm%to_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                     call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
@@ -664,20 +707,31 @@ contains
                     ! === Historical period ===
                     if (time .le. time_hist(2)) then
                         ! === Atmospheric fields === 
-                        call varslice_update(esm%ts_hist,[time],method="extrap",rep=1)
-                        call varslice_update(esm%pr_hist,[time],method="extrap",rep=1)
+                        call varslice_update(esm%ts_hist,[time],method="extrap",rep=12)
+                        if (use_smb) then
+                            call varslice_update(esm%smb_hist,[time],method="extrap",rep=12)
+                        else
+                            call varslice_update(esm%pr_hist,[time],method="extrap",rep=12)
+                        end if
+
                         do m = 1, 12 
-                            esm%dts(:,:,m) = esm%ts_hist%var(:,:,1,1)-esm%ts_esm_ref%var(:,:,1,1)
-                            esm%dpr(:,:,m) = esm%pr_hist%var(:,:,1,1)/(esm%pr_esm_ref%var(:,:,1,1)+1e-8)
+                            esm%dts(:,:,m) = esm%ts_hist%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
+                            if (use_smb) then
+                                esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_ref%var(:,:,m,1)
+                            else
+                                esm%dpr(:,:,m) = esm%pr_hist%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
+                            end if
                         end do
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
                             
-                        ! Interpolate ocean data to the interior of ice shelves
-                        call ocn_variable_extrapolation(esm%to_hist%var(:,:,:,1),H_ice,basins,-esm%to_hist%z,z_bed)
-                        call ocn_variable_extrapolation(esm%so_hist%var(:,:,:,1),H_ice,basins,-esm%so_hist%z,z_bed)
-                            
+                        if (extrap_shlf) then
+                            ! Extrapolate ocean data to the interior of ice shelves
+                            call ocn_variable_extrapolation(esm%to_hist%var(:,:,:,1),H_ice,basins,-esm%to_hist%z,z_bed)
+                            call ocn_variable_extrapolation(esm%so_hist%var(:,:,:,1),H_ice,basins,-esm%so_hist%z,z_bed)
+                        end if
+
                         ! Compute the anomaly at the desired depth level
                         call marshelf_interp_shelf(esm%dto,mshlf,esm%to_hist%var(:,:,:,1)-esm%to_esm_ref%var(:,:,:,1),H_ice, &
                                                     z_bed,f_grnd,z_sl,-esm%to_esm_ref%z)
@@ -689,21 +743,31 @@ contains
 
                         ! === Atmospheric fields ===
                         call varslice_update(esm%ts_proj, [time],method="extrap",rep=12)
-                        call varslice_update(esm%pr_proj, [time],method="extrap",rep=12)
-                        
+                        if (use_smb) then
+                            call varslice_update(esm%smb_proj, [time],method="extrap",rep=12)
+                        else
+                            call varslice_update(esm%pr_proj, [time],method="extrap",rep=12)
+                        end if
+
                         do m = 1, 12
                             esm%dts(:,:,m) = esm%ts_proj%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
-                            esm%dpr(:,:,m) = esm%pr_proj%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
+                            if (use_smb) then
+                                esm%dsmb(:,:,m) = esm%smb_proj%var(:,:,m,1)-esm%smb_esm_ref%var(:,:,m,1)
+                            else
+                                esm%dpr(:,:,m) = esm%pr_proj%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
+                            end if
                         end do    
                         
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
                         
-                        ! Interpolate ocean data to the interior
-                        call ocn_variable_extrapolation(esm%to_proj%var(:,:,:,1),H_ice,basins,-esm%to_proj%z,z_bed)
-                        call ocn_variable_extrapolation(esm%so_proj%var(:,:,:,1),H_ice,basins,-esm%so_proj%z,z_bed)
-                        
+                        if (extrap_shlf) then
+                            ! Interpolate ocean data to the interior
+                            call ocn_variable_extrapolation(esm%to_proj%var(:,:,:,1),H_ice,basins,-esm%to_proj%z,z_bed)
+                            call ocn_variable_extrapolation(esm%so_proj%var(:,:,:,1),H_ice,basins,-esm%so_proj%z,z_bed)
+                        end if
+
                         ! Compute the anomaly at the desired depth level
                         esm%dto = 0.0_wp
                         esm%dso = 0.0_wp
@@ -756,8 +820,9 @@ contains
             
         if (use_ref_atm) then
             ! set atmosphere to reference values
-            esm%dts = 0.0_wp
-            esm%dpr = 1.0_wp
+            esm%dts  = 0.0_wp
+            esm%dpr  = 1.0_wp
+            esm%dsmb = 0.0_wp
         end if
             
         if (use_ref_ocn) then

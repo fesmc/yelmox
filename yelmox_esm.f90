@@ -128,18 +128,18 @@ program yelmox_esm
     end if
 
     ! Read run_step specific control parameters
-    call nml_read(path_par,trim(ctl%run_step),"time_init",    ctl%time_init)    ! [yr] Starting time
-    call nml_read(path_par,trim(ctl%run_step),"time_end",     ctl%time_end)     ! [yr] Ending time
-    call nml_read(path_par,trim(ctl%run_step),"dtt",          ctl%dtt)          ! [yr] Main loop time step 
-    call nml_read(path_par,trim(ctl%run_step),"time_equil",   ctl%time_equil)   ! [yr] Years to relax first
-    call nml_read(path_par,trim(ctl%run_step),"time_ref",     ctl%time_ref)     ! [yr,yr] Reference period
-    call nml_read(path_par,trim(ctl%run_step),"time_hist",    ctl%time_hist)    ! [yr,yr] Historical period
-    call nml_read(path_par,trim(ctl%run_step),"time_proj",    ctl%time_proj)    ! [yr,yr] Projection period
-    call nml_read(path_par,trim(ctl%run_step),"time_esm_ref", ctl%time_esm_ref) ! [yr,yr] ESM reference period
-    call nml_read(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)     ! Climate variability
-    call nml_read(path_par,trim(ctl%run_step),"clim_seed",    ctl%clim_seed)     ! Climate variability
-    call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method) ! Calendar choice ("const" or "rel")
-    call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)  ! Assumed time bp for const method
+    call nml_read(path_par,trim(ctl%run_step),"time_init",    ctl%time_init)        ! [yr] Starting time
+    call nml_read(path_par,trim(ctl%run_step),"time_end",     ctl%time_end)         ! [yr] Ending time
+    call nml_read(path_par,trim(ctl%run_step),"dtt",          ctl%dtt)              ! [yr] Main loop time step 
+    call nml_read(path_par,trim(ctl%run_step),"time_equil",   ctl%time_equil)       ! [yr] Years to relax first
+    call nml_read(path_par,trim(ctl%run_step),"time_ref",     ctl%time_ref)         ! [yr,yr] Reference period
+    call nml_read(path_par,trim(ctl%run_step),"time_hist",    ctl%time_hist)        ! [yr,yr] Historical period
+    call nml_read(path_par,trim(ctl%run_step),"time_proj",    ctl%time_proj)        ! [yr,yr] Projection period
+    call nml_read(path_par,trim(ctl%run_step),"time_esm_ref", ctl%time_esm_ref)     ! [yr,yr] ESM reference period
+    call nml_read(path_par,trim(ctl%run_step),"clim_var",     ctl%clim_var)         ! Climate variability
+    call nml_read(path_par,trim(ctl%run_step),"clim_seed",    ctl%clim_seed)        ! Climate variability
+    call nml_read(path_par,trim(ctl%run_step),"tstep_method", ctl%tstep_method)     ! Calendar choice ("const" or "rel")
+    call nml_read(path_par,trim(ctl%run_step),"tstep_const",  ctl%tstep_const)      ! Assumed time bp for const method
         
     call nml_read(path_par,trim(ctl%run_step),"kill_shelves",  ctl%kill_shelves)    ! Kill shelves beyond pd?
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
@@ -222,7 +222,6 @@ program yelmox_esm
                     time_ref=2000.0_wp,const_rel=0.0_wp,const_cal=ctl%tstep_const)
     
     ! === Initialize ice sheet model =====
-    
     ! Initialize data objects and load initial topography
     call yelmo_init(yelmo1,filename=path_par,grid_def="file",time=ts%time)
 
@@ -234,7 +233,11 @@ program yelmox_esm
     allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
     allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
     
-    opt%cf_min = yelmo1%dyn%par%till_cf_min
+    if (opt%use_yelmo_cf_min) then
+        opt%cf_min = yelmo1%dyn%par%till_cf_min 
+    else
+        opt%cf_min = opt%opt_cf_min
+    end if
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define specific regions of interest =====================
@@ -493,6 +496,7 @@ program yelmox_esm
             else
                 ! Do nothing
             end if
+
             call timer_step(tmrs,comp=1,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================
@@ -502,8 +506,7 @@ program yelmox_esm
 
             ! == CLIMATE ===========================================================
 
-            ! Update forcing to present-day reference, but 
-            ! adjusting to ice topography
+            ! Update forcing to present-day reference, but adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                                   time=ts%time,time_bp=ts%time_rel, &
                                   domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name) 
@@ -727,9 +730,16 @@ contains
     
         ! === Atmospheric boundary conditions ===
         ! Calculate SMB fields
-        call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
-                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
-    
+        if (use_smb) then
+            ! SMB data
+            ! compute SMB
+            smbp%ann%smb = esm%smb_ref + esm%dsmb + esm%dsmbdz*(ylmo%tpo%now%H_ice-)
+        else
+            ! SMB model
+            call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
+                                        ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
+        end
+
         ! === Oceanic boundary conditions ===
         ! Interpolate ocean data to the interior of the ice shelf
         call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
@@ -1180,6 +1190,9 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        ! jablasco: test
+        !call nc_write(filename,"cb_tgt",ylmo%dyn%now%cb_tgt,units="--",long_name="Bed friction scalar target", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &

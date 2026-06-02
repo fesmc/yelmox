@@ -36,7 +36,7 @@
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
+    cf_init         = 1e-2              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
@@ -59,8 +59,8 @@
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
+    tf_min          = -1.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  1.0              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False             ! If true: Fill grounded basins with ice-shelf mean tf-corr values
 /

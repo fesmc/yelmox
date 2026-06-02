@@ -284,19 +284,6 @@
     time_par    = 1995, 2300, 1, 1
 /
 
-! === Other fields ===
-
-&basins
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name        = "basin_reese"
-    units_in    = "1"
-    units_out   = "1"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False
-    time_par    = 2020, 2020, 0, 1
-/
-
 ! =====================================================
 !
 ! CMIP output variable list
