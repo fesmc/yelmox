@@ -747,7 +747,7 @@ contains
         ! Calculate SMB fields
         if (ctl%esm_use_smb) then
             ! compute SMB
-            smbp%ann%smb = sum(esm%smb_ref%var(:,:,:,1),dim=3)/12 + sum(esm%dsmb,dim=3)/12.0 ! TO DO jablasco + esm%dsmbdz*(ylmo%tpo%now%H_ice-)
+            smbp%ann%smb = sum(esm%smb_ref%var(:,:,:,1),dim=3)/12 + sum(esm%dsmb,dim=3)/12.0 + esm%dsmbdz*(esm%zs_ref%var(:,:,1,1)-ylmo%tpo%now%z_srf)
         else
             ! SMB model
             call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &

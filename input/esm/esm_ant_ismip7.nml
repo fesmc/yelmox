@@ -188,6 +188,17 @@
     time_par    = 1850, 2014, 1, 12
 /
 
+&gcm_dsmbdz_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_historical_v2_1850_2014_dacabfdz.nc"
+    name        = "dacabfdz"
+    units_in    = "kg m-2 s-1 m-1"
+    units_out   = "mm yr-1 m-1"
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1850, 2014, 1, 1
+/
+
 ! ======== Projection period ========
 &gcm_ts_proj
     filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/tas/v2/{grid_name}_{gcm}_ssp585_v2_2015_2300_tas.nc"
@@ -220,6 +231,17 @@
     unit_offset = 0.0 
     with_time   = True 
     time_par    = 2015, 2300, 1, 12
+/
+
+&gcm_dsmbdz_proj
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_ssp585_v2_2016_2300_dacabfdz.nc"
+    name        = "dacabfdz"
+    units_in    = "kg m-2 s-1 m-1"
+    units_out   = "mm yr-1 m-1"
+    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 2016, 2300, 1, 1
 /
 
 ! ========      OCEAN      =========

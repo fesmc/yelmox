@@ -74,11 +74,13 @@ module esm
 
         type(varslice_class)   :: ts_hist 
         type(varslice_class)   :: pr_hist
-        type(varslice_class)   :: smb_hist 
+        type(varslice_class)   :: smb_hist
+        type(varslice_class)   :: dsmbdz_hist 
 
         type(varslice_class)   :: ts_proj
         type(varslice_class)   :: pr_proj
         type(varslice_class)   :: smb_proj
+        type(varslice_class)   :: dsmbdz_proj
 
         ! Oceanic fields 
         type(varslice_class)   :: to_esm_ref
@@ -105,7 +107,8 @@ module esm
         ! Anomalies
         real(wp), allocatable :: dts(:,:,:)       ! Surface temperature anomaly [K]
         real(wp), allocatable :: dpr(:,:,:)       ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [m/yr]
+        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr]
+        real(wp), allocatable :: dsmbdz(:,:)      ! SMB height anomaly [mm/yr*m]
         real(wp), allocatable :: dts_var(:,:,:)   ! Surface temperature anomaly variability[K]
         real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation relative anomaly variability [%]
         real(wp), allocatable :: dsmb_var(:,:,:)  ! SMB anomaly variability [m/yr]
@@ -237,12 +240,14 @@ contains
         character(len=256) :: grp_ts_hist 
         character(len=256) :: grp_pr_hist
         character(len=256) :: grp_smb_hist
+        character(len=256) :: grp_dsmbdz_hist
         character(len=256) :: grp_to_hist 
         character(len=256) :: grp_so_hist
         ! ESM Projection period 
         character(len=256) :: grp_ts_proj 
         character(len=256) :: grp_pr_proj 
         character(len=256) :: grp_smb_proj
+        character(len=256) :: grp_dsmbdz_proj
         character(len=256) :: grp_to_proj 
         character(len=256) :: grp_so_proj
 
@@ -336,18 +341,20 @@ contains
         grp_so_esm_ref   = trim(group_prefix)//"so_esm_ref" 
 
         ! ESM Historical sims 
-        grp_ts_hist  = trim(group_prefix)//"ts_hist"
-        grp_pr_hist  = trim(group_prefix)//"pr_hist"
-        grp_smb_hist = trim(group_prefix)//"smb_hist"
-        grp_to_hist  = trim(group_prefix)//"to_hist"
-        grp_so_hist  = trim(group_prefix)//"so_hist"
+        grp_ts_hist     = trim(group_prefix)//"ts_hist"
+        grp_pr_hist     = trim(group_prefix)//"pr_hist"
+        grp_smb_hist    = trim(group_prefix)//"smb_hist"
+        grp_dsmbdz_hist = trim(group_prefix)//"dsmbdz_hist"
+        grp_to_hist     = trim(group_prefix)//"to_hist"
+        grp_so_hist     = trim(group_prefix)//"so_hist"
 
         ! ESM projected sims
-        grp_ts_proj  = trim(group_prefix)//"ts_proj"
-        grp_pr_proj  = trim(group_prefix)//"pr_proj"
-        grp_smb_proj = trim(group_prefix)//"smb_proj"
-        grp_to_proj  = trim(group_prefix)//"to_proj"
-        grp_so_proj  = trim(group_prefix)//"so_proj"         
+        grp_ts_proj     = trim(group_prefix)//"ts_proj"
+        grp_pr_proj     = trim(group_prefix)//"pr_proj"
+        grp_smb_proj    = trim(group_prefix)//"smb_proj"
+        grp_dsmbdz_proj = trim(group_prefix)//"dsmbdz_proj"
+        grp_to_proj     = trim(group_prefix)//"to_proj"
+        grp_so_proj     = trim(group_prefix)//"so_proj"         
      
         ! Climatology
         ! Reference period
@@ -405,6 +412,7 @@ contains
                     call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, esm%gcm, esm%scenario)
                     if (use_smb) then
                         call varslice_init_nml_esm(esm%smb_hist, filename, trim(grp_smb_hist), domain, grid_name, esm%gcm, esm%scenario)
+                        call varslice_init_nml_esm(esm%dsmbdz_hist, filename, trim(grp_dsmbdz_hist), domain, grid_name, esm%gcm, esm%scenario)
                     else
                         call varslice_init_nml_esm(esm%pr_hist, filename, trim(grp_pr_hist), domain, grid_name, esm%gcm, esm%scenario)
                     end if
@@ -417,6 +425,7 @@ contains
                     call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
                     if (use_smb) then
                         call varslice_init_nml_esm(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, esm%gcm, esm%scenario)
+                        call varslice_init_nml_esm(esm%dsmbdz_proj, filename, trim(grp_dsmbdz_proj), domain, grid_name, esm%gcm, esm%scenario)
                     else
                         call varslice_init_nml_esm(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, esm%gcm, esm%scenario)
                     end if
@@ -687,6 +696,7 @@ contains
         esm%dts  = 0.0_wp
         esm%dpr  = 1.0_wp
         esm%dsmb = 1.0_wp
+        esm%dsmbdz = 0.0_wp
         esm%dto  = 0.0_wp
         esm%dso  = 0.0_wp 
 
@@ -721,6 +731,7 @@ contains
                         call varslice_update(esm%ts_hist,[time],method="extrap",rep=12)
                         if (use_smb) then
                             call varslice_update(esm%smb_hist,[time],method="extrap",rep=12)
+                            call varslice_update(esm%dsmbdz_hist,[time],method="extrap",rep=1)
                         else
                             call varslice_update(esm%pr_hist,[time],method="extrap",rep=12)
                         end if
@@ -729,6 +740,7 @@ contains
                             esm%dts(:,:,m) = esm%ts_hist%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
                             if (use_smb) then
                                 esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_ref%var(:,:,m,1)
+                                esm%dsmbdz(:,:) = esm%dsmbdz_hist%var(:,:,1,1)
                             else
                                 esm%dpr(:,:,m) = esm%pr_hist%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
                             end if
@@ -756,6 +768,7 @@ contains
                         call varslice_update(esm%ts_proj, [time],method="extrap",rep=12)
                         if (use_smb) then
                             call varslice_update(esm%smb_proj, [time],method="extrap",rep=12)
+                            call varslice_update(esm%dsmbdz_proj, [time],method="extrap",rep=1)
                         else
                             call varslice_update(esm%pr_proj, [time],method="extrap",rep=12)
                         end if
@@ -764,6 +777,7 @@ contains
                             esm%dts(:,:,m) = esm%ts_proj%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
                             if (use_smb) then
                                 esm%dsmb(:,:,m) = esm%smb_proj%var(:,:,m,1)-esm%smb_esm_ref%var(:,:,m,1)
+                                esm%dsmbdz(:,:) = esm%dsmbdz_proj%var(:,:,1,1)
                             else
                                 esm%dpr(:,:,m) = esm%pr_proj%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
                             end if
@@ -834,6 +848,7 @@ contains
             esm%dts  = 0.0_wp
             esm%dpr  = 1.0_wp
             esm%dsmb = 0.0_wp
+            esm%dsmbdz = 0.0_wp
         end if
             
         if (use_ref_ocn) then
