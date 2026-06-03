@@ -1,7 +1,9 @@
 #!/bin/bash
 
 resolution=32km
-output_path=output_albedo/ismip7/opt-${resolution}_energy_cbtgtVA26_enh3_jbn_smb
+#output_path=output_albedo/ismip7/opt-${resolution}_energy_cbtgtVA26_enh3_l21_smb
+output_path=output_albedo/ismip7/test
+
 
 ctrl_params=(
     "ctrl.run_step=spinup"
@@ -16,7 +18,7 @@ ctrl_params=(
 )
 
 opt_params=(
-    "opt.H0=-1"
+    "opt.H0=100"
 	"opt.cf_time_end=15e3"
     "opt.tf_time_end=15e3"
     "opt.tau_c=100.0"

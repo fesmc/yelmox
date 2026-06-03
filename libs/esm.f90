@@ -732,6 +732,7 @@ contains
                         if (use_smb) then
                             call varslice_update(esm%smb_hist,[time],method="extrap",rep=12)
                             call varslice_update(esm%dsmbdz_hist,[time],method="extrap",rep=1)
+                            esm%dsmbdz(:,:) = esm%dsmbdz_hist%var(:,:,1,1)
                         else
                             call varslice_update(esm%pr_hist,[time],method="extrap",rep=12)
                         end if
@@ -740,7 +741,6 @@ contains
                             esm%dts(:,:,m) = esm%ts_hist%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
                             if (use_smb) then
                                 esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_ref%var(:,:,m,1)
-                                esm%dsmbdz(:,:) = esm%dsmbdz_hist%var(:,:,1,1)
                             else
                                 esm%dpr(:,:,m) = esm%pr_hist%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
                             end if
@@ -769,6 +769,7 @@ contains
                         if (use_smb) then
                             call varslice_update(esm%smb_proj, [time],method="extrap",rep=12)
                             call varslice_update(esm%dsmbdz_proj, [time],method="extrap",rep=1)
+                            esm%dsmbdz(:,:) = esm%dsmbdz_proj%var(:,:,1,1)
                         else
                             call varslice_update(esm%pr_proj, [time],method="extrap",rep=12)
                         end if
@@ -777,7 +778,6 @@ contains
                             esm%dts(:,:,m) = esm%ts_proj%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
                             if (use_smb) then
                                 esm%dsmb(:,:,m) = esm%smb_proj%var(:,:,m,1)-esm%smb_esm_ref%var(:,:,m,1)
-                                esm%dsmbdz(:,:) = esm%dsmbdz_proj%var(:,:,1,1)
                             else
                                 esm%dpr(:,:,m) = esm%pr_proj%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
                             end if
@@ -1242,6 +1242,8 @@ contains
         allocate(esm%pr(nx,ny,12))
         allocate(esm%dts(nx,ny,12))
         allocate(esm%dpr(nx,ny,12))
+        allocate(esm%dsmb(nx,ny,12))
+        allocate(esm%dsmbdz(nx,ny))
         allocate(esm%dto(nx,ny))
         allocate(esm%dso(nx,ny))
         allocate(esm%dts_var(nx,ny,12))
@@ -1267,6 +1269,8 @@ contains
             if (allocated(esm%pr))      deallocate(esm%pr)
             if (allocated(esm%dts))     deallocate(esm%dts)
             if (allocated(esm%dpr))     deallocate(esm%dpr)
+            if (allocated(esm%dsmb))    deallocate(esm%dsmb)
+            if (allocated(esm%dsmbdz))  deallocate(esm%dsmbdz)
             if (allocated(esm%dto))     deallocate(esm%dto)
             if (allocated(esm%dso))     deallocate(esm%dso)
             if (allocated(esm%dts_var)) deallocate(esm%dts_var)

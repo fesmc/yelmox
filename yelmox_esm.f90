@@ -321,7 +321,7 @@ program yelmox_esm
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                           time=ts%time,time_bp=ts%time_rel, &
                           domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name)
-
+    
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm" .and. (.not. ctl%esm_use_smb)) then 
         call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
@@ -521,7 +521,7 @@ program yelmox_esm
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                                   time=ts%time,time_bp=ts%time_rel, &
                                   domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name) 
-
+           
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
@@ -713,7 +713,7 @@ contains
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,ctl%esm_use_smb,domain,grid_name)
         
         ! extrapolate towards interior of ice shelf
-        if (.FALSE.) then
+        if (extrap_shlf) then
             ! avoid for ismip7
             call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
             call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
@@ -728,7 +728,7 @@ contains
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
                                     ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
                                     ctl%esm_use_var,use_ref_atm=.false.,use_ref_ocn=.false.)
-        
+
         ! Check anomalies
         if (.FALSE.) then
             ! ATM Anomaly check
@@ -747,13 +747,13 @@ contains
         ! Calculate SMB fields
         if (ctl%esm_use_smb) then
             ! compute SMB
-            smbp%ann%smb = sum(esm%smb_ref%var(:,:,:,1),dim=3)/12 + sum(esm%dsmb,dim=3)/12.0 + esm%dsmbdz*(esm%zs_ref%var(:,:,1,1)-ylmo%tpo%now%z_srf)
+            smbp%ann%smb = sum(esm%smb_ref%var(:,:,:,1),dim=3)/12 + sum(esm%dsmb,dim=3)/12.0 + esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf) !+ esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf)
         else
             ! SMB model
             call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
                                         ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
         end if
-
+        
         ! === Oceanic boundary conditions ===
         if (extrap_shlf) then
             ! Extrapolate ocean data to the interior of the ice shelf
