@@ -112,7 +112,7 @@ program yelmox_esm
     call nml_read(path_par,"esm","esm_name",         ctl%esm_name)
     call nml_read(path_par,"esm","use_esm",          ctl%esm_use_esm)
 
-    call nml_read(path_par,"esm","use_smb",          ctl%esm_use_esm)
+    call nml_read(path_par,"esm","use_smb",          ctl%esm_use_smb)
     call nml_read(path_par,"esm","use_var",          ctl%esm_use_var)
     call nml_read(path_par,"esm","use_proj",         ctl%esm_use_proj)
     call nml_read(path_par,"esm","use_hist",         ctl%esm_use_hist)
@@ -704,6 +704,10 @@ contains
         character(len=*),           intent(IN)    :: grid_name 
         logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
     
+        ! local variables
+        logical  :: extrap_shlf
+        extrap_shlf = .FALSE. ! parameter, to do (jablasco)
+
         ! Step 1: set the reference climatologies (for reference and variability reference)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,domain,grid_name)
         
@@ -740,21 +744,22 @@ contains
     
         ! === Atmospheric boundary conditions ===
         ! Calculate SMB fields
-        if (use_smb) then
-            ! SMB data
+        if (ctl%esm_use_smb) then
             ! compute SMB
-            smbp%ann%smb = esm%smb_ref + esm%dsmb + esm%dsmbdz*(ylmo%tpo%now%H_ice-)
+            smbp%ann%smb = sum(esm%smb_ref%var(:,:,:,1),dim=3)/12 + sum(esm%dsmb,dim=3)/12.0 ! TO DO jablasco + esm%dsmbdz*(ylmo%tpo%now%H_ice-)
         else
             ! SMB model
             call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
                                         ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
-        end
+        end if
 
         ! === Oceanic boundary conditions ===
-        ! Interpolate ocean data to the interior of the ice shelf
-        call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
-        call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
-    
+        if (extrap_shlf) then
+            ! Extrapolate ocean data to the interior of the ice shelf
+            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
+            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
+        end if
+
         if (.FALSE.) then
             ! Atm check
             write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
