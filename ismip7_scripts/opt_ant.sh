@@ -1,13 +1,14 @@
 #!/bin/bash
 
 resolution=32km
-output_path=output_albedo/ismip7/opt-${resolution}_energy_vanakker_cbtgt_enh3_jbn
+output_path=output_albedo/ismip7/opt-${resolution}_energy_cbtgtVA26_enh3_jbn_smb
 
 ctrl_params=(
     "ctrl.run_step=spinup"
+    "esm.use_smb=True"
     "spinup.equil_method=opt"
     "spinup.time_end=15.0e3"
-	"spinup.kill_shelves=True"
+    "spinup.kill_shelves=True"
     "tm_1D.dt=10.0"
     "tm_2Dsm.dt=2e3"
     "yelmo.nz_aa=11"

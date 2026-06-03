@@ -286,7 +286,8 @@ program yelmox_esm
     
     ! Initialize ESM atmospheric and oceanic objects 
     esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
-    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,gcm=ctl%esm_name,scenario=ctl%esm_experiment,use_esm=ctl%esm_use_esm)
+    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,gcm=ctl%esm_name,scenario=ctl%esm_experiment,&
+                          use_esm=ctl%esm_use_esm,use_smb=ctl%esm_use_smb,use_var=ctl%esm_use_var,use_hist=ctl%esm_use_hist,use_proj=ctl%esm_use_proj)
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
@@ -322,7 +323,7 @@ program yelmox_esm
                           domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name)
 
     ! Equilibrate snowpack for itm
-    if (trim(smbpal1%par%abl_method) .eq. "itm") then 
+    if (trim(smbpal1%par%abl_method) .eq. "itm" .and. (.not. ctl%esm_use_smb)) then 
         call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
             yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
@@ -532,7 +533,7 @@ program yelmox_esm
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2Dsm,ts%time)) then 
-                call write_step_2D_small(yelmo1,isos1,esm1,mshlf1,smbpal1,file2Dsm,ts%time)
+                call write_step_2D_small(yelmo1,isos1,esm1,mshlf1,smbpal1,ctl,file2Dsm,ts%time)
             end if
 
             if (timeout_check(tm_2D,ts%time)) then
@@ -634,7 +635,7 @@ program yelmox_esm
             ! == MODEL OUTPUT ===================================
 
             if (timeout_check(tm_2Dsm,ts%time)) then
-                call write_step_2D_small(yelmo1,isos1,esm1,mshlf1,smbpal1,file2Dsm,ts%time)
+                call write_step_2D_small(yelmo1,isos1,esm1,mshlf1,smbpal1,ctl,file2Dsm,ts%time)
             end if
 
             if (timeout_check(tm_2D,ts%time)) then
@@ -709,7 +710,7 @@ contains
         extrap_shlf = .FALSE. ! parameter, to do (jablasco)
 
         ! Step 1: set the reference climatologies (for reference and variability reference)
-        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,domain,grid_name)
+        call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,ctl%esm_use_smb,domain,grid_name)
         
         ! extrapolate towards interior of ice shelf
         if (.FALSE.) then
@@ -726,7 +727,7 @@ contains
         ! Step 3: Calculate the variability anomaly field
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
                                     ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
-                                    use_ref_atm=.false.,use_ref_ocn=.false.)
+                                    ctl%esm_use_var,use_ref_atm=.false.,use_ref_ocn=.false.)
         
         ! Check anomalies
         if (.FALSE.) then
@@ -1157,7 +1158,7 @@ contains
 
     end subroutine write_step_2D_combined
 
-    subroutine write_step_2D_small(ylmo,isos,esm,mshlf,srf,filename,time)
+    subroutine write_step_2D_small(ylmo,isos,esm,mshlf,smbp,ctl,filename,time)
 
         implicit none
 
@@ -1165,10 +1166,11 @@ contains
         type(isos_class),        intent(IN) :: isos
         type(esm_forcing_class), intent(IN) :: esm
         type(marshelf_class),    intent(IN) :: mshlf
-        type(smbpal_class),      intent(IN) :: srf
-
-        character(len=*),       intent(IN) :: filename
-        real(wp),               intent(IN) :: time
+        type(smbpal_class),      intent(IN) :: smbp
+        type(ctrl_params),       intent(IN) :: ctl
+        
+        character(len=*),        intent(IN) :: filename
+        real(wp),                intent(IN) :: time
 
         ! Local variables
         integer  :: ncid, n
@@ -1205,9 +1207,6 @@ contains
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! jablasco: test
-        !call nc_write(filename,"cb_tgt",ylmo%dyn%now%cb_tgt,units="--",long_name="Bed friction scalar target", &
-        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uxy_s_pd_err",ylmo%dta%pd%err_uxy_s,units="m/a",long_name="Surface velocity error wrt present day", &
@@ -1223,12 +1222,21 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dts_var",SUM(esm%dts_var, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly (variability)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dpr_ann",SUM(esm%dpr, dim=3)/12.0,units="%",long_name="Precipitation anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dpr_var",SUM(esm%dpr_var, dim=3)/12.0,units="%",long_name="Precipitation anomaly (variability)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        if (ctl%esm_use_smb) then
+            call nc_write(filename,"smb_ann",smbp%ann%smb,units="m/a water equiv.",long_name="SMB (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dsmb_ann",SUM(esm%dsmb, dim=3)/12.0,units="%",long_name="SMB anomaly (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dsmb_var",SUM(esm%dsmb_var, dim=3)/12.0,units="%",long_name="SMB anomaly (variability)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        else
+            call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dpr_ann",SUM(esm%dpr, dim=3)/12.0,units="%",long_name="Precipitation anomaly (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dpr_var",SUM(esm%dpr_var, dim=3)/12.0,units="%",long_name="Precipitation anomaly (variability)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        end if
 
         ! Oceanic boundary conditions
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &

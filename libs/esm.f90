@@ -100,7 +100,7 @@ module esm
         ! Monthly fields (but right now constant anomaly between months)
         real(wp), allocatable :: t2m(:,:,:)       ! Monthly surface temperature [K]
         real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation [mm/yr]
-        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [m/yr]
+        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr]
 
         ! Anomalies
         real(wp), allocatable :: dts(:,:,:)       ! Surface temperature anomaly [K]
@@ -120,7 +120,7 @@ module esm
         real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:)     ! Annual surface temperature [K]
         real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/yr]
-        real(wp), allocatable :: smb_ann(:,:)     ! Annual SMB [m/yr]
+        real(wp), allocatable :: smb_ann(:,:)     ! Annual SMB [mm/yr]
 
     end type
 
@@ -435,7 +435,7 @@ contains
     
     end subroutine esm_forcing_init
 
-    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,domain,grid_name)
+    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,domain,grid_name)
         ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
 
         implicit none
@@ -444,6 +444,7 @@ contains
         real(wp),                intent(IN)    :: z_srf_ylm(:,:)
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
+        logical,                 intent(IN)    :: use_smb
         character(len=*),        intent(IN)    :: domain, grid_name
 
         ! Local variables 
@@ -452,11 +453,10 @@ contains
         real(wp), parameter :: pi = 3.14159265359 
         character(len=56)   :: slice_method, ref_grid_name 
         !type(map_scrip_class) :: mps
-        logical  :: south, use_smb
+        logical  :: south
 
         ! Get slices for current time
         slice_method = "extrap"
-        use_smb = .TRUE. ! jablasco: add to nml
 
         ! select domain
         south = .FALSE. 
@@ -496,7 +496,7 @@ contains
             end if    
             esm%t2m(:,:,m) = esm%ts_ref%var(:,:,m,1) + lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
             if (use_smb) then
-                esm%smb(:,:,m) = esm%smb_ref%var(:,:,m,1) !No model elevation chanhges for SMB
+                esm%smb(:,:,m) = esm%smb_ref%var(:,:,m,1) !No model elevation changes for SMB
             else
                 esm%pr(:,:,m)  = esm%pr_ref%var(:,:,m,1) * exp(esm%beta_p*lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm))
             end if
@@ -520,7 +520,7 @@ contains
 
     end subroutine esm_clim_update
 
-    subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_ref_atm,use_ref_ocn)
+    subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -533,6 +533,7 @@ contains
         character(len=*), intent(IN) :: clim_var
         real(wp), intent(IN) :: time_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
+        logical,  intent(IN) :: use_var
         logical,  intent(IN), optional :: use_ref_atm 
         logical,  intent(IN), optional :: use_ref_ocn 
     
@@ -548,7 +549,7 @@ contains
         esm%dso_var = 0.0_wp
 
         ! jablasco: skip for ismip7 (improve)
-        if (.FALSE.) then 
+        if (use_var) then 
         ! Variability reference
         ! === Atmospheric fields ===
         call varslice_update(esm%ts_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
