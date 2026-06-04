@@ -50,7 +50,8 @@ mat_params=(
     "ymat.enh_shlf=1.0"
 )
 
-path_restart=/albedo/home/jablas001/yelmo-awi/yelmox/output_albedo/ismip7/opt-${resolution}_energy_cbtgtVA26_enh3_jbn_smb/restart-0.000-kyr/
+#path_restart=/albedo/home/jablas001/yelmo-awi/yelmox/output_albedo/ismip7/opt-${resolution}_energy_cbtgtVA26_enh3_jbn_smb/restart-0.000-kyr/
+path_restart=/albedo/home/jablas001/yelmo-awi/yelmox/output_albedo/ismip7/test_smb/restart-0.000-kyr/
 restart_params=(
   "yelmo.restart=${path_restart}/yelmo_restart.nc" 
   "marine_shelf.restart=${path_restart}/marine_shelf.nc" 
@@ -59,4 +60,4 @@ restart_params=(
 )
 
 runme -rs -q 48h -e esm -n par/yelmo_Antarctica_esm_ismip7.nml -o "${output_path}" \
-      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${neff_params[@]}" "${mat_params[@]}"
+      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${neff_params[@]}" "${mat_params[@]}" "${restart_params[@]}"

@@ -119,20 +119,20 @@
 
     opt_tf          = True              ! Should thermal forcing be optimized?
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
-    tf_time_end     = 20e3               ! [yr] When should optimization of thermal forcing stop?
-    H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    tf_time_end     = 20e3              ! [yr] When should optimization of thermal forcing stop?
+    H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
-    tau_m           = 10.0             ! [yr] Optimization relxation timescale 
+    tau_m           = 10.0              ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -1.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  1.0              ! [degC] Maximum allowed tf_corr value 
+    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False    
 /
 
 &yelmo
     domain          = "Antarctica"
-    grid_name       = "ANT-16KM" 
+    grid_name       = "ANT-32KM" 
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
@@ -620,7 +620,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
