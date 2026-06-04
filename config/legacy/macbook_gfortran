@@ -1,59 +1,28 @@
+# Legacy single-file config for `python config.py --file macbook_gfortran`.
+#
+# The modern path is `python config.py macbook gfortran` (or `configme`),
+# which assembles compilers/<compiler>.mk + machines/<machine>.mk +
+# common.mk centrally. This legacy file inlines the per-machine/per-compiler
+# bits and then `include`s common.mk so the shared dependency wiring lives
+# in exactly one place.
+
 FC = gfortran
 
 # Note: set NC_CROOT and NC_FROOT in .zshrc
-INC_NC  = -I${NC_FROOT}/include
-LIB_NC  = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf
+INC_NC = -I${NC_FROOT}/include
+LIB_NC = -L${NC_FROOT}/lib -lnetcdff -L${NC_CROOT}/lib -lnetcdf
 
-FESMUTILSROOT=fesm-utils/utils
-INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
-LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+# Compiler flags (gfortran). FFLAGS_OPENMP is appended by common.mk when
+# building with `make openmp=1`.
+FFLAGS = -ffree-line-length-none -I$(objdir) -J$(objdir)
+FFLAGS_OPENMP = -fopenmp
 
-FFTWROOT = fesm-utils/fftw-serial
-INC_FFTW = -I${FFTWROOT}/include
-LIB_FFTW = -L${FFTWROOT}/lib -lfftw3 -lm
-
-LISROOT = fesm-utils/lis-serial
-INC_LIS = -I${LISROOT}/include 
-LIB_LIS = -L${LISROOT}/lib -llis
-
-ISOSTASYROOT = FastIsostasy
-INC_ISOSTASY = -I${ISOSTASYROOT}/libisostasy/include 
-LIB_ISOSTASY = -L${ISOSTASYROOT}/libisostasy/include -lisostasy
-
-YELMOROOT = yelmo
-INC_YELMO = -I${YELMOROOT}/libyelmo/include 
-LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
-
-REMBOROOT = rembo1
-INC_REMBO = -I${REMBOROOT}/librembo/include
-LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
-
-# coordinates is a build dependency of rembo1; only used by `make yelmox_rembo`.
-COORDROOT = coordinates
-
-FFLAGS  = -ffree-line-length-none -I$(objdir) -J$(objdir)
-
-ifeq ($(openmp), 1)
-    # Overwrite default choices with openmp relevant choices 
-
-    FESMUTILSROOT=fesm-utils/utils
-    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
-    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
-
-    FFTWROOT = fesm-utils/fftw-omp
-    INC_FFTW = -I${FFTWROOT}/include
-    LIB_FFTW = -L${FFTWROOT}/lib -lfftw3_omp -lfftw3 -lm
-
-    LISROOT = fesm-utils/lis-omp
-    INC_LIS = -I${LISROOT}/include 
-    LIB_LIS = -L${LISROOT}/lib/ -llis
-
-    FFLAGS  = -I$(objdir) -J$(objdir) -ffree-line-length-none -fomit-frame-pointer -fopenmp 
-
-endif 
-
-LFLAGS  = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW)
+# Apple ld (ld64) rejects -Wl,-zmuldefs (GNU-ld/ELF flag). Disable it before
+# common.mk's `LFLAGS_EXTRA ?= -Wl,-zmuldefs` runs.
+LFLAGS_EXTRA =
 
 DFLAGS_NODEBUG = -O2
 DFLAGS_DEBUG   = -w -g -ggdb -ffpe-trap=invalid,zero,overflow,underflow -fbacktrace -fcheck=all
 DFLAGS_PROFILE = -O2 -pg
+
+include config/common.mk

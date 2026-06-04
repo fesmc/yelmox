@@ -26,6 +26,12 @@ YELMOROOT = yelmo
 INC_YELMO = -I${YELMOROOT}/libyelmo/include
 LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
+# FastHydrology: dependency of yelmo. yelmo's static archive does not pull it
+# in transitively, so the top-level link line must reference it explicitly.
+FASTHYDROROOT = FastHydrology
+INC_FASTHYDRO = -I${FASTHYDROROOT}/include
+LIB_FASTHYDRO = -L${FASTHYDROROOT}/include -lfasthydro
+
 REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
@@ -57,4 +63,4 @@ endif
 # macbook does this). ?= leaves any such earlier machine setting in force.
 LFLAGS_EXTRA ?= -Wl,-zmuldefs
 
-LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
+LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
