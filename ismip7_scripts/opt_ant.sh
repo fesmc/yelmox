@@ -1,7 +1,7 @@
 #!/bin/bash
 
-resolution=16km
-output_path=output_albedo/ismip7/test-${resolution}-cfminyelmo
+resolution=32km
+output_path=output_albedo/ismip7/opt-${resolution}-l21-bedmap3_ocn_clim
 #output_path=output_albedo/ismip7/test_smb
 
 
@@ -22,18 +22,19 @@ opt_params=(
 	"opt.cf_time_end=15e3"
     "opt.tf_time_end=15e3"
     "opt.tau_c=100.0"
-    "opt.rel_tau1=1.0"
-    "opt.rel_time1=1.0"
-    "opt.rel_tau2=1.0"
-    "opt.rel_time2=1.0"
-    "opt.use_yelmo_cf_min=True"
+    "opt.rel_tau1=100.0"
+    "opt.rel_time1=100.0"
+    "opt.rel_tau2=100.0"
+    "opt.rel_time2=100.0"
+    "opt.use_yelmo_cf_min=False"
 	"opt.opt_cf_min=1e-3"
     "opt.cf_init=-1"
 	"opt.basin_fill=True"
+    "opt.H_grnd_lim=500.0"
     "ytill.scale_zb=1"
     "ytill.z0=-700"
     "ytill.z1=700"
-    "ytill.cf_min=1e-2"
+    "ytill.cf_min=0.1"
     "ytill.cf_ref=0.4"
 )
 

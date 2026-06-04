@@ -259,8 +259,8 @@
 
 ! ======== Reference period ========
 &gcm_to_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
-    name        = "to"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_thetao_extrap.nc"
+    name        = "thetao"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0 
@@ -270,7 +270,7 @@
 /
 
 &gcm_so_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_so_extrap.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
