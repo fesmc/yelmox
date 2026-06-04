@@ -45,8 +45,8 @@
     filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
     name        = "precip"
     units_in    = "kg m-2 month-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 0.08333         
+    units_out   = "mm d-1"
+    unit_scale  = 0.0329         
     unit_offset = 0.0 
     with_time   = True
     time_par    = 1979.0, 2022.0, 1.0, 12.0
@@ -57,7 +57,7 @@
     name        = "smb"
     units_in    = "kg m-2 month-1"
     units_out   = "mm yr-1"
-    unit_scale  = 0.08333         
+    unit_scale  = 12.0         
     unit_offset = 0.0 
     with_time   = True
     time_par    = 1979.0, 2022.0, 1.0, 12.0
@@ -91,8 +91,8 @@
     filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
     name        = "precip_dt"
     units_in    = "kg m-2 month-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 0.08333         
+    units_out   = "mm d-1"
+    unit_scale  = 0.0329         
     unit_offset = 0.0 
     with_time   = True
     time_par    = 1990.0, 2019.0, 1.0, 12.0
@@ -103,7 +103,7 @@
     name        = "smb"
     units_in    = "kg m-2 month-1"
     units_out   = "mm yr-1"
-    unit_scale  = 0.08333         
+    unit_scale  = 12.0         
     unit_offset = 0.0 
     with_time   = True
     time_par    = 1979.0, 2022.0, 1.0, 12.0

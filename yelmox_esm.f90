@@ -409,7 +409,7 @@ program yelmox_esm
 
         call timer_step(tmr,comp=1,label="initialization") 
         call timer_step(tmrs,comp=-1)
-        
+
         do while (.not. ts%is_finished)
 
             ! == Update timestep ===
@@ -454,7 +454,7 @@ program yelmox_esm
                                                     yelmo1%dta%pd%H_ice,yelmo1%dta%pd%uxy_s,yelmo1%dta%pd%H_grnd, &
                                                     opt%cf_min,opt%cf_max,yelmo1%tpo%par%dx,opt%sigma_err,opt%sigma_vel,opt%tau_c,opt%H0, &
                                                     dt=ctl%dtt,fill_method=opt%fill_method,fill_dist=opt%sigma_err,cb_tgt=yelmo1%dyn%now%cb_tgt)
-                        
+
                     end if
 
                     if (opt%opt_tf .and. &
@@ -746,7 +746,11 @@ contains
         ! Calculate SMB fields
         if (ctl%esm_use_smb) then
             ! compute SMB
-            smbp%ann%smb = sum(esm%smb_ref%var(:,:,:,1),dim=3)/12 + sum(esm%dsmb,dim=3)/12.0 + esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf) !+ esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf)
+            smbp%ann%smb = esm%smb_ann + sum(esm%dsmb,dim=3)/12.0 + esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf) 
+            ! assign surface temp from model as boundary
+            smbp%ann%tsrf = sum(esm%t2m+esm%dts+esm%dts_var,dim=3)/12.0
+            where(ylmo%tpo%now%H_ice .gt. 0.0 .and.&
+                sum(esm%t2m+esm%dts+esm%dts_var,dim=3)/12.0 .gt. 273.15) smbp%ann%tsrf = 273.15
         else
             ! SMB model
             call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
@@ -1205,6 +1209,8 @@ contains
         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"cb_ref",ylmo%dyn%now%cb_ref,units="--",long_name="Bed friction scalar", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)    
+        call nc_write(filename,"cb_tgt",ylmo%dyn%now%cb_tgt,units="--",long_name="Bed friction scalar", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"H_ice_pd_err",ylmo%dta%pd%err_H_ice,units="m",long_name="Ice thickness error wrt present day", &
                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1221,12 +1227,12 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dts_var",SUM(esm%dts_var, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly (variability)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"smb_ann",ylmo%bnd%smb,units="m/a water equiv.",long_name="SMB (ann)", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         if (ctl%esm_use_smb) then
-            call nc_write(filename,"smb_ann",smbp%ann%smb,units="m/a water equiv.",long_name="SMB (ann)", &
+            call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"dsmb_ann",SUM(esm%dsmb, dim=3)/12.0,units="%",long_name="SMB anomaly (ann)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"dsmb_var",SUM(esm%dsmb_var, dim=3)/12.0,units="%",long_name="SMB anomaly (variability)", &
+            call nc_write(filename,"dsmb_var",1e-3*SUM(esm%dsmb_var, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (variability)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         else
             call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &

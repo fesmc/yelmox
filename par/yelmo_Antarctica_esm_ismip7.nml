@@ -102,7 +102,7 @@
     cf_time_init     = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end      = 20e3              ! [yr] When should optimization of basal friction stop?
     cf_init          = 0.1               ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
-    use_yelmo_cf_min = False             ! If false, min friction is opt_cf_min
+    use_yelmo_cf_min = True              ! If false, min friction is opt_cf_min
     opt_cf_min       = 1e-3              ! [--] Minimum allowed cf value
     tau_c            = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0               = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
@@ -132,7 +132,7 @@
 
 &yelmo
     domain          = "Antarctica"
-    grid_name       = "ANT-32KM" 
+    grid_name       = "ANT-16KM" 
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
@@ -395,7 +395,7 @@
 &yelmo_init_topo
     init_topo_load    = True
     init_topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"
-    init_topo_names   = "thickness_bedmachine" "bed_bedmachine" "bed_bedmachine" "surface_bedmachine"      
+    init_topo_names   = "thickness_bedmap3" "bed_bedmap3" "bed_bedmap3" "surface_bedmap3"      
                                                                 ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
@@ -407,7 +407,7 @@
 &yelmo_data 
     pd_topo_load      = True 
     pd_topo_path      = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"
-    pd_topo_names     = "thickness_bedmachine" "bed_bedmachine" "bed_bedmachine" "surface_bedmachine" "mask_bedmachine" 
+    pd_topo_names     = "thickness_bedmap3" "bed_bedmap3" "bed_bedmap3" "surface_bedmap3" "mask_bedmap3" 
                                                                 ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_RACMO23-VW23.nc"
@@ -620,7 +620,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-resolution=32km
-#output_path=output_albedo/ismip7/opt-${resolution}_energy_cbtgtVA26_enh3_l21_smb
-output_path=output_albedo/ismip7/test
+resolution=16km
+output_path=output_albedo/ismip7/test-${resolution}-cfminyelmo
+#output_path=output_albedo/ismip7/test_smb
 
 
 ctrl_params=(
@@ -23,16 +23,17 @@ opt_params=(
     "opt.tf_time_end=15e3"
     "opt.tau_c=100.0"
     "opt.rel_tau1=1.0"
-    "opt.rel_time1=10.0"
+    "opt.rel_time1=1.0"
     "opt.rel_tau2=1.0"
-    "opt.rel_time2=10.0"
+    "opt.rel_time2=1.0"
+    "opt.use_yelmo_cf_min=True"
 	"opt.opt_cf_min=1e-3"
     "opt.cf_init=-1"
 	"opt.basin_fill=True"
     "ytill.scale_zb=1"
     "ytill.z0=-700"
     "ytill.z1=700"
-    "ytill.cf_min=0.1"
+    "ytill.cf_min=1e-2"
     "ytill.cf_ref=0.4"
 )
 
