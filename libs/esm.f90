@@ -695,7 +695,7 @@ contains
         ! Initialize anomalies
         esm%dts  = 0.0_wp
         esm%dpr  = 1.0_wp
-        esm%dsmb = 1.0_wp
+        esm%dsmb = 0.0_wp
         esm%dsmbdz = 0.0_wp
         esm%dto  = 0.0_wp
         esm%dso  = 0.0_wp 
@@ -1240,6 +1240,7 @@ contains
         ! Allocate variables
         allocate(esm%t2m(nx,ny,12))
         allocate(esm%pr(nx,ny,12))
+        allocate(esm%smb(nx,ny,12))
         allocate(esm%dts(nx,ny,12))
         allocate(esm%dpr(nx,ny,12))
         allocate(esm%dsmb(nx,ny,12))
@@ -1252,7 +1253,8 @@ contains
         allocate(esm%dso_var(nx,ny))
         allocate(esm%t2m_ann(nx,ny))
         allocate(esm%t2m_sum(nx,ny))
-        allocate(esm%pr_ann(nx,ny))        
+        allocate(esm%pr_ann(nx,ny)) 
+        allocate(esm%smb_ann(nx,ny))       
 
         return
     
@@ -1267,6 +1269,7 @@ contains
             ! Allocate state objects
             if (allocated(esm%t2m))     deallocate(esm%t2m)
             if (allocated(esm%pr))      deallocate(esm%pr)
+            if (allocated(esm%smb))     deallocate(esm%smb)
             if (allocated(esm%dts))     deallocate(esm%dts)
             if (allocated(esm%dpr))     deallocate(esm%dpr)
             if (allocated(esm%dsmb))    deallocate(esm%dsmb)
@@ -1280,6 +1283,7 @@ contains
             if (allocated(esm%t2m_sum)) deallocate(esm%t2m_sum)
             if (allocated(esm%t2m_ann)) deallocate(esm%t2m_ann)
             if (allocated(esm%pr_ann))  deallocate(esm%pr_ann)
+            if (allocated(esm%smb_ann)) deallocate(esm%smb_ann)
 
             return
     
