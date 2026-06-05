@@ -5,18 +5,20 @@ Usage:
     python config.py <machine> <compiler>     # e.g. macbook gfortran
     python config.py --file <legacy_config>    # e.g. --file macbook_gfortran
 
-In the two-axis form, three fragments are assembled into the Makefile
+In the two-axis form, two fragments are assembled into the Makefile
 template (config/Makefile), in this order:
 
     config/compilers/<compiler>.mk   compiler flags (FC, FFLAGS, DFLAGS, ...)
     config/machines/<machine>.mk     machine paths (NetCDF) and any overrides
-    config/common.mk                 shared dependency paths and link flags
 
-Order matters: common.mk references variables the other two fragments set,
-and a machine fragment may override a compiler default (e.g. DFLAGS_NODEBUG).
+The shared dependency wiring (config/common.mk) is `include`d by the
+Makefile template itself, after the placeholder -- it is no longer
+concatenated here. A machine fragment may still override a compiler
+default (e.g. DFLAGS_NODEBUG), and common.mk references variables both
+fragments set.
 
 The --file form reproduces the legacy behaviour, dropping a single
-self-contained config file (kept in config/legacy/) into the template.
+per-host config file (kept in config/legacy/) into the template.
 """
 
 import argparse
@@ -105,10 +107,9 @@ def main():
         machine_mk = read(
             os.path.join(MACHINES_DIR, args.machine + ".mk"), "machine"
         )
-        common_mk = open(os.path.join(CONFIG_DIR, "common.mk")).read()
-        # Order matters: common.mk references vars set by the other two, and
-        # the machine fragment may override compiler defaults.
-        compile_info = "\n".join([compiler_mk, machine_mk, common_mk])
+        # common.mk is `include`d directly by the Makefile template; the
+        # machine fragment may still override compiler defaults.
+        compile_info = "\n".join([compiler_mk, machine_mk])
         source_desc = f"machine={args.machine}, compiler={args.compiler}"
 
     template = open(TEMPLATE).read()

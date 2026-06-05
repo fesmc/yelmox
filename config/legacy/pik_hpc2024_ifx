@@ -18,5 +18,3 @@ FFLAGS_OPENMP = -qopenmp
 DFLAGS_NODEBUG = -O2 -fp-model precise
 DFLAGS_DEBUG   = -C -traceback -ftrapuv -fpe0 -check all -fp-model precise
 DFLAGS_PROFILE = -O2 -fp-model precise -pg
-
-include config/common.mk

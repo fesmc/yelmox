@@ -14,17 +14,17 @@ LIB_NC = -L${NETCDFFI_ROOT}/lib -Wl\,-rpath=${NETCDFFI_ROOT}/lib -lnetcdff -L${N
 FFLAGS = -no-wrap-margin -module $(objdir) -L$(objdir)
 FFLAGS_OPENMP = -qopenmp
 
-# OBM: extra static library, only linked for the SPM variant.
+# OBM: extra static library, only linked for the SPM variant. Folded into
+# LFLAGS_EXTRA so common.mk picks it up as part of the final LFLAGS line
+# (the template `include`s common.mk after this fragment runs, so we cannot
+# append to LFLAGS directly). The default LFLAGS_EXTRA on Linux is
+# -Wl,-zmuldefs; we set both explicitly here.
 OBMROOT = libs/obm/
 INC_OBM =
 LIB_OBM = -L${OBMROOT}/
+LFLAGS_EXTRA = -Wl,-zmuldefs $(LIB_OBM)
 
 #DFLAGS_NODEBUG = -O2 -fp-model precise
 DFLAGS_NODEBUG = -Ofast -march=core-avx2 -mtune=core-avx2 -traceback #-recursive
 DFLAGS_DEBUG   = -C -O0 -g -traceback -ftrapuv -fpe0 -check all,nouninit -fp-model precise -debug extended -gen-interfaces -warn interfaces -check arg_temp_created
 DFLAGS_PROFILE = -O2 -fp-model precise -pg
-
-include config/common.mk
-
-# Append OBM after common.mk has set LFLAGS.
-LFLAGS += $(LIB_OBM)

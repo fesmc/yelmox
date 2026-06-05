@@ -1,10 +1,10 @@
 # Legacy single-file config for `python config.py --file macbook_gfortran`.
 #
 # The modern path is `python config.py macbook gfortran` (or `configme`),
-# which assembles compilers/<compiler>.mk + machines/<machine>.mk +
-# common.mk centrally. This legacy file inlines the per-machine/per-compiler
-# bits and then `include`s common.mk so the shared dependency wiring lives
-# in exactly one place.
+# which assembles compilers/<compiler>.mk + machines/<machine>.mk centrally.
+# This legacy file inlines the per-machine/per-compiler bits only; the
+# shared dependency wiring (config/common.mk) is `include`d by the Makefile
+# template itself.
 
 FC = gfortran
 
@@ -24,5 +24,3 @@ LFLAGS_EXTRA =
 DFLAGS_NODEBUG = -O2
 DFLAGS_DEBUG   = -w -g -ggdb -ffpe-trap=invalid,zero,overflow,underflow -fbacktrace -fcheck=all
 DFLAGS_PROFILE = -O2 -pg
-
-include config/common.mk
