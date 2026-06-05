@@ -82,9 +82,14 @@ fesmutils-static: fesmutils-deps-check
 	$(MAKE) -C $(FESMUTILSROOT) fesmutils-static openmp=$(openmp)
 
 # Compile static library in its own directory
-yelmo-static: fesmutils-static
+yelmo-static: fesmutils-static fasthydro-static
 	$(MAKE) -C $(YELMOROOT) yelmo-static openmp=$(openmp)
 	cp $(YELMOROOT)/git_yelmo.txt ./
+
+# FastHydrology's static archive provides fast_hydrology.mod, which yelmo's
+# sources `use`, so this must build before yelmo-static.
+fasthydro-static: fesmutils-static
+	$(MAKE) -C $(FASTHYDROROOT) fasthydro-static openmp=$(openmp)
 
 # Compile static library in its own directory
 isostasy-static: fesmutils-static
