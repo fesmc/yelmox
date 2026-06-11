@@ -646,7 +646,6 @@ program yelmox_esm
                 call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
             end if
            
-             
             if (timeout_check(tm_1D,ts%time)) then
                 call yelmo_regions_write(yelmo1,ts%time)
                 call write_1D_esm(yelmo1,esm1,mshlf1,file1D_esm,ts%time)
@@ -1233,8 +1232,6 @@ contains
         if (ctl%esm_use_smb) then
             call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-            call nc_write(filename,"dsmb_var",1e-3*SUM(esm%dsmb_var, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (variability)", &
-                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         else
             call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1280,174 +1277,6 @@ contains
     end subroutine write_step_2D_small
 
     ! ===== esm output routines =========
-
-    subroutine write_step_2D_esm(ylmo,filename,time)
-
-        implicit none
-
-        type(yelmo_class), intent(IN) :: ylmo
-        character(len=*),  intent(IN) :: filename
-        real(wp),          intent(IN) :: time
-
-        ! Local variables
-        integer  :: ncid, n
-        real(wp) :: rho_ice 
-        real(wp) :: density_corr
-        real(wp) :: m3yr_to_kgs
-        real(wp) :: esm_correction
-        real(wp) :: yr_to_sec
-        
-        ! esm variables
-        real(wp), allocatable :: bmb_grnd_masked(:,:)
-        real(wp), allocatable :: bmb_shlf_masked(:,:)
-        real(wp), allocatable :: z_base(:,:)
-        real(wp), allocatable :: T_top_ice(:,:)
-        real(wp), allocatable :: T_base_grnd(:,:)
-        real(wp), allocatable :: T_base_flt(:,:)
-        real(wp), allocatable :: flux_grl(:,:)
-        
-        ! Allocate and initialize local arrays
-        allocate(bmb_grnd_masked(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(bmb_shlf_masked(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(z_base(ylmo%grd%nx,ylmo%grd%ny)) 
-        allocate(T_top_ice(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(T_base_grnd(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(T_base_flt(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(flux_grl(ylmo%grd%nx,ylmo%grd%ny))
-
-        bmb_shlf_masked   = 0.0_wp
-        bmb_grnd_masked   = 0.0_wp
-        z_base            = 0.0_wp
-        T_top_ice         = 0.0_wp
-        T_base_grnd       = 0.0_wp
-        T_base_flt        = 0.0_wp 
-        flux_grl          = 0.0_wp
-
-        ! === Data conversion factors ========================================
-
-        rho_ice             = 917.0             ! ice density kg/m3
-        m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
-        density_corr        = rho_ice/1000.0    ! ice density correction with pure water
-        esm_correction   = m3yr_to_kgs*density_corr
-        yr_to_sec           = 31556952.0
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_time_index(filename,"time",time,ncid)
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-
-        ! Write esm variables 
-
-        ! == yelmo_topography ==
-        call nc_write(filename,"lithk",ylmo%tpo%now%H_ice,units="m",long_name="Ice thickness", &
-                        standard_name="land_ice_thickness", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"orog",ylmo%tpo%now%z_srf,units="m",long_name="Surface evelation", &
-                        standard_name="surface_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! ajr, should we just be writing the Yelmo variable ylmo%tpo%now%z_base??
-        where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0) z_base = ylmo%bnd%z_bed
-        call nc_write(filename,"base",z_base,units="m",long_name="Base elevation", &
-                        standard_name="base_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        
-        call nc_write(filename,"topg",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
-                        standard_name="bedrock_altitude", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! == yelmo_GHF ==
-        call nc_write(filename,"hfgeoubed",ylmo%bnd%Q_geo*1e3,units="W/m^2",long_name="Geothermal heat flux", &
-                        standard_name="upward_geothermal_heat_flux_at_ground_level", dim1="xc",dim2="yc",start=[1,1],ncid=ncid)
-
-        ! == yelmo_mass_balances ==
-        
-        where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0) bmb_grnd_masked = ylmo%thrm%now%bmb_grnd
-        where(ylmo%tpo%now%H_ice .gt. 0.0 .and. ylmo%tpo%now%f_grnd_bmb .eq. 0.0) bmb_shlf_masked = ylmo%bnd%bmb_shlf
-        call nc_write(filename,"acabf",ylmo%bnd%smb*esm_correction,units="kg m-2 s-1",long_name="Surface mass balance flux", &
-                        standard_name="land_ice_surface_specific_mass_balance_flux", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"libmassbfgr",bmb_grnd_masked*esm_correction,units="kg m-2 s-1",long_name="Basal mass balance flux beneath grounded ice", &
-                        standard_name="land_ice_basal_specific_mass_balance_flux", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"libmassbffl",bmb_shlf_masked*esm_correction,units="kg m-2 s-1",long_name="Basal mass balance flux beneath floating ice", &
-                        standard_name="float_ice_basal_specific_mass_balance_flux", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! == yelmo_velocities ==
-        call nc_write(filename,"dlithkdt",ylmo%tpo%now%dHidt/yr_to_sec,units="m s-1",long_name="Ice thickness imbalance", &
-                        standard_name="tendency_of_land_ice_thickness", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! comparison dHdt m/yr
-        !call nc_write(filename,"dHdt",ylmo%tpo%now%dHidt,units="m yr-1",long_name="Ice thickness imbalance", &
-        !              standard_name="tendency_of_land_ice_thickness", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"xvelsurf",ylmo%dyn%now%ux_s/yr_to_sec,units="m s-1",long_name="Surface velocity in x", &
-                        standard_name="land_ice_surface_x_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"yvelsurf",ylmo%dyn%now%uy_s/yr_to_sec,units="m s-1",long_name="Surface velocity in y", &
-                        standard_name="land_ice_surface_y_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"zvelsurf",ylmo%dyn%now%uz_s/yr_to_sec,units="m s-1",long_name="Surface velocity in z", &
-                        standard_name="land_ice_surface_upward_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"xvelbase",ylmo%dyn%now%ux_b/yr_to_sec,units="m s-1",long_name="Basal velocity in x", &
-                        standard_name="land_ice_surface_x_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"yvelbase",ylmo%dyn%now%uy_b/yr_to_sec,units="m s-1",long_name="Basal velocity in y", &
-                        standard_name="land_ice_surface_y_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"zvelbase",ylmo%dyn%now%uz_b/yr_to_sec,units="m s-1",long_name="Basal velocity in z", &
-                        standard_name="land_ice_basal_upward_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"xvelmean",ylmo%dyn%now%ux_bar/yr_to_sec,units="m s-1",long_name="Mean velocity in x", &
-                        standard_name="land_ice_vertical_mean_x_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"yvelmean",ylmo%dyn%now%uy_bar/yr_to_sec,units="m s-1",long_name="Mean velocity in y", &
-                        standard_name="land_ice_vertical_mean_y_velocity", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! == yelmo_ice_temperature ==
-        
-        ! Local variables
-        where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0) T_base_grnd = ylmo%thrm%now%T_ice(:,:,1)
-        where(ylmo%tpo%now%H_ice .gt. 0.0 .and. ylmo%tpo%now%f_grnd_bmb .eq. 0.0) T_base_flt = ylmo%thrm%now%T_ice(:,:,1)
-        where(ylmo%tpo%now%H_ice .gt. 0.0) T_top_ice = ylmo%thrm%now%T_ice(:,:,ylmo%dyn%par%nz_aa)
-        call nc_write(filename,"litemptop",T_top_ice,units="K",long_name="Surface temperature", &
-                        standard_name="temperature_at_top_of_ice_sheet_model", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"litempbotgr",T_base_grnd,units="K",long_name="Basal temperature beneath grounded ice sheet", &
-                        standard_name="land_ice_basal_temperature", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"litempbotfl",T_base_flt,units="K",long_name="Basal temperature beneath floating ice shelf", &
-                        standard_name="floating_ice_basal_temperature", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! == yelmo_drag_and_fluxes ==
-        ! ajr, flux at gl not calculated correctly?
-        where(ylmo%tpo%now%f_grnd_bmb .gt. 0.0 .and. ylmo%tpo%now%f_grnd_bmb .lt. 1.0) flux_grl = ylmo%tpo%now%dHidt
-        call nc_write(filename,"strbasemag",ylmo%dyn%now%taub,units="Pa",long_name="Basal drag", &
-                        standard_name="Basal drag", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"licalvf",ylmo%tpo%now%cmb*esm_correction,units="kg m-2 s-1",long_name="Calving flux", &
-                        standard_name="land_ice_specific_mass_flux_due_to_calving", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"lifmassbf",(ylmo%tpo%now%fmb+ylmo%tpo%now%cmb)*esm_correction,units="kg m-2 s-1",long_name="Ice front melt and calving flux", &
-                        standard_name="land_ice_specific_mass_flux_due_to_calving_and_ice_front_melting", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"ligroundf",flux_grl*esm_correction,units="kg m-2 s-1",long_name="Grounding line flux", &
-                        standard_name="land_ice_specific_mass_flux_at_grounding_line", dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! == yelmo_masks ==
-        call nc_write(filename,"sftgif",ylmo%tpo%now%f_ice,units="1",long_name="Land ice area fraction", &
-                        standard_name="land_ice_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"sftgrf",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded ice sheet area fraction", &
-                        standard_name="grounded_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"sftflf",MAX(ylmo%tpo%now%f_ice-ylmo%tpo%now%f_grnd,0.0),units="1",long_name="Floating ice sheet area fraction", &
-                        standard_name="floating_ice_sheet_area_fraction",dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"mask_bed",ylmo%tpo%now%mask_bed,units="",long_name="Bed mask", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! ATM and OCN test files
-        ! call nc_write(filename,"T_atm_snap",esm1%ts%var(:,:,1,1),units="K",long_name="Surface temperature anomaly", &
-        !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"Tf_snap",esm1%tf%var(:,:,1,1),units="K",long_name="TF map", &
-        !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"T_srf",yelmo1%bnd%T_srf,units="K",long_name="Surface temperature Yelmo", &
-        !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"Tf_shlf",mshlf%now%tf_shlf,units="K",long_name="Shelf temperature", &
-        !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        ! call nc_write(filename,"tf_corr",mshlf%now%tf_corr,units="K",long_name="Shelf thermal forcing correction factor", &
-        !                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
-        ! Close the netcdf file
-        call nc_close(ncid)
-
-        return
-
-    end subroutine write_step_2D_esm
-
     subroutine write_1D_esm(dom, esm, mshlf, filename, time)
 
         ! Used to plot climatic variable fields
@@ -1695,322 +1524,278 @@ contains
         real(wp) :: yr_to_sec
         
         ! 2-D working arrays
-        real(wp), allocatable :: bmb_grnd_masked(:,:)
-        real(wp), allocatable :: bmb_shlf_masked(:,:)
+        real(wp), allocatable :: bmb_grnd_masked(:,:), bmb_shlf_masked(:,:)
         real(wp), allocatable :: z_base(:,:)
-        real(wp), allocatable :: T_top_ice(:,:)
-        real(wp), allocatable :: T_base_grnd(:,:)
-        real(wp), allocatable :: T_base_flt(:,:)
-        real(wp), allocatable :: T_avg(:,:)
-                real(wp), allocatable :: dTdz_base_grnd(:,:)
-                real(wp), allocatable :: dTdz_base_flt(:,:)
-                real(wp), allocatable :: flux_grl_2d(:,:)
-                real(wp), allocatable :: tfbase(:,:)
-                real(wp), allocatable :: ux_aa(:,:)     ! xvelmean on aa-nodes
-                real(wp), allocatable :: uy_aa(:,:)     ! yvelmean on aa-nodes
+        real(wp), allocatable :: T_top_ice(:,:), T_base_grnd(:,:), T_base_flt(:,:), T_avg(:,:)
+        real(wp), allocatable :: dTdz_base_grnd(:,:), dTdz_base_flt(:,:)
+        real(wp), allocatable :: flux_grl_2d(:,:), flux_clv_2d(:,:), tfbase(:,:)
+        real(wp), allocatable :: ux_aa(:,:), uy_aa(:,:)    
         
-                ! ---- allocate -------------------------------------------------------
-                allocate(bmb_grnd_masked (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(bmb_shlf_masked (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(z_base          (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(T_top_ice       (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(T_base_grnd     (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(T_base_flt      (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(T_avg           (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(dTdz_base_grnd  (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(dTdz_base_flt   (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(flux_grl_2d     (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(tfbase          (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(ux_aa           (ylmo%grd%nx, ylmo%grd%ny))
-                allocate(uy_aa           (ylmo%grd%nx, ylmo%grd%ny))
+        ! ---- allocate -------------------------------------------------------
+        allocate(bmb_grnd_masked (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(bmb_shlf_masked (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(z_base          (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(T_top_ice       (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(T_base_grnd     (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(T_base_flt      (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(T_avg           (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(dTdz_base_grnd  (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(dTdz_base_flt   (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(flux_grl_2d     (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(flux_clv_2d     (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(tfbase          (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(ux_aa           (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(uy_aa           (ylmo%grd%nx, ylmo%grd%ny))
         
-                ! ---- initialise -----------------------------------------------------
-                bmb_grnd_masked = 0.0_wp;  bmb_shlf_masked = 0.0_wp
-                z_base          = 0.0_wp;  T_top_ice        = 0.0_wp
-                T_base_grnd     = 0.0_wp;  T_base_flt       = 0.0_wp
-                T_avg           = 0.0_wp
-                dTdz_base_grnd  = 0.0_wp;  dTdz_base_flt    = 0.0_wp
-                flux_grl_2d     = 0.0_wp;  tfbase           = 0.0_wp
-                ux_aa           = 0.0_wp;  uy_aa            = 0.0_wp
+        ! ---- initialise -----------------------------------------------------
+        bmb_grnd_masked = 0.0_wp;  bmb_shlf_masked = 0.0_wp
+        z_base          = 0.0_wp;  T_top_ice        = 0.0_wp
+        T_base_grnd     = 0.0_wp;  T_base_flt       = 0.0_wp
+        T_avg           = 0.0_wp;  tfbase           = 0.0_wp
+        dTdz_base_grnd  = 0.0_wp;  dTdz_base_flt    = 0.0_wp
+        flux_grl_2d     = 0.0_wp;  flux_clv_2d      = 0.0_wp  
+        ux_aa           = 0.0_wp;  uy_aa            = 0.0_wp
         
-                ! ---- unit conversion ------------------------------------------------
-                rho_ice        = 917.0_wp
-                m3yr_to_kgs    = 3.2e-5_wp
-                density_corr   = rho_ice / 1000.0_wp
-                esm_correction = m3yr_to_kgs * density_corr
-                yr_to_sec      = 31556952.0_wp
+        ! ---- unit conversion ------------------------------------------------
+        rho_ice        = 917.0_wp
+        m3yr_to_kgs    = 3.2e-5_wp
+        density_corr   = rho_ice / 1000.0_wp
+        esm_correction = m3yr_to_kgs * density_corr
+        yr_to_sec      = 31556952.0_wp
+        nz = ylmo%dyn%par%nz_aa
         
-                nz = ylmo%dyn%par%nz_aa
+        ! ---- derived fields -------------------------------------------------
         
-                ! ---- derived fields -------------------------------------------------
+        ! Ice-base elevation
+        z_base = ylmo%tpo%now%z_base
         
-                ! Ice-base elevation
-                z_base = ylmo%tpo%now%z_base
+        ! BMB masked to grounded / floating
+        where (ylmo%tpo%now%f_grnd .gt. 0.0_wp) bmb_grnd_masked = ylmo%thrm%now%bmb_grnd
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp) bmb_shlf_masked = ylmo%bnd%bmb_shlf
         
-                ! BMB masked to grounded / floating
-                where (ylmo%tpo%now%f_grnd .gt. 0.0_wp)
-                    bmb_grnd_masked = ylmo%thrm%now%bmb_grnd
-                end where
-                where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
-                    bmb_shlf_masked = ylmo%bnd%bmb_shlf
-                end where
+        ! Temperature fields
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp) T_top_ice = ylmo%thrm%now%T_ice(:,:,nz)
+        where (ylmo%tpo%now%f_grnd .gt. 0.0_wp) T_base_grnd = ylmo%thrm%now%T_ice(:,:,1)
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp) T_base_flt = ylmo%thrm%now%T_ice(:,:,1)
         
-                ! Temperature fields
+        ! Depth-averaged temperature
+        if (nz .gt. 0) then
+            do k = 1, nz
                 where (ylmo%tpo%now%H_ice .gt. 0.0_wp)
-                    T_top_ice = ylmo%thrm%now%T_ice(:,:,nz)
+                    T_avg = T_avg + ylmo%thrm%now%T_ice(:,:,k)
                 end where
-                where (ylmo%tpo%now%f_grnd .gt. 0.0_wp)
-                    T_base_grnd = ylmo%thrm%now%T_ice(:,:,1)
-                end where
-                where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
-                    T_base_flt = ylmo%thrm%now%T_ice(:,:,1)
-                end where
+            end do
+            where (ylmo%tpo%now%H_ice .gt. 0.0_wp)
+                T_avg = T_avg / real(nz, wp)
+            end where
+        end if
         
-                ! Depth-averaged temperature
-                if (nz .gt. 0) then
-                    do k = 1, nz
-                        where (ylmo%tpo%now%H_ice .gt. 0.0_wp)
-                            T_avg = T_avg + ylmo%thrm%now%T_ice(:,:,k)
-                        end where
-                    end do
-                    where (ylmo%tpo%now%H_ice .gt. 0.0_wp)
-                        T_avg = T_avg / real(nz, wp)
-                    end where
-                end if
+        ! Vertical basal temperature gradient (first-order upward difference)
+        if (nz .gt. 1) then
+            where (ylmo%tpo%now%f_grnd .gt. 0.0_wp .and. ylmo%tpo%now%H_ice .gt. 1.0_wp)
+                dTdz_base_grnd = (ylmo%thrm%now%T_ice(:,:,2) - ylmo%thrm%now%T_ice(:,:,1)) &
+                                 / (ylmo%tpo%now%H_ice / real(nz - 1, wp))
+            end where
+            where (ylmo%tpo%now%H_ice .gt. 1.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
+                dTdz_base_flt  = (ylmo%thrm%now%T_ice(:,:,2) - ylmo%thrm%now%T_ice(:,:,1)) &
+                                 / (ylmo%tpo%now%H_ice / real(nz - 1, wp))
+            end where
+        end if
         
-                ! Vertical basal temperature gradient (first-order upward difference)
-                if (nz .gt. 1) then
-                    where (ylmo%tpo%now%f_grnd .gt. 0.0_wp .and. ylmo%tpo%now%H_ice .gt. 1.0_wp)
-                        dTdz_base_grnd = (ylmo%thrm%now%T_ice(:,:,2) - ylmo%thrm%now%T_ice(:,:,1)) &
-                                         / (ylmo%tpo%now%H_ice / real(nz - 1, wp))
-                    end where
-                    where (ylmo%tpo%now%H_ice .gt. 1.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
-                        dTdz_base_flt  = (ylmo%thrm%now%T_ice(:,:,2) - ylmo%thrm%now%T_ice(:,:,1)) &
-                                         / (ylmo%tpo%now%H_ice / real(nz - 1, wp))
-                    end where
-                end if
+        ! Grounding-line flux (2-D, for ligroundf field)
+        ! Use mask_grz convention from yelmo_calving.f90: grounded + mask_grz==0
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp &
+            .and. ylmo%tpo%now%mask_grz .eq. 0.0_wp)
+            flux_grl_2d = ylmo%dyn%now%uxy_bar * ylmo%tpo%now%H_ice * rho_ice / yr_to_sec
+        end where
         
-                ! Grounding-line flux (2-D, for ligroundf field)
-                ! Use mask_grz convention from yelmo_calving.f90: grounded + mask_grz==0
-                where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp &
-                       .and. ylmo%tpo%now%mask_grz .eq. 0.0_wp)
-                    flux_grl_2d = ylmo%dyn%now%uxy_bar * ylmo%tpo%now%H_ice * rho_ice / yr_to_sec
-                end where
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp &
+            .and. ylmo%tpo%now%mask_frnt .eq. 1.0_wp)
+            flux_clv_2d = ylmo%tpo%now%cmb * esm_correction
+        end where
+
+        ! Thermal forcing at ice base (floating only)
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
+            tfbase = mshlf%now%tf_shlf
+        end where
         
-                ! Thermal forcing at ice base (floating only)
-                where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
-                    tfbase = mshlf%now%tf_shlf
-                end where
+        ! Mean velocities interpolated onto aa-nodes (staggered → centred)
+        do j = 2, ylmo%grd%ny - 1
+        do i = 2, ylmo%grd%nx - 1
+            ux_aa(i,j) = 0.5_wp * (ylmo%dyn%now%ux_bar(i,j) + ylmo%dyn%now%ux_bar(i-1,j))
+            uy_aa(i,j) = 0.5_wp * (ylmo%dyn%now%uy_bar(i,j) + ylmo%dyn%now%uy_bar(i,j-1))
+        end do
+        end do
         
-                ! Mean velocities interpolated onto aa-nodes (staggered → centred)
-                do j = 2, ylmo%grd%ny - 1
-                do i = 2, ylmo%grd%nx - 1
-                    ux_aa(i,j) = 0.5_wp * (ylmo%dyn%now%ux_bar(i,j) + ylmo%dyn%now%ux_bar(i-1,j))
-                    uy_aa(i,j) = 0.5_wp * (ylmo%dyn%now%uy_bar(i,j) + ylmo%dyn%now%uy_bar(i,j-1))
-                end do
-                end do
+        ! ---- open file & find time index ------------------------------------
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
         
-                ! ---- open file & find time index ------------------------------------
-                call nc_open(filename, ncid, writable=.TRUE.)
-                n = nc_time_index(filename, "time", time, ncid)
-                call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        ! ====================================================================
+        ! 2-D ST variables  (snapshot)
+        ! ====================================================================
         
-                ! ====================================================================
-                ! 2-D ST variables  (snapshot)
-                ! ====================================================================
+        call nc_write(filename, "lithk", ylmo%tpo%now%H_ice, &
+            units="m", long_name="Ice thickness", &
+            standard_name="land_ice_thickness", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! lithk : Ice thickness                                    [MANDATORY]
-                call nc_write(filename, "lithk", ylmo%tpo%now%H_ice, &
-                    units="m", long_name="Ice thickness", &
-                    standard_name="land_ice_thickness", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "orog", ylmo%tpo%now%z_srf, &
+            units="m", long_name="Surface elevation", &
+            standard_name="surface_altitude", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! orog : Surface elevation                                 [MANDATORY]
-                call nc_write(filename, "orog", ylmo%tpo%now%z_srf, &
-                    units="m", long_name="Surface elevation", &
-                    standard_name="surface_altitude", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "topg", ylmo%bnd%z_bed, &
+            units="m", long_name="Bedrock elevation", &
+            standard_name="bedrock_altitude", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! topg : Bedrock elevation                                 [MANDATORY]
-                call nc_write(filename, "topg", ylmo%bnd%z_bed, &
-                    units="m", long_name="Bedrock elevation", &
-                    standard_name="bedrock_altitude", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "base", z_base, &
+            units="m", long_name="Ice base elevation", &
+            standard_name="base_altitude", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! base : Ice base elevation                                [MANDATORY]
-                call nc_write(filename, "base", z_base, &
-                    units="m", long_name="Ice base elevation", &
-                    standard_name="base_altitude", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "xvelsurf", ylmo%dyn%now%ux_s / yr_to_sec, &
+            units="m s-1", long_name="Surface velocity in x", &
+            standard_name="land_ice_surface_x_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! xvelsurf : Surface velocity x                            [optional]
-                call nc_write(filename, "xvelsurf", ylmo%dyn%now%ux_s / yr_to_sec, &
-                    units="m s-1", long_name="Surface velocity in x", &
-                    standard_name="land_ice_surface_x_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "yvelsurf", ylmo%dyn%now%uy_s / yr_to_sec, &
+            units="m s-1", long_name="Surface velocity in y", &
+            standard_name="land_ice_surface_y_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! yvelsurf : Surface velocity y                            [optional]
-                call nc_write(filename, "yvelsurf", ylmo%dyn%now%uy_s / yr_to_sec, &
-                    units="m s-1", long_name="Surface velocity in y", &
-                    standard_name="land_ice_surface_y_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "zvelsurf", ylmo%dyn%now%uz_s / yr_to_sec, &
+            units="m s-1", long_name="Surface velocity in z", &
+            standard_name="land_ice_surface_upward_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! zvelsurf : Surface velocity z                            [optional]
-                call nc_write(filename, "zvelsurf", ylmo%dyn%now%uz_s / yr_to_sec, &
-                    units="m s-1", long_name="Surface velocity in z", &
-                    standard_name="land_ice_surface_upward_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "xvelbase", ylmo%dyn%now%ux_b / yr_to_sec, &
+            units="m s-1", long_name="Basal velocity in x", &
+            standard_name="land_ice_basal_x_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! xvelbase : Basal velocity x                              [optional]
-                call nc_write(filename, "xvelbase", ylmo%dyn%now%ux_b / yr_to_sec, &
-                    units="m s-1", long_name="Basal velocity in x", &
-                    standard_name="land_ice_basal_x_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "yvelbase", ylmo%dyn%now%uy_b / yr_to_sec, &
+            units="m s-1", long_name="Basal velocity in y", &
+            standard_name="land_ice_basal_y_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! yvelbase : Basal velocity y                              [optional]
-                call nc_write(filename, "yvelbase", ylmo%dyn%now%uy_b / yr_to_sec, &
-                    units="m s-1", long_name="Basal velocity in y", &
-                    standard_name="land_ice_basal_y_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "zvelbase", ylmo%dyn%now%uz_b / yr_to_sec, &
+            units="m s-1", long_name="Basal velocity in z", &
+            standard_name="land_ice_basal_upward_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! zvelbase : Basal velocity z                              [optional]
-                call nc_write(filename, "zvelbase", ylmo%dyn%now%uz_b / yr_to_sec, &
-                    units="m s-1", long_name="Basal velocity in z", &
-                    standard_name="land_ice_basal_upward_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "xvelmean", ux_aa / yr_to_sec, &
+            units="m s-1", long_name="Mean velocity in x", &
+            standard_name="land_ice_vertical_mean_x_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! xvelmean : Vertical-mean velocity x, aa-nodes           [MANDATORY]
-                call nc_write(filename, "xvelmean", ux_aa / yr_to_sec, &
-                    units="m s-1", long_name="Mean velocity in x", &
-                    standard_name="land_ice_vertical_mean_x_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "yvelmean", uy_aa / yr_to_sec, &
+            units="m s-1", long_name="Mean velocity in y", &
+            standard_name="land_ice_vertical_mean_y_velocity", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! yvelmean : Vertical-mean velocity y, aa-nodes           [MANDATORY]
-                call nc_write(filename, "yvelmean", uy_aa / yr_to_sec, &
-                    units="m s-1", long_name="Mean velocity in y", &
-                    standard_name="land_ice_vertical_mean_y_velocity", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "litemptop", T_top_ice, &
+            units="K", long_name="Surface temperature", &
+            standard_name="temperature_at_top_of_ice_sheet_model", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! litemptop : Surface temperature                          [optional]
-                call nc_write(filename, "litemptop", T_top_ice, &
-                    units="K", long_name="Surface temperature", &
-                    standard_name="temperature_at_top_of_ice_sheet_model", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "litempavg", T_avg, &
+            units="K", long_name="Depth-averaged ice temperature", &
+            standard_name="land_ice_temperature", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! litempavg : Depth-averaged temperature                   [optional]
-                call nc_write(filename, "litempavg", T_avg, &
-                    units="K", long_name="Depth-averaged ice temperature", &
-                    standard_name="land_ice_temperature", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "litempbotgr", T_base_grnd, &
+            units="K", long_name="Basal temperature beneath grounded ice sheet", &
+            standard_name="temperature_at_base_of_ice_sheet_model", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! litempbotgr : Basal temperature, grounded                [optional]
-                call nc_write(filename, "litempbotgr", T_base_grnd, &
-                    units="K", long_name="Basal temperature beneath grounded ice sheet", &
-                    standard_name="temperature_at_base_of_ice_sheet_model", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "litempbotfl", T_base_flt, &
+            units="K", long_name="Basal temperature beneath floating ice shelf", &
+            standard_name="temperature_at_base_of_ice_sheet_model", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! litempbotfl : Basal temperature, floating                [optional]
-                call nc_write(filename, "litempbotfl", T_base_flt, &
-                    units="K", long_name="Basal temperature beneath floating ice shelf", &
-                    standard_name="temperature_at_base_of_ice_sheet_model", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "litempgradgr", dTdz_base_grnd, &
+            units="K m-1", long_name="Vertical basal temperature gradient beneath grounded ice sheet", &
+            standard_name="", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! litempgradgr : Vertical basal T-gradient, grounded       [optional]
-                call nc_write(filename, "litempgradgr", dTdz_base_grnd, &
-                    units="K m-1", long_name="Vertical basal temperature gradient beneath grounded ice sheet", &
-                    standard_name="", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "litempgradfl", dTdz_base_flt, &
+            units="K m-1", long_name="Vertical basal temperature gradient beneath floating ice shelf", &
+            standard_name="", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! litempgradfl : Vertical basal T-gradient, floating       [optional]
-                call nc_write(filename, "litempgradfl", dTdz_base_flt, &
-                    units="K m-1", long_name="Vertical basal temperature gradient beneath floating ice shelf", &
-                    standard_name="", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "strbasemag", ylmo%dyn%now%taub, &
+            units="Pa", long_name="Basal drag", &
+            standard_name="land_ice_basal_drag", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! strbasemag : Basal drag                                  [MANDATORY]
-                call nc_write(filename, "strbasemag", ylmo%dyn%now%taub, &
-                    units="Pa", long_name="Basal drag", &
-                    standard_name="land_ice_basal_drag", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "sftgif", ylmo%tpo%now%f_ice, &
+            units="1", long_name="Land ice area fraction", &
+            standard_name="land_ice_area_fraction", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! sftgif : Land ice area fraction                          [MANDATORY]
-                call nc_write(filename, "sftgif", ylmo%tpo%now%f_ice, &
-                    units="1", long_name="Land ice area fraction", &
-                    standard_name="land_ice_area_fraction", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "sftgrf", ylmo%tpo%now%f_grnd, &
+            units="1", long_name="Grounded ice sheet area fraction", &
+            standard_name="grounded_ice_sheet_area_fraction", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! sftgrf : Grounded ice area fraction                      [MANDATORY]
-                call nc_write(filename, "sftgrf", ylmo%tpo%now%f_grnd, &
-                    units="1", long_name="Grounded ice sheet area fraction", &
-                    standard_name="grounded_ice_sheet_area_fraction", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "sftflf", MAX(ylmo%tpo%now%f_ice - ylmo%tpo%now%f_grnd, 0.0_wp), &
+            units="1", long_name="Floating ice sheet area fraction", &
+            standard_name="floating_ice_shelf_area_fraction", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! sftflf : Floating ice area fraction                      [MANDATORY]
-                call nc_write(filename, "sftflf", MAX(ylmo%tpo%now%f_ice - ylmo%tpo%now%f_grnd, 0.0_wp), &
-                    units="1", long_name="Floating ice sheet area fraction", &
-                    standard_name="floating_ice_shelf_area_fraction", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        ! ====================================================================
+        ! 2-D FL variables  (yearly-average flux)
+        ! ====================================================================
         
-                ! ====================================================================
-                ! 2-D FL variables  (yearly-average flux)
-                ! ====================================================================
+        ! Time-invariant in most setups; written without time dimension.
+        call nc_write(filename, "hfgeoubed", ylmo%bnd%Q_geo * 1.0e3_wp, &
+            units="W m-2", long_name="Geothermal heat flux", &
+            standard_name="upward_geothermal_heat_flux_in_land_ice", &
+            dim1="xc", dim2="yc", start=[1,1], ncid=ncid)
         
-                ! hfgeoubed : Geothermal heat flux                         [optional]
-                ! Time-invariant in most setups; written without time dimension.
-                call nc_write(filename, "hfgeoubed", ylmo%bnd%Q_geo * 1.0e3_wp, &
-                    units="W m-2", long_name="Geothermal heat flux", &
-                    standard_name="upward_geothermal_heat_flux_in_land_ice", &
-                    dim1="xc", dim2="yc", start=[1,1], ncid=ncid)
+        call nc_write(filename, "acabf", ylmo%bnd%smb * esm_correction, &
+            units="kg m-2 s-1", long_name="Surface mass balance flux", &
+            standard_name="land_ice_surface_specific_mass_balance_flux", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! acabf : Surface mass balance flux                        [MANDATORY]
-                call nc_write(filename, "acabf", ylmo%bnd%smb * esm_correction, &
-                    units="kg m-2 s-1", long_name="Surface mass balance flux", &
-                    standard_name="land_ice_surface_specific_mass_balance_flux", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "libmassbfgr", bmb_grnd_masked * esm_correction, &
+            units="kg m-2 s-1", long_name="Basal mass balance flux beneath grounded ice", &
+            standard_name="land_ice_basal_specific_mass_balance_flux", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! libmassbfgr : BMB flux, grounded                         [MANDATORY]
-                call nc_write(filename, "libmassbfgr", bmb_grnd_masked * esm_correction, &
-                    units="kg m-2 s-1", long_name="Basal mass balance flux beneath grounded ice", &
-                    standard_name="land_ice_basal_specific_mass_balance_flux", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "libmassbffl", bmb_shlf_masked * esm_correction, &
+            units="kg m-2 s-1", long_name="Basal mass balance flux beneath floating ice", &
+            standard_name="land_ice_basal_specific_mass_balance_flux", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! libmassbffl : BMB flux, floating                         [MANDATORY]
-                call nc_write(filename, "libmassbffl", bmb_shlf_masked * esm_correction, &
-                    units="kg m-2 s-1", long_name="Basal mass balance flux beneath floating ice", &
-                    standard_name="land_ice_basal_specific_mass_balance_flux", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        call nc_write(filename, "dlithkdt", ylmo%tpo%now%dHidt / yr_to_sec, &
+            units="m s-1", long_name="Ice thickness imbalance", &
+            standard_name="tendency_of_land_ice_thickness", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! dlithkdt : Ice thickness imbalance dH/dt                 [MANDATORY]
-                call nc_write(filename, "dlithkdt", ylmo%tpo%now%dHidt / yr_to_sec, &
-                    units="m s-1", long_name="Ice thickness imbalance", &
-                    standard_name="tendency_of_land_ice_thickness", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        ! Kinematic flux through ice-front cells (mask_frnt==1, floating).
+        ! Uses same formula as CalvingMIP
+        call nc_write(filename, "licalvf", flux_clv_2d, &
+            units="kg m-2 s-1", long_name="Calving flux", &
+            standard_name="land_ice_specific_mass_flux_due_to_calving", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! licalvf : Calving flux                                   [MANDATORY]
-                ! Kinematic flux through ice-front cells (mask_frnt==1, floating).
-                ! Uses same formula as yelmo_calving.f90; convert yr-1 → s-1.
-                call nc_write(filename, "licalvf", &
-                    ylmo%dyn%now%uxy_bar * ylmo%tpo%now%H_ice * rho_ice / yr_to_sec, &
-                    units="kg m-2 s-1", long_name="Calving flux", &
-                    standard_name="land_ice_specific_mass_flux_due_to_calving", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
-                ! NOTE: mask to mask_frnt==1 cells in post-processing, or apply here:
-                ! Consider replacing the line above with a masked array if your
-                ! nc_write supports fill values for non-front cells.
+        ! ligroundf : Grounding-line flux                          [MANDATORY]
+        call nc_write(filename, "ligroundf", flux_grl_2d, &
+            units="kg m-2 s-1", long_name="Grounding line flux", &
+            standard_name="land_ice_specific_grounding_line_flux", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! ligroundf : Grounding-line flux                          [MANDATORY]
-                call nc_write(filename, "ligroundf", flux_grl_2d, &
-                    units="kg m-2 s-1", long_name="Grounding line flux", &
-                    standard_name="land_ice_specific_grounding_line_flux", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        ! tfbase : Thermal forcing at ice base, floating           [optional]
+        call nc_write(filename, "tfbase", tfbase, &
+            units="K", long_name="Thermal forcing at the ice base", &
+            standard_name="", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-                ! tfbase : Thermal forcing at ice base, floating           [optional]
-                call nc_write(filename, "tfbase", tfbase, &
-                    units="K", long_name="Thermal forcing at the ice base", &
-                    standard_name="", &
-                    dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
-        
-                ! ---- close ----------------------------------------------------------
+        ! ---- close ----------------------------------------------------------
         call nc_close(ncid)
         
         return
