@@ -96,21 +96,21 @@
 /
 
 &opt
-    opt_cf           = True              ! Should basal friction be optimized?
-    cf_time_init     = 0.0               ! [yr] When should optimization of basal friction start?
-    cf_time_end      = 20e3              ! [yr] When should optimization of basal friction stop?
-    cf_init          = 0.1               ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
-    use_yelmo_cf_min = True              ! If false, min friction is opt_cf_min
-    opt_cf_min       = 1e-3              ! [--] Minimum allowed cf value
-    tau_c            = 500.0             ! [yr] L21: Optimization relaxation timescale 
-    H0               = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
+    opt_cf           = True             ! Should basal friction be optimized?
+    cf_time_init     = 0.0              ! [yr] When should optimization of basal friction start?
+    cf_time_end      = 20e3             ! [yr] When should optimization of basal friction stop?
+    cf_init          = 0.1              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
+    use_yelmo_cf_min = True             ! If false, min friction is opt_cf_min
+    opt_cf_min       = 1e-3             ! [--] Minimum allowed cf value
+    tau_c            = 500.0            ! [yr] L21: Optimization relaxation timescale 
+    H0               = 100.0            ! [m]  L21: Optimization ice-thickness error scaling 
  
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    rel_tau1        = 1.0               ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 6000.0            ! [yr] Relaxation timescale in time period 2
+    rel_tau1        = 1e3               ! [yr] Relaxation timescale in time period 1
+    rel_tau2        = 1e3               ! [yr] Relaxation timescale in time period 2
     rel_time1       = 1e3               ! [yr] Time limit for time period 1
     rel_time2       = 1e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
@@ -120,7 +120,7 @@
     tf_time_end     = 20e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
-    tau_m           = 10.0              ! [yr] Optimization relxation timescale 
+    tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
@@ -130,7 +130,7 @@
 
 &yelmo
     domain          = "Antarctica"
-    grid_name       = "ANT-32KM" 
+    grid_name       = "ANT-8KM" 
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
@@ -586,7 +586,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-8KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
