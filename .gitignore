@@ -6,6 +6,7 @@ libs/lis*
 coordinates
 yelmo
 FastIsostasy
+FastHydrology
 rembo1
 ice_data
 isostasy_data

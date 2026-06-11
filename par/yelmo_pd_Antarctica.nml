@@ -208,6 +208,7 @@
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
     cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
+    neff_nxi            = 0               ! Subgrid interpolation of hyd%N onto dyn%N_eff. 0: none, 1: Gaussian quadrature, >1: nxi x nxi subgrid.
     
 /
 
@@ -226,17 +227,50 @@
     cf_ref          =  0.1              ! [-- or deg] Reference/const/max value of cf
 /
 
-&yneff 
-    method          = 3                 ! -1: external N_eff, 0: neff_const, 1: overburden pressure, 2: Leguy param., 3: Till pressure
-    nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.    
-    const           = 1e7               ! == rho_ice*g*(eg 1000 m ice thickness)
-    p               = 0.0               ! *neff_method=2* marine connectivity exponent (0: none, 1: full)
-    H_w_max         = -1.0              ! < 0: Use ytherm.H_w_max; >= 0: Saturation water thickness for neff_method=3.
-    N0              = 1000.0            ! [Pa] *neff_method=3* Reference effective pressure 
-    delta           = 0.8              ! [--] *neff_method=3* Fraction of overburden pressure for saturated till
-    e0              = 0.69              ! [--] *neff_method=3* Reference void ratio at N0 
-    Cc              = 0.12              ! [--] *neff_method=3* Till compressibility    
-    s_const         = 0.5               ! [--] *neff_method=4* Imposed constant till water saturation level    
+&fhyd
+    ! Bucket-only configuration (no K24 transport). Closure parameters
+    ! mirror the legacy &yneff till closure; W_til_max / bkt_till_rate
+    ! mirror the legacy &ytherm bucket.
+    method_til         = 1        ! 0=NONE 1=BUCKET
+    method_transport   = 0        ! 0=NONE 1=K24
+    rho_ice            = 917.0    ! [kg/m^3]
+    rho_w              = 1000.0   ! [kg/m^3]
+    g                  = 9.81     ! [m/s^2]
+    W_til_max          = 2.0      ! [m]   was ytherm.H_w_max
+    mask_bc            = 0        ! 0=ZERO 1=IMPOSED 2=MIRROR
+    W_til_bc           = 0.0      ! [m]
+
+    ! ---- bucket (bkt_) ----
+    bkt_till_rate = 1e-3        ! [m/a]  was ytherm.till_rate
+    bkt_N_closure = 3             ! 0=NONE 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE
+
+    ! ---- closures (no prefix) ----
+    marine_p         = 0.0
+    marine_rho_sw    = 1028.0
+    till_N0          = 1000.0     ! legacy yneff.N0
+    till_delta       = 0.8       ! legacy yneff.delta
+    till_e0          = 0.69       ! legacy yneff.e0
+    till_Cc          = 0.12       ! legacy yneff.Cc
+    two_value_delta  = 0.02
+
+    ! ---- k24 (k24_) ----  unused under method_transport=0
+    k24_substrate_type               = 0
+    k24_flux_solver                  = 0
+    k24_manning_exponent             = 3.0
+    k24_latent_heat_water            = 3.35e5
+    k24_bed_thickness                = 0.1
+    k24_manning_coefficient_exponent = 1.25
+    k24_bed_friction_exponent        = 1.5
+    k24_friction_factor              = 0.1
+    k24_till_factor                  = 1.1
+    k24_critical_discharge           = 1.0
+    k24_initial_cavity_height        = 0.1
+    k24_coupling_length              = 1.0e4
+    k24_long_coupling_water          = 5.0
+    k24_min_pressure_fraction        = 0.02
+    k24_eta_w                        = 1.8e-3
+    k24_W_min                        = 1.0e-8
+    k24_W_max                        = 0.015
 /
 
 &ymat
@@ -274,8 +308,6 @@
     const_kt        = 6.62e7            ! [J a-1 m-1 K-1] Thermal conductivity [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
     enth_cr         = 1e-3              ! [--] Conductivity ratio for temperate ice (kappa_temp     = enth_cr*kappa_cold)
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction 
-    till_rate       = 1e-3              ! [m/a] Basal water till drainage rate (water equiv.)
-    H_w_max         = 2.0               ! [m] Maximum limit to basal water layer thickness (water equiv.)
 
     rock_method     = "active"          ! "equil" (not active bedrock) or "active"
     nzr_aa          = 5                 ! Number of vertical points in bedrock 

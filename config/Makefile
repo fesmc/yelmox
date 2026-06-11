@@ -213,6 +213,7 @@ clean:
 cleanall: clean
 	$(MAKE) -C $(FESMUTILSROOT) clean
 	$(MAKE) -C $(ISOSTASYROOT) clean
+	$(MAKE) -C $(FASTHYDROROOT) clean
 	$(MAKE) -C $(YELMOROOT) clean
 	$(MAKE) -C $(COORDROOT) clean
 	$(MAKE) -C $(REMBOROOT) clean
