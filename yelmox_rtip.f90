@@ -1338,7 +1338,7 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call yelmo_write_var(filename,"f_pmp",ylmo,n,ncid)
         call yelmo_write_var(filename,"Q_b",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_grnd",ylmo,n,ncid)
-        call yelmo_write_var(filename,"H_w",ylmo,n,ncid)
+        call yelmo_write_var(filename,"hyd_W_til",ylmo,n,ncid)
         
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
@@ -1488,7 +1488,7 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         
         ! == yelmo_thermodymamics
         call yelmo_write_var(filename,"T_prime_b",ylmo,n,ncid)
-        call yelmo_write_var(filename,"H_w",ylmo,n,ncid)
+        call yelmo_write_var(filename,"hyd_W_til",ylmo,n,ncid)
         
         ! == yelmo_bound ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
@@ -1622,7 +1622,7 @@ subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
         call nc_write(filename,"f_pmp",reg%f_pmp,units="1",long_name="Temperate fraction (grounded)", &
                       dim1="time",start=[n],ncid=ncid)
 
-        call nc_write(filename,"H_w",reg%H_w,units="m",long_name="Mean basal water thickness (grounded)", &
+        call nc_write(filename,"W_til",reg%W_til,units="m",long_name="Mean basal water thickness (grounded)", &
                       dim1="time",start=[n],ncid=ncid)
 
         call nc_write(filename,"bmb_g",reg%bmb_g,units="m/a",long_name="Mean basal mass balance (grounded)", &

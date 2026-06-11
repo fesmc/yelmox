@@ -990,7 +990,7 @@ contains
         call yelmo_write_var(filename,"f_pmp",ylmo,n,ncid)
         call yelmo_write_var(filename,"Q_b",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_grnd",ylmo,n,ncid)
-        call yelmo_write_var(filename,"H_w",ylmo,n,ncid)
+        call yelmo_write_var(filename,"hyd_W_til",ylmo,n,ncid)
         
         !call yelmo_write_var(filename,"Q_strn",ylmo,n,ncid)
         ! Write Q_strn in K/yr instead of mW/m^3:

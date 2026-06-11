@@ -801,7 +801,7 @@ contains
         call yelmo_write_var(filename,"f_pmp",ylmo,n,ncid)
         call yelmo_write_var(filename,"Q_b",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_grnd",ylmo,n,ncid)
-        call yelmo_write_var(filename,"H_w",ylmo,n,ncid)
+        call yelmo_write_var(filename,"hyd_W_til",ylmo,n,ncid)
         
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)

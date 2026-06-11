@@ -76,7 +76,7 @@
     nml_ycalv       = "ycalv"
     nml_ydyn        = "ydyn"
     nml_ytill       = "ytill"
-    nml_yneff       = "yneff"
+    nml_yhyd       = "fhyd"
     nml_ymat        = "ymat"
     nml_ytherm      = "ytherm"
     nml_masks       = "yelmo_masks"
