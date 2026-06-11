@@ -665,7 +665,7 @@ contains
     
     end subroutine esm_variability_update
 
-    subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_ref_atm,use_ref_ocn)
+    subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -677,20 +677,17 @@ contains
         logical,  intent(IN) :: use_esm
         real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
-        logical,  intent(IN), optional :: use_ref_atm 
-        logical,  intent(IN), optional :: use_ref_ocn 
+        logical,  intent(IN) :: use_smb  
+        logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn 
     
         ! Local variables 
         integer  :: k, m 
         real(wp) :: tmp, anomaly
         character(len=56) :: slice_method 
-        logical  :: extrap_shlf, use_smb
     
         ! Get slices for current time
         slice_method = "extrap" 
         anomaly = 0.0_wp
-        extrap_shlf = .FALSE. ! parameter, to do (jablasco)
-        use_smb = .TRUE.
             
         ! Initialize anomalies
         esm%dts  = 0.0_wp
@@ -749,7 +746,7 @@ contains
                         call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
                             
-                        if (extrap_shlf) then
+                        if (mshlf%par%extrap_shlf) then
                             ! Extrapolate ocean data to the interior of ice shelves
                             call ocn_variable_extrapolation(esm%to_hist%var(:,:,:,1),H_ice,basins,-esm%to_hist%z,z_bed)
                             call ocn_variable_extrapolation(esm%so_hist%var(:,:,:,1),H_ice,basins,-esm%so_hist%z,z_bed)
@@ -787,7 +784,7 @@ contains
                         call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
                         
-                        if (extrap_shlf) then
+                        if (mshlf%par%extrap_shlf) then
                             ! Interpolate ocean data to the interior
                             call ocn_variable_extrapolation(esm%to_proj%var(:,:,:,1),H_ice,basins,-esm%to_proj%z,z_bed)
                             call ocn_variable_extrapolation(esm%so_proj%var(:,:,:,1),H_ice,basins,-esm%so_proj%z,z_bed)

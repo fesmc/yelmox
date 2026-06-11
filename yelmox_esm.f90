@@ -706,16 +706,12 @@ contains
         character(len=*),           intent(IN)    :: domain
         character(len=*),           intent(IN)    :: grid_name 
         logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
-    
-        ! local variables
-        logical  :: extrap_shlf
-        extrap_shlf = .FALSE. ! parameter, to do (jablasco)
 
         ! Step 1: set the reference climatologies (for reference and variability reference)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,ctl%esm_use_smb,domain,grid_name)
         
         ! extrapolate towards interior of ice shelf
-        if (extrap_shlf) then
+        if (mshlf%par%extrap_shlf) then
             ! avoid for ismip7
             call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
             call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
@@ -724,7 +720,7 @@ contains
         ! Step 2: Calculate anomaly fields (forcing)
         call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
                                 ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
-                                use_ref_atm=.false.,use_ref_ocn=.false.)
+                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.)
 
         ! Step 3: Calculate the variability anomaly field
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
@@ -761,7 +757,7 @@ contains
         end if
         
         ! === Oceanic boundary conditions ===
-        if (extrap_shlf) then
+        if (mshlf%par%extrap_shlf) then
             ! Extrapolate ocean data to the interior of the ice shelf
             call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
             call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
