@@ -21,7 +21,7 @@ program yelmox_esm
     implicit none 
 
     character(len=256) :: outfldr, file2D, file2Dsm
-    character(len=256) :: file1D_esm, file2D_esm
+    character(len=256) :: file1D_esm, file1D_cmip, file2D_cmip
     character(len=256) :: file_isos, file_bsl
     character(len=256) :: domain, grid_name 
     character(len=512) :: path_par  
@@ -179,8 +179,10 @@ program yelmox_esm
     file_isos        = trim(outfldr)//"fastisostasy.nc"
     file_bsl         = trim(outfldr)//"bsl.nc"
     
+    ! 1D formatted fields
     file1D_esm       = trim(outfldr)//"yelmo1D_esm.nc"
-    file2D_esm       = trim(outfldr)//"yelmo2D_esm.nc"
+    file1D_cmip      = trim(outfldr)//"yelmo1D_cmip.nc"
+    file2D_cmip      = trim(outfldr)//"yelmo2D_cmip.nc"
 
     tmr_file         = trim(outfldr)//"timer_table.txt"
 
@@ -587,8 +589,8 @@ program yelmox_esm
 
         if (ctl%esm_write_formatted) then
             ! Initialize output files for esm
-            call yelmo_write_init(yelmo1,file2D_esm,time_init=ts%time,units="years")
-            call yelmo_write_reg_init(yelmo1,file1D_esm,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE))
+            call yelmo_write_init(yelmo1,file2D_cmip,time_init=ts%time,units="years")
+            call yelmo_write_reg_init(yelmo1,file1D_cmip,time_init=ts%time,units="years",mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE))
         end if 
 
         call timer_step(tmr,comp=1,label="initialization") 
@@ -653,8 +655,8 @@ program yelmox_esm
             ! esm output if desired:
             if (ctl%esm_write_formatted) then
                 if (mod(nint(ts%time_elapsed*100),nint(ctl%esm_dt_formatted*100))==0) then
-                    call write_step_2D_esm(yelmo1,file2D_esm,ts%time)
-                    call write_1D_esm(yelmo1,esm1,mshlf1,file1D_esm,ts%time)
+                    call write_step_2D_cmip(yelmo1,mshlf1,file2D_cmip,ts%time)
+                    call write_step_1D_cmip(yelmo1,mshlf1,file1D_cmip,ts%time)
                 end if
             end if
 
@@ -1446,253 +1448,173 @@ contains
 
     end subroutine write_step_2D_esm
 
-    subroutine write_1D_esm(dom,esm,mshlf,filename,time)
+    subroutine write_1D_esm(dom, esm, mshlf, filename, time)
 
+        ! Used to plot climatic variable fields
+    
         implicit none
-
-        type(yelmo_class), intent(IN) :: dom
+    
+        type(yelmo_class),       intent(IN) :: dom
         type(esm_forcing_class), intent(IN) :: esm
         type(marshelf_class),    intent(IN) :: mshlf
-        character(len=*),  intent(IN) :: filename
-        real(wp),          intent(IN) :: time
-
+        character(len=*),        intent(IN) :: filename
+        real(wp),                intent(IN) :: time
+    
         ! Local variables
         type(yregions_class) :: reg
-        
+    
         integer  :: ncid, n
-        real(wp) :: rho_ice
-        real(wp) :: density_corr
-        real(wp) :: m3yr_to_kgs
-        real(wp) :: esm_correction
-        real(wp) :: yr_to_sec
-        
-        real(wp) :: m3_km3
-        real(wp) :: m2_km2 
-
-        integer  :: npts_tot
-        integer  :: npts_grnd
-        integer  :: npts_flt
-        integer  :: npts_grl
-        integer  :: npts_frnt 
-
-        real(wp) :: dx
-        real(wp) :: dy 
-        real(wp) :: smb_tot 
-        real(wp) :: bmb_tot 
-        real(wp) :: bmb_shlf_t 
-
-        real(wp) :: A_ice_grl 
-        real(wp) :: flux_grl 
-        real(wp) :: A_ice_frnt 
-        real(wp) :: calv_flt 
-        real(wp) :: flux_frnt 
-        
-        ! === Climatic variables ===
-        ! Atmosphere
-        real(wp) :: t2m_1d
-        real(wp) :: pr_1d
-        real(wp) :: dt_1d,  dt_var_1d
-        real(wp) :: dpr_1d, dpr_var_1d
-
-        ! Ocean
+        real(wp) :: rho_ice, density_corr, m3yr_to_kgs, esm_correction, yr_to_sec
+    
+        real(wp) :: dx, dy
+        integer  :: npts_tot, npts_flt
+        real(wp) :: smb_tot, bmb_shlf_t
+    
+        ! Climatic variables - atmosphere
+        real(wp) :: t2m_1d, pr_1d
+        real(wp) :: dt_1d,  dt_var_1d, dpr_1d, dpr_var_1d
+    
+        ! Climatic variables - ocean
         real(wp) :: to_1d
         real(wp) :: so_1d
         real(wp) :: tf_1d
         real(wp) :: dto_1d, dto_var_1d
         real(wp) :: dso_1d, dso_var_1d
-        !real(wp) :: dtf_1d
-
-        logical, allocatable :: mask_tot(:,:) 
+    
+        logical, allocatable :: mask_tot(:,:)
         logical, allocatable :: mask_grnd(:,:)
-        logical, allocatable :: mask_flt(:,:) 
-        logical, allocatable :: mask_grl(:,:) 
-        logical, allocatable :: mask_frnt(:,:) 
-        
-        dx = dom%grd%dx 
-        dy = dom%grd%dy 
-
-        ! Allocate variables
-
-        allocate(mask_tot(dom%grd%nx,dom%grd%ny))
-        allocate(mask_grnd(dom%grd%nx,dom%grd%ny))
-        allocate(mask_flt(dom%grd%nx,dom%grd%ny))
-        allocate(mask_grl(dom%grd%nx,dom%grd%ny))
-        allocate(mask_frnt(dom%grd%nx,dom%grd%ny))
-
-        ! === Data conversion factors ========================================
-
-        rho_ice             = 917.0             ! ice density kg/m3
-        m3yr_to_kgs         = 3.2e-5            ! m3/yr of pure water to kg/s
-        density_corr        = rho_ice/1000.0    ! ice density correction with pure water
-        esm_correction      = m3yr_to_kgs*density_corr
-        yr_to_sec           = 31556952.0
-        
-        m3_km3              = 1e-9 
-        m2_km2              = 1e-6 
-        
-        ! 1. Determine regional values of variables 
-
-        ! Take the global regional data object that 
-        ! is calculated over the whole domain at each timestep 
+        logical, allocatable :: mask_flt(:,:)
+    
+        dx = dom%grd%dx
+        dy = dom%grd%dy
+    
+        allocate(mask_tot (dom%grd%nx, dom%grd%ny))
+        allocate(mask_grnd(dom%grd%nx, dom%grd%ny))
+        allocate(mask_flt (dom%grd%nx, dom%grd%ny))
+    
+        ! === Unit conversion factors =========================================
+        rho_ice        = 917.0_wp           ! ice density kg m-3
+        m3yr_to_kgs    = 3.2e-5_wp          ! m3 yr-1 pure water -> kg s-1
+        density_corr   = rho_ice / 1000.0_wp
+        esm_correction = m3yr_to_kgs * density_corr
+        yr_to_sec      = 31556952.0_wp
+    
+        ! === Masks ===========================================================
+    
+        mask_tot  = (dom%tpo%now%H_ice .gt. 0.0_wp)
+        mask_grnd = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .gt. 0.0_wp)
+        mask_flt  = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .eq. 0.0_wp)
+    
+        npts_tot = count(mask_tot)
+        npts_flt = count(mask_flt)
+    
+        ! === Regional object =================================================
+    
         reg = dom%reg
-
-        ! Assign masks of interest
-
-        mask_tot  = (dom%tpo%now%H_ice .gt. 0.0) 
-        mask_grnd = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .gt. 0.0)
-        mask_flt  = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%f_grnd .eq. 0.0)
-        mask_grl  = (dom%tpo%now%f_grnd_bmb .gt. 0.0 .and. dom%tpo%now%f_grnd_bmb .lt. 1.0)         
-        mask_frnt = (dom%tpo%now%H_ice .gt. 0.0 .and. dom%tpo%now%mask_bed .eq. 4)
-
-        ! Determine number of points at grl and frnt
-        npts_tot  = count(mask_tot)
-        npts_grnd = count(mask_grnd)
-        npts_flt  = count(mask_flt)
-        npts_grl  = count(mask_grl)      
-        npts_frnt = count(mask_frnt) 
-
-        ! Calculate additional variables of interest for esm
-        ! Atmosphere
-        t2m_1d     = sum(esm%t2m_ann+esm%dts(:,:,1),     mask=mask_tot)/npts_tot
-        pr_1d      = sum(esm%pr_ann*1e-3*esm%dpr(:,:,1), mask=mask_tot)/npts_tot
-        dt_1d      = sum(esm%dts(:,:,1),                 mask=mask_tot)/npts_tot
-        dpr_1d     = sum(100*esm%dpr(:,:,1),             mask=mask_tot)/npts_tot
-        dt_var_1d  = sum(esm%dts_var(:,:,1),             mask=mask_tot)/npts_tot
-        dpr_var_1d = sum(100*esm%dpr_var(:,:,1),         mask=mask_tot)/npts_tot
-
-        ! Ocean
-        to_1d      = sum(mshlf%now%T_shlf,  mask=mask_flt)/npts_flt
-        so_1d      = sum(mshlf%now%S_shlf,  mask=mask_flt)/npts_flt
-        tf_1d      = sum(mshlf%now%tf_shlf, mask=mask_flt)/npts_flt
-        dto_1d     = sum(esm%dto,           mask=mask_flt)/npts_flt
-        dso_1d     = sum(esm%dso,           mask=mask_flt)/npts_flt
-        dto_var_1d = sum(esm%dto_var,       mask=mask_flt)/npts_flt
-        dso_var_1d = sum(esm%dso_var,       mask=mask_flt)/npts_flt
-
-        ! Fluxes
-        smb_tot     = sum(dom%bnd%smb,    mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
-        bmb_tot     = sum(dom%tpo%now%bmb,mask=mask_tot)*(dx*dy)    ! m^3/yr: flux
-        bmb_shlf_t  = sum(dom%tpo%now%bmb,mask=mask_flt)*(dx*dy)    ! m^3/yr: flux
-
-        if (npts_grl .gt. 0) then
-
-            A_ice_grl = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_grl)*dx*dy*m2_km2 ! [km^2]
-            !flux_grl  = sum(dom%tpo%now%H_ice,mask=mask_grl)*(dx*dy)                 ! m^3/yr: flux
-            flux_grl  = sum(dom%dyn%now%uxy_bar*dom%tpo%now%H_ice,mask=mask_grl)*dx   ! m^3/yr: flux
-
-            ! ajr, why only *dx above? 
-
-        else
-
-            A_ice_grl = 0.0_wp
-            flux_grl  = 0.0_wp
-
-        end if
- 
-        ! ===== Frontal ice-shelves variables =====
-
-        if (npts_frnt .gt. 0) then
-
-            A_ice_frnt = count(dom%tpo%now%H_ice .gt. 0.0 .and. mask_frnt)*dx*dy*m2_km2         ! [km^2]
-            calv_flt   = sum(dom%tpo%now%cmb_flt*dom%tpo%now%H_ice,mask=mask_frnt)*dx          ! m^3/yr: flux [m-1 yr-1]
-            flux_frnt  = calv_flt+sum(dom%tpo%now%fmb*dom%tpo%now%H_ice,mask=mask_frnt)*dx      ! m^3/yr: flux [m-1 yr-1]
-
-            ! ajr, why only *dx above? 
-
-        else
-
-            A_ice_frnt = 0.0_wp
-            calv_flt   = 0.0_wp 
-            flux_frnt  = 0.0_wp
-
-        end if
-
-
-        ! 2. Begin writing step 
-
-        ! Open the file for writing
-        call nc_open(filename,ncid,writable=.TRUE.)
-
-        ! Determine current writing time step 
-        n = nc_time_index(filename,"time",time,ncid)
-
-        ! Update the time step
-        call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
-
-        call nc_write(filename,"V_sl",reg%V_sl*1e-6,units="1e6 km^3",long_name="Ice volume above flotation", &
-                          dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"V_sle",reg%V_sle,units="m sle",long_name="Sea-level equivalent volume", &
-                        dim1="time",start=[n],ncid=ncid)
-
-        ! Variability climatic fields 
-        call nc_write(filename,"dt_var_1d",dt_var_1d,units="K",long_name="Mean ice surf. Temp. Anomaly", &
-                standard_name="Mean ice surf. Temp. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dpr_var_1d",dpr_var_1d,units="%",long_name="Mean ice surf. Pr. Anomaly", &
-                standard_name="Mean ice surf. Pr. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dto_var_1d",dto_var_1d,units="K",long_name="Mean ice-shelf Temp. Anomaly", &
-                standard_name="Mean ice-shelf Temp. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dso_var_1d",dso_var_1d,units="PSU",long_name="Mean ice-shelf draft Sal. Anomaly", &
-                standard_name="Mean ice-shelf draft Sal. Anomaly (Variability)",dim1="time",start=[n],ncid=ncid)
-
-
-        ! ESM climatic fields
-        call nc_write(filename,"t2m_1d",t2m_1d,units="K",long_name="Mean ice surf. Temp.", &
-                standard_name="Mean ice surf. Temp.",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"pr_1d",pr_1d,units="m yr-1",long_name="Mean ice surf. Pr.", &
-                standard_name="Mean ice surf. Pr.",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dt_1d",dt_1d,units="K",long_name="Mean ice surf. Temp. Anomaly", &
-                standard_name="Mean ice surf. Temp. Anomaly",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dpr_1d",dpr_1d,units="%",long_name="Mean ice surf. Pr. Anomaly", &
-                standard_name="Mean ice surf. Pr. Anomaly",dim1="time",start=[n],ncid=ncid)
-                                
-        call nc_write(filename,"to_1d",to_1d,units="K",long_name="Mean ice-shelf Temp.", &
-                standard_name="Mean ice-shelf draft Temp.",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"so_1d",so_1d,units="PSU",long_name="Mean ice-shelf draft Sal.", &
-                standard_name="Mean ice-shelf draft Sal.",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dto_1d",dto_1d,units="K",long_name="Mean ice-shelf Temp. Anomaly", &
-                standard_name="Mean ice-shelf Temp. Anomaly",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"dso_1d",dso_1d,units="PSU",long_name="Mean ice-shelf draft Sal. Anomaly", &
-                standard_name="Mean ice-shelf draft Sal. Anomaly",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tf_1d",tf_1d,units="K",long_name="Mean ice-shelf TF.", &
-                standard_name="Mean ice-shelf draft TF",dim1="time",start=[n],ncid=ncid)
-                
-        call nc_write(filename,"smb_tot",smb_tot,units="m yr-1",long_name="Total SMB flux", &
-                standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"bmb_shlf",bmb_shlf_t,units="m yr-1",long_name="Total BMB flux beneath floating ice", &
-                standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
-  
-
-        ! ===== Mass ===== 
-        call nc_write(filename,"lim",reg%V_ice*rho_ice*1e9,units="kg",long_name="Total ice mass", &
-                      standard_name="land_ice_mass",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"limnsw",reg%V_sl*rho_ice*1e9,units="kg",long_name="Mass above flotation", &
-                      standard_name="land_ice_mass_not_displacing_sea_water",dim1="time",start=[n],ncid=ncid)
-
-        ! ===== Area ====
-        call nc_write(filename,"iareagr",reg%A_ice_g*1e6,units="m^2",long_name="Grounded ice area", &
-                      standard_name="grounded_ice_sheet_area",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"iareafl",reg%A_ice_f*1e6,units="m^2",long_name="Floating ice area", &
-                      standard_name="floating_ice_shelf_area",dim1="time",start=[n],ncid=ncid)
-
-        ! ==== Fluxes ====
-        call nc_write(filename,"tendacabf",smb_tot*esm_correction,units="kg s-1",long_name="Total SMB flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlibmassbf ",bmb_tot*esm_correction,units="kg s-1",long_name="Total BMB flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlibmassbffl",bmb_shlf_t*esm_correction,units="kg s-1",long_name="Total BMB flux beneath floating ice", &
-                      standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlicalvf",calv_flt*esm_correction,units="kg s-1",long_name="Total calving flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_calving",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendlifmassbf",flux_frnt*esm_correction,units="kg s-1",long_name="Total calving and ice front melting flux", &
-                      standard_name="tendency_of_land_ice_mass_due_to_calving_and_ice_front_melting",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"tendligroundf",flux_grl*esm_correction,units="kg s-1",long_name="Total grounding line flux", &
-                      standard_name="tendency_of_grounded_ice_mass",dim1="time",start=[n],ncid=ncid)
-
-        ! Close the netcdf file
+    
+        ! === Integrated fluxes [m yr-1 * m2 -> m3 yr-1] =====================
+        ! Total SMB over all ice-covered cells [m3 yr-1]
+        smb_tot    = sum(dom%bnd%smb,       mask=mask_tot)  * (dx * dy)
+    
+        ! Total BMB beneath floating ice [m3 yr-1]
+        bmb_shlf_t = sum(dom%bnd%bmb_shlf, mask=mask_flt)  * (dx * dy)
+    
+        ! === Spatially averaged climatic fields ==============================
+    
+        ! Atmosphere (averaged over all ice)
+        t2m_1d     = sum(esm%t2m_ann + esm%dts(:,:,1),      mask=mask_tot) / npts_tot
+        pr_1d      = sum(esm%pr_ann * 1e-3_wp * esm%dpr(:,:,1), mask=mask_tot) / npts_tot
+        dt_1d      = sum(esm%dts(:,:,1),                     mask=mask_tot) / npts_tot
+        dpr_1d     = sum(100.0_wp * esm%dpr(:,:,1),          mask=mask_tot) / npts_tot
+        dt_var_1d  = sum(esm%dts_var(:,:,1),                 mask=mask_tot) / npts_tot
+        dpr_var_1d = sum(100.0_wp * esm%dpr_var(:,:,1),      mask=mask_tot) / npts_tot
+    
+        ! Ocean (averaged over floating ice only)
+        to_1d      = sum(mshlf%now%T_shlf,  mask=mask_flt) / npts_flt
+        so_1d      = sum(mshlf%now%S_shlf,  mask=mask_flt) / npts_flt
+        tf_1d      = sum(mshlf%now%tf_shlf, mask=mask_flt) / npts_flt
+        dto_1d     = sum(esm%dto,           mask=mask_flt) / npts_flt
+        dso_1d     = sum(esm%dso,           mask=mask_flt) / npts_flt
+        dto_var_1d = sum(esm%dto_var,       mask=mask_flt) / npts_flt
+        dso_var_1d = sum(esm%dso_var,       mask=mask_flt) / npts_flt
+    
+        ! === Write to file ===================================================
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+            
+        ! -- Variability fields -----------------------------------------------
+        call nc_write(filename, "dt_var_1d",  dt_var_1d,  units="K",   &
+            long_name="Mean ice surf. Temp. Anomaly (Variability)",     &
+            standard_name="Mean ice surf. Temp. Anomaly (Variability)", &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dpr_var_1d", dpr_var_1d, units="%",   &
+            long_name="Mean ice surf. Pr. Anomaly (Variability)",       &
+            standard_name="Mean ice surf. Pr. Anomaly (Variability)",   &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dto_var_1d", dto_var_1d, units="K",   &
+            long_name="Mean ice-shelf Temp. Anomaly (Variability)",     &
+            standard_name="Mean ice-shelf Temp. Anomaly (Variability)", &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dso_var_1d", dso_var_1d, units="PSU", &
+            long_name="Mean ice-shelf Sal. Anomaly (Variability)",      &
+            standard_name="Mean ice-shelf Sal. Anomaly (Variability)",  &
+            dim1="time", start=[n], ncid=ncid)
+    
+        ! -- Atmosphere fields ------------------------------------------------
+        call nc_write(filename, "t2m_1d",  t2m_1d,  units="K",       &
+            long_name="Mean ice surf. Temp.",                          &
+            standard_name="Mean ice surf. Temp.",                      &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "pr_1d",   pr_1d,   units="m yr-1",  &
+            long_name="Mean ice surf. Pr.",                            &
+            standard_name="Mean ice surf. Pr.",                        &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dt_1d",   dt_1d,   units="K",       &
+            long_name="Mean ice surf. Temp. Anomaly",                  &
+            standard_name="Mean ice surf. Temp. Anomaly",              &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dpr_1d",  dpr_1d,  units="%",       &
+            long_name="Mean ice surf. Pr. Anomaly",                    &
+            standard_name="Mean ice surf. Pr. Anomaly",                &
+            dim1="time", start=[n], ncid=ncid)
+    
+        ! -- Ocean fields -----------------------------------------------------
+        call nc_write(filename, "to_1d",   to_1d,   units="K",       &
+            long_name="Mean ice-shelf Temp.",                          &
+            standard_name="Mean ice-shelf draft Temp.",                &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "so_1d",   so_1d,   units="PSU",     &
+            long_name="Mean ice-shelf draft Sal.",                     &
+            standard_name="Mean ice-shelf draft Sal.",                 &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "tf_1d",   tf_1d,   units="K",       &
+            long_name="Mean ice-shelf TF.",                            &
+            standard_name="Mean ice-shelf draft TF",                   &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dto_1d",  dto_1d,  units="K",       &
+            long_name="Mean ice-shelf Temp. Anomaly",                  &
+            standard_name="Mean ice-shelf Temp. Anomaly",              &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "dso_1d",  dso_1d,  units="PSU",     &
+            long_name="Mean ice-shelf draft Sal. Anomaly",             &
+            standard_name="Mean ice-shelf draft Sal. Anomaly",         &
+            dim1="time", start=[n], ncid=ncid)
+    
+        ! -- Integrated mass fluxes [kg s-1] ----------------------------------
+        call nc_write(filename, "smb_tot",  smb_tot  * esm_correction, units="kg s-1", &
+            long_name="Total SMB flux",                                                 &
+            standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance",     &
+            dim1="time", start=[n], ncid=ncid)
+        call nc_write(filename, "bmb_shlf", bmb_shlf_t * esm_correction, units="kg s-1", &
+            long_name="Total BMB flux beneath floating ice",                              &
+            standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance",         &
+            dim1="time", start=[n], ncid=ncid)
+    
         call nc_close(ncid)
-
+    
         return
-
+    
     end subroutine write_1D_esm
 
     subroutine yelmox_restart_write(bsl,isos,ylmo,mshlf,time,fldr)
@@ -1738,7 +1660,7 @@ contains
 
     end subroutine yelmox_restart_write
 
-! =========================================================================
+    ! =========================================================================
     ! ISMIP7 (ISM_2026 sheet) output subroutines
     ! Variable names, standard_names, units and long_names follow the
     ! ISMIP7 variable request spreadsheet (ISM_2026 sheet).
@@ -1751,35 +1673,35 @@ contains
     ! =========================================================================
 
     ! -------------------------------------------------------------------------
-        subroutine write_step_2D_cmip(ylmo, mshlf, filename, time)
-            ! Writes all mandatory (and key optional) 2-D ISMIP7 variables.
-            ! ST = snapshot (end-of-year); FL = yearly-average flux.
-            ! -------------------------------------------------------------------------
+    subroutine write_step_2D_cmip(ylmo, mshlf, filename, time)
+        ! Writes all mandatory (and key optional) 2-D ISMIP7 variables.
+        ! ST = snapshot (end-of-year); FL = yearly-average flux.
+        ! -------------------------------------------------------------------------
         
-                implicit none
+        implicit none
         
-                type(yelmo_class),    intent(IN) :: ylmo
-                type(marshelf_class), intent(IN) :: mshlf
-                character(len=*),     intent(IN) :: filename
-                real(wp),             intent(IN) :: time
+        type(yelmo_class),    intent(IN) :: ylmo
+        type(marshelf_class), intent(IN) :: mshlf
+        character(len=*),     intent(IN) :: filename
+        real(wp),             intent(IN) :: time
         
-                ! ---- local variables ------------------------------------------------
-                integer  :: ncid, n, i, j, k, nz
+        ! ---- local variables ------------------------------------------------
+        integer  :: ncid, n, i, j, k, nz
         
-                real(wp) :: rho_ice
-                real(wp) :: density_corr
-                real(wp) :: m3yr_to_kgs
-                real(wp) :: esm_correction   ! [kg m-2 s-1] per [m yr-1]
-                real(wp) :: yr_to_sec
+        real(wp) :: rho_ice
+        real(wp) :: density_corr
+        real(wp) :: m3yr_to_kgs
+        real(wp) :: esm_correction   ! [kg m-2 s-1] per [m yr-1]
+        real(wp) :: yr_to_sec
         
-                ! 2-D working arrays
-                real(wp), allocatable :: bmb_grnd_masked(:,:)
-                real(wp), allocatable :: bmb_shlf_masked(:,:)
-                real(wp), allocatable :: z_base(:,:)
-                real(wp), allocatable :: T_top_ice(:,:)
-                real(wp), allocatable :: T_base_grnd(:,:)
-                real(wp), allocatable :: T_base_flt(:,:)
-                real(wp), allocatable :: T_avg(:,:)
+        ! 2-D working arrays
+        real(wp), allocatable :: bmb_grnd_masked(:,:)
+        real(wp), allocatable :: bmb_shlf_masked(:,:)
+        real(wp), allocatable :: z_base(:,:)
+        real(wp), allocatable :: T_top_ice(:,:)
+        real(wp), allocatable :: T_base_grnd(:,:)
+        real(wp), allocatable :: T_base_flt(:,:)
+        real(wp), allocatable :: T_avg(:,:)
                 real(wp), allocatable :: dTdz_base_grnd(:,:)
                 real(wp), allocatable :: dTdz_base_flt(:,:)
                 real(wp), allocatable :: flux_grl_2d(:,:)
@@ -2089,11 +2011,11 @@ contains
                     dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
                 ! ---- close ----------------------------------------------------------
-                call nc_close(ncid)
+        call nc_close(ncid)
         
-                return
+        return
         
-            end subroutine write_step_2D_cmip
+    end subroutine write_step_2D_cmip
         
         
             ! -------------------------------------------------------------------------
