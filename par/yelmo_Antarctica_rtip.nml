@@ -274,6 +274,7 @@ T_frz            = -3.0
  ssa_iter_conv   = 0.01       
  taud_lim        = 200000.0   
  cb_sia          = 0.0        
+    neff_nxi            = 0               ! Subgrid interpolation of hyd%N onto dyn%N_eff. 0: none, 1: Gaussian quadrature, >1: nxi x nxi subgrid.
 /
 &ytill
  method          = -1         
@@ -289,17 +290,50 @@ T_frz            = -3.0
  cf_min          = 0.001      
  cf_ref          = 0.05       
 /
-&yneff
- method          = 3          
- const           = 10000000.0 
- nxi             = 0                 ! 0: no subgrid interpolation, 1: Guassian quadrature of Neff, > 1: interpolate cell H_w to nxi x nxi points.
- p               = 1.0        
- H_w_max         = -1         
- N0              = 1000.0     
- delta           = 0.8        
- e0              = 0.69       
- Cc              = 0.12       
- s_const         = 0.5        
+&fhyd
+    ! Bucket-only configuration (no K24 transport). Closure parameters
+    ! mirror the legacy &yneff till closure; W_til_max / bkt_till_rate
+    ! mirror the legacy &ytherm bucket.
+    method_til         = 1        ! 0=NONE 1=BUCKET
+    method_transport   = 0        ! 0=NONE 1=K24
+    rho_ice            = 917.0    ! [kg/m^3]
+    rho_w              = 1000.0   ! [kg/m^3]
+    g                  = 9.81     ! [m/s^2]
+    W_til_max          = 2.0      ! [m]   was ytherm.H_w_max
+    mask_bc            = 0        ! 0=ZERO 1=IMPOSED 2=MIRROR
+    W_til_bc           = 0.0      ! [m]
+
+    ! ---- bucket (bkt_) ----
+    bkt_till_rate = 0.001        ! [m/a]  was ytherm.till_rate
+    bkt_N_closure = 3             ! 0=NONE 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE
+
+    ! ---- closures (no prefix) ----
+    marine_p         = 1.0
+    marine_rho_sw    = 1028.0
+    till_N0          = 1000.0     ! legacy yneff.N0
+    till_delta       = 0.8       ! legacy yneff.delta
+    till_e0          = 0.69       ! legacy yneff.e0
+    till_Cc          = 0.12       ! legacy yneff.Cc
+    two_value_delta  = 0.02
+
+    ! ---- k24 (k24_) ----  unused under method_transport=0
+    k24_substrate_type               = 0
+    k24_flux_solver                  = 0
+    k24_manning_exponent             = 3.0
+    k24_latent_heat_water            = 3.35e5
+    k24_bed_thickness                = 0.1
+    k24_manning_coefficient_exponent = 1.25
+    k24_bed_friction_exponent        = 1.5
+    k24_friction_factor              = 0.1
+    k24_till_factor                  = 1.1
+    k24_critical_discharge           = 1.0
+    k24_initial_cavity_height        = 0.1
+    k24_coupling_length              = 1.0e4
+    k24_long_coupling_water          = 5.0
+    k24_min_pressure_fraction        = 0.02
+    k24_eta_w                        = 1.8e-3
+    k24_W_min                        = 1.0e-8
+    k24_W_max                        = 0.015
 /
 
 &ymat
@@ -335,8 +369,6 @@ T_frz            = -3.0
  const_kt        = 66200000.0 
  enth_cr         = 0.001      
  omega_max       = 0.01       
- till_rate       = 0.001      
- H_w_max         = 2.0        
  rock_method     = 'active'   
  nzr_aa          = 5          
  zeta_scale_rock = 'exp-inv'  
