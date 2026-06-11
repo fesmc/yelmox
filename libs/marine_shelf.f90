@@ -54,6 +54,7 @@ module marine_shelf
         character(len=56)   :: interp_depth 
         logical             :: find_ocean 
         character(len=512)  :: restart
+        logical             :: extrap_shlf
         logical             :: use_obs
         character(len=512)  :: obs_path
         character(len=56)   :: obs_name 
@@ -1032,6 +1033,8 @@ contains
         call nml_read(filename,group,"interp_method",  par%interp_method,  init=init_pars)
         call nml_read(filename,group,"find_ocean",     par%find_ocean,     init=init_pars)
         call nml_read(filename,group,"restart",        par%restart,        init=init_pars)
+        call nml_read(filename,group,"extrap_shlf",    par%extrap_shlf,    init=init_pars)
+        
         call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
         call nml_read(filename,group,"basin_number",   par%basin_number,   init=init_pars)
         call nml_read(filename,group,"basin_bmb_corr", par%basin_bmb_corr, init=init_pars)
