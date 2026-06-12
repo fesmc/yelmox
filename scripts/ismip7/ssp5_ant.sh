@@ -1,6 +1,6 @@
 #!/bin/bash
 
-resolution=32km
+resolution=16km
 output_path=output_albedo/ismip7/ssp585-${resolution}_test_formatted
 
 

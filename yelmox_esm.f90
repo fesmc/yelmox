@@ -642,11 +642,11 @@ program yelmox_esm
             if (timeout_check(tm_2Dsm,ts%time)) then
                 call write_step_2D_small(yelmo1,isos1,esm1,mshlf1,smbpal1,ctl,file2Dsm,ts%time)
             end if
-
+            
             if (timeout_check(tm_2D,ts%time)) then
                 call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
             end if
-           
+
             if (timeout_check(tm_1D,ts%time)) then
                 call yelmo_regions_write(yelmo1,ts%time)
                 call write_1D_esm(yelmo1,esm1,mshlf1,file1D_esm,ts%time)
@@ -971,7 +971,7 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"visc_int",ylmo%mat%now%visc_int,units="Pa a m",long_name="Vertically integrated viscosity", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        
+
         ! Boundaries
         call nc_write(filename,"z_bed",ylmo%bnd%z_bed,units="m",long_name="Bedrock elevation", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1022,17 +1022,18 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dts_ann",SUM(esm%dts, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*SUM(esm%dpr, dim=3)/12.0,units="m/a water equiv.",long_name="Precipitation (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dpr_ann",SUM(esm%dpr, dim=3)/12.0,units="%",long_name="Precipitation anomaly (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        if (ctl%esm_use_smb) then
+            call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        else
+            call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dpr_ann",SUM(esm%dpr, dim=3)/12.0,units="%",long_name="Precipitation anomaly (ann)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            !call nc_write(filename,"dpr_var",SUM(esm%dpr_var, dim=3)/12.0,units="%",long_name="Precipitation anomaly (variability)", &
+            !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        end if
         
-        ! Variability fields
-        call nc_write(filename,"dts_var_ann",SUM(esm%dts_var, dim=3)/12.0,units="K",long_name="Annual surface air temperature anomaly (variability)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dpr_var_ann",SUM(esm%dpr_var, dim=3)/12.0,units="%",long_name="Annual precipitation anomaly (variability)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-
         ! Oceanic boundary conditions
         call nc_write(filename,"T_shlf",mshlf%now%T_shlf,units="K",long_name="Shelf temperature", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1042,10 +1043,10 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dso",esm%dso,units="PSU",long_name="Shelf salinity anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dto_var",esm%dto_var,units="K",long_name="Shelf temperature anomaly (variability)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"dso_var",esm%dso_var,units="PSU",long_name="Shelf salinity anomaly (variability)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dto_var",esm%dto_var,units="K",long_name="Shelf temperature anomaly (variability)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        !call nc_write(filename,"dso_var",esm%dso_var,units="PSU",long_name="Shelf salinity anomaly (variability)", &
+        !                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf,units="K",long_name="Shelf temperature anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
