@@ -15,6 +15,14 @@ ctrl_params=(
     "tm_2Dsm.dt=2e3"
     "yelmo.nz_aa=11"
     "yelmo.dt_min=0.1"
+    "tm_1D.dt=1.0"
+    "tm_2Dsm.method=const"
+    "tm_2Dsm.dt=2.5e3"
+    "tm_2D.method=times"
+    "tm_2D.times=0.0,15e3"
+    "yelmo.nz_aa=11"
+    "yelmo.dt_min=0.1"
+    "esm.write_formatted=False"
 )
 
 opt_params=(
