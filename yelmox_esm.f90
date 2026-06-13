@@ -644,12 +644,12 @@ program yelmox_esm
             
             if (timeout_check(tm_2D,ts%time)) then
                 call write_step_2D_combined(yelmo1,isos1,esm1,mshlf1,smbpal1,file2D,ts%time)
-            end if
+            end if 
 
             if (timeout_check(tm_1D,ts%time)) then
                 call yelmo_regions_write(yelmo1,ts%time)
                 call write_1D_esm(yelmo1,esm1,mshlf1,file1D_esm,ts%time)
-            end if 
+            end if
 
             ! esm output if desired:
             if (ctl%esm_write_formatted) then
@@ -657,7 +657,7 @@ program yelmox_esm
                     call write_step_2D_cmip(yelmo1,mshlf1,file2D_cmip,ts%time)
                     call write_step_1D_cmip(yelmo1,mshlf1,file1D_cmip,ts%time)
                 end if
-            end if
+            end if  
 
             call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io") 
         
@@ -898,10 +898,12 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"N_eff",ylmo%dyn%now%N_eff,units="bar",long_name="Effective pressure", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"cmb",ylmo%tpo%now%cmb,units="m/a ice equiv.",long_name="Calving mass balance rate", &
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb_flt+ylmo%tpo%now%cmb_grnd,units="m/a ice equiv.",long_name="Calving mass balance rate", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"cmb_flt",ylmo%tpo%now%cmb_flt,units="m/a ice equiv.",long_name="Calving mass balance rate flt", &
-                     dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"cmb_grnd",ylmo%tpo%now%cmb_grnd,units="m/a ice equiv.",long_name="Calving mass balance rate grnd", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         call nc_write(filename,"f_grnd",ylmo%tpo%now%f_grnd,units="1",long_name="Grounded fraction", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1228,7 +1230,7 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dts_var",SUM(esm%dts_var, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly (variability)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"smb_ann",ylmo%bnd%smb,units="m/a water equiv.",long_name="SMB (ann)", &
+        call nc_write(filename,"smb_ann",ylmo%tpo%now%smb,units="m/a water equiv.",long_name="SMB (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         if (ctl%esm_use_smb) then
             call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
@@ -1278,13 +1280,13 @@ contains
     end subroutine write_step_2D_small
 
     ! ===== esm output routines =========
-    subroutine write_1D_esm(dom, esm, mshlf, filename, time)
+    subroutine write_1D_esm(ylmo, esm, mshlf, filename, time)
 
         ! Used to plot climatic variable fields
     
         implicit none
     
-        type(yelmo_class),       intent(IN) :: dom
+        type(yelmo_class),       intent(IN) :: ylmo
         type(esm_forcing_class), intent(IN) :: esm
         type(marshelf_class),    intent(IN) :: mshlf
         character(len=*),        intent(IN) :: filename
@@ -1315,12 +1317,12 @@ contains
         logical, allocatable :: mask_grnd(:,:)
         logical, allocatable :: mask_flt(:,:)
     
-        dx = dom%grd%dx
-        dy = dom%grd%dy
+        dx = ylmo%grd%dx
+        dy = ylmo%grd%dy
     
-        allocate(mask_tot (dom%grd%nx, dom%grd%ny))
-        allocate(mask_grnd(dom%grd%nx, dom%grd%ny))
-        allocate(mask_flt (dom%grd%nx, dom%grd%ny))
+        allocate(mask_tot (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_grnd(ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_flt (ylmo%grd%nx, ylmo%grd%ny))
     
         ! === Unit conversion factors =========================================
         rho_ice        = 917.0_wp           ! ice density kg m-3
@@ -1331,23 +1333,23 @@ contains
     
         ! === Masks ===========================================================
     
-        mask_tot  = (dom%tpo%now%H_ice .gt. 0.0_wp)
-        mask_grnd = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .gt. 0.0_wp)
-        mask_flt  = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .eq. 0.0_wp)
+        mask_tot  = (ylmo%tpo%now%H_ice .gt. 0.0_wp)
+        mask_grnd = (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp)
+        mask_flt  = (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
     
         npts_tot = count(mask_tot)
         npts_flt = count(mask_flt)
     
         ! === Regional object =================================================
     
-        reg = dom%reg
+        reg = ylmo%reg
     
         ! === Integrated fluxes [m yr-1 * m2 -> m3 yr-1] =====================
         ! Total SMB over all ice-covered cells [m3 yr-1]
-        smb_tot    = sum(dom%bnd%smb,       mask=mask_tot)  * (dx * dy)
+        smb_tot    = sum(ylmo%bnd%smb,       mask=mask_tot)  * (dx * dy)
     
         ! Total BMB beneath floating ice [m3 yr-1]
-        bmb_shlf_t = sum(dom%bnd%bmb_shlf, mask=mask_flt)  * (dx * dy)
+        bmb_shlf_t = sum(ylmo%bnd%bmb_shlf, mask=mask_flt)  * (dx * dy)
     
         ! === Spatially averaged climatic fields ==============================
     
@@ -1530,7 +1532,8 @@ contains
         real(wp), allocatable :: T_top_ice(:,:), T_base_grnd(:,:), T_base_flt(:,:), T_avg(:,:)
         real(wp), allocatable :: dTdz_base_grnd(:,:), dTdz_base_flt(:,:)
         real(wp), allocatable :: flux_grl_2d(:,:), flux_clv_2d(:,:), tfbase(:,:)
-        real(wp), allocatable :: ux_aa(:,:), uy_aa(:,:)    
+        real(wp), allocatable :: ux_aa(:,:), uy_aa(:,:) 
+        real(wp), allocatable :: uz_s_masked(:,:), uz_b_masked(:,:)   
         
         ! ---- allocate -------------------------------------------------------
         allocate(bmb_grnd_masked (ylmo%grd%nx, ylmo%grd%ny))
@@ -1547,6 +1550,8 @@ contains
         allocate(tfbase          (ylmo%grd%nx, ylmo%grd%ny))
         allocate(ux_aa           (ylmo%grd%nx, ylmo%grd%ny))
         allocate(uy_aa           (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(uz_s_masked     (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(uz_b_masked     (ylmo%grd%nx, ylmo%grd%ny))
         
         ! ---- initialise -----------------------------------------------------
         bmb_grnd_masked = 0.0_wp;  bmb_shlf_masked = 0.0_wp
@@ -1603,6 +1608,14 @@ contains
             end where
         end if
         
+        ! Vertical velocities (weird shape with regions)
+        uz_s_masked = 0.0_wp
+        uz_b_masked = 0.0_wp
+        where (ylmo%tpo%now%H_ice .gt. 0.0_wp)
+            uz_s_masked = ylmo%dyn%now%uz_s / yr_to_sec
+            uz_b_masked = ylmo%dyn%now%uz_b / yr_to_sec
+        end where
+
         ! Grounding-line flux (2-D, for ligroundf field)
         ! Use mask_grz convention from yelmo_calving.f90: grounded + mask_grz==0
         where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp &
@@ -1610,10 +1623,7 @@ contains
             flux_grl_2d = ylmo%dyn%now%uxy_bar * ylmo%tpo%now%H_ice * rho_ice / yr_to_sec
         end where
         
-        where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp &
-            .and. ylmo%tpo%now%mask_frnt .eq. 1.0_wp)
-            flux_clv_2d = ylmo%tpo%now%cmb * esm_correction
-        end where
+        flux_clv_2d = (ylmo%tpo%now%cmb_flt+ylmo%tpo%now%cmb_grnd) * esm_correction
 
         ! Thermal forcing at ice base (floating only)
         where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
@@ -1667,7 +1677,7 @@ contains
             standard_name="land_ice_surface_y_velocity", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-        call nc_write(filename, "zvelsurf", ylmo%dyn%now%uz_s / yr_to_sec, &
+        call nc_write(filename, "zvelsurf", uz_s_masked, &
             units="m s-1", long_name="Surface velocity in z", &
             standard_name="land_ice_surface_upward_velocity", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
@@ -1682,7 +1692,7 @@ contains
             standard_name="land_ice_basal_y_velocity", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-        call nc_write(filename, "zvelbase", ylmo%dyn%now%uz_b / yr_to_sec, &
+        call nc_write(filename, "zvelbase", uz_b_masked, &
             units="m s-1", long_name="Basal velocity in z", &
             standard_name="land_ice_basal_upward_velocity", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
@@ -1757,7 +1767,7 @@ contains
             standard_name="upward_geothermal_heat_flux_in_land_ice", &
             dim1="xc", dim2="yc", start=[1,1], ncid=ncid)
         
-        call nc_write(filename, "acabf", ylmo%bnd%smb * esm_correction, &
+        call nc_write(filename, "acabf", ylmo%tpo%now%smb * esm_correction, &
             units="kg m-2 s-1", long_name="Surface mass balance flux", &
             standard_name="land_ice_surface_specific_mass_balance_flux", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
@@ -1804,179 +1814,168 @@ contains
     end subroutine write_step_2D_cmip
         
         
-            ! -------------------------------------------------------------------------
-            subroutine write_step_1D_cmip(dom, mshlf, filename, time)
-            ! Writes all mandatory scalar ISMIP7 (ISM_2026) variables.
-            ! Flux computation follows yelmo_calving.f90: kinematic uxy_bar*H_ice*rho_ice.
-            ! -------------------------------------------------------------------------
+    subroutine write_step_1D_cmip(ylmo, mshlf, filename, time)
+        ! Writes all mandatory scalar ISMIP7 (ISM_2026) variables.
+        ! Flux computation follows yelmo_calving.f90: kinematic uxy_bar*H_ice*rho_ice.
+        ! -------------------------------------------------------------------------
         
-                implicit none
+        implicit none
         
-                type(yelmo_class),    intent(IN) :: dom
-                type(marshelf_class), intent(IN) :: mshlf
-                character(len=*),     intent(IN) :: filename
-                real(wp),             intent(IN) :: time
+        type(yelmo_class),    intent(IN) :: ylmo
+        type(marshelf_class), intent(IN) :: mshlf
+        character(len=*),     intent(IN) :: filename
+        real(wp),             intent(IN) :: time
         
-                ! ---- local variables ------------------------------------------------
-                type(yregions_class) :: reg
+        ! ---- local variables ------------------------------------------------
+        type(yregions_class) :: reg
         
-                integer  :: ncid, n
-                real(wp) :: rho_ice, density_corr, m3yr_to_kgs, esm_correction, yr_to_sec
-                real(wp) :: dx, dy
+        integer  :: ncid, n
+        real(wp) :: rho_ice, density_corr, m3yr_to_kgs, esm_correction, yr_to_sec
+        real(wp) :: dx, dy
         
-                real(wp) :: smb_tot          ! total SMB           [m3 yr-1]
-                real(wp) :: bmb_grnd_tot     ! total BMB grounded  [m3 yr-1]
-                real(wp) :: bmb_shlf_t       ! total BMB floating  [m3 yr-1]
-                real(wp) :: flux_grl         ! total GL flux       [kg yr-1]
-                real(wp) :: calv_flt         ! total calving flux  [kg yr-1]
+        real(wp) :: smb_tot          ! total SMB           [m3 yr-1]
+        real(wp) :: bmb_grnd_tot     ! total BMB grounded  [m3 yr-1]
+        real(wp) :: bmb_shlf_t       ! total BMB floating  [m3 yr-1]
+        real(wp) :: flux_grl         ! total GL flux       [kg yr-1]
+        real(wp) :: flux_clv         ! total calving flux  [kg yr-1]
         
-                logical, allocatable :: mask_tot(:,:)
-                logical, allocatable :: mask_grnd(:,:)
-                logical, allocatable :: mask_flt(:,:)
-                logical, allocatable :: mask_grl(:,:)    ! grounding-line cells
-                logical, allocatable :: mask_frnt(:,:)   ! ice-front cells
+        logical, allocatable :: mask_tot(:,:)
+        logical, allocatable :: mask_grnd(:,:)
+        logical, allocatable :: mask_flt(:,:)
+        logical, allocatable :: mask_grl(:,:)    ! grounding-line cells
+        logical, allocatable :: mask_frnt(:,:)   ! ice-front cells
         
-                ! ---- allocate -------------------------------------------------------
-                allocate(mask_tot  (dom%grd%nx, dom%grd%ny))
-                allocate(mask_grnd (dom%grd%nx, dom%grd%ny))
-                allocate(mask_flt  (dom%grd%nx, dom%grd%ny))
-                allocate(mask_grl  (dom%grd%nx, dom%grd%ny))
-                allocate(mask_frnt (dom%grd%nx, dom%grd%ny))
+        ! ---- allocate -------------------------------------------------------
+        allocate(mask_tot  (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_grnd (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_flt  (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_grl  (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_frnt (ylmo%grd%nx, ylmo%grd%ny))
         
-                ! ---- unit conversions -----------------------------------------------
-                rho_ice        = 917.0_wp
-                m3yr_to_kgs    = 3.2e-5_wp
-                density_corr   = rho_ice / 1000.0_wp
-                esm_correction = m3yr_to_kgs * density_corr
-                yr_to_sec      = 31556952.0_wp
+        ! ---- unit conversions -----------------------------------------------
+        rho_ice        = 917.0_wp
+        m3yr_to_kgs    = 3.2e-5_wp
+        density_corr   = rho_ice / 1000.0_wp
+        esm_correction = m3yr_to_kgs * density_corr
+        yr_to_sec      = 31556952.0_wp
         
-                dx = dom%grd%dx
-                dy = dom%grd%dy
+        dx = ylmo%grd%dx
+        dy = ylmo%grd%dy
         
-                ! ---- masks (updated to match yelmo_calving.f90) ---------------------
-                mask_tot  = (dom%tpo%now%H_ice .gt. 0.0_wp)
-                mask_grnd = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .gt. 0.0_wp)
-                mask_flt  = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .eq. 0.0_wp)
+        ! ---- masks (updated to match yelmo_calving.f90) ---------------------
+        mask_tot  = (ylmo%tpo%now%H_ice .gt. 0.0_wp)
+        mask_grnd = (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp)
+        mask_flt  = (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
         
-                ! Grounding-line cells: grounded ice where mask_grz == 0
-                mask_grl  = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .gt. 0.0_wp &
-                             .and. dom%tpo%now%mask_grz .eq. 0.0_wp)
+        ! Grounding-line cells: grounded ice where mask_grz == 0
+        mask_grl  = (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .gt. 0.0_wp &
+                        .and. ylmo%tpo%now%mask_grz .eq. 0.0_wp)
         
-                ! Ice-front cells: floating ice where mask_frnt == 1
-                mask_frnt = (dom%tpo%now%H_ice .gt. 0.0_wp .and. dom%tpo%now%f_grnd .eq. 0.0_wp &
-                             .and. dom%tpo%now%mask_frnt .eq. 1.0_wp)
+        ! Ice-front cells: floating ice where mask_frnt == 1
+        mask_frnt = (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp &
+                        .and. ylmo%tpo%now%mask_frnt .eq. 1.0_wp)
         
-                ! ---- regional object (pre-computed by Yelmo) ------------------------
-                reg = dom%reg
+        ! ---- regional object (pre-computed by Yelmo) ------------------------
+        reg = ylmo%reg
         
-                ! ---- integrated fluxes ----------------------------------------------
-                ! SMB and BMB: area-integrated [m3 yr-1], converted via esm_correction
-                smb_tot      = sum(dom%bnd%smb,       mask=mask_tot)  * (dx * dy)
-                bmb_grnd_tot = sum(dom%tpo%now%bmb,   mask=mask_grnd) * (dx * dy)
-                bmb_shlf_t   = sum(dom%tpo%now%bmb,   mask=mask_flt)  * (dx * dy)
+        ! ---- integrated fluxes ----------------------------------------------
+        ! SMB and BMB: area-integrated [m3 yr-1], converted via esm_correction
+        smb_tot      = sum(ylmo%bnd%smb,       mask=mask_tot)  * (dx * dy)
+        bmb_grnd_tot = sum(ylmo%tpo%now%bmb,   mask=mask_grnd) * (dx * dy)
+        bmb_shlf_t   = sum(ylmo%tpo%now%bmb,   mask=mask_flt)  * (dx * dy)
         
-                ! Grounding-line flux: kinematic, [kg yr-1]
-                ! Matches yelmo_calving.f90: uxy_bar * H_ice * rho_ice * dx
-                if (count(mask_grl) .gt. 0) then
-                    flux_grl = sum(dom%dyn%now%uxy_bar * dom%tpo%now%H_ice * rho_ice, mask=mask_grl) * dx
-                else
-                    flux_grl = 0.0_wp
-                end if
+        ! Grounding-line flux: kinematic, [kg yr-1]
+        ! Matches yelmo_calving.f90: uxy_bar * H_ice * rho_ice * dx
+        if (count(mask_grl) .gt. 0) then
+            flux_grl = sum(ylmo%dyn%now%uxy_bar * ylmo%tpo%now%H_ice * rho_ice, mask=mask_grl) * dx
+        else
+            flux_grl = 0.0_wp
+        end if
         
-                ! Calving flux: kinematic through ice-front cells, [kg yr-1]
-                ! Matches yelmo_calving.f90: uxy_bar * H_ice * rho_ice * dx
-                if (count(mask_frnt) .gt. 0) then
-                    calv_flt = sum(dom%dyn%now%uxy_bar * dom%tpo%now%H_ice * rho_ice, mask=mask_frnt) * dx
-                else
-                    calv_flt = 0.0_wp
-                end if
+        ! Calving flux: sum of cmb_flt and cmb_grnd, [kg yr-1]
+        flux_clv = sum(ylmo%tpo%now%cmb_flt + ylmo%tpo%now%cmb_grnd) * (dx * dy)  ! [m3 yr-1]
         
-                ! ---- open file & find time index ------------------------------------
-                call nc_open(filename, ncid, writable=.TRUE.)
-                n = nc_time_index(filename, "time", time, ncid)
-                call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        ! ---- open file & find time index ------------------------------------
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
         
-                ! ====================================================================
-                ! Scalar ST variables  (snapshot)
-                ! ====================================================================
+        ! ====================================================================
+        ! Scalar ST variables  (snapshot)
+        ! ====================================================================
         
-                ! lim : Total ice mass                                     [MANDATORY]
-                call nc_write(filename, "lim", reg%V_ice * rho_ice * 1.0e9_wp, &
-                    units="kg", long_name="Total ice mass", &
-                    standard_name="land_ice_mass", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! lim : Total ice mass                                     [MANDATORY]
+        call nc_write(filename, "lim", reg%V_ice * rho_ice * 1.0e9_wp, &
+            units="kg", long_name="Total ice mass", &
+            standard_name="land_ice_mass", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! limnsw : Mass above floatation                           [MANDATORY]
-                call nc_write(filename, "limnsw", reg%V_sl * rho_ice * 1.0e9_wp, &
-                    units="kg", long_name="Mass above floatation", &
-                    standard_name="land_ice_mass_not_displacing_sea_water", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! limnsw : Mass above floatation                           [MANDATORY]
+        call nc_write(filename, "limnsw", reg%V_sl * rho_ice * 1.0e9_wp, &
+            units="kg", long_name="Mass above floatation", &
+            standard_name="land_ice_mass_not_displacing_sea_water", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! iareagr : Grounded ice area                              [MANDATORY]
-                call nc_write(filename, "iareagr", reg%A_ice_g * 1.0e6_wp, &
-                    units="m2", long_name="Grounded ice area", &
-                    standard_name="grounded_ice_sheet_area", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! iareagr : Grounded ice area                              [MANDATORY]
+        call nc_write(filename, "iareagr", reg%A_ice_g * 1.0e6_wp, &
+            units="m2", long_name="Grounded ice area", &
+            standard_name="grounded_ice_sheet_area", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! iareafl : Floating ice area                              [MANDATORY]
-                call nc_write(filename, "iareafl", reg%A_ice_f * 1.0e6_wp, &
-                    units="m2", long_name="Floating ice area", &
-                    standard_name="floating_ice_shelf_area", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! iareafl : Floating ice area                              [MANDATORY]
+        call nc_write(filename, "iareafl", reg%A_ice_f * 1.0e6_wp, &
+            units="m2", long_name="Floating ice area", &
+            standard_name="floating_ice_shelf_area", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! ====================================================================
-                ! Scalar FL variables  (yearly-average flux)
-                ! ====================================================================
+        ! ====================================================================
+        ! Scalar FL variables  (yearly-average flux)
+        ! ====================================================================
         
-                ! tendacabf : Total SMB flux                               [MANDATORY]
-                call nc_write(filename, "tendacabf", smb_tot * esm_correction, &
-                    units="kg s-1", long_name="Total SMB flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! tendacabf : Total SMB flux                               [MANDATORY]
+        call nc_write(filename, "tendacabf", smb_tot * esm_correction, &
+            units="kg s-1", long_name="Total SMB flux", &
+            standard_name="tendency_of_land_ice_mass_due_to_surface_mass_balance", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! tendlibmassbfgr : Total BMB flux, grounded               [MANDATORY]
-                call nc_write(filename, "tendlibmassbfgr", bmb_grnd_tot * esm_correction, &
-                    units="kg s-1", long_name="Total BMB flux beneath grounded ice", &
-                    standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! tendlibmassbfgr : Total BMB flux, grounded               [MANDATORY]
+        call nc_write(filename, "tendlibmassbfgr", bmb_grnd_tot * esm_correction, &
+            units="kg s-1", long_name="Total BMB flux beneath grounded ice", &
+            standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! tendlibmassbffl : Total BMB flux, floating               [MANDATORY]
-                call nc_write(filename, "tendlibmassbffl", bmb_shlf_t * esm_correction, &
-                    units="kg s-1", long_name="Total BMB flux beneath floating ice", &
-                    standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! tendlibmassbffl : Total BMB flux, floating               [MANDATORY]
+        call nc_write(filename, "tendlibmassbffl", bmb_shlf_t * esm_correction, &
+            units="kg s-1", long_name="Total BMB flux beneath floating ice", &
+            standard_name="tendency_of_land_ice_mass_due_to_basal_mass_balance", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! tendlicalvf : Total calving flux                         [MANDATORY]
-                ! Kinematic: uxy_bar * H_ice * rho_ice integrated over ice-front cells.
-                ! Convert from kg yr-1 to kg s-1.
-                call nc_write(filename, "tendlicalvf", calv_flt / yr_to_sec, &
-                    units="kg s-1", long_name="Total calving flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_calving", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! tendlicalvf : Total calving flux                         [MANDATORY]
+        call nc_write(filename, "tendlicalvf", flux_clv * esm_correction, &
+            units="kg s-1", long_name="Total calving flux", &
+            standard_name="tendency_of_land_ice_mass_due_to_calving", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! tendlifmassbf : Total ice-front melt flux                [MANDATORY]
-                ! ISMIP7-2026 separates this from calving. The kinematic approach does
-                ! not distinguish melt from calving at the front; we write zero here
-                ! and flag it so you can substitute dom%tpo%now%fmb if available
-                ! in your Yelmo build.
-                ! TODO: replace with sum(dom%tpo%now%fmb * ...) when field is confirmed.
-                call nc_write(filename, "tendlifmassbf", 0.0_wp, &
-                    units="kg s-1", long_name="Total ice front melting flux", &
-                    standard_name="tendency_of_land_ice_mass_due_to_ice_front_melting", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! tendlifmassbf : Total ice-front melt flux                [MANDATORY]
+        ! ISMIP7-2026 separates this from calving. The kinematic approach does
+        ! TODO: replace with sum(ylmo%tpo%now%fmb * ...) when field is confirmed.
+        call nc_write(filename, "tendlifmassbf", 0.0_wp, &
+            units="kg s-1", long_name="Total ice front melting flux", &
+            standard_name="tendency_of_land_ice_mass_due_to_ice_front_melting", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! tendligroundf : Total grounding-line flux                [MANDATORY]
-                ! Kinematic, convert from kg yr-1 to kg s-1.
-                call nc_write(filename, "tendligroundf", flux_grl / yr_to_sec, &
-                    units="kg s-1", long_name="Total grounding line flux", &
-                    standard_name="tendency_of_grounded_ice_sheet_mass", &
-                    dim1="time", start=[n], ncid=ncid)
+        ! tendligroundf : Total grounding-line flux                [MANDATORY]
+        ! Kinematic, convert from kg yr-1 to kg s-1.
+        call nc_write(filename, "tendligroundf", flux_grl / yr_to_sec, &
+            units="kg s-1", long_name="Total grounding line flux", &
+            standard_name="tendency_of_grounded_ice_sheet_mass", &
+            dim1="time", start=[n], ncid=ncid)
         
-                ! ---- close ----------------------------------------------------------
-                call nc_close(ncid)
+        ! ---- close ----------------------------------------------------------
+        call nc_close(ncid)
         
-                return
+        return
         
-            end subroutine write_step_1D_cmip
+    end subroutine write_step_1D_cmip
 
 end program yelmox_esm

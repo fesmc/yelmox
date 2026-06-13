@@ -1,6 +1,6 @@
 #!/bin/bash
 
-resolution=16km
+resolution=32km
 output_path=output_albedo/ismip7/ssp585-${resolution}_test_formatted
 
 
@@ -11,10 +11,11 @@ ctrl_params=(
     "esm.use_proj=True"
     "transient.equil_method=none"
     "transient.time_init=2016"
-    "transient.time_end=2300"
+    "transient.time_end=2027"
     "spinup.kill_shelves=False"
     "tm_1D.dt=1.0"
     "tm_2Dsm.dt=10.0"
+    "tm_2D.dt=10.0"
     "yelmo.nz_aa=11"
     "yelmo.dt_min=0.1"
     "esm.write_formatted=True"
