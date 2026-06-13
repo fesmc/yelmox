@@ -4,7 +4,7 @@
 
 &esm
     ! Experiment
-    par_file        = "input/esm/esm_gris_ismip7.nml"
+    par_file        = "input/esm/esm_grl_ismip7.nml"
     experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
 
     ! Load climatic fields
@@ -27,7 +27,7 @@
     dT_threshold    = 0.0               ! Temperature threshold. After this, constant climate.
 
     ! Source grid
-    grid_src        = "none"        ! Source grid of ESM.
+    grid_src        = "none"            ! Source grid of ESM.
 /
 
 &spinup
@@ -39,7 +39,7 @@
     dtt             = 10.0              ! [yr] Main loop timestep 
 
     ! Time intervals (check with ESM forcings)
-    time_ref        = 1960.0, 1989.0    ! [yr] Year interval used as Reference
+    time_ref        = 1961.0, 1990.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization
     time_esm_ref    = 1960.0, 1989.0    ! [yr] Year interval used as Reference of ESM
     time_hist       = 1850.0, 2014.0    ! [yr] Year interval used as Historical period
@@ -130,7 +130,7 @@
 
 &yelmo
     domain          = "Greenland"
-    grid_name       = "GRL-8KM" 
+    grid_name       = "GRL-16KM" 
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
@@ -176,7 +176,7 @@
     grad_lim_zb         = 0.05               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     dHdt_dyn_lim        = 100.0             ! [m/yr] Maximum allowed ice thickness change due to dynamics
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
-    margin_flt_subgrid  = tau_relax             ! Allow fractional ice area for floating margins
+    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
     f_ice_method        = "upstream"        ! "upstream" (H_ice/H_neighb) or "lsf" (geometric LSF area fraction)
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
@@ -209,7 +209,7 @@
 
 &ycalv
     ! === calving method & law ===
-    use_lsf             = False              ! use level-set method
+    use_lsf             = True              ! use level-set method
     lsf_method          = "snap"            ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
     lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations. redist mode only.
@@ -275,10 +275,10 @@
 /
 
 &ytill
-    method          =  1               ! -1: set externally; 1: calculate cb_ref online
+    method          = -1               ! -1: set externally; 1: calculate cb_ref online
     scale_zb        = 0                 ! 0: none, 1: lin, 2: exp : scaling with elevation
     scale_sed       = 0                 ! 0: none, 1: min(cb_zb,cb_sed), 2: cb_zb*(lambda_sed*f_sed), 3: 2 but no lower limit
-    is_angle        = True             ! cb_ref is a till strength angle?
+    is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 100.0               ! [m] Sediment thickness for no reduction in friction
@@ -446,7 +446,9 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     restart         = "none"        ! Load fields from a restart file?
-    
+    extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
+                                    ! Useful to account for moving ice fronts and/or filling mv in datasets
+  
     corr_method     = "none"          ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
     basin_number    = 1
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]

@@ -1235,6 +1235,8 @@ contains
         if (ctl%esm_use_smb) then
             call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+            call nc_write(filename,"dsmbdz",1e-3*esm%dsmbdz,units="m/a m-1 water equiv.",long_name="SMB lapse rate", &
+                dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         else
             call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
