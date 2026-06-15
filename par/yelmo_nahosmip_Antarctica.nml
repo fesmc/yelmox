@@ -17,6 +17,7 @@
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 5.0               ! [yr] Main loop timestep 
     with_ice_sheet  = True              ! Is the ice sheet active?
+    with_isostasy   = True              ! Is isostasy active?
     equil_method    = "relax"           ! "none", "relax", "opt"
 /
 
@@ -28,6 +29,7 @@
     time_equil      = 0.0               ! [yr] Equilibration time 
     dtt             = 1.0               ! [yr] Main loop timestep 
     with_ice_sheet  = True              ! Is the ice sheet active?
+    with_isostasy   = True              ! Is isostasy active?
     equil_method    = "none"            ! "none", "relax", "opt"
 /
 

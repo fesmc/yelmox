@@ -147,7 +147,8 @@ program yelmox
         real(wp) :: dt_restart
         real(wp) :: dt_clim
 
-        logical  :: with_ice_sheet 
+        logical  :: with_ice_sheet
+        logical  :: with_isostasy
         character(len=56) :: equil_method
 
         ! bipolar-specific control parameters
@@ -346,18 +347,20 @@ program yelmox
         call timer_step(tmrs,comp=0) 
 
         ! == ISOSTASY and SEA LEVEL ======================================================
-        call bsl_update(bsl, ts%time_rel)
-        if (ctl%active_north) then
-            call isos_update(yelmox_north%isos1, yelmox_north%yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmox_north%yelmo1%bnd%dzbdt_corr)
-            yelmox_north%yelmo1%bnd%z_bed = yelmox_north%isos1%out%z_bed
-            yelmox_north%yelmo1%bnd%z_sl  = yelmox_north%isos1%out%z_ss
+        if (ctl%with_isostasy) then
+            call bsl_update(bsl, ts%time_rel)
+            if (ctl%active_north) then
+                call isos_update(yelmox_north%isos1, yelmox_north%yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmox_north%yelmo1%bnd%dzbdt_corr)
+                yelmox_north%yelmo1%bnd%z_bed = yelmox_north%isos1%out%z_bed
+                yelmox_north%yelmo1%bnd%z_sl  = yelmox_north%isos1%out%z_ss
+            end if
+            if (ctl%active_south) then
+                call isos_update(yelmox_south%isos1, yelmox_south%yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmox_south%yelmo1%bnd%dzbdt_corr)
+                yelmox_south%yelmo1%bnd%z_bed = yelmox_south%isos1%out%z_bed
+                yelmox_south%yelmo1%bnd%z_sl  = yelmox_south%isos1%out%z_ss
+            end if
         end if
-        if (ctl%active_south) then
-            call isos_update(yelmox_south%isos1, yelmox_south%yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmox_south%yelmo1%bnd%dzbdt_corr)
-            yelmox_south%yelmo1%bnd%z_bed = yelmox_south%isos1%out%z_bed
-            yelmox_south%yelmo1%bnd%z_sl  = yelmox_south%isos1%out%z_ss
-        end if
-
+        
         call timer_step(tmrs,comp=1,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="isostasy") 
 
         ! == Ocean Box Model ===================================================
@@ -1229,6 +1232,7 @@ contains
         call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
         call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
         call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
+        call nml_read(path_par,"ctrl","with_isostasy",  ctl%with_isostasy)      ! Include active isostasy
         call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
         ! Get output times

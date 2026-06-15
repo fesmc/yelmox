@@ -64,7 +64,8 @@ program yelmox_ismip6
         character(len=56)  :: tstep_method
         real(wp) :: tstep_const
 
-        logical  :: with_ice_sheet 
+        logical  :: with_ice_sheet
+        logical  :: with_isostasy
         character(len=56) :: equil_method
 
         character(len=512) :: ismip6_par_file
@@ -108,6 +109,7 @@ program yelmox_ismip6
     call nml_read(path_par,trim(ctl%run_step),"tstep_const", ctl%tstep_const)   ! Assumed time bp for const method
     
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
+    call nml_read(path_par,trim(ctl%run_step),"with_isostasy",ctl%with_isostasy)    ! Active isostasy?
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
 
     if (trim(ctl%equil_method) .eq. "opt") then 
@@ -453,11 +455,13 @@ program yelmox_ismip6
             call timer_step(tmrs,comp=0) 
             
             ! == ISOSTASY and SEA LEVEL ===========================================
-            call bsl_update(bsl, ts%time_rel)
-            call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-            yelmo1%bnd%z_bed = isos1%out%z_bed
-            yelmo1%bnd%z_sl  = isos1%out%z_ss
-
+            if (ctl%with_isostasy) then
+                call bsl_update(bsl, ts%time_rel)
+                call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+                yelmo1%bnd%z_bed = isos1%out%z_bed
+                yelmo1%bnd%z_sl  = isos1%out%z_ss
+            end if
+            
             call timer_step(tmrs,comp=1,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="isostasy") 
 
             ! == ICE SHEET ===================================================

@@ -8,6 +8,7 @@
     dt_restart      = 20e3              ! [yr] Frequency of writing restart files
     transient_clim  = True              ! Calculate transient climate? 
     with_ice_sheet  = True              ! Is the ice sheet active?
+    with_isostasy   = True              ! Is isostasy active?
     equil_method    = "opt"           ! "none", "relax", "opt"
 /
 

@@ -12,7 +12,8 @@
     dT              = 0.0               ! [K]  Contant summer warming anomaly              
     lim_pd_ice      = True              ! Apply extra melting outside of PD ice extent
     greenland_init_marine_H = False     ! Initialize ice thickness to LGM-like state
-    with_ice_sheet  = True              ! Active ice sheet? 
+    with_ice_sheet  = True              ! Active ice sheet?
+    with_isostasy   = True              ! Is isostasy active?
     optimize        = False             ! Optimize basal friction? 
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing

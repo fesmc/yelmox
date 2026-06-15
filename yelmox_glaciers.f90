@@ -57,7 +57,8 @@ program yelmox
         real(wp) :: dt_restart
         real(wp) :: dt_clim
 
-        logical  :: with_ice_sheet 
+        logical  :: with_ice_sheet
+        logical  :: with_isostasy
         character(len=56) :: equil_method
 
     end type 
@@ -89,6 +90,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
+    call nml_read(path_par,"ctrl","with_isostasy",  ctl%with_isostasy)      ! Include active isostasy
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
 
     ! Get output times
@@ -337,11 +339,13 @@ program yelmox
         call timer_step(tmrs,comp=0) 
         
         ! == ISOSTASY and SEA LEVEL ======================================================
-        call bsl_update(bsl, ts%time_rel)
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = isos1%out%z_bed
-        yelmo1%bnd%z_sl  = isos1%out%z_ss
-
+        if (ctl%with_isostasy) then
+            call bsl_update(bsl, ts%time_rel)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
+        end if
+        
         call timer_step(tmrs,comp=1,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="isostasy") 
         
         ! == ICE SHEET ===================================================

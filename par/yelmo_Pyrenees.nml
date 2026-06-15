@@ -7,6 +7,7 @@
     dtt             = 10.0               ! [yr] Main loop timestep 
     dt_restart      = 10e3              ! [yr] Frequency of writing restart files
     with_ice_sheet  = True              ! Is the ice sheet active?
+    with_isostasy   = True              ! Is isostasy active?
     equil_method    = "none"            ! "none", "relax", "opt"
 /
 

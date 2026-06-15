@@ -54,7 +54,8 @@ program yelmox
     ! No-ice mask (to impose additional melting)
     logical, allocatable :: mask_noice(:,:)  
     logical :: lim_pd_ice 
-    logical :: with_ice_sheet 
+    logical :: with_ice_sheet
+    logical :: with_isostasy
     logical :: optimize 
     logical :: greenland_init_marine_H
 
@@ -87,6 +88,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dT",             dT_summer)              ! Initial summer temperature anomaly
     call nml_read(path_par,"ctrl","lim_pd_ice",     lim_pd_ice)             ! Limit to pd ice extent (apply extra melting outside mask)
     call nml_read(path_par,"ctrl","with_ice_sheet", with_ice_sheet)         ! Active ice sheet? 
+    call nml_read(path_par,"ctrl","with_isostasy",  with_isostasy)          ! Include active isostasy
     call nml_read(path_par,"ctrl","greenland_init_marine_H", greenland_init_marine_H)   ! Initialize ice thickness with extra marine ice?
     call nml_read(path_par,"ctrl","optimize",       optimize)               ! Optimize basal friction?
     call nml_read(path_par,"ctrl","write_ocn_forcing", file_rembo_write_ocn_forcing)
@@ -399,10 +401,12 @@ program yelmox
         call timer_step(tmrs,comp=0) 
 
         ! == ISOSTASY and SEA LEVEL ===========================================
-        call bsl_update(bsl, ts%time_rel)
-        call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
-        yelmo1%bnd%z_bed = isos1%out%z_bed
-        yelmo1%bnd%z_sl  = isos1%out%z_ss
+        if (with_isostasy) then
+            call bsl_update(bsl, ts%time_rel)
+            call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
+            yelmo1%bnd%z_bed = isos1%out%z_bed
+            yelmo1%bnd%z_sl  = isos1%out%z_ss
+        end if
 
         call timer_step(tmrs,comp=1,time_mod=[ts%time-dtt_now,ts%time]*1e-3,label="isostasy") 
         

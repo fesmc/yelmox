@@ -14,7 +14,8 @@
  dtt             = 5.0        
  time_const      = 2015.0     
  kill_shelves    = .true.     
- with_ice_sheet  = .true.     
+ with_ice_sheet  = .true.
+ with_isostasy   = .true.
  equil_method    = 'opt'      
 /
 &transient
@@ -23,7 +24,8 @@
  time_equil      = 0.0        
  dtt             = 1.0        
  time_const      = 2015.0     
- with_ice_sheet  = .true.     
+ with_ice_sheet  = .true.
+ with_isostasy   = .true.
  equil_method    = 'none'     
 /
 &abumip

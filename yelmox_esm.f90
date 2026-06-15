@@ -69,7 +69,8 @@ program yelmox_esm
         real(wp)            :: tstep_const
 
         logical             :: kill_shelves
-        logical             :: with_ice_sheet 
+        logical             :: with_ice_sheet
+        logical             :: with_isostasy
         character(len=56)   :: equil_method
 
         character(len=512)  :: esm_par_file
@@ -153,6 +154,7 @@ program yelmox_esm
         
     call nml_read(path_par,trim(ctl%run_step),"kill_shelves",  ctl%kill_shelves)    ! Kill shelves beyond pd?
     call nml_read(path_par,trim(ctl%run_step),"with_ice_sheet",ctl%with_ice_sheet)  ! Active ice sheet? 
+    call nml_read(path_par,trim(ctl%run_step),"with_isostasy", ctl%with_isostasy)   ! Active isostasy?
     call nml_read(path_par,trim(ctl%run_step),"equil_method",  ctl%equil_method)    ! What method should be used for spin-up?
 
     if (trim(ctl%equil_method) .eq. "opt") then 
@@ -498,14 +500,11 @@ program yelmox_esm
             call timer_step(tmrs,comp=0) 
             
             ! == ISOSTASY and SEA LEVEL ===========================================
-            if (.True.) then
-                ! freeze isostasy during spinup?
+            if (ctl%with_isostasy) then
                 call bsl_update(bsl, ts%time_rel)
                 call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
                 yelmo1%bnd%z_bed = isos1%out%z_bed
                 yelmo1%bnd%z_sl  = isos1%out%z_ss
-            else
-                ! Do nothing
             end if
 
             call timer_step(tmrs,comp=1,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="isostasy") 
