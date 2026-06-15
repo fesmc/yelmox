@@ -3,11 +3,10 @@
 !
 ! Demonstration of the new defaults+overlay system. Equivalent
 ! to par/yelmo_pd_Antarctica.nml but with every yelmo-owned
-! group reduced to the parameters that differ from
-! input/yelmo_defaults.nml. Unchanged blocks:
+! group (including &fhyd, owned by FastHydrology) reduced to
+! the parameters that differ from input/yelmo_defaults.nml.
+! Unchanged blocks:
 !
-!   &fhyd  - kept verbatim because hydro_init (FastHydrology)
-!            is not threaded through nml_defaults yet.
 !   &ctrl, &tm_*, &opt, &barysealevel, &snap*, &smbpal, &itm,
 !   &marine_shelf, &tf_corr_ant, &pico, &sed, &ghf, &isos
 !          - driver-owned groups; defaults are not wired here.
@@ -127,47 +126,9 @@
     cf_ref   = 0.1
 /
 
-! &fhyd: kept verbatim because hydro_init (FastHydrology) is
-! not yet threaded through the defaults mechanism. Until that
-! lands, every parameter FastHydrology reads must be present.
 &fhyd
-    method_til         = 1
-    method_transport   = 0
-    rho_ice            = 917.0
-    rho_w              = 1000.0
-    g                  = 9.81
-    W_til_max          = 2.0
-    mask_bc            = 0
-    W_til_bc           = 0.0
-
-    bkt_till_rate = 1e-3
-    bkt_N_closure = 3
-
-    marine_p         = 0.0
-    marine_rho_sw    = 1028.0
-    till_N0          = 1000.0
-    till_delta       = 0.8
-    till_e0          = 0.69
-    till_Cc          = 0.12
-    two_value_delta  = 0.02
-
-    k24_substrate_type               = 0
-    k24_flux_solver                  = 0
-    k24_manning_exponent             = 3.0
-    k24_latent_heat_water            = 3.35e5
-    k24_bed_thickness                = 0.1
-    k24_manning_coefficient_exponent = 1.25
-    k24_bed_friction_exponent        = 1.5
-    k24_friction_factor              = 0.1
-    k24_till_factor                  = 1.1
-    k24_critical_discharge           = 1.0
-    k24_initial_cavity_height        = 0.1
-    k24_coupling_length              = 1.0e4
-    k24_long_coupling_water          = 5.0
-    k24_min_pressure_fraction        = 0.02
-    k24_eta_w                        = 1.8e-3
-    k24_W_min                        = 1.0e-8
-    k24_W_max                        = 0.015
+    marine_p   = 0.0
+    till_delta = 0.8
 /
 
 &ymat
