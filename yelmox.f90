@@ -59,7 +59,8 @@ program yelmox
         real(wp) :: dt_restart
         real(wp) :: dt_clim
 
-        logical  :: with_ice_sheet 
+        logical  :: with_ice_sheet
+        logical  :: with_isostasy
         character(len=56) :: equil_method
         logical  :: write_clim_and_kill
 
@@ -98,6 +99,7 @@ program yelmox
     call nml_read(path_par,"ctrl","dtt",            ctl%dtt)                ! [yr] Main loop time step 
     call nml_read(path_par,"ctrl","dt_restart",     ctl%dt_restart)
     call nml_read(path_par,"ctrl","with_ice_sheet", ctl%with_ice_sheet)     ! Include an active ice sheet 
+    call nml_read(path_par,"ctrl","with_isostasy",  ctl%with_isostasy)      ! Include active isostasy
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
     call nml_read(path_par,"ctrl","write_clim_and_kill",   ctl%write_clim_and_kill)       ! Write climate output and kill program?
 
@@ -296,14 +298,12 @@ end if
 
     ! === Initialize external models (forcing for ice sheet) ======
 
-    ! jablasco
-    if (.TRUE.) then
-        ! Initialize barysealevel model
-        call bsl_init(bsl, path_par, ts%time_rel)
+    ! Initialize barysealevel model
+    call bsl_init(bsl, path_par, ts%time_rel)
 
-        ! Initialize fastisosaty
-        call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
-    end if
+    ! Initialize fastisosaty
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
+
     ! Initialize "climate" model (climate and ocean forcing)
     call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
     
@@ -324,19 +324,16 @@ end if
     ! ybound: z_bed, z_sl, H_sed, smb, T_srf, bmb_shlf , Q_geo
 
     ! Barystatic sea level
-    ! jablasco
-    if (.TRUE.) then
-        call bsl_update(bsl, year_bp=ts%time_rel)
-        call bsl_write_init(bsl, file_bsl, ts%time)
+    call bsl_update(bsl, year_bp=ts%time_rel)
+    call bsl_write_init(bsl, file_bsl, ts%time)
 
-        ! Initialize the isostasy reference state using reference topography fields
-        call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-        call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
-        call isos_write_init_extended(isos1, file_isos, ts%time)
+    ! Initialize the isostasy reference state using reference topography fields
+    call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
+    call isos_write_init_extended(isos1, file_isos, ts%time)
 
-        yelmo1%bnd%z_bed = isos1%out%z_bed
-        yelmo1%bnd%z_sl  = isos1%out%z_ss
-    end if
+    yelmo1%bnd%z_bed = isos1%out%z_bed
+    yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
@@ -563,8 +560,7 @@ end if
         call timer_step(tmrs,comp=0) 
         
         ! == ISOSTASY and SEA LEVEL ======================================================
-        ! jablasco
-        if (.FALSE.) then
+        if (ctl%with_isostasy) then
                 call bsl_update(bsl, ts%time_rel)
                 call isos_update(isos1, yelmo1%tpo%now%H_ice, ts%time, bsl, dwdt_corr=yelmo1%bnd%dzbdt_corr)
                 yelmo1%bnd%z_bed = isos1%out%z_bed
