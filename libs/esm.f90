@@ -120,6 +120,8 @@ module esm
         real(wp), allocatable :: dso(:,:)         ! Precipitation relative anomaly [%]
         real(wp), allocatable :: dto_var(:,:)     ! Surface temperature anomaly variability [K]
         real(wp), allocatable :: dso_var(:,:)     ! Precipitation relative anomaly variability [%]
+        real(wp), allocatable :: Qd_ann(:,:)      ! Annual mean subglacial discharge [m3/s]
+        real(wp), allocatable :: Qd_sum(:,:)      ! Summer mean subglacial discharge [m3/s]
         
         ! === Mean fields ===
         real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
@@ -708,12 +710,14 @@ contains
         anomaly = 0.0_wp
             
         ! Initialize anomalies
-        esm%dts  = 0.0_wp
-        esm%dpr  = 1.0_wp
-        esm%dsmb = 0.0_wp
+        esm%dts    = 0.0_wp
+        esm%dpr    = 1.0_wp
+        esm%dsmb   = 0.0_wp
         esm%dsmbdz = 0.0_wp
-        esm%dto  = 0.0_wp
-        esm%dso  = 0.0_wp 
+        esm%dto    = 0.0_wp
+        esm%dso    = 0.0_wp 
+        esm%Qd_ann = 0.0_wp
+        esm%Qd_sum = 0.0_wp
 
         select case(trim(esm%ctrl_run_type))
             
@@ -763,10 +767,12 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
-                        !if (trim(domain).eq."Greenland") then
-                        !    call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
-                        !end if
-                            
+                        if (trim(domain).eq."Greenland") then
+                            call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
+                            esm%Qd_ann = sum(esm%Qd_hist%var(:,:,:,1),dim=3) / 12.0
+                            esm%Qd_sum = (esm%Qd_hist%var(:,:,6,1)+esm%Qd_hist%var(:,:,7,1)+esm%Qd_hist%var(:,:,8,1)) / 3.0
+                        end if
+                                         
                         if (mshlf%par%extrap_shlf) then
                             ! Extrapolate ocean data to the interior of ice shelves
                             call ocn_variable_extrapolation(esm%to_hist%var(:,:,:,1),H_ice,basins,-esm%to_hist%z,z_bed)
@@ -803,10 +809,12 @@ contains
                         
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
-                        call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
-                        !if (trim(domain).eq."Greenland") then
-                        !    call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
-                        !end if
+                        call varslice_update(esm%so_proj,[time],method="extrap",rep=1)  
+                        if (trim(domain).eq."Greenland") then
+                            call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
+                            esm%Qd_ann = sum(esm%Qd_proj%var(:,:,:,1),dim=3) / 12.0
+                            esm%Qd_sum = (esm%Qd_proj%var(:,:,6,1)+esm%Qd_proj%var(:,:,7,1)+esm%Qd_proj%var(:,:,8,1)) / 3.0
+                        end if
                             
                         if (mshlf%par%extrap_shlf) then
                             ! Interpolate ocean data to the interior
@@ -1268,6 +1276,8 @@ contains
         allocate(esm%dsmbdz(nx,ny))
         allocate(esm%dto(nx,ny))
         allocate(esm%dso(nx,ny))
+        allocate(esm%Qd_ann(nx,ny))
+        allocate(esm%Qd_sum(nx,ny))
         allocate(esm%dts_var(nx,ny,12))
         allocate(esm%dpr_var(nx,ny,12))
         allocate(esm%dto_var(nx,ny))
@@ -1301,6 +1311,9 @@ contains
             if (allocated(esm%dpr_var)) deallocate(esm%dpr_var)
             if (allocated(esm%dto_var)) deallocate(esm%dto_var)
             if (allocated(esm%dso_var)) deallocate(esm%dso_var)
+            if (allocated(esm%dso_var)) deallocate(esm%dso_var)
+            if (allocated(esm%Qd_ann))  deallocate(esm%Qd_ann)
+            if (allocated(esm%Qd_sum))  deallocate(esm%Qd_sum)
             if (allocated(esm%t2m_sum)) deallocate(esm%t2m_sum)
             if (allocated(esm%t2m_ann)) deallocate(esm%t2m_ann)
             if (allocated(esm%pr_ann))  deallocate(esm%pr_ann)

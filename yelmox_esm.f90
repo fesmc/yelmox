@@ -338,7 +338,7 @@ program yelmox_esm
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf 
-    !yelmo1%bnd%Qd       = esm%Qd                ! subglacial dscharge needed for frontal melt
+    yelmo1%bnd%Qd       = esm1%Qd_ann           ! subglacial dscharge needed for frontal melt
 
     call yelmo_print_bound(yelmo1%bnd)
 
