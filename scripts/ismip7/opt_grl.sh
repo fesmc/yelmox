@@ -1,7 +1,7 @@
 #!/bin/bash
 
-resolution=GRL-16KM
-output_path=output_albedo/ismip7/${resolution}/opt-l21-gimp_test
+resolution=GRL-4KM
+output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp_test
 
 res_params=(
     "yelmo.grid_name=${resolution}"

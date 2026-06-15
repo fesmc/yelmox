@@ -337,7 +337,8 @@ program yelmox_esm
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
+    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf 
+    yelmo1%bnd%Qd       = esm%Qd                ! subglacial dscharge needed for frontal melt
 
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -714,14 +715,30 @@ contains
         ! extrapolate towards interior of ice shelf
         if (mshlf%par%extrap_shlf) then
             ! avoid for ismip7
-            call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
-            call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
+            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+            !call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
+            !call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+        end if
+
+        ! Check reference states
+        if (.FALSE.) then
+            ! Atm check
+            write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
+            write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
+            write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
+            ! Ocean check
+            write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
+            write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
+            write(*,*) "To_min = ",minval(esm%to_ref%var(:,:,:,1))
+            write(*,*) "So_min = ",minval(esm%so_ref%var(:,:,:,1))
         end if
 
         ! Step 2: Calculate anomaly fields (forcing)
         call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
                                 ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
-                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.)
+                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.,domain)
 
         ! Step 3: Calculate the variability anomaly field
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
@@ -756,42 +773,29 @@ contains
             call smbpal_update_monthly(smbp,esm%t2m+esm%dts+esm%dts_var,esm%pr*esm%dpr*esm%dpr_var, &
                                         ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,time)
         end if
-        
-        ! === Oceanic boundary conditions ===
-        if (mshlf%par%extrap_shlf) then
-            ! Extrapolate ocean data to the interior of the ice shelf
-            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%to_ref%z,ylmo%bnd%z_bed)
-            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), ylmo%tpo%now%H_ice, ylmo%bnd%basins,-esm%so_ref%z,ylmo%bnd%z_bed)
-        end if
-
-        if (.FALSE.) then
-            ! Atm check
-            write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
-            write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
-            write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
-            write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
-            ! Ocean check
-            write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
-            write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
-            write(*,*) "To_min = ",minval(esm%to_ref%var(:,:,:,1))
-            write(*,*) "So_min = ",minval(esm%so_ref%var(:,:,:,1))
-        end if
     
+        ! === Oceanic boundary conditions ===
         ! Update oceanic fields at desired levels
         call marshelf_interp_shelf(mshlf%now%T_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
-                                   ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
+                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
-                                        ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
-    
+                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
+
         ! Add anomaly to reference ocean
         mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto + esm%dto_var
         mshlf%now%S_shlf = mshlf%now%S_shlf + esm%dso + esm%dso_var
-    
+        
         if (.FALSE.) then
             ! remove for ismip7
             ! Fill any remaining missing values
             call fill_missing_2d(mshlf%now%T_shlf, mv)
             call fill_missing_2d(mshlf%now%S_shlf, mv)
+        end if        
+        
+        if (trim(domain) .eq. "Greenland") then
+            ! Directly given in TF
+            mshlf%now%dT_shlf = mshlf%now%T_shlf + esm%dto !+ esm%dto_var
+            mshlf%par%tf_method = 2
         end if
 
         ! Update bmb_shlf and mask_ocn

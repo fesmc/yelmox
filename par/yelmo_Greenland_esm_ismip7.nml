@@ -213,8 +213,8 @@
     lsf_method          = "snap"            ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
     lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations. redist mode only.
-    calv_flt_method     = "vm-l19"           ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "zero"           ! "zero", "stress-b12"
+    calv_flt_method     = "zero"            ! "zero", "simple", "flux", "vm-l19", "kill"
+    calv_grnd_method    = "zero"            ! "zero", "stress-b12"
     
     ! === numeric noise === 
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
@@ -361,8 +361,8 @@
 &yelmo_init_topo
     init_topo_load    = True 
     init_topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    init_topo_names   = "thickness" "bed" "bed" "surface_gimp"        ! Ice thickness, bedrock elevation, surface elevation has two options: 
-                                                                ! surface elevation can be: "surface_gimp" (BedMachine) or "surface_grimp" (GrIMP)
+    init_topo_names   = "thickness" "bed" "bed" "surface_grimp"        ! Ice thickness, bedrock elevation, surface elevation has two options: 
+                                                                ! surface elevation can be: "surface_grimp" (BedMachine) or "surface_grimp" (GrIMP)
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -373,19 +373,19 @@
 &yelmo_data 
     pd_topo_load      = True 
     pd_topo_path      = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    pd_topo_names     = "thickness" "bed" "bed" "surface_gimp" "mask"        ! Ice thickness, bedrock elevation, surface elevation has two options: 
-                                                                ! surface elevation can be: "surface_gimp" (BedMachine) or "surface_grimp" (GrIMP)
+    pd_topo_names     = "thickness" "bed" "bed" "surface_grimp" "mask"        ! Ice thickness, bedrock elevation, surface elevation has two options: 
+                                                                ! surface elevation can be: "surface_grimp" (BedMachine) or "surface_grimp" (GrIMP)
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/ISMIP7/{domain}/{grid_name}/climatology/{grid_name}_tas_CESM2-WACCM_ltm_SDBN1_1960-1989.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
     pd_tsrf_name      = "tas"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = True
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/ISMIP7/{domain}/{grid_name}/climatology/{grid_name}_acabf_CESM2-WACCM_ltm_SDBN1_1960-1989.nc"
-    pd_smb_name       = "acabf"                        ! Surface mass balance 
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
-    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_vel_path       = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
+    pd_vel_names      = "vx_mosaic" "vy_mosaic"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 

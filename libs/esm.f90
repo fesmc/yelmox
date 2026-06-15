@@ -85,12 +85,15 @@ module esm
         ! Oceanic fields 
         type(varslice_class)   :: to_esm_ref
         type(varslice_class)   :: so_esm_ref
-
+        !type(varslice_class)   :: Qd_esm_ref
+                
         type(varslice_class)   :: to_hist
         type(varslice_class)   :: so_hist
+        type(varslice_class)   :: Qd_hist
 
         type(varslice_class)   :: to_proj
         type(varslice_class)   :: so_proj
+        type(varslice_class)   :: Qd_proj
 
         ! General fields 
         type(varslice_class)   :: zs_ref
@@ -236,6 +239,7 @@ contains
         character(len=256) :: grp_zs_esm_ref
         character(len=256) :: grp_to_esm_ref 
         character(len=256) :: grp_so_esm_ref
+        !character(len=256) :: grp_Qd_esm_ref
         ! ESM Historical period 
         character(len=256) :: grp_ts_hist 
         character(len=256) :: grp_pr_hist
@@ -243,6 +247,7 @@ contains
         character(len=256) :: grp_dsmbdz_hist
         character(len=256) :: grp_to_hist 
         character(len=256) :: grp_so_hist
+        character(len=256) :: grp_Qd_hist
         ! ESM Projection period 
         character(len=256) :: grp_ts_proj 
         character(len=256) :: grp_pr_proj 
@@ -250,6 +255,7 @@ contains
         character(len=256) :: grp_dsmbdz_proj
         character(len=256) :: grp_to_proj 
         character(len=256) :: grp_so_proj
+        character(len=256) :: grp_Qd_proj   ! used for Greenland
 
         integer  :: iloc, k 
         real(wp) :: tmp
@@ -339,6 +345,7 @@ contains
         grp_zs_esm_ref   = trim(group_prefix)//"zs_esm_ref"
         grp_to_esm_ref   = trim(group_prefix)//"to_esm_ref"
         grp_so_esm_ref   = trim(group_prefix)//"so_esm_ref" 
+        !grp_Qd_esm_ref   = trim(group_prefix)//"Qd_esm_ref"
 
         ! ESM Historical sims 
         grp_ts_hist     = trim(group_prefix)//"ts_hist"
@@ -347,6 +354,7 @@ contains
         grp_dsmbdz_hist = trim(group_prefix)//"dsmbdz_hist"
         grp_to_hist     = trim(group_prefix)//"to_hist"
         grp_so_hist     = trim(group_prefix)//"so_hist"
+        grp_Qd_hist     = trim(group_prefix)//"Qd_hist"
 
         ! ESM projected sims
         grp_ts_proj     = trim(group_prefix)//"ts_proj"
@@ -354,7 +362,8 @@ contains
         grp_smb_proj    = trim(group_prefix)//"smb_proj"
         grp_dsmbdz_proj = trim(group_prefix)//"dsmbdz_proj"
         grp_to_proj     = trim(group_prefix)//"to_proj"
-        grp_so_proj     = trim(group_prefix)//"so_proj"         
+        grp_so_proj     = trim(group_prefix)//"so_proj"
+        grp_Qd_proj     = trim(group_prefix)//"Qd_proj"         
      
         ! Climatology
         ! Reference period
@@ -406,7 +415,10 @@ contains
                 call varslice_init_nml_esm(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
                 call varslice_init_nml_esm(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
                 call varslice_init_nml_esm(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-            
+                !if (trim(domain).eq."Greenland")
+                !    call varslice_init_nml_esm(esm%Qd_esm_ref, filename,trim(grp_Qd_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
+                !end if
+
                 ! ESM historical period
                 if (use_hist) then
                     call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, esm%gcm, esm%scenario)
@@ -418,10 +430,14 @@ contains
                     end if
                     call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%scenario)
                     call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    if (trim(domain).eq."Greenland")
+                        call varslice_init_nml_esm(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,esm%gcm,esm%scenario)
+                    end if
                 end if
                 
                 ! ESM projection period
                 if (use_proj) then
+                    ! atm
                     call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
                     if (use_smb) then
                         call varslice_init_nml_esm(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, esm%gcm, esm%scenario)
@@ -429,8 +445,12 @@ contains
                     else
                         call varslice_init_nml_esm(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, esm%gcm, esm%scenario)
                     end if
+                    ! ocean
                     call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
                     call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
+                    if (trim(domain).eq."Greenland")
+                        call varslice_init_nml_esm(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,esm%gcm,esm%scenario)
+                    end if
                 end if
             end if
         end if
@@ -665,7 +685,8 @@ contains
     
     end subroutine esm_variability_update
 
-    subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
+    subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,&
+                                    H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn,domain)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -678,7 +699,8 @@ contains
         real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
-        logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn 
+        logical,  intent(IN) :: use_ref_atm, use_ref_ocn
+        character(len=*), intent(IN) :: domain
     
         ! Local variables 
         integer  :: k, m 
@@ -745,6 +767,9 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
+                        if (trim(domain).eq."Greenland") then
+                            call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
+                        end if
                             
                         if (mshlf%par%extrap_shlf) then
                             ! Extrapolate ocean data to the interior of ice shelves
@@ -783,7 +808,10 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
-                        
+                        if (trim(domain).eq."Greenland") then
+                            call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
+                        end if
+                            
                         if (mshlf%par%extrap_shlf) then
                             ! Interpolate ocean data to the interior
                             call ocn_variable_extrapolation(esm%to_proj%var(:,:,:,1),H_ice,basins,-esm%to_proj%z,z_bed)
@@ -797,7 +825,7 @@ contains
                                                     z_bed,f_grnd,z_sl,-esm%to_esm_ref%z)
                         call marshelf_interp_shelf(esm%dso,mshlf,esm%so_proj%var(:,:,:,1)-esm%so_esm_ref%var(:,:,:,1),H_ice, &
                                                     z_bed,f_grnd,z_sl,-esm%so_esm_ref%z)            
-                        
+
                     ! === Reference period ===
                     ! Only used if there is a gap between the historical and projection period
                     else if (time .gt. time_hist(2) .and. time .lt. time_proj(1)) then
