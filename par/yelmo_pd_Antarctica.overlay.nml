@@ -1,0 +1,460 @@
+! ============================================================
+! yelmo_pd_Antarctica.overlay.nml
+!
+! Demonstration of the new defaults+overlay system. Equivalent
+! to par/yelmo_pd_Antarctica.nml but with every yelmo-owned
+! group reduced to the parameters that differ from
+! input/yelmo_defaults.nml. Unchanged blocks:
+!
+!   &fhyd  - kept verbatim because hydro_init (FastHydrology)
+!            is not threaded through nml_defaults yet.
+!   &ctrl, &tm_*, &opt, &barysealevel, &snap*, &smbpal, &itm,
+!   &marine_shelf, &tf_corr_ant, &pico, &sed, &ghf, &isos
+!          - driver-owned groups; defaults are not wired here.
+! ============================================================
+
+&ctrl
+    tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_const     = 0.0               ! Assumed time for "const" method
+    time_init       = 0.0               ! [yr] Starting time
+    time_end        = 50e3              ! [yr] Ending time
+    time_equil      = 1e3               ! [yr] Equilibration time
+    dtt             = 5.0               ! [yr] Main loop timestep
+    dt_restart      = 20e3              ! [yr] Frequency of writing restart files
+    transient_clim  = True              ! Calculate transient climate?
+    with_ice_sheet  = True              ! Is the ice sheet active?
+    with_isostasy   = True              ! Is isostasy active?
+    equil_method    = "none"            ! "none", "relax", "opt"
+/
+
+&tm_1D
+    method          = "const"
+    dt              = 1.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
+&tm_2D
+    method          = "const"
+    dt              = 500.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_2Dsm
+    method          = "const"
+    dt              = 500000000.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&opt
+    opt_cf          = True
+    cf_time_init    = 0.0
+    cf_time_end     = 15e3
+    cf_init         = -1.0
+    cf_min          = 0.001
+    tau_c           = 500.0
+    H0              = 100.0
+
+    sigma_err       = 50e3
+    sigma_vel       = 100.0
+    fill_method     = "cf_min"
+
+    rel_tau1        = 100.0
+    rel_tau2        = 2000.0
+    rel_time1       = 2e3
+    rel_time2       = 6e3
+    rel_m           = 2.0
+
+    opt_tf          = True
+    tf_time_init    = 0.0
+    tf_time_end     = 15e3
+    tf_time         = 15e3
+    H_grnd_lim      = 500.0
+    tf_sigma        = 50e3
+    tau_m           = 100.0
+    m_temp          = 10.0
+    tf_min          = -3.0
+    tf_max          =  0.5
+    tf_basins       = 1, 12, 14, 15
+
+    cf_ref_wais     = 0.01
+/
+
+! ============================================================
+! Yelmo-owned groups below: only overrides of input/yelmo_defaults.nml
+! ============================================================
+
+&yelmo
+    domain          = "Antarctica"
+    grid_name       = "ANT-32KM"
+    restart_z_bed   = True
+    restart_H_ice   = True
+    dt_method       = 0
+    cfl_max         = 0.5
+/
+
+&ytopo
+    grad_lim    = 0.05
+    grad_lim_zb = 0.05
+/
+
+&ycalv
+    use_lsf         = True
+    calv_flt_method = "vm-m16"
+    H_min_grnd      = 0.0
+    H_min_flt       = 0.0
+    tau_ice         = 85.0e3
+    Hc_ref_grnd     = 100.0
+/
+
+&ydyn
+    beta_method  = 3
+    beta_q       = 0.2
+    beta_gl_stag = 3
+    ssa_solver   = "energy"
+    ssa_lat_bc   = "all"
+    ssa_iter_max = 5
+/
+
+&ytill
+    scale_zb = 2
+    f_sed    = 1.0
+    z1       = 0.0
+    cf_min   = 0.001
+    cf_ref   = 0.1
+/
+
+! &fhyd: kept verbatim because hydro_init (FastHydrology) is
+! not yet threaded through the defaults mechanism. Until that
+! lands, every parameter FastHydrology reads must be present.
+&fhyd
+    method_til         = 1
+    method_transport   = 0
+    rho_ice            = 917.0
+    rho_w              = 1000.0
+    g                  = 9.81
+    W_til_max          = 2.0
+    mask_bc            = 0
+    W_til_bc           = 0.0
+
+    bkt_till_rate = 1e-3
+    bkt_N_closure = 3
+
+    marine_p         = 0.0
+    marine_rho_sw    = 1028.0
+    till_N0          = 1000.0
+    till_delta       = 0.8
+    till_e0          = 0.69
+    till_Cc          = 0.12
+    two_value_delta  = 0.02
+
+    k24_substrate_type               = 0
+    k24_flux_solver                  = 0
+    k24_manning_exponent             = 3.0
+    k24_latent_heat_water            = 3.35e5
+    k24_bed_thickness                = 0.1
+    k24_manning_coefficient_exponent = 1.25
+    k24_bed_friction_exponent        = 1.5
+    k24_friction_factor              = 0.1
+    k24_till_factor                  = 1.1
+    k24_critical_discharge           = 1.0
+    k24_initial_cavity_height        = 0.1
+    k24_coupling_length              = 1.0e4
+    k24_long_coupling_water          = 5.0
+    k24_min_pressure_fraction        = 0.02
+    k24_eta_w                        = 1.8e-3
+    k24_W_min                        = 1.0e-8
+    k24_W_max                        = 0.015
+/
+
+&ymat
+    de_max     = 0.5
+    enh_stream = 1.0
+/
+
+&ytherm
+    rock_method = "active"
+/
+
+&barysealevel
+    method      = "fastiso"
+    bsl_init    = 0.0
+    sl_path     = "none"
+    sl_name     = "none"
+    A_ocean_pd  = 3.625e14
+    A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
+    restart    = "None"
+/
+
+&yelmo_masks
+    basins_nms      = "basin_reese" "basin_mask"
+/
+
+&yelmo_init_topo
+    init_topo_path = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    z_bed_f_sd     = 0.0
+/
+
+&yelmo_data
+    pd_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    pd_tsrf_path    = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    pd_tsrf_monthly = True
+    pd_smb_path     = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERA-INTERIM_monthly_1981-2010.nc"
+    pd_smb_monthly  = True
+    pd_vel_path     = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
+/
+
+! ============================================================
+! Below: non-yelmo groups, kept verbatim from yelmo_pd_Antarctica.nml
+! ============================================================
+
+&snap
+    atm_type           = "anom"
+    ocn_type           = "anom"
+    fname_at           = "input/zeros.dat"
+    fname_ao           = "input/zeros.dat"
+    fname_ap           = "input/zeros.dat"
+    fname_as           = "input/zeros.dat"
+    fname_bt           = "input/ones.dat"
+    fname_bo           = "input/ones.dat"
+    fname_bp           = "input/ones.dat"
+    fname_bs           = "input/ones.dat"
+    lapse              = 0.0080 0.0065
+    dTa_const          = 0.0
+    dTo_const          = 0.0
+    dSo_const          = 0.0
+    f_to               = 0.25
+    f_p                = 0.05
+    f_stdev            = 0.0
+/
+
+&snap_hybrid
+    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
+    f_eem              = 1.0
+    f_glac             = 1.0
+    f_hol              = 1.0
+    f_seas             = 1.0
+    f_to               = 0.2
+/
+
+&snap_clim0
+    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
+    clim_names      = "zs" "T_srf" "pr" ""
+    clim_monthly    = True
+    clim_time       = 0
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr"
+    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    ocn_names       = "z" "mask_ocn" "to" "so"
+    ocn_monthly     = False
+    ocn_time        = 0
+/
+
+&snap_clim1
+    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
+    clim_monthly    = False
+    clim_time       = 0
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr"
+    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = False
+    ocn_time        = 0
+/
+
+&snap_clim2
+    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
+    clim_monthly    = False
+    clim_time       = -21000
+    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
+    clim_stdev_name = "pr_ann"
+    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = False
+    ocn_time        = -21000
+/
+
+&snap_clim3
+    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
+    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
+    clim_monthly    = False
+    clim_time       = -21000
+    clim_stdev_path = "None"
+    clim_stdev_name = "pr"
+    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
+    ocn_names       = "depth" "mask_ocn" "to"
+    ocn_monthly     = False
+    ocn_time        = -21000
+/
+
+&smbpal
+    const_insol = True
+    const_kabp  = 0.0
+    insol_fldr  = "input"
+    abl_method  = "pdd"
+    sigma_snow  = 5.0
+    sigma_melt  = 5.0
+    sigma_land  = 5.0
+
+    sf_a        = 0.273
+    sf_b        = 273.6
+    firn_fac    = 0.0266
+
+    mm_snow = 3.0
+    mm_ice  = 8.0
+/
+
+&itm
+    H_snow_max      =  5.0e3
+    Pmaxfrac        =  0.6
+
+    trans_a         =  0.46
+    trans_b         =  6e-5
+    trans_c         =  0.01
+    itm_c           = -75.0
+    itm_t           =  10.0
+    itm_b           =  -2.0
+    itm_lat0        =  65.0
+
+    alb_snow_dry       =  0.8
+    alb_snow_wet       =  0.65
+    alb_ice            =  0.4
+    alb_land           =  0.2
+    alb_forest         =  0.1
+    alb_ocean          =  0.1
+    H_snow_crit_desert =  10.0
+    H_snow_crit_forest = 100.0
+    melt_crit          =   0.5
+/
+
+&marine_shelf
+    bmb_method      = "quad-nl"
+    tf_method       = 1
+    interp_depth    = "shlf"
+    interp_method   = "interp"
+    find_ocean      = True
+    restart         = "none"
+
+    corr_method     = "tf-ant"
+    basin_number    = 1
+    basin_bmb_corr  = 0.0
+    basin_tf_corr   = 0.0
+    tf_correction   = True
+    tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
+    tf_name         = "dT_nl"
+
+    bmb_max         = 0.0
+
+    c_deep          = -10.0
+    depth_deep      = 2000.0
+    depth_const     = 2000.0
+    depth_min       = 1100.0
+    depth_max       = 1500.0
+
+    lambda1         = -0.0575
+    lambda2         = 0.0832
+    lambda3         = 7.59e-4
+
+    gamma_lin       = 630.0
+    gamma_quad      = 11100.0
+    gamma_quad_nl   = 14500.0
+    gamma_prime     = 100.0
+
+    kappa_grz       = 10.0
+    c_grz           = 1.0
+    f_grz_shlf      = 10.0
+    grz_length      = 16.0
+
+    use_obs         = False
+    obs_path        = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+    obs_name        = "bm_eq_reese"
+    obs_scale       = 1.0
+    obs_lim         = 100.0
+    basin_name      = "none"
+    basin_bmb       = 0.0
+/
+
+&tf_corr_ant
+    ronne   =  0.3
+    ross    =  0.3
+    pine    = -1.5
+    abbott  =  0.0
+/
+
+&pico
+    n_box          = 5.0
+    a_pico         = -0.0572
+    b_pico         = 0.0788
+    c_pico         = 7.77e-8
+    alpha_pico     = 7.5e-5
+    beta_pico      = 7.7e-4
+    rho_star       = 1033.0
+    gamma_tstar    = 630.0
+    C_over         = 1.0
+/
+
+&sed
+    method    = 0
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
+    obs_name  = "z_sed"
+/
+
+&ghf
+    use_obs   = True
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-S04.nc"
+    obs_name  = "ghf"
+    obs_err_name = "ghf_sigma"
+    f_stdev   = 0.0
+    ghf_const = 50.0
+/
+
+&isos
+    heterogeneous_ssh = .true.
+    interactive_sealevel = .true.
+    include_elastic = .true.
+    correct_compression = .true.
+    correct_distortion = .false.
+    method          = 3
+    dt_diagnostics  = 10.
+    pad         = 1024.
+
+    mantle = "rheology_file"
+    lithosphere = "rheology_file"
+    layering    = "parallel"
+    lumping     = "min"
+    viscosities = 1e21, 1e21, 1e21, 1e21, 2e21
+    ref_viscosity = 1.e21
+    tau = 3000.0
+    rheo_smoothing_radius = 40.0
+    litho_thickness_scaling = 1.0
+
+    E               = 66.0
+    nu              = 0.28
+    rho_ice         = 910.
+    rho_seawater    = 1028.0
+    rho_water       = 1000.0
+    rho_uppermantle = 3400.0
+    rho_litho       = 3200.0
+    g               = 9.81
+    r_earth         = 6.378e3
+    m_earth         = 5.972e24
+
+    restart = "None"
+    mask_file = "None"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    litho_thickness_varname = "litho_thickness"
+    log10_viscosity_varname = "log10_visc"
+    stddev_log10_viscosity_varname = "stddev_log10_visc"
+
+    dt_method = "tsit54"
+    dt_init = 1.0
+    dt_min = 1e-10
+    dt_max = 10.0
+    rtol = 1e-4
+    atol = 1e-2
+    q = 1.0
+/
