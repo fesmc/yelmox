@@ -85,7 +85,6 @@ module esm
         ! Oceanic fields 
         type(varslice_class)   :: to_esm_ref
         type(varslice_class)   :: so_esm_ref
-        !type(varslice_class)   :: Qd_esm_ref
                 
         type(varslice_class)   :: to_hist
         type(varslice_class)   :: so_hist
@@ -239,7 +238,7 @@ contains
         character(len=256) :: grp_zs_esm_ref
         character(len=256) :: grp_to_esm_ref 
         character(len=256) :: grp_so_esm_ref
-        !character(len=256) :: grp_Qd_esm_ref
+
         ! ESM Historical period 
         character(len=256) :: grp_ts_hist 
         character(len=256) :: grp_pr_hist
@@ -248,6 +247,7 @@ contains
         character(len=256) :: grp_to_hist 
         character(len=256) :: grp_so_hist
         character(len=256) :: grp_Qd_hist
+
         ! ESM Projection period 
         character(len=256) :: grp_ts_proj 
         character(len=256) :: grp_pr_proj 
@@ -345,7 +345,6 @@ contains
         grp_zs_esm_ref   = trim(group_prefix)//"zs_esm_ref"
         grp_to_esm_ref   = trim(group_prefix)//"to_esm_ref"
         grp_so_esm_ref   = trim(group_prefix)//"so_esm_ref" 
-        !grp_Qd_esm_ref   = trim(group_prefix)//"Qd_esm_ref"
 
         ! ESM Historical sims 
         grp_ts_hist     = trim(group_prefix)//"ts_hist"
@@ -415,9 +414,6 @@ contains
                 call varslice_init_nml_esm(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
                 call varslice_init_nml_esm(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
                 call varslice_init_nml_esm(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-                !if (trim(domain).eq."Greenland")
-                !    call varslice_init_nml_esm(esm%Qd_esm_ref, filename,trim(grp_Qd_esm_ref), domain,grid_name,esm%gcm,esm%scenario)
-                !end if
 
                 ! ESM historical period
                 if (use_hist) then
@@ -430,7 +426,7 @@ contains
                     end if
                     call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%scenario)
                     call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%scenario)
-                    if (trim(domain).eq."Greenland")
+                    if (trim(domain).eq."Greenland") then
                         call varslice_init_nml_esm(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,esm%gcm,esm%scenario)
                     end if
                 end if
@@ -448,7 +444,7 @@ contains
                     ! ocean
                     call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
                     call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
-                    if (trim(domain).eq."Greenland")
+                    if (trim(domain).eq."Greenland") then
                         call varslice_init_nml_esm(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,esm%gcm,esm%scenario)
                     end if
                 end if
@@ -686,7 +682,7 @@ contains
     end subroutine esm_variability_update
 
     subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,&
-                                    H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn,domain)
+                                  domain,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -697,10 +693,10 @@ contains
         real(wp), intent(IN) :: time
         logical,  intent(IN) :: use_esm
         real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
+        character(len=*), intent(IN) :: domain
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
-        logical,  intent(IN) :: use_ref_atm, use_ref_ocn
-        character(len=*), intent(IN) :: domain
+        logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
     
         ! Local variables 
         integer  :: k, m 
@@ -767,9 +763,9 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
-                        if (trim(domain).eq."Greenland") then
-                            call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
-                        end if
+                        !if (trim(domain).eq."Greenland") then
+                        !    call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
+                        !end if
                             
                         if (mshlf%par%extrap_shlf) then
                             ! Extrapolate ocean data to the interior of ice shelves
@@ -808,9 +804,9 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_proj,[time],method="extrap",rep=1)
-                        if (trim(domain).eq."Greenland") then
-                            call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
-                        end if
+                        !if (trim(domain).eq."Greenland") then
+                        !    call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
+                        !end if
                             
                         if (mshlf%par%extrap_shlf) then
                             ! Interpolate ocean data to the interior

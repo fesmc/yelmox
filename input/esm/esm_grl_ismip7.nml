@@ -236,7 +236,7 @@
 /
 
 ! ======== ESM Reference period ========
-&gcm_tf_hist
+&gcm_to_hist
     filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
     name        = "tf"
     units_in    = "degrees C"
@@ -259,7 +259,7 @@
 /
 
 ! ======== Historical period ========
-&gcm_tf_hist
+&gcm_to_hist
     filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
     name        = "tf"
     units_in    = "degrees C"

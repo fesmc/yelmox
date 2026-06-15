@@ -1,6 +1,6 @@
 #!/bin/bash
 
-resolution=GRL-4KM
+resolution=GRL-16KM
 output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp_test
 
 res_params=(

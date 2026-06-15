@@ -338,7 +338,7 @@ program yelmox_esm
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf 
-    yelmo1%bnd%Qd       = esm%Qd                ! subglacial dscharge needed for frontal melt
+    !yelmo1%bnd%Qd       = esm%Qd                ! subglacial dscharge needed for frontal melt
 
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -737,8 +737,8 @@ contains
 
         ! Step 2: Calculate anomaly fields (forcing)
         call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
-                                ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
-                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.,domain)
+                                domain,ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
+                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.)
 
         ! Step 3: Calculate the variability anomaly field
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
@@ -1235,7 +1235,7 @@ contains
         call nc_write(filename,"dts_var",SUM(esm%dts_var, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly (variability)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_ann",ylmo%tpo%now%smb,units="m/a water equiv.",long_name="SMB (ann)", &
-                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
         if (ctl%esm_use_smb) then
             call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
