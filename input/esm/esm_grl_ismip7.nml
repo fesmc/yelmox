@@ -200,14 +200,14 @@
 /
 
 &gcm_dsmbdz_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_ssp585_v2_2016-2300_dacabfdz.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_dacabfdz.nc"
     name        = "dacabfdz"
     units_in    = "kg m-2 s-1 m-1"
     units_out   = "mm yr-1 m-1"
     unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 2016, 2300, 1, 1
+    time_par    = 2015, 2300, 1, 1
 /
 
 ! ========      OCEAN      =========
@@ -236,7 +236,7 @@
 /
 
 ! ======== ESM Reference period ========
-&gcm_to_hist
+&gcm_to_esm_ref
     filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
     name        = "tf"
     units_in    = "degrees C"
@@ -247,14 +247,15 @@
     time_par    = 1850, 2014, 1, 12
 /
 
-&gcm_sgd_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/v2/{grid_name}_{gcm}_historical_v2_1850-2014_sgd.nc"
-    name        = "sgd"
-    units_in    = "m3 s-1"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 1 
-    with_time   = True
+! loaded but not used so far
+&gcm_so_esm_ref
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
+    name        = "so"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
     time_par    = 1850, 2014, 1, 12
 /
 
@@ -281,9 +282,21 @@
     time_par    = 1850, 2014, 1, 12
 /
 
+! loaded but not used so far
+&gcm_so_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
+    name        = "so"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
+    time_par    = 1850, 2014, 1, 12
+/
+
 ! ======== Projection period ========
 
-&gcm_tf_proj
+&gcm_to_proj
     filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/ocean/tf/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_tf.nc"
     name        = "tf"
     units_in    = "degrees C"
@@ -302,6 +315,18 @@
     unit_scale  = 1.0
     unit_offset = 1 
     with_time   = True
+    time_par    = 2015, 2300, 1, 12
+/
+
+! Loaded but not used
+&gcm_so_proj
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/ocean/so/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_so.nc"
+    name        = "so"
+    units_in    = "PSU"
+    units_out   = "PSU"
+    unit_scale  = 1.0 
+    unit_offset = 0.0 
+    with_time   = True 
     time_par    = 2015, 2300, 1, 12
 /
 
@@ -355,73 +380,6 @@
     unit_offset = 0.0 
     with_time   = False 
     time_par    = 2000, 2000, 0, 1
-/
-
-&gcm_to_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/ocean/thetao/v3/{grid_name}_{gcm}_ssp585_v3_2016-2300_thetao.nc"
-    name        = "thetao"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 273.15 
-    with_time   = True
-    time_par    = 2016, 2300, 1, 1
-/
-
-&gcm_so_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/ocean/so/v3/{grid_name}_{gcm}_ssp585_v3_2016-2300_so.nc"
-    name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 2016, 2300, 1, 1
-/
-
-&gcm_to_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
-    name        = "tf"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 273.15 
-    with_time   = True
-    time_par    = 1850, 2014, 1, 1
-/
-
-&gcm_so_hist
-      filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
-    name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 1
-/
-
-
-&gcm_to_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
-    name        = "tf"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 273.15 
-    with_time   = True
-    time_par    = 1850, 2014, 1, 1
-/
-
-&gcm_so_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
-    name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 1
 /
 
 ! ======== Variability period ========

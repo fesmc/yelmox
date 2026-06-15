@@ -355,7 +355,7 @@ contains
         grp_dsmbdz_hist = trim(group_prefix)//"dsmbdz_hist"
         grp_to_hist     = trim(group_prefix)//"to_hist"
         grp_so_hist     = trim(group_prefix)//"so_hist"
-        grp_Qd_hist     = trim(group_prefix)//"Qd_hist"
+        grp_Qd_hist     = trim(group_prefix)//"sgd_hist"
 
         ! ESM projected sims
         grp_ts_proj     = trim(group_prefix)//"ts_proj"
@@ -364,7 +364,7 @@ contains
         grp_dsmbdz_proj = trim(group_prefix)//"dsmbdz_proj"
         grp_to_proj     = trim(group_prefix)//"to_proj"
         grp_so_proj     = trim(group_prefix)//"so_proj"
-        grp_Qd_proj     = trim(group_prefix)//"Qd_proj"         
+        grp_Qd_proj     = trim(group_prefix)//"sgd_proj"         
      
         ! Climatology
         ! Reference period
@@ -646,7 +646,7 @@ contains
                 
         end select
    
-        ! remove ronne variability
+        ! routine to rome variability in speciic basins. TO DO
         if (.FALSE.) then
                 where(basins .eq. 1) esm%dto_var = 0.0_wp
         end if

@@ -339,6 +339,7 @@ program yelmox_esm
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf 
     yelmo1%bnd%Qd       = esm1%Qd_ann           ! subglacial dscharge needed for frontal melt
+    ! yelmo1%bnd%Qd       = esm1%Qd_sum
 
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -1277,6 +1278,10 @@ contains
             call nc_write(filename,"smb_ref",ylmo%bnd%smb,units="m/a ice equiv.",long_name="Surface mass balance", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)    
         end if
+        call nc_write(filename,"Qd_ann",esm%Qd_ann,units="m3/s",long_name="Subglacial discharge (annual)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"Qd_sum",esm%Qd_sum,units="m3/s",long_name="Sunglacial discharge (summer)", &
+                            dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
 
         ! Close the netcdf file
         call nc_close(ncid)
@@ -1360,22 +1365,32 @@ contains
         ! === Spatially averaged climatic fields ==============================
     
         ! Atmosphere (averaged over all ice)
-        t2m_1d     = sum(esm%t2m_ann + esm%dts(:,:,1),      mask=mask_tot) / npts_tot
-        pr_1d      = sum(esm%pr_ann * 1e-3_wp * esm%dpr(:,:,1), mask=mask_tot) / npts_tot
-        dt_1d      = sum(esm%dts(:,:,1),                     mask=mask_tot) / npts_tot
-        dpr_1d     = sum(100.0_wp * esm%dpr(:,:,1),          mask=mask_tot) / npts_tot
-        dt_var_1d  = sum(esm%dts_var(:,:,1),                 mask=mask_tot) / npts_tot
-        dpr_var_1d = sum(100.0_wp * esm%dpr_var(:,:,1),      mask=mask_tot) / npts_tot
-    
+        if (npts_tot .gt. 0.0) then
+            t2m_1d     = sum(esm%t2m_ann + esm%dts(:,:,1),      mask=mask_tot) / npts_tot
+            pr_1d      = sum(esm%pr_ann * 1e-3_wp * esm%dpr(:,:,1), mask=mask_tot) / npts_tot
+            dt_1d      = sum(esm%dts(:,:,1),                     mask=mask_tot) / npts_tot
+            dpr_1d     = sum(100.0_wp * esm%dpr(:,:,1),          mask=mask_tot) / npts_tot
+            dt_var_1d  = sum(esm%dts_var(:,:,1),                 mask=mask_tot) / npts_tot
+            dpr_var_1d = sum(100.0_wp * esm%dpr_var(:,:,1),      mask=mask_tot) / npts_tot
+        else
+            t2m_1d = 0.0_wp; pr_1d = 1.0_wp; dt_1d = 0.0_wp; dpr_1d = 1.0_wp
+            dt_var_1d = 0.0_wp; dpr_var_1d = 0.0_wp
+        end if
+
         ! Ocean (averaged over floating ice only)
-        to_1d      = sum(mshlf%now%T_shlf,  mask=mask_flt) / npts_flt
-        so_1d      = sum(mshlf%now%S_shlf,  mask=mask_flt) / npts_flt
-        tf_1d      = sum(mshlf%now%tf_shlf, mask=mask_flt) / npts_flt
-        dto_1d     = sum(esm%dto,           mask=mask_flt) / npts_flt
-        dso_1d     = sum(esm%dso,           mask=mask_flt) / npts_flt
-        dto_var_1d = sum(esm%dto_var,       mask=mask_flt) / npts_flt
-        dso_var_1d = sum(esm%dso_var,       mask=mask_flt) / npts_flt
-    
+        if (npts_flt .gt. 0.0) then
+            to_1d      = sum(mshlf%now%T_shlf,  mask=mask_flt) / npts_flt
+            so_1d      = sum(mshlf%now%S_shlf,  mask=mask_flt) / npts_flt
+            tf_1d      = sum(mshlf%now%tf_shlf, mask=mask_flt) / npts_flt
+            dto_1d     = sum(esm%dto,           mask=mask_flt) / npts_flt
+            dso_1d     = sum(esm%dso,           mask=mask_flt) / npts_flt
+            dto_var_1d = sum(esm%dto_var,       mask=mask_flt) / npts_flt
+            dso_var_1d = sum(esm%dso_var,       mask=mask_flt) / npts_flt
+        else
+            to_1d = 0.0_wp; so_1d = 0.0_wp; tf_1d = 0.0_wp
+            dto_1d = 0.0_wp; dso_1d = 0.0_wp; dto_var_1d = 0.0_wp; dso_var_1d = 0.0_wp
+        end if
+
         ! === Write to file ===================================================
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
