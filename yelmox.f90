@@ -95,7 +95,6 @@ program yelmox
     logical,  allocatable :: smbs_mask(:,:)
     real(wp), allocatable :: smbs_smb(:,:)
     real(wp), allocatable :: smbs_tsrf(:,:)
-    real(wp), allocatable :: smbs_tmp(:,:)
 
     ! Internal parameters
     logical  :: running_greenland
@@ -337,16 +336,8 @@ end if
         allocate(smbs_smb (yelmo1%grd%nx,yelmo1%grd%ny))
         allocate(smbs_tsrf(yelmo1%grd%nx,yelmo1%grd%ny))
 
-        ! Define the target ice mask: read from file if given, else use the
-        ! reference ice thickness loaded by yelmo_init.
-        if (len_trim(smbs_mask_file) .gt. 0) then
-            allocate(smbs_tmp(yelmo1%grd%nx,yelmo1%grd%ny))
-            call nc_read(smbs_mask_file,smbs_mask_var,smbs_tmp)
-            smbs_mask = (smbs_tmp .gt. 0.0_wp)
-            deallocate(smbs_tmp)
-        else
-            smbs_mask = (yelmo1%bnd%H_ice_ref .gt. 0.0_wp)
-        end if
+        ! Define the target ice mask (from file, or reference ice thickness)
+        call smb_simple_set_mask(yelmo1)
 
     end if
 
@@ -752,6 +743,31 @@ contains
 
     end subroutine calc_smb_simple_yelmo
 
+    subroutine smb_simple_set_mask(ylmo)
+        ! Define the smb_simple target ice mask. If a mask file is given, read
+        ! it; otherwise derive it from the reference ice thickness H_ice_ref
+        ! (special start-up routines may update H_ice_ref to a target geometry,
+        ! so this is called again from there to keep the mask consistent).
+
+        implicit none
+
+        type(yelmo_class), intent(IN) :: ylmo
+
+        real(wp), allocatable :: tmp(:,:)
+
+        if (len_trim(smbs_mask_file) .gt. 0) then
+            allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
+            call nc_read(smbs_mask_file,smbs_mask_var,tmp)
+            smbs_mask = (tmp .gt. 0.0_wp)
+            deallocate(tmp)
+        else
+            smbs_mask = (ylmo%bnd%H_ice_ref .gt. 0.0_wp)
+        end if
+
+        return
+
+    end subroutine smb_simple_set_mask
+
     subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,path_par,method,with_ice_sheet)
 
         implicit none
@@ -828,11 +844,18 @@ contains
         ! Update snapclim to reflect new topography 
         call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain=domain,dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
 
-        ! Update smbpal
-        call smbpal_update_monthly(smb,snp%now%tas,snp%now%pr, &
-                                    ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,ts%time_rel) 
-        ylmo%bnd%smb   = smb%ann%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-        ylmo%bnd%T_srf = smb%ann%tsrf 
+        if (trim(ctl%smb_method) .eq. "smb_simple") then
+            ! Refresh the target mask from the (updated) reference geometry and
+            ! compute SMB with the smb_simple method
+            call smb_simple_set_mask(ylmo)
+            call calc_smb_simple_yelmo(ylmo,snp)
+        else
+            ! Update smbpal
+            call smbpal_update_monthly(smb,snp%now%tas,snp%now%pr, &
+                                        ylmo%tpo%now%z_srf,ylmo%tpo%now%H_ice,ts%time_rel)
+            ylmo%bnd%smb   = smb%ann%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+            ylmo%bnd%T_srf = smb%ann%tsrf
+        end if
 
         if (trim(method) .eq. "const") then
             ! Additionally ensure smb is postive for land above 50degN in Laurentide region
