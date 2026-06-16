@@ -50,12 +50,17 @@ module smb_simple_m
 
     use iso_fortran_env, only: sp => real32
     use nml
+    use ncio
     implicit none
     private
 
     public :: smb_params_syn
     public :: smb_params_tg24
+    public :: smb_simple_class
+    public :: smb_simple_init
     public :: smb_simple_par_load
+    public :: smb_simple_set_mask
+    public :: smb_simple_update
     public :: calc_smb_simple_syn
     public :: calc_smb_simple_pwl
     public :: calc_smb_simple_tg24
@@ -131,7 +136,152 @@ module smb_simple_m
 
     end type smb_params_tg24
 
+    !-----------------------------------------------------------------
+    ! Container holding the smb_simple settings, the (static) grid, the
+    ! target ice mask, and the output fields. Lets a driver program keep
+    ! a single object instead of many loose variables.
+    !-----------------------------------------------------------------
+    type :: smb_simple_class
+
+        ! Settings / parameters
+        type(smb_params_syn) :: par         ! synthetic-scheme parameters
+        character(len=56)    :: scheme      ! "syn" (tg24 not yet supported)
+        real(sp)             :: co2         ! [ppm]  constant CO2
+        real(sp)             :: f           ! [W/m2] constant insolation
+        character(len=512)   :: mask_file   ! target-mask file ("" => H_ice_ref)
+        character(len=56)    :: mask_var    ! target-mask variable name
+        character(len=16)    :: units       ! coordinate units for distance ("m")
+
+        ! Static grid (stored once so update needs no grid arguments)
+        real(sp), allocatable :: x(:,:)      ! x coordinate (per units)
+        real(sp), allocatable :: y(:,:)      ! y coordinate (per units)
+        real(sp), allocatable :: lat(:,:)    ! latitude [deg N]
+
+        ! State
+        logical,  allocatable :: mask(:,:)   ! target ice mask
+        real(sp), allocatable :: smb(:,:)    ! [mm w.e./yr]
+        real(sp), allocatable :: t_srf(:,:)  ! [K]
+
+    end type smb_simple_class
+
 contains
+
+    !=================================================================
+    ! Class-based driver interface (init / set_mask / update)
+    !=================================================================
+
+    !-----------------------------------------------------------------
+    !> Initialize an smb_simple_class: load the namelist settings, store
+    !> the (static) coordinate grid, and allocate the state fields.
+    !> Build the target mask separately with smb_simple_set_mask.
+    !-----------------------------------------------------------------
+    subroutine smb_simple_init(smbs, filename, x, y, lat, group, units, init)
+
+        type(smb_simple_class), intent(inout) :: smbs
+        character(len=*),       intent(in)    :: filename
+        real(sp),               intent(in)    :: x(:,:)
+        real(sp),               intent(in)    :: y(:,:)
+        real(sp),               intent(in)    :: lat(:,:)
+        character(len=*),       intent(in), optional :: group
+        character(len=*),       intent(in), optional :: units
+        logical,                intent(in), optional :: init
+
+        integer :: nx, ny
+
+        nx = size(x, 1)
+        ny = size(x, 2)
+
+        if (size(y, 1)   /= nx .or. size(y, 2)   /= ny .or. &
+            size(lat, 1) /= nx .or. size(lat, 2) /= ny) then
+            error stop "smb_simple_init: x, y, lat shape mismatch"
+        end if
+
+        ! Load settings + synthetic-scheme parameters
+        call smb_simple_par_load(smbs, filename, group=group, init=init)
+
+        ! Coordinate units for the signed-distance calculation
+        smbs%units = "m"
+        if (present(units)) smbs%units = units
+
+        ! Store the static grid
+        if (allocated(smbs%x))   deallocate(smbs%x)
+        if (allocated(smbs%y))   deallocate(smbs%y)
+        if (allocated(smbs%lat)) deallocate(smbs%lat)
+        allocate(smbs%x(nx, ny), smbs%y(nx, ny), smbs%lat(nx, ny))
+        smbs%x   = x
+        smbs%y   = y
+        smbs%lat = lat
+
+        ! Allocate state fields
+        if (allocated(smbs%mask))  deallocate(smbs%mask)
+        if (allocated(smbs%smb))   deallocate(smbs%smb)
+        if (allocated(smbs%t_srf)) deallocate(smbs%t_srf)
+        allocate(smbs%mask(nx, ny), smbs%smb(nx, ny), smbs%t_srf(nx, ny))
+        smbs%mask  = .false.
+        smbs%smb   = 0.0_sp
+        smbs%t_srf = 0.0_sp
+
+    end subroutine smb_simple_init
+
+    !-----------------------------------------------------------------
+    !> Define the target ice mask. If mask_file is set, read mask_var
+    !> from it (cells > 0 are ice); otherwise derive the mask from the
+    !> reference ice thickness H_ice_ref (cells > 0 are ice). Call again
+    !> after H_ice_ref is updated to keep the mask consistent.
+    !-----------------------------------------------------------------
+    subroutine smb_simple_set_mask(smbs, H_ice_ref)
+
+        type(smb_simple_class), intent(inout) :: smbs
+        real(sp),               intent(in)    :: H_ice_ref(:,:)
+
+        real(sp), allocatable :: tmp(:,:)
+
+        if (.not. allocated(smbs%mask)) then
+            error stop "smb_simple_set_mask: smbs not initialized"
+        end if
+        if (size(H_ice_ref, 1) /= size(smbs%mask, 1) .or. &
+            size(H_ice_ref, 2) /= size(smbs%mask, 2)) then
+            error stop "smb_simple_set_mask: H_ice_ref shape mismatch"
+        end if
+
+        if (len_trim(smbs%mask_file) > 0) then
+            allocate(tmp(size(smbs%mask, 1), size(smbs%mask, 2)))
+            call nc_read(smbs%mask_file, smbs%mask_var, tmp)
+            smbs%mask = (tmp > 0.0_sp)
+            deallocate(tmp)
+        else
+            smbs%mask = (H_ice_ref > 0.0_sp)
+        end if
+
+    end subroutine smb_simple_set_mask
+
+    !-----------------------------------------------------------------
+    !> Compute the SMB (mm w.e./yr) and surface temperature (K) fields
+    !> for the active scheme, storing them in smbs%smb and smbs%t_srf.
+    !> Only the synthetic-elevation scheme ("syn") is currently wired;
+    !> "tg24" is not yet supported.
+    !-----------------------------------------------------------------
+    subroutine smb_simple_update(smbs, z_srf, t_sl)
+
+        type(smb_simple_class), intent(inout) :: smbs
+        real(sp),               intent(in)    :: z_srf(:,:)
+        real(sp),               intent(in)    :: t_sl(:,:)
+
+        select case (trim(smbs%scheme))
+
+            case ("syn")
+                call calc_smb_simple_syn(smbs%smb, smbs%t_srf, z_srf, smbs%mask, &
+                                         smbs%x, smbs%y, smbs%lat, t_sl, &
+                                         smbs%co2, smbs%f, smbs%par, units=smbs%units)
+
+            case default
+                write(*,*) "smb_simple_update: scheme not supported: ", trim(smbs%scheme)
+                write(*,*) "Only scheme='syn' is currently implemented."
+                error stop "smb_simple_update: unsupported scheme"
+
+        end select
+
+    end subroutine smb_simple_update
 
     !=================================================================
     ! Production entry point — synthetic-elevation scheme
@@ -701,18 +851,12 @@ contains
     !> The TG24 scheme is not yet wired into yelmox, so its parameter
     !> type is not loaded here.
     !-----------------------------------------------------------------
-    subroutine smb_simple_par_load(p_syn, scheme, co2_const, f_const, &
-                                   mask_file, mask_var, filename, group, init)
+    subroutine smb_simple_par_load(smbs, filename, group, init)
 
-        type(smb_params_syn),  intent(out) :: p_syn
-        character(len=*),      intent(out) :: scheme       ! "syn" (tg24 not yet supported)
-        real(sp),              intent(out) :: co2_const    ! ppm
-        real(sp),              intent(out) :: f_const      ! W/m^2 (insolation)
-        character(len=*),      intent(out) :: mask_file    ! target-mask file ("" => H_ice_ref)
-        character(len=*),      intent(out) :: mask_var     ! target-mask variable name
-        character(len=*),      intent(in)  :: filename
-        character(len=*),      intent(in), optional :: group
-        logical,               intent(in), optional :: init
+        type(smb_simple_class), intent(inout) :: smbs
+        character(len=*),       intent(in)    :: filename
+        character(len=*),       intent(in), optional :: group
+        logical,                intent(in), optional :: init
 
         ! Local variables
         logical           :: init_pars
@@ -728,35 +872,35 @@ contains
         if (present(init)) init_pars = init
 
         ! Control fields
-        call nml_read(filename,nml_group,"scheme",    scheme,    init=init_pars)
-        call nml_read(filename,nml_group,"co2_const", co2_const, init=init_pars)
-        call nml_read(filename,nml_group,"f_const",   f_const,   init=init_pars)
-        call nml_read(filename,nml_group,"mask_file", mask_file, init=init_pars)
-        call nml_read(filename,nml_group,"mask_var",  mask_var,  init=init_pars)
+        call nml_read(filename,nml_group,"scheme",    smbs%scheme,    init=init_pars)
+        call nml_read(filename,nml_group,"co2_const", smbs%co2,       init=init_pars)
+        call nml_read(filename,nml_group,"f_const",   smbs%f,         init=init_pars)
+        call nml_read(filename,nml_group,"mask_file", smbs%mask_file, init=init_pars)
+        call nml_read(filename,nml_group,"mask_var",  smbs%mask_var,  init=init_pars)
 
         ! Synthetic-elevation (syn) scheme parameters
-        call nml_read(filename,nml_group,"a1",         p_syn%a1,         init=init_pars)
-        call nml_read(filename,nml_group,"a2",         p_syn%a2,         init=init_pars)
-        call nml_read(filename,nml_group,"a3",         p_syn%a3,         init=init_pars)
-        call nml_read(filename,nml_group,"a4",         p_syn%a4,         init=init_pars)
-        call nml_read(filename,nml_group,"fmean",      p_syn%fmean,      init=init_pars)
-        call nml_read(filename,nml_group,"beta0",      p_syn%beta0,      init=init_pars)
-        call nml_read(filename,nml_group,"beta1",      p_syn%beta1,      init=init_pars)
-        call nml_read(filename,nml_group,"phiref",     p_syn%phiref,     init=init_pars)
-        call nml_read(filename,nml_group,"beta_floor", p_syn%beta_floor, init=init_pars)
-        call nml_read(filename,nml_group,"c0",         p_syn%c0,         init=init_pars)
-        call nml_read(filename,nml_group,"gamma_acc",  p_syn%gamma_acc,  init=init_pars)
-        call nml_read(filename,nml_group,"use_plastic",p_syn%use_plastic,init=init_pars)
-        call nml_read(filename,nml_group,"slope",      p_syn%slope,      init=init_pars)
-        call nml_read(filename,nml_group,"tau0",       p_syn%tau0,       init=init_pars)
-        call nml_read(filename,nml_group,"slope_out",  p_syn%slope_out,  init=init_pars)
-        call nml_read(filename,nml_group,"z_max_in",   p_syn%z_max_in,   init=init_pars)
-        call nml_read(filename,nml_group,"z_max_out",  p_syn%z_max_out,  init=init_pars)
-        call nml_read(filename,nml_group,"rho_ice",    p_syn%rho_ice,    init=init_pars)
-        call nml_read(filename,nml_group,"g",          p_syn%g,          init=init_pars)
-        call nml_read(filename,nml_group,"gamma_t",    p_syn%gamma_t,    init=init_pars)
-        call nml_read(filename,nml_group,"t_ice_max",  p_syn%t_ice_max,  init=init_pars)
-        call nml_read(filename,nml_group,"smb_min",    p_syn%smb_min,    init=init_pars)
+        call nml_read(filename,nml_group,"a1",         smbs%par%a1,         init=init_pars)
+        call nml_read(filename,nml_group,"a2",         smbs%par%a2,         init=init_pars)
+        call nml_read(filename,nml_group,"a3",         smbs%par%a3,         init=init_pars)
+        call nml_read(filename,nml_group,"a4",         smbs%par%a4,         init=init_pars)
+        call nml_read(filename,nml_group,"fmean",      smbs%par%fmean,      init=init_pars)
+        call nml_read(filename,nml_group,"beta0",      smbs%par%beta0,      init=init_pars)
+        call nml_read(filename,nml_group,"beta1",      smbs%par%beta1,      init=init_pars)
+        call nml_read(filename,nml_group,"phiref",     smbs%par%phiref,     init=init_pars)
+        call nml_read(filename,nml_group,"beta_floor", smbs%par%beta_floor, init=init_pars)
+        call nml_read(filename,nml_group,"c0",         smbs%par%c0,         init=init_pars)
+        call nml_read(filename,nml_group,"gamma_acc",  smbs%par%gamma_acc,  init=init_pars)
+        call nml_read(filename,nml_group,"use_plastic",smbs%par%use_plastic,init=init_pars)
+        call nml_read(filename,nml_group,"slope",      smbs%par%slope,      init=init_pars)
+        call nml_read(filename,nml_group,"tau0",       smbs%par%tau0,       init=init_pars)
+        call nml_read(filename,nml_group,"slope_out",  smbs%par%slope_out,  init=init_pars)
+        call nml_read(filename,nml_group,"z_max_in",   smbs%par%z_max_in,   init=init_pars)
+        call nml_read(filename,nml_group,"z_max_out",  smbs%par%z_max_out,  init=init_pars)
+        call nml_read(filename,nml_group,"rho_ice",    smbs%par%rho_ice,    init=init_pars)
+        call nml_read(filename,nml_group,"g",          smbs%par%g,          init=init_pars)
+        call nml_read(filename,nml_group,"gamma_t",    smbs%par%gamma_t,    init=init_pars)
+        call nml_read(filename,nml_group,"t_ice_max",  smbs%par%t_ice_max,  init=init_pars)
+        call nml_read(filename,nml_group,"smb_min",    smbs%par%smb_min,    init=init_pars)
 
     end subroutine smb_simple_par_load
 

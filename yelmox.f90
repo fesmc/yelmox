@@ -86,15 +86,7 @@ program yelmox
     type(negis_params)   :: ngs
 
     ! smb_simple method (alternative surface mass balance to smbpal)
-    type(smb_params_syn)  :: smbs_syn
-    character(len=56)     :: smbs_scheme
-    real(wp)              :: smbs_co2
-    real(wp)              :: smbs_f
-    character(len=512)    :: smbs_mask_file
-    character(len=56)     :: smbs_mask_var
-    logical,  allocatable :: smbs_mask(:,:)
-    real(wp), allocatable :: smbs_smb(:,:)
-    real(wp), allocatable :: smbs_tsrf(:,:)
+    type(smb_simple_class) :: smbs1
 
     ! Internal parameters
     logical  :: running_greenland
@@ -328,17 +320,10 @@ end if
 
     ! Initialize alternative surface mass balance method (smb_simple)
     if (trim(ctl%smb_method) .eq. "smb_simple") then
-
-        call smb_simple_par_load(smbs_syn,smbs_scheme,smbs_co2,smbs_f, &
-                                 smbs_mask_file,smbs_mask_var,path_par,group="smb_simple")
-
-        allocate(smbs_mask(yelmo1%grd%nx,yelmo1%grd%ny))
-        allocate(smbs_smb (yelmo1%grd%nx,yelmo1%grd%ny))
-        allocate(smbs_tsrf(yelmo1%grd%nx,yelmo1%grd%ny))
-
+        call smb_simple_init(smbs1,path_par,yelmo1%grd%x,yelmo1%grd%y,yelmo1%grd%lat, &
+                             group="smb_simple",units="m")
         ! Define the target ice mask (from file, or reference ice thickness)
-        call smb_simple_set_mask(yelmo1)
-
+        call smb_simple_set_mask(smbs1,yelmo1%bnd%H_ice_ref)
     end if
 
     ! Initialize marine melt model (bnd%bmb_shlf)
@@ -713,60 +698,23 @@ end if
 contains
 
     subroutine calc_smb_simple_yelmo(ylmo,snp)
-        ! Compute surface mass balance and surface temperature using the
-        ! smb_simple method and store them in ylmo%bnd%smb / ylmo%bnd%T_srf.
-        ! Uses host-associated smb_simple state (smbs_*) set up at init.
+        ! Compute surface mass balance and surface temperature with the
+        ! smb_simple method (object smbs1) and store them in
+        ! ylmo%bnd%smb / ylmo%bnd%T_srf.
 
         implicit none
 
         type(yelmo_class),    intent(INOUT) :: ylmo
         type(snapclim_class), intent(IN)    :: snp
 
-        select case(trim(smbs_scheme))
+        call smb_simple_update(smbs1,ylmo%tpo%now%z_srf,snp%now%tsl_ann)
 
-            case("syn")
-                call calc_smb_simple_syn(smbs_smb,smbs_tsrf,ylmo%tpo%now%z_srf,smbs_mask, &
-                                         ylmo%grd%x,ylmo%grd%y,ylmo%grd%lat, &
-                                         snp%now%tsl_ann,smbs_co2,smbs_f,smbs_syn,units="m")
-
-            case default
-                write(*,*) "calc_smb_simple_yelmo:: Error: smb_simple scheme not supported: ", trim(smbs_scheme)
-                write(*,*) "Only scheme='syn' is currently implemented in yelmox."
-                stop 1
-
-        end select
-
-        ylmo%bnd%smb   = smbs_smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-        ylmo%bnd%T_srf = smbs_tsrf
+        ylmo%bnd%smb   = smbs1%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+        ylmo%bnd%T_srf = smbs1%t_srf
 
         return
 
     end subroutine calc_smb_simple_yelmo
-
-    subroutine smb_simple_set_mask(ylmo)
-        ! Define the smb_simple target ice mask. If a mask file is given, read
-        ! it; otherwise derive it from the reference ice thickness H_ice_ref
-        ! (special start-up routines may update H_ice_ref to a target geometry,
-        ! so this is called again from there to keep the mask consistent).
-
-        implicit none
-
-        type(yelmo_class), intent(IN) :: ylmo
-
-        real(wp), allocatable :: tmp(:,:)
-
-        if (len_trim(smbs_mask_file) .gt. 0) then
-            allocate(tmp(ylmo%grd%nx,ylmo%grd%ny))
-            call nc_read(smbs_mask_file,smbs_mask_var,tmp)
-            smbs_mask = (tmp .gt. 0.0_wp)
-            deallocate(tmp)
-        else
-            smbs_mask = (ylmo%bnd%H_ice_ref .gt. 0.0_wp)
-        end if
-
-        return
-
-    end subroutine smb_simple_set_mask
 
     subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,path_par,method,with_ice_sheet)
 
@@ -847,7 +795,7 @@ contains
         if (trim(ctl%smb_method) .eq. "smb_simple") then
             ! Refresh the target mask from the (updated) reference geometry and
             ! compute SMB with the smb_simple method
-            call smb_simple_set_mask(ylmo)
+            call smb_simple_set_mask(smbs1,ylmo%bnd%H_ice_ref)
             call calc_smb_simple_yelmo(ylmo,snp)
         else
             ! Update smbpal
