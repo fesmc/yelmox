@@ -1,14 +1,11 @@
 #!/bin/bash
 
 resolution=ANT-16KM
-output_path=output_albedo/ismip7/${resolution}/opt-l21-bedmap3_ensemble
-
-res_params=(
-    "yelmo.grid_name=${resolution}"
-    "isos.rheology_file=isostasy_data/earth_structure/yelmo/${resolution}_GIA_HR24.nc"
-)
+output_path=output_albedo/ismip7/${resolution}/opt-l21-bedmap3
 
 ctrl_params=(
+    "yelmo.grid_name=${resolution}"
+    "isos.rheology_file=isostasy_data/earth_structure/yelmo/${resolution}_GIA_HR24.nc"
     "ctrl.run_step=spinup"
     "esm.use_smb=True"
     "spinup.equil_method=opt"
@@ -62,11 +59,6 @@ dyn_params=(
 	"ydyn.ssa_lat_bc=all"
 )
 
-neff_params=(
-    "yneff.method=2"
-    "yneff.p=1.0"
-)     
-
 mat_params=(
     "ymat.enh_shear=1.0"
     "ymat.enh_stream=1.0"
@@ -74,4 +66,4 @@ mat_params=(
 )
 
 runme -rs -q 48h -e esm --omp 8 -n par/yelmo_Antarctica_esm_ismip7.nml -o "${output_path}" \
-      -p "${res_params[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${neff_params[@]}" "${mat_params[@]}"
+      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${neff_params[@]}" "${mat_params[@]}"

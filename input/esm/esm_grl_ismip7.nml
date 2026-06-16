@@ -1,32 +1,3 @@
-&var1
-    filename    = "var_test.nc"
-    name        = "var1"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1950, 1960, 1
-/
-
-! ====== ESM experiment definitions ======
-
-&ctrl
-    experiment      = "ctrl"
-/
-
-&1pctCO2
-    experiment      = "1pctCO2"
-/
-
-&ssp126
-    experiment      = "ssp126"
-/
-
-&ssp585
-    experiment      = "ssp585"
-/
-
 ! =========== ATMOSPHERE ===========
 
 ! ======== Reference period ========
@@ -77,7 +48,7 @@
 
 ! ======== ESM Reference period ========
 &gcm_ts_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/{grid_name}_{gcm}_historical_1850-2014_tas.nc"
     name        = "tas"
     units_in    = "K"
     units_out   = "K"
@@ -87,8 +58,8 @@
     time_par    = 1850, 2014, 1, 12
 /
 
-&gcm_pr_esm_ref pendiente
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
+&gcm_pr_esm_ref 
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/{grid_name}_{gcm}_historical_1850-2014_pr.nc"
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -99,7 +70,7 @@
 /
 
 &gcm_smb_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_acabf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/{grid_name}_{gcm}_historical_1850-2014_acabf.nc"
     name        = "acabf"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -122,7 +93,7 @@
 
 ! ======= Historical period =======
 &gcm_ts_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/{grid_name}_{gcm}_historical_1850-2014_tas.nc"
     name        = "tas"
     units_in    = "K"
     units_out   = "K"
@@ -133,7 +104,7 @@
 /
 
 &gcm_pr_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/{grid_name}_{gcm}_historical_1850-2014_pr.nc"
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -144,7 +115,7 @@
 /
 
 &gcm_smb_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_acabf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/{grid_name}_{gcm}_historical_1850-2014_acabf.nc"
     name        = "acabf"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -155,7 +126,7 @@
 /
 
 &gcm_dsmbdz_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_historical_v2_1850-2014_dacabfdz.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/{grid_name}_{gcm}_historical_1850-2014_dacabfdz.nc"
     name        = "dacabfdz"
     units_in    = "kg m-2 s-1 m-1"
     units_out   = "mm yr-1 m-1"
@@ -167,7 +138,7 @@
 
 ! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/tas/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_tas.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/tas/{grid_name}_{gcm}_{experiment}_2015-2300_tas.nc"
     name        = "tas"
     units_in    = "K"
     units_out   = "K"
@@ -178,7 +149,7 @@
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/pr/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_pr.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/pr/{grid_name}_{gcm}_{experiment}_2015-2300_pr.nc"
     name        = "pr"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -189,7 +160,7 @@
 /
 
 &gcm_smb_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/acabf/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_acabf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/acabf/{grid_name}_{gcm}_{experiment}_2015-2300_acabf.nc"
     name        = "acabf"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
@@ -200,7 +171,7 @@
 /
 
 &gcm_dsmbdz_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_dacabfdz.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/dacabfdz/{grid_name}_{gcm}_{experiment}_2015-2300_dacabfdz.nc"
     name        = "dacabfdz"
     units_in    = "kg m-2 s-1 m-1"
     units_out   = "mm yr-1 m-1"
@@ -237,7 +208,7 @@
 
 ! ======== ESM Reference period ========
 &gcm_to_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/{grid_name}_{gcm}_historical_1850-2014_tf.nc"
     name        = "tf"
     units_in    = "degrees C"
     units_out   = "K"
@@ -249,7 +220,7 @@
 
 ! loaded but not used so far
 &gcm_so_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/{grid_name}_{gcm}_historical_1850-2014_so.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -261,7 +232,7 @@
 
 ! ======== Historical period ========
 &gcm_to_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/{grid_name}_{gcm}_historical_1850-2014_tf.nc"
     name        = "tf"
     units_in    = "degrees C"
     units_out   = "K"
@@ -272,7 +243,7 @@
 /
 
 &gcm_sgd_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/v2/{grid_name}_{gcm}_historical_v2_1850-2014_sgd.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/{grid_name}_{gcm}_historical_1850-2014_sgd.nc"
     name        = "sgd"
     units_in    = "m3 s-1"
     units_out   = "K"
@@ -284,7 +255,7 @@
 
 ! loaded but not used so far
 &gcm_so_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/{grid_name}_{gcm}_historical_1850-2014_so.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"
@@ -297,7 +268,7 @@
 ! ======== Projection period ========
 
 &gcm_to_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/ocean/tf/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_tf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/tf/{grid_name}_{gcm}_{experiment}_2015-2300_tf.nc"
     name        = "tf"
     units_in    = "degrees C"
     units_out   = "K"
@@ -308,7 +279,7 @@
 /
 
 &gcm_sgd_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/SDBN1/sgd/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_sgd.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/sgd/{grid_name}_{gcm}_{experiment}_2015-2300_sgd.nc"
     name        = "sgd"
     units_in    = "m3 s-1"
     units_out   = "K"
@@ -320,7 +291,7 @@
 
 ! Loaded but not used
 &gcm_so_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/ssp585/ocean/so/v2/{grid_name}_{gcm}_ssp585_v2_2015-2300_so.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/so/{grid_name}_{gcm}_{experiment}_2015-2300_so.nc"
     name        = "so"
     units_in    = "PSU"
     units_out   = "PSU"

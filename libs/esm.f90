@@ -29,7 +29,6 @@ module esm
         
         ! Experiment information
         character(len=256)     :: gcm 
-        character(len=256)     :: scenario
         character(len=256)     :: experiment 
         character(len=256)     :: domain 
         character(len=256)     :: grid_name 
@@ -161,7 +160,6 @@ module esm
     public :: esm_ice_class
 
     ! General routines
-    public :: esm_experiment_def
     public :: esm_forcing_init
     public :: esm_forcing_update
     public :: esm_variability_update
@@ -172,35 +170,10 @@ module esm
     
 contains
     
-    subroutine esm_experiment_def(ie,expname,filename,group,model,domain)
-
-        implicit none
-
-        type(esm_experiment_class), intent(OUT) :: ie
-        character(len=*), intent(IN) :: expname
-        character(len=*), intent(IN) :: filename
-        character(len=*), intent(IN) :: group 
-        character(len=*), intent(IN) :: model
-        character(len=*), intent(IN) :: domain 
-
-        ! Save the experiment name (ctrlAE, expAE01, etc)
-        ie%expname = trim(expname)
-        ie%group   = trim(group)
-        ie%model   = trim(model)
-        ie%model   = trim(domain)
-
-        ! Load parameters associated with this experiment
-        call nml_read(filename,ie%expname,"experiment",   ie%experiment)
-        
-        ! Define the ouput filename according to protocol
-        ie%file_suffix = trim(domain)//"_"//trim(group)//"_"//trim(model)//"_"//trim(ie%expname)//".nc"
-
-        return
-        
-    end subroutine esm_experiment_def
-
-    subroutine esm_forcing_init(esm,filename,domain,grid_name,gcm,scenario,experiment, &
-                                use_esm,use_smb,use_var,use_hist,use_proj)
+    subroutine esm_forcing_init(esm,filename,domain,grid_name,run_type,gcm,experiment, &
+                                use_esm,use_smb,use_var,&
+                                use_hist,time_hist,&
+                                use_proj,time_proj)
 
         implicit none 
     
@@ -208,16 +181,12 @@ contains
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain 
         character(len=*), intent(IN) :: grid_name 
-        character(len=*), intent(IN), optional :: gcm
-        character(len=*), intent(IN), optional :: scenario
-        character(len=*), intent(IN), optional :: experiment
-        logical,          intent(IN), optional :: use_esm, use_smb, use_hist, use_proj, use_var
+        character(len=*), intent(IN), optional :: run_type, gcm, experiment
+        logical,          intent(IN), optional :: use_esm, use_smb, use_var
+        logical,          intent(IN), optional :: use_hist, use_proj
+        real(wp),         intent(IN), optional :: time_hist(2), time_proj(2)
     
         ! Local variables 
-        character(len=256) :: gcm_now
-        character(len=256) :: experiment_now
-        character(len=256) :: scenario_now
-            
         character(len=256) :: group_prefix 
     
         ! Reference climatology
@@ -263,63 +232,15 @@ contains
         real(wp) :: tmp
         real(wp) :: time_par_ref(4),time_par_hist(4),time_par_proj(4),time_par_var(4)
     
-        ! First determine whether gcm+scenario provided or experiment
-        ! obtain valid values for gcm and scenario to start.
-        if (present(experiment)) then 
-            ! Experiment provided, obtain gcm+scenario from it 
-    
-            if (trim(experiment) .eq. "ctrl" .or. trim(experiment) .eq. "ctrl0") then 
-                gcm_now        = trim(experiment)
-                scenario_now   = trim(experiment)
-                experiment_now = "ctrl"
-            ! jablasco: change this?
-            elseif (trim(experiment) .eq. "1pctCO2") then
-                gcm_now      = trim(experiment)
-                scenario_now = "transient"
-                experiment_now = "transient" 
-            elseif (trim(experiment) .eq. "ssp126" .or. trim(experiment) .eq. "ssp585") then
-                gcm_now      = trim(experiment)
-                scenario_now = "transient"
-            else 
-                iloc = index(experiment,"_")
-                if (iloc == 0) then
-                    write(error_unit,*) "esm_ant_forcing_init:: Error: experiment &
-                    &argument must be defined as gcm_scenario."
-                    write(error_unit,*) "experiment = ", trim(experiment)
-                    stop
-                end if
-    
-                gcm_now = experiment(1:iloc-1)
-                scenario_now = experiment(iloc+1:len_trim(experiment))
-    
-            end if 
-    
-        else if (present(gcm) .and. present(scenario)) then 
-            ! gcm and scenario provided go forward as usual 
-    
-            gcm_now        = trim(gcm)
-            scenario_now   = trim(scenario)
-            experiment_now = "transient"
-    
-        else
-            ! Arguments not provided 
-            write(error_unit,*) "esm_forcing_init:: Error: gcm+scenario or experiment must be provided &
-            &as arguments."
-            stop
-        end if
-    
         ! Define the current experiment characteristics
-        ! jablasco: que hace esto?
-        esm%ctrl_run_type = trim(experiment_now)
-        esm%gcm           = trim(gcm_now)
-        esm%scenario      = trim(scenario_now) 
-        esm%experiment    = trim(esm%gcm)//"_"//trim(esm%scenario) 
+        esm%ctrl_run_type = trim(run_type)
+        esm%gcm           = trim(gcm)
+        esm%experiment    = trim(experiment) 
     
         write(*,*)
         write(*,*) "esm_forcing_init:: summary"
         write(*,*) "ctrl_run_type: ", trim(esm%ctrl_run_type)
         write(*,*) "gcm:           ", trim(esm%gcm)
-        write(*,*) "scenario:      ", trim(esm%scenario)
         write(*,*) "experiment:    ", trim(esm%experiment)
         write(*,*) 
     
@@ -368,86 +289,86 @@ contains
      
         ! Climatology
         ! Reference period
-        call varslice_init_nml_esm(esm%ts_ref, filename, trim(grp_ts_ref), domain, grid_name, esm%gcm, esm%scenario)
+        call varslice_init_nml_esm(esm%ts_ref, filename, trim(grp_ts_ref), domain, grid_name, esm%gcm, esm%experiment)
         if (use_smb) then
-            call varslice_init_nml_esm(esm%smb_ref, filename, trim(grp_smb_ref), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%smb_ref, filename, trim(grp_smb_ref), domain, grid_name, esm%gcm, esm%experiment)
         else
-            call varslice_init_nml_esm(esm%pr_ref, filename, trim(grp_pr_ref), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%pr_ref, filename, trim(grp_pr_ref), domain, grid_name, esm%gcm, esm%experiment)
         end if
-        call varslice_init_nml_esm(esm%zs_ref, filename, trim(grp_zs_ref), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%to_ref, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%scenario)
-        call varslice_init_nml_esm(esm%so_ref, filename, trim(grp_so_ref), domain, grid_name, esm%gcm, esm%scenario)
+        call varslice_init_nml_esm(esm%zs_ref, filename, trim(grp_zs_ref), domain, grid_name, esm%gcm, esm%experiment)
+        call varslice_init_nml_esm(esm%to_ref, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%experiment)
+        call varslice_init_nml_esm(esm%so_ref, filename, trim(grp_so_ref), domain, grid_name, esm%gcm, esm%experiment)
 
         ! Initialize variables at other grids if source grid is different
-        call varslice_init_nml_esm(esm%to_ref_src, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%scenario)
+        !call varslice_init_nml_esm(esm%to_ref_src, filename, trim(grp_to_ref), domain, grid_name, esm%gcm, esm%experiment)
 
         if (use_var) then
             ! Variability
             ! Transient dependent field
-            call varslice_init_nml_esm(esm%ts_var, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%ts_var, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%experiment)
             if (use_smb) then
-                call varslice_init_nml_esm(esm%smb_var, filename, trim(grp_smb_var), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%smb_var, filename, trim(grp_smb_var), domain, grid_name, esm%gcm, esm%experiment)
             else
-                call varslice_init_nml_esm(esm%pr_var, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%pr_var, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%experiment)
             end if
-            call varslice_init_nml_esm(esm%to_var, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
-            call varslice_init_nml_esm(esm%so_var, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%to_var, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%experiment)
+            call varslice_init_nml_esm(esm%so_var, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%experiment)
             ! Reference period
-            call varslice_init_nml_esm(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, esm%gcm, esm%experiment)
             if (use_smb) then
-                call varslice_init_nml_esm(esm%smb_var_ref, filename, trim(grp_smb_var), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%smb_var_ref, filename, trim(grp_smb_var), domain, grid_name, esm%gcm, esm%experiment)
             else
-                call varslice_init_nml_esm(esm%pr_var_ref, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%pr_var_ref, filename, trim(grp_pr_var), domain, grid_name, esm%gcm, esm%experiment)
             end if
-            call varslice_init_nml_esm(esm%to_var_ref, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%scenario)
-            call varslice_init_nml_esm(esm%so_var_ref, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%scenario)
+            call varslice_init_nml_esm(esm%to_var_ref, filename, trim(grp_to_var), domain, grid_name, esm%gcm, esm%experiment)
+            call varslice_init_nml_esm(esm%so_var_ref, filename, trim(grp_so_var), domain, grid_name, esm%gcm, esm%experiment)
         end if
 
         ! Transient dependent fields
-        if (trim(esm%ctrl_run_type) .eq. "transient") then
+        if (trim(esm%ctrl_run_type) .eq. "transient" .and. trim(esm%experiment) .ne. "ctrl") then
             ! ESM reference period
             if (use_esm) then
-                call varslice_init_nml_esm(esm%ts_esm_ref, filename, trim(grp_ts_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%ts_esm_ref, filename, trim(grp_ts_esm_ref), domain, grid_name, esm%gcm, esm%experiment)
                 if (use_smb) then
-                    call varslice_init_nml_esm(esm%smb_esm_ref, filename, trim(grp_smb_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                    call varslice_init_nml_esm(esm%smb_esm_ref, filename, trim(grp_smb_esm_ref), domain, grid_name, esm%gcm, esm%experiment)
                 else
-                    call varslice_init_nml_esm(esm%pr_esm_ref, filename, trim(grp_pr_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                    call varslice_init_nml_esm(esm%pr_esm_ref, filename, trim(grp_pr_esm_ref), domain, grid_name, esm%gcm, esm%experiment)
                 end if
-                call varslice_init_nml_esm(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-                call varslice_init_nml_esm(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
-                call varslice_init_nml_esm(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, esm%gcm, esm%scenario)
+                call varslice_init_nml_esm(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, esm%gcm, esm%experiment)
+                call varslice_init_nml_esm(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, esm%gcm, esm%experiment)
+                call varslice_init_nml_esm(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, esm%gcm, esm%experiment)
 
                 ! ESM historical period
                 if (use_hist) then
-                    call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    call varslice_init_nml_esm(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, esm%gcm, esm%experiment)
                     if (use_smb) then
-                        call varslice_init_nml_esm(esm%smb_hist, filename, trim(grp_smb_hist), domain, grid_name, esm%gcm, esm%scenario)
-                        call varslice_init_nml_esm(esm%dsmbdz_hist, filename, trim(grp_dsmbdz_hist), domain, grid_name, esm%gcm, esm%scenario)
+                        call varslice_init_nml_esm(esm%smb_hist, filename, trim(grp_smb_hist), domain, grid_name, esm%gcm, esm%experiment)
+                        call varslice_init_nml_esm(esm%dsmbdz_hist, filename, trim(grp_dsmbdz_hist), domain, grid_name, esm%gcm, esm%experiment)
                     else
-                        call varslice_init_nml_esm(esm%pr_hist, filename, trim(grp_pr_hist), domain, grid_name, esm%gcm, esm%scenario)
+                        call varslice_init_nml_esm(esm%pr_hist, filename, trim(grp_pr_hist), domain, grid_name, esm%gcm, esm%experiment)
                     end if
-                    call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%scenario)
-                    call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%scenario)
+                    call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%experiment)
+                    call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%experiment)
                     if (trim(domain).eq."Greenland") then
-                        call varslice_init_nml_esm(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,esm%gcm,esm%scenario)
+                        call varslice_init_nml_esm(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,esm%gcm,esm%experiment)
                     end if
                 end if
                 
                 ! ESM projection period
                 if (use_proj) then
                     ! atm
-                    call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%scenario)
+                    call varslice_init_nml_esm(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,esm%gcm,esm%experiment)
                     if (use_smb) then
-                        call varslice_init_nml_esm(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, esm%gcm, esm%scenario)
-                        call varslice_init_nml_esm(esm%dsmbdz_proj, filename, trim(grp_dsmbdz_proj), domain, grid_name, esm%gcm, esm%scenario)
+                        call varslice_init_nml_esm(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, esm%gcm, esm%experiment)
+                        call varslice_init_nml_esm(esm%dsmbdz_proj, filename, trim(grp_dsmbdz_proj), domain, grid_name, esm%gcm, esm%experiment)
                     else
-                        call varslice_init_nml_esm(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, esm%gcm, esm%scenario)
+                        call varslice_init_nml_esm(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, esm%gcm, esm%experiment)
                     end if
                     ! ocean
-                    call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%scenario)
-                    call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%scenario)
+                    call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%experiment)
+                    call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%experiment)
                     if (trim(domain).eq."Greenland") then
-                        call varslice_init_nml_esm(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,esm%gcm,esm%scenario)
+                        call varslice_init_nml_esm(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,esm%gcm,esm%experiment)
                     end if
                 end if
             end if
@@ -838,7 +759,7 @@ contains
                     end if
 
                 else ! Compute a spatially homogeneous anomaly
-                    select case(trim(esm%scenario))
+                    select case(trim(esm%experiment))
                         case("1pctCO2")
                             ! jablasco: TO DO change
                             ! sergio test
@@ -859,7 +780,7 @@ contains
                                 ! Do nothing
 
                         case DEFAULT
-                            write(*,*) "esm_forcing_update:: Error: transient experiment not recognized: "//trim(esm%scenario)
+                            write(*,*) "esm_forcing_update:: Error: transient experiment not recognized: "//trim(esm%experiment)
                             stop
 
                     end select
@@ -931,7 +852,7 @@ contains
 
     ! === varslice wrapper routines with esm specific options ===================
 
-    subroutine varslice_init_nml_esm(vs,filename,group,domain,grid_name,gcm,scenario,verbose)
+    subroutine varslice_init_nml_esm(vs,filename,group,domain,grid_name,gcm,experiment,time_init,time_end,verbose)
         ! Routine to load information related to a given 
         ! transient variable, so that it can be processed properly.
 
@@ -942,13 +863,14 @@ contains
         character(len=*),       intent(IN)    :: group
         character(len=*),       intent(IN), optional :: domain
         character(len=*),       intent(IN), optional :: grid_name
-        character(len=*),       intent(IN)    :: gcm
-        character(len=*),       intent(IN)    :: scenario
+        character(len=*),       intent(IN)     :: gcm
+        character(len=*),       intent(IN)     :: experiment
+        character(len=*), optional, intent(IN) :: time_init, time_end
         logical,                intent(IN), optional :: verbose 
         ! Local variables 
         
         ! First load parameters from nml file 
-        call varslice_par_load_esm(vs%par,filename,group,domain,grid_name,gcm,scenario,verbose)
+        call varslice_par_load_esm(vs%par,filename,group,domain,grid_name,gcm,experiment,time_init,time_end,verbose)
 
         ! Perform remaining init operations 
         call varslice_init_data(vs) 
@@ -957,7 +879,7 @@ contains
 
     end subroutine varslice_init_nml_esm
 
-    subroutine varslice_par_load_esm(par,filename,group,domain,grid_name,gcm,scenario,verbose)
+    subroutine varslice_par_load_esm(par,filename,group,domain,grid_name,gcm,experiment,time_init, time_end, verbose)
 
         type(varslice_param_class), intent(OUT) :: par 
         character(len=*), intent(IN) :: filename
@@ -965,7 +887,8 @@ contains
         character(len=*), intent(IN), optional :: domain
         character(len=*), intent(IN), optional :: grid_name   
         character(len=*), intent(IN) :: gcm
-        character(len=*), intent(IN) :: scenario
+        character(len=*), intent(IN) :: experiment
+        character(len=*), optional, intent(IN) :: time_init, time_end
         logical, optional :: verbose 
     
         ! Local variables
@@ -989,7 +912,11 @@ contains
             
         ! Parse filename as needed
         call parse_path(par%filename,domain,grid_name)
-        call parse_path_esm(par%filename,gcm,scenario)
+        if (present(time_init)) then
+            call parse_path_esm(par%filename,gcm,experiment,time_init,time_end)
+        else
+            call parse_path_esm(par%filename,gcm,experiment)
+        end if
 
         ! See if multiple files are available
         call get_matching_files(par%filenames, par%filename)
@@ -1029,16 +956,20 @@ contains
     
     end subroutine varslice_par_load_esm
     
-    subroutine parse_path_esm(path,gcm,scenario)
+    subroutine parse_path_esm(path,gcm,experiment,time_init,time_end)
 
         implicit none
 
         character(len=*), intent(INOUT) :: path
         character(len=*), intent(IN)    :: gcm
-        character(len=*), intent(IN)    :: scenario
+        character(len=*), intent(IN)    :: experiment
+        character(len=*), optional, intent(IN) :: time_init
+        character(len=*), optional, intent(IN) :: time_end
 
         call nml_replace(path,"{gcm}",        trim(gcm))
-        call nml_replace(path,"{scenario}",   trim(scenario))
+        call nml_replace(path,"{experiment}", trim(experiment))
+        if (present(time_init)) call nml_replace(path,"{time_init}",  trim(time_init)) 
+        if (present(time_end)) call nml_replace(path,"{timeend}",    trim(time_end))
 
         return
 
@@ -1322,6 +1253,14 @@ contains
             return
     
         end subroutine esm_deallocate
+
+        ! Internal functions
+        function int_to_str(i) result(str)
+            integer, intent(in) :: i
+            character(len=20)   :: str
+            write(str, '(i10)') i
+            str = trim(str)
+        end function
     
 end module esm
 

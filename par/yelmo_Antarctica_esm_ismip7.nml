@@ -5,7 +5,7 @@
 &esm
     ! Experiment
     par_file        = "input/esm/esm_ant_ismip7.nml"
-    experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
+    experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", "ssp585", etc.
 
     ! Load climatic fields
     use_esm         = False             ! use ESM snapshots?   
@@ -27,7 +27,7 @@
     dT_threshold    = 0.0               ! Temperature threshold. After this, constant climate.
 
     ! Source grid
-    grid_src        = "none"        ! Source grid of ESM.
+    grid_src        = "none"            ! Source grid of ESM.
 /
 
 &spinup
