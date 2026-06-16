@@ -300,6 +300,7 @@
     interp_method   = "interp"
     find_ocean      = True
     restart         = "none"
+    extrap_shlf     = False
 
     corr_method     = "tf-ant"
     basin_number    = 1

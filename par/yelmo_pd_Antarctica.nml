@@ -511,6 +511,8 @@
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     restart         = "none"        ! Load fields from a restart file?
+    extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
+                                    ! Useful to account for moving ice fronts and/or filling mv in datasets
     
     corr_method     = "tf-ant"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
     basin_number    = 1             ! 1 2 3
