@@ -92,6 +92,10 @@ $(objdir)/smbpal.o: $(libdir)/smbpal/smbpal.f90 $(objdir)/smbpal_precision.o $(o
 					$(objdir)/smb_pdd.o $(objdir)/smb_itm.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
+# smb_simple library
+$(objdir)/smb_simple.o: $(libdir)/smb_simple.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
 # pico library
 $(objdir)/pico_geometry.o: $(libdir)/pico/pico_geometry.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -149,6 +153,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smb_itm.o \
 					    $(objdir)/smb_pdd.o \
 					    $(objdir)/smbpal.o \
+					    $(objdir)/smb_simple.o \
 					    $(objdir)/snapclim.o \
 						$(objdir)/ice_sub_regions.o\
 						$(objdir)/obm_defs.o\
