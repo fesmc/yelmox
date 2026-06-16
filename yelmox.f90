@@ -356,7 +356,11 @@ end if
 
     if (trim(ctl%smb_method) .eq. "smb_simple") then
         ! Alternative surface mass balance method
-        call calc_smb_simple_yelmo(yelmo1,snp1)
+        call smb_simple_set_mask(smbs1,yelmo1%bnd%H_ice_ref)
+        call smb_simple_update(smbs1,yelmo1%tpo%now%z_srf,snp1%now%tsl_ann)
+        yelmo1%bnd%smb   = smbs1%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf = smbs1%t_srf
+
     else
         ! Equilibrate snowpack for itm
         if (trim(smbpal1%par%abl_method) .eq. "itm") then
@@ -617,7 +621,10 @@ end if
 
         if (trim(ctl%smb_method) .eq. "smb_simple") then
             ! Alternative surface mass balance method
-            call calc_smb_simple_yelmo(yelmo1,snp1)
+            call smb_simple_set_mask(smbs1,yelmo1%bnd%H_ice_ref)
+            call smb_simple_update(smbs1,yelmo1%tpo%now%z_srf,snp1%now%tsl_ann)
+            yelmo1%bnd%smb   = smbs1%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf = smbs1%t_srf
         else
             call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
                                        yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel)
@@ -696,25 +703,6 @@ end if
     call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=ts%time*1e-3)
     
 contains
-
-    subroutine calc_smb_simple_yelmo(ylmo,snp)
-        ! Compute surface mass balance and surface temperature with the
-        ! smb_simple method (object smbs1) and store them in
-        ! ylmo%bnd%smb / ylmo%bnd%T_srf.
-
-        implicit none
-
-        type(yelmo_class),    intent(INOUT) :: ylmo
-        type(snapclim_class), intent(IN)    :: snp
-
-        call smb_simple_update(smbs1,ylmo%tpo%now%z_srf,snp%now%tsl_ann)
-
-        ylmo%bnd%smb   = smbs1%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-        ylmo%bnd%T_srf = smbs1%t_srf
-
-        return
-
-    end subroutine calc_smb_simple_yelmo
 
     subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,path_par,method,with_ice_sheet)
 
@@ -796,7 +784,10 @@ contains
             ! Refresh the target mask from the (updated) reference geometry and
             ! compute SMB with the smb_simple method
             call smb_simple_set_mask(smbs1,ylmo%bnd%H_ice_ref)
-            call calc_smb_simple_yelmo(ylmo,snp)
+            call smb_simple_update(smbs1,ylmo%tpo%now%z_srf,snp%now%tsl_ann)
+            ylmo%bnd%smb   = smbs1%smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+            ylmo%bnd%T_srf = smbs1%t_srf
+
         else
             ! Update smbpal
             call smbpal_update_monthly(smb,snp%now%tas,snp%now%pr, &

@@ -10,7 +10,7 @@
     with_isostasy   = True              ! Is isostasy active?
     equil_method    = "none"            ! "none", "relax", "opt"
     write_clim_and_kill = False
-    smb_method      = "smbpal"          ! "smbpal" or "smb_simple"
+    smb_method      = "smb_simple"      ! "smbpal" or "smb_simple"
 /
 
 &tm_1D
@@ -434,7 +434,7 @@
     ! Alternative surface mass balance method (ctrl: smb_method = "smb_simple").
     ! Synthetic-elevation piecewise-linear scheme. Output is mm w.e./yr.
     scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
-    co2_const   = 280.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
+    co2_const   = 190.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
     f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
     mask_file   = ""         ! Target ice-mask file ("" => use reference H_ice_ref > 0)
     mask_var    = ""         ! Target ice-mask variable name in mask_file
