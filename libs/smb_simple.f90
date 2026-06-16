@@ -150,6 +150,7 @@ module smb_simple_m
         real(sp)             :: f           ! [W/m2] constant insolation
         character(len=512)   :: mask_file   ! target-mask file ("" => H_ice_ref)
         character(len=56)    :: mask_var    ! target-mask variable name
+        integer              :: mask_idx = 1 ! index along the 3rd (e.g. time) dim of mask_var
         character(len=16)    :: units       ! coordinate units for distance ("m")
 
         ! Static grid (stored once so update needs no grid arguments)
@@ -224,16 +225,18 @@ contains
     end subroutine smb_simple_init
 
     !-----------------------------------------------------------------
-    !> Define the target ice mask. If mask_file is set, read mask_var
-    !> from it (cells > 0 are ice); otherwise derive the mask from the
-    !> reference ice thickness H_ice_ref (cells > 0 are ice). Call again
-    !> after H_ice_ref is updated to keep the mask consistent.
+    !> Define the target ice mask. If mask_file is set, read slice
+    !> mask_idx along the 3rd dimension of mask_var (cells > 0 are ice);
+    !> otherwise derive the mask from the reference ice thickness
+    !> H_ice_ref (cells > 0 are ice). Call again after H_ice_ref is
+    !> updated to keep the mask consistent.
     !-----------------------------------------------------------------
     subroutine smb_simple_set_mask(smbs, H_ice_ref)
 
         type(smb_simple_class), intent(inout) :: smbs
         real(sp),               intent(in)    :: H_ice_ref(:,:)
 
+        integer :: nx, ny
         real(sp), allocatable :: tmp(:,:)
 
         if (.not. allocated(smbs%mask)) then
@@ -244,9 +247,14 @@ contains
             error stop "smb_simple_set_mask: H_ice_ref shape mismatch"
         end if
 
+        nx = size(smbs%mask, 1)
+        ny = size(smbs%mask, 2)
+
         if (len_trim(smbs%mask_file) > 0) then
-            allocate(tmp(size(smbs%mask, 1), size(smbs%mask, 2)))
-            call nc_read(smbs%mask_file, smbs%mask_var, tmp)
+            ! Read the mask_idx slice along the 3rd (e.g. time/index) dimension
+            allocate(tmp(nx, ny))
+            call nc_read(smbs%mask_file, smbs%mask_var, tmp, &
+                         start=[1, 1, smbs%mask_idx], count=[nx, ny, 1])
             smbs%mask = (tmp > 0.0_sp)
             deallocate(tmp)
         else
@@ -877,6 +885,7 @@ contains
         call nml_read(filename,nml_group,"f_const",   smbs%f,         init=init_pars)
         call nml_read(filename,nml_group,"mask_file", smbs%mask_file, init=init_pars)
         call nml_read(filename,nml_group,"mask_var",  smbs%mask_var,  init=init_pars)
+        call nml_read(filename,nml_group,"mask_idx",  smbs%mask_idx,  init=init_pars)
 
         ! Synthetic-elevation (syn) scheme parameters
         call nml_read(filename,nml_group,"a1",         smbs%par%a1,         init=init_pars)

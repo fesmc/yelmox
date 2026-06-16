@@ -436,8 +436,9 @@
     scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
     co2_const   = 190.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
     f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
-    mask_file   = ""         ! Target ice-mask file ("" => use reference H_ice_ref > 0)
-    mask_var    = ""         ! Target ice-mask variable name in mask_file
+    mask_file   = "ice_data/Laurentide/LIS-32KM/LIS-32KM_Batchelor2019_ice_masks.nc"  ! Target ice-mask file ("" => use reference H_ice_ref > 0)
+    mask_var    = "mask"     ! Target ice-mask variable name in mask_file
+    mask_idx    = 18         ! Index along 3rd dim of mask_var (Batchelor2019: 18 = "LGM")
 
     ! Climate snow line  z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean)
     a1          = 3750.0     ! [m]

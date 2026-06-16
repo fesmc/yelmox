@@ -438,6 +438,7 @@
     f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
     mask_file   = ""         ! Target ice-mask file ("" => use reference H_ice_ref > 0)
     mask_var    = ""         ! Target ice-mask variable name in mask_file
+    mask_idx    = 1          ! Index along 3rd dim of mask_var (used only if mask_file set)
 
     ! Climate snow line  z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean)
     a1          = 3750.0     ! [m]
