@@ -12,8 +12,8 @@
 ! files are expected to override them.
 
 &yelmo
-    domain          = "Greenland"
-    grid_name       = "GRL-16KM"
+    domain          = "None"            ! User par file must override this
+    grid_name       = "None"            ! User par file must override this
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"       
