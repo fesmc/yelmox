@@ -17,6 +17,7 @@ program yelmox
     use snapclim
     use marine_shelf
     use smbpal
+    use smb_simple_m
     use sediments
     use geothermal
     
@@ -64,7 +65,9 @@ program yelmox
         character(len=56) :: equil_method
         logical  :: write_clim_and_kill
 
-    end type 
+        character(len=56) :: smb_method     ! "smbpal" or "smb_simple"
+
+    end type
 
     type negis_params
         logical  :: use_negis_par
@@ -79,8 +82,20 @@ program yelmox
     end type
 
     type(ctrl_params)    :: ctl
-    type(ice_opt_params) :: opt  
-    type(negis_params)   :: ngs 
+    type(ice_opt_params) :: opt
+    type(negis_params)   :: ngs
+
+    ! smb_simple method (alternative surface mass balance to smbpal)
+    type(smb_params_syn)  :: smbs_syn
+    character(len=56)     :: smbs_scheme
+    real(wp)              :: smbs_co2
+    real(wp)              :: smbs_f
+    character(len=512)    :: smbs_mask_file
+    character(len=56)     :: smbs_mask_var
+    logical,  allocatable :: smbs_mask(:,:)
+    real(wp), allocatable :: smbs_smb(:,:)
+    real(wp), allocatable :: smbs_tsrf(:,:)
+    real(wp), allocatable :: smbs_tmp(:,:)
 
     ! Internal parameters
     logical  :: running_greenland
@@ -102,6 +117,8 @@ program yelmox
     call nml_read(path_par,"ctrl","with_isostasy",  ctl%with_isostasy)      ! Include active isostasy
     call nml_read(path_par,"ctrl","equil_method",   ctl%equil_method)       ! What method should be used for spin-up?
     call nml_read(path_par,"ctrl","write_clim_and_kill",   ctl%write_clim_and_kill)       ! Write climate output and kill program?
+    ctl%smb_method = "smbpal"                                               ! Default (backwards compatible if key absent)
+    call nml_read(path_par,"ctrl","smb_method",     ctl%smb_method)         ! Surface mass balance method ("smbpal" or "smb_simple")
 
     ! Get output times
     call timeout_init(tm_1D,  path_par,"tm_1D",  "small",  ctl%time_init,ctl%time_end)
@@ -309,7 +326,30 @@ end if
     
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
-    
+
+    ! Initialize alternative surface mass balance method (smb_simple)
+    if (trim(ctl%smb_method) .eq. "smb_simple") then
+
+        call smb_simple_par_load(smbs_syn,smbs_scheme,smbs_co2,smbs_f, &
+                                 smbs_mask_file,smbs_mask_var,path_par,group="smb_simple")
+
+        allocate(smbs_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+        allocate(smbs_smb (yelmo1%grd%nx,yelmo1%grd%ny))
+        allocate(smbs_tsrf(yelmo1%grd%nx,yelmo1%grd%ny))
+
+        ! Define the target ice mask: read from file if given, else use the
+        ! reference ice thickness loaded by yelmo_init.
+        if (len_trim(smbs_mask_file) .gt. 0) then
+            allocate(smbs_tmp(yelmo1%grd%nx,yelmo1%grd%ny))
+            call nc_read(smbs_mask_file,smbs_mask_var,smbs_tmp)
+            smbs_mask = (smbs_tmp .gt. 0.0_wp)
+            deallocate(smbs_tmp)
+        else
+            smbs_mask = (yelmo1%bnd%H_ice_ref .gt. 0.0_wp)
+        end if
+
+    end if
+
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
@@ -338,16 +378,21 @@ end if
     ! Update snapclim
     call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
 
-    ! Equilibrate snowpack for itm
-    if (trim(smbpal1%par%abl_method) .eq. "itm") then 
-        call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
-    end if 
+    if (trim(ctl%smb_method) .eq. "smb_simple") then
+        ! Alternative surface mass balance method
+        call calc_smb_simple_yelmo(yelmo1,snp1)
+    else
+        ! Equilibrate snowpack for itm
+        if (trim(smbpal1%par%abl_method) .eq. "itm") then
+            call smbpal_update_monthly_equil(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                   yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
+        end if
 
-    call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                               yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel) 
-    yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
-    yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+        call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                   yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel)
+        yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+        yelmo1%bnd%T_srf = smbpal1%ann%tsrf
+    end if
 
     ! Write out initial boundary conditions if desired
     if (ctl%write_clim_and_kill) then
@@ -594,12 +639,17 @@ end if
 
         ! == SURFACE MASS BALANCE ==============================================
 
-        call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
-                                   yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel) 
-        yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
-        yelmo1%bnd%T_srf = smbpal1%ann%tsrf 
+        if (trim(ctl%smb_method) .eq. "smb_simple") then
+            ! Alternative surface mass balance method
+            call calc_smb_simple_yelmo(yelmo1,snp1)
+        else
+            call smbpal_update_monthly(smbpal1,snp1%now%tas,snp1%now%pr, &
+                                       yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel)
+            yelmo1%bnd%smb   = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3       ! [mm we/a] => [m ie/a]
+            yelmo1%bnd%T_srf = smbpal1%ann%tsrf
+        end if
 
-        if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
+        if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then
             ! Modify glacial smb
             call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
         end if
@@ -670,7 +720,38 @@ end if
     call timer_print_summary(tmr,units="m",units_mod="kyr",time_mod=ts%time*1e-3)
     
 contains
-    
+
+    subroutine calc_smb_simple_yelmo(ylmo,snp)
+        ! Compute surface mass balance and surface temperature using the
+        ! smb_simple method and store them in ylmo%bnd%smb / ylmo%bnd%T_srf.
+        ! Uses host-associated smb_simple state (smbs_*) set up at init.
+
+        implicit none
+
+        type(yelmo_class),    intent(INOUT) :: ylmo
+        type(snapclim_class), intent(IN)    :: snp
+
+        select case(trim(smbs_scheme))
+
+            case("syn")
+                call calc_smb_simple_syn(smbs_smb,smbs_tsrf,ylmo%tpo%now%z_srf,smbs_mask, &
+                                         ylmo%grd%x,ylmo%grd%y,ylmo%grd%lat, &
+                                         snp%now%tsl_ann,smbs_co2,smbs_f,smbs_syn,units="m")
+
+            case default
+                write(*,*) "calc_smb_simple_yelmo:: Error: smb_simple scheme not supported: ", trim(smbs_scheme)
+                write(*,*) "Only scheme='syn' is currently implemented in yelmox."
+                stop 1
+
+        end select
+
+        ylmo%bnd%smb   = smbs_smb*ylmo%bnd%c%conv_we_ie*1e-3    ! [mm we/a] => [m ie/a]
+        ylmo%bnd%T_srf = smbs_tsrf
+
+        return
+
+    end subroutine calc_smb_simple_yelmo
+
     subroutine yelmox_init_laurentide_lgm(ylmo,snp,smb,ts,path_par,method,with_ice_sheet)
 
         implicit none

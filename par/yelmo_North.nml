@@ -9,6 +9,7 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     with_isostasy   = True              ! Is isostasy active?
     equil_method    = "none"            ! "none", "relax", "opt"
+    smb_method      = "smbpal"          ! "smbpal" or "smb_simple"
 
 /
 
@@ -426,7 +427,50 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
-    
+
+/
+
+&smb_simple
+    ! Alternative surface mass balance method (ctrl: smb_method = "smb_simple").
+    ! Synthetic-elevation piecewise-linear scheme. Output is mm w.e./yr.
+    scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
+    co2_const   = 280.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
+    f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
+    mask_file   = ""         ! Target ice-mask file ("" => use reference H_ice_ref > 0)
+    mask_var    = ""         ! Target ice-mask variable name in mask_file
+
+    ! Climate snow line  z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean)
+    a1          = 3750.0     ! [m]
+    a2          = -50.0      ! [m/degN]
+    a3          = 0.0        ! [m/ppm]
+    a4          = 0.0        ! [m/(W/m2)]
+    fmean       = 494.5      ! [W/m2]
+
+    ! Ablation lapse rate  beta = max(beta_floor, beta0 + beta1*(phiref - phi))
+    beta0       = 4.0        ! [(mm/yr)/m] at phiref
+    beta1       = 0.05       ! [(mm/yr)/m] per degN
+    phiref      = 60.0       ! [degN]
+    beta_floor  = 0.0        ! [(mm/yr)/m]
+
+    ! Accumulation
+    c0          = 150.0      ! [mm w.e./yr] ceiling
+    gamma_acc   = 1.0        ! [(mm/yr)/m]
+
+    ! Synthetic-elevation profile
+    use_plastic = True       ! True => plastic Nye/Vialov; False => linear wedge
+    slope       = 6.09e-3    ! [m/m] linear inside (use_plastic=False)
+    tau0        = 36.0e3     ! [Pa]  plastic basal yield stress
+    slope_out   = 6.09e-3    ! [m/m] linear outside ramp
+    z_max_in    = 2500.0     ! [m]   inside cap
+    z_max_out   = 200.0      ! [m]   outside floor
+    rho_ice     = 910.0      ! [kg/m3]
+    g           = 9.81       ! [m/s2]
+
+    ! Surface temperature  t_srf = t_sl - gamma_t*max(z_syn,0), capped at t_ice_max over ice
+    gamma_t     = 6.5e-3     ! [K/m] lapse rate
+    t_ice_max   = 273.15     ! [K]
+
+    smb_min     = -2000.0    ! [mm w.e./yr] SMB floor outside the target mask (<= 0)
 /
 
 &itm
