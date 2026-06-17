@@ -3,7 +3,7 @@
 !
 ! Demonstration of the new defaults+overlay system. Equivalent
 ! to par/yelmo_pd_Antarctica.nml but with every yelmo-owned
-! group (including &fhyd, owned by FastHydrology) reduced to
+! group (including &yhyd, owned by FastHydrology) reduced to
 ! the parameters that differ from input/yelmo_defaults.nml.
 ! Unchanged blocks:
 !
@@ -126,7 +126,7 @@
     cf_ref   = 0.1
 /
 
-&fhyd
+&yhyd
     marine_p   = 0.0
     till_delta = 0.8
 /
