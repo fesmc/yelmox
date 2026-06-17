@@ -247,29 +247,30 @@
 /
 
 &yhyd
-    ! Bucket-only configuration (no K24 transport). Closure parameters
-    ! mirror the legacy &yneff till closure; W_til_max / bkt_till_rate
-    ! mirror the legacy &ytherm bucket.
-    method_til         = 1        ! 0=NONE 1=BUCKET
-    method_transport   = 0        ! 0=NONE 1=K24
-    W_til_max          = 2.0      ! [m]   was ytherm.H_w_max
-    mask_bc            = 2        ! 0=ZERO 1=IMPOSED 2=MIRROR
-    W_til_bc           = 0.0      ! [m]
+    ! Basal hydrology (fasthydrology). Closure parameters mirror the legacy
+    ! &yneff till closure; W_til_max / bkt_till_rate mirror the legacy &ytherm bucket.
+    method_til       = 1   ! 0=NONE 1=BUCKET
+    method_transport = 0   ! 0=NONE 1=K24
+    W_til_max        = 2.0 ! [m]   was ytherm.H_w_max
+    mask_bc          = 2   ! 0=ZERO 1=IMPOSED 2=MIRROR
+    W_til_bc         = 0.0 ! [m]
 
     ! ---- bucket (bkt_) ----
-    bkt_till_rate = 1e-3        ! [m/a]  was ytherm.till_rate
-    bkt_N_closure = 3             ! 0=NONE 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE 5=CONST
+    bkt_N_closure     = 3    ! 0=CONST 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE
+    bkt_till_rate     = 1e-3 ! [m/a]  was ytherm.till_rate
+    bkt_floating_mode = 1    ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
 
     ! ---- closures (no prefix) ----
-    marine_p         = 0.0
-    marine_rho_sw    = 1028.0
-    till_N0          = 1000.0     ! legacy yneff.N0
-    till_delta       = 0.02       ! legacy yneff.delta
-    till_e0          = 0.69       ! legacy yneff.e0
-    till_Cc          = 0.12       ! legacy yneff.Cc
-    two_value_delta  = 0.02
+    const_N         = 1.0e7  ! [Pa] N_CLOSURE_CONST (legacy yneff.const)
+    marine_p        = 0.0
+    marine_rho_sw   = 1028.0
+    till_N0         = 1000.0 ! legacy yneff.N0
+    till_delta      = 0.02   ! legacy yneff.delta
+    till_e0         = 0.69   ! legacy yneff.e0
+    till_Cc         = 0.12   ! legacy yneff.Cc
+    two_value_delta = 0.02
 
-    ! ---- k24 (k24_) ----  unused under method_transport=0
+    ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
     k24_flux_solver                  = 0
     k24_manning_exponent             = 3.0
