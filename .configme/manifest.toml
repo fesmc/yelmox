@@ -1,10 +1,10 @@
 # configme manifest for yelmox.
 package = "yelmox"
 deps = [
-    "fesm-utils",
+    "fesm-utils:v1.1",
     "fesm-utils/utils",
-    "coordinates",
+    "coordinates:v1.1",
     "yelmo",
     "FastIsostasy",
-    "rembo1",
+    "rembo1:v1.1",
 ]
