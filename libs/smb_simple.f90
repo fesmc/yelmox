@@ -96,6 +96,17 @@ module smb_simple_m
         real(sp) :: c0         = 150.0_sp   ! mm w.e./yr (ceiling)
         real(sp) :: gamma_acc  = 1.0_sp     ! (mm/yr)/m
 
+        ! Accumulation-ceiling spatial modifiers (multiplicative on c0).
+        !   c_acc = c0 * f_lat(phi) * f_dist(d_in)
+        !   f_lat  = clamp(1 - k_acc_lat *max(0, phi - phi_acc_ref),  facc_lat_min,  1)
+        !   f_dist = clamp(1 - k_acc_dist*max(0, d_in_km),            facc_dist_min, 1)
+        ! d_in_km is distance inland from the margin (km); defaults are no-ops (k=0 => 1).
+        real(sp) :: k_acc_lat     = 0.0_sp    ! frac. accum decrease per deg N beyond phi_acc_ref
+        real(sp) :: phi_acc_ref   = 0.0_sp    ! deg N, latitude above which accum starts dropping
+        real(sp) :: facc_lat_min  = 0.3_sp    ! floor on latitude modifier
+        real(sp) :: k_acc_dist    = 0.0_sp    ! frac. accum decrease per km inland from margin
+        real(sp) :: facc_dist_min = 0.5_sp    ! floor on distance modifier (keeps it weak)
+
         ! Synthetic-elevation profile
         logical  :: use_plastic = .true.      ! .true. → plastic Nye/Vialov; .false. → linear
         real(sp) :: slope       = 6.09e-3_sp  ! m/m, linear inside (when use_plastic=.false.)
@@ -374,7 +385,7 @@ contains
         end if
 
         dz_SL = 0.0_sp
-        c_acc = p%c0
+        call compute_c_acc(c_acc, d_m, lat, mask_target, p)
 
         call calc_smb_simple_pwl(smb, z_syn, dz_SL, c_acc, lat, CO2, f, p)
         call apply_smb_min_outside(smb, mask_target, p%smb_min)
@@ -432,6 +443,58 @@ contains
             end do
         end do
     end subroutine calc_smb_simple_pwl
+
+    !-----------------------------------------------------------------
+    !> Spatially-varying accumulation ceiling: scales c0 down (weakly)
+    !> with latitude and with distance inland from the margin.
+    !>
+    !>   c_acc = c0 * f_lat(phi) * f_dist(d_in)
+    !>   f_lat  = clamp(1 - k_acc_lat *max(0, phi - phi_acc_ref),  facc_lat_min,  1)
+    !>   f_dist = clamp(1 - k_acc_dist*max(0, d_in_km),            facc_dist_min, 1)
+    !>
+    !> d_m is the signed distance to the mask boundary in metres
+    !> (positive inside); only the inland part (d_m > 0) reduces the
+    !> ceiling. Outside the mask the distance modifier is 1 (accumulation
+    !> there is governed by the ablation branch / smb_min floor anyway).
+    !> With the default k_acc_lat = k_acc_dist = 0 this returns c0 exactly.
+    !-----------------------------------------------------------------
+    subroutine compute_c_acc(c_acc, d_m, lat, mask_target, p)
+        real(sp),             intent(out) :: c_acc(:,:)
+        real(sp),             intent(in)  :: d_m(:,:)
+        real(sp),             intent(in)  :: lat(:,:)
+        logical,              intent(in)  :: mask_target(:,:)
+        type(smb_params_syn), intent(in)  :: p
+
+        integer  :: i, j, nx, ny
+        real(sp) :: phi, d_in_km, f_lat, f_dist
+
+        nx = size(c_acc, 1)
+        ny = size(c_acc, 2)
+
+        if (size(d_m,1)         /= nx .or. size(d_m,2)         /= ny .or. &
+            size(lat,1)         /= nx .or. size(lat,2)         /= ny .or. &
+            size(mask_target,1) /= nx .or. size(mask_target,2) /= ny) then
+            error stop "compute_c_acc: shape mismatch among inputs"
+        end if
+
+        do j = 1, ny
+            do i = 1, nx
+                phi   = lat(i, j)
+                f_lat = 1.0_sp - p%k_acc_lat * max(0.0_sp, phi - p%phi_acc_ref)
+                f_lat = max(p%facc_lat_min, min(1.0_sp, f_lat))
+
+                if (mask_target(i, j)) then
+                    d_in_km = max(0.0_sp, d_m(i, j)) / 1000.0_sp
+                    f_dist  = 1.0_sp - p%k_acc_dist * d_in_km
+                    f_dist  = max(p%facc_dist_min, min(1.0_sp, f_dist))
+                else
+                    f_dist  = 1.0_sp
+                end if
+
+                c_acc(i, j) = p%c0 * f_lat * f_dist
+            end do
+        end do
+    end subroutine compute_c_acc
 
     !=================================================================
     ! TG24 2-D kernel
@@ -899,6 +962,11 @@ contains
         call nml_read(filename,nml_group,"beta_floor", smbs%par%beta_floor, init=init_pars)
         call nml_read(filename,nml_group,"c0",         smbs%par%c0,         init=init_pars)
         call nml_read(filename,nml_group,"gamma_acc",  smbs%par%gamma_acc,  init=init_pars)
+        call nml_read(filename,nml_group,"k_acc_lat",    smbs%par%k_acc_lat,    init=init_pars)
+        call nml_read(filename,nml_group,"phi_acc_ref",  smbs%par%phi_acc_ref,  init=init_pars)
+        call nml_read(filename,nml_group,"facc_lat_min", smbs%par%facc_lat_min, init=init_pars)
+        call nml_read(filename,nml_group,"k_acc_dist",   smbs%par%k_acc_dist,   init=init_pars)
+        call nml_read(filename,nml_group,"facc_dist_min",smbs%par%facc_dist_min,init=init_pars)
         call nml_read(filename,nml_group,"use_plastic",smbs%par%use_plastic,init=init_pars)
         call nml_read(filename,nml_group,"slope",      smbs%par%slope,      init=init_pars)
         call nml_read(filename,nml_group,"tau0",       smbs%par%tau0,       init=init_pars)
