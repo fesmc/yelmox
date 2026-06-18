@@ -1,13 +1,10 @@
 #!/bin/bash
 
-resolution=GRL-16KM
-output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp_test
-
-res_params=(
-    "yelmo.grid_name=${resolution}"
-)
+resolution=GRL-8KM
+output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp
 
 ctrl_params=(
+    "yelmo.grid_name=${resolution}"
     "ctrl.run_step=spinup"
     "esm.use_smb=True"
     "spinup.equil_method=opt"
@@ -31,12 +28,12 @@ opt_params=(
     "opt.rel_tau2=100.0"
     "opt.rel_time2=100.0"
     "opt.use_yelmo_cf_min=False"
-    "opt.opt_cf_min=1e-3"
+    "opt.opt_cf_min=1e-2"
     "opt.cf_init=-1"
     "opt.H_grnd_lim=500.0"
     "ytill.scale_zb=1"
-    "ytill.z0=-500"
-    "ytill.z1=500"
+    "ytill.z0=-1000"
+    "ytill.z1=0"
     "ytill.cf_min=1e-1"
     "ytill.cf_ref=1e-0"
     "marine_shelf.gamma_quad_nl=14.5e3"
@@ -48,6 +45,7 @@ topo_params=(
 )
 
 calv_params=(
+    "ycalv.use_lsf=True"
     "ycalv.calv_flt_method=equil"
     "ycalv.calv_grnd_method=equil"
     "ycalv.tau_ice=200e3"
@@ -59,11 +57,6 @@ dyn_params=(
     "ydyn.scale_T=0"
 	"ydyn.ssa_solver=energy"
 	"ydyn.ssa_lat_bc=all"
-)
-
-neff_params=(
-    "yneff.method=2"
-    "yneff.p=1.0"
 )     
 
 mat_params=(
@@ -73,5 +66,5 @@ mat_params=(
 )
 
 runme -rs -q 48h -e esm --omp 8 -n par/yelmo_Greenland_esm_ismip7.nml -o "${output_path}" \
-      -p "${res_params[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${neff_params[@]}" "${mat_params[@]}"
+      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"
 

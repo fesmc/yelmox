@@ -132,12 +132,6 @@ program yelmox_esm
     ! esm source grid
     call nml_read(path_par,"esm","grid_src",         esm1%grid_src)
 
-    ! What does this?: needed?
-    if (index(ctl%esm_par_file,"ant") .gt. 0) then
-        ! Running Antarctica domain, load Antarctica specific parameters
-        call esm_experiment_def(esmexp,ctl%esm_experiment,ctl%esm_par_file,"UCM","YELMO",yelmo1%par%domain)
-    end if
-
     ! Read run_step specific control parameters
     call nml_read(path_par,trim(ctl%run_step),"time_init",    ctl%time_init)        ! [yr] Starting time
     call nml_read(path_par,trim(ctl%run_step),"time_end",     ctl%time_end)         ! [yr] Ending time
@@ -201,9 +195,9 @@ program yelmox_esm
     write(*,*) "load_esm:            ", ctl%esm_use_esm
     if (ctl%esm_use_esm) write(*,*) "esm_name: ", trim(ctl%esm_name)
 
-    ! set the seed
+    ! set the seed (for variability reproducibility)
     seed = ctl%clim_seed                 ! Set the seed value (any integer value as the seed)
-    call random_seed(put=seed)       ! Initialize the random number generator with the seed
+    call random_seed(put=seed)           ! Initialize the random number generator with the seed
     
     select case(trim(ctl%run_step))
 
@@ -216,7 +210,7 @@ program yelmox_esm
         case("transient")
 
             write(*,*) "esm_write_formatted: ", ctl%esm_write_formatted
-            write(*,*) "esm_file_suffix:     ", trim(ctl%esm_name)
+            if (ctl%esm_use_esm) write(*,*) "esm_file_suffix:     ", trim(ctl%esm_name)
             write(*,*) "time_ref: ",            ctl%time_ref(1),ctl%time_ref(2)
             write(*,*) "time_hist: ",           ctl%time_hist(1),ctl%time_hist(2)
             write(*,*) "time_proj: ",           ctl%time_proj(1),ctl%time_proj(2)
@@ -290,7 +284,7 @@ program yelmox_esm
     
     ! Initialize ESM atmospheric and oceanic objects 
     esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
-    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,gcm=ctl%esm_name,scenario=ctl%esm_experiment,&
+    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,run_type=ctl%run_step,gcm=ctl%esm_name,experiment=ctl%esm_experiment,&
                           use_esm=ctl%esm_use_esm,use_smb=ctl%esm_use_smb,use_var=ctl%esm_use_var,use_hist=ctl%esm_use_hist,use_proj=ctl%esm_use_proj)
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
