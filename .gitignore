@@ -13,6 +13,7 @@ isostasy_data
 tests/plots
 output
 tmp
+logs
 tests/.DS_Store
 .DS_Store
 .runme/config.toml
