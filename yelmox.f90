@@ -468,15 +468,23 @@ end if
                 end if 
 
             end if
-                
-        case DEFAULT 
-            ! Run simple startup equilibration step 
-            
+
+        case("North")
+            ! Steady-state: initialise from the ICE-6G_C LGM reconstruction
+            ! (whole NH: Laurentide + Greenland + Eurasian ice).
+            if (trim(ctl%tstep_method) .eq. "const") then
+                call yelmox_init_north_lgm(yelmo1,snp1,ts,path_par, &
+                                           with_ice_sheet=ctl%with_ice_sheet)
+            end if
+
+        case DEFAULT
+            ! Run simple startup equilibration step
+
             if (ctl%with_ice_sheet) then
                 ! Run yelmo for a few years with constant boundary conditions
                 ! to synchronize all model fields a bit
                 call yelmo_update_equil(yelmo1,ts%time,time_tot=10.0_wp, dt=1.0_wp,topo_fixed=.FALSE.)
-            end if 
+            end if
 
         end select
         
@@ -840,6 +848,55 @@ contains
 
     end subroutine yelmox_init_laurentide_lgm
 
+    subroutine yelmox_init_north_lgm(ylmo,snp,ts,path_par,with_ice_sheet)
+        ! Initialise the whole-NH domain from the ICE-6G_C LGM reconstruction
+        ! (slice 1 = LGM, -26 ka): set the reconstructed grounded ice as the
+        ! initial thickness and reference state, then refresh surface + climate
+        ! fields. Mirrors the Laurentide ref_lgm path but covers all NH ice.
+
+        implicit none
+
+        type(yelmo_class),    intent(INOUT) :: ylmo
+        type(snapclim_class), intent(INOUT) :: snp
+        type(tstep_class),    intent(IN)    :: ts
+        character(len=*),     intent(IN)    :: path_par
+        logical,              intent(IN)    :: with_ice_sheet
+
+        character(len=1024) :: path_lgm
+
+        ! Load LGM reconstruction (slice 1) into the reference ice thickness
+        path_lgm = "ice_data/North/"//trim(ylmo%par%grid_name)//&
+                    "/"//trim(ylmo%par%grid_name)//"_TOPO-ICE-6G_C.nc"
+        call nc_read(path_lgm,"dz",ylmo%bnd%H_ice_ref,start=[1,1,1], &
+                            count=[ylmo%tpo%par%nx,ylmo%tpo%par%ny,1])
+
+        ! Set the reconstruction as the initial grounded ice thickness
+        ylmo%tpo%now%H_ice = 0.0
+        where ( ylmo%bnd%z_bed .gt. -500.0 .and. ylmo%bnd%H_ice_ref .gt. 0.0 )
+            ylmo%tpo%now%H_ice = ylmo%bnd%H_ice_ref
+        end where
+
+        ! Smooth for stability and refresh topographic fields (z_srf from H_ice)
+        call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
+        call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
+        call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
+
+        ! Store the clean LGM thickness as the reference state (drives smb_simple mask)
+        ylmo%bnd%H_ice_ref = ylmo%tpo%now%H_ice
+
+        ! Update climate to reflect the LGM surface
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain="North", &
+                             dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
+
+        if (with_ice_sheet) then
+            ! Stabilise dynamic fields with fixed boundaries (coupled runs only)
+            call yelmo_update_equil(ylmo,ts%time,time_tot=2e2,dt=5.0,topo_fixed=.FALSE.)
+        end if
+
+        return
+
+    end subroutine yelmox_init_north_lgm
+
     subroutine calc_glacial_smb(smb,lat2D,ta_ann,ta_ann_pd)
 
         implicit none
@@ -1042,7 +1099,7 @@ contains
         ! == yelmo_boundaries ==
         call yelmo_write_var(filename,"z_bed",ylmo,n,ncid)
         call yelmo_write_var(filename,"z_sl",ylmo,n,ncid)
-        !call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)
+        call yelmo_write_var(filename,"smb_ref",ylmo,n,ncid)   ! bnd%smb: raw method smb (m ie/yr); nonzero even with ice sheet off
         call yelmo_write_var(filename,"T_srf",ylmo,n,ncid)
         call yelmo_write_var(filename,"bmb_shlf",ylmo,n,ncid)
         !call yelmo_write_var(filename,"Q_geo",ylmo,n,ncid)     ! Written as static field below
