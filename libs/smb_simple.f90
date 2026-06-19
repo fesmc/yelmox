@@ -156,8 +156,8 @@ module smb_simple_m
         character(len=56)    :: scheme      ! "syn" (tg24 not yet supported)
         real(sp)             :: co2         ! [ppm]  constant CO2
         real(sp)             :: f           ! [W/m2] constant insolation
-        character(len=512)   :: mask_file   ! target-mask file ("" => H_ice_ref)
-        character(len=56)    :: mask_var    ! target-mask variable name
+        character(len=512)   :: mask_file = "" ! target-mask file ("" => H_ice_ref)
+        character(len=56)    :: mask_var  = "" ! target-mask variable name
         integer              :: mask_idx = 1 ! index along the 3rd (e.g. time) dim of mask_var
         character(len=16)    :: units       ! coordinate units for distance ("m")
 
