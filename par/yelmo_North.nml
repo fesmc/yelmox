@@ -440,14 +440,14 @@
     mask_idx    = 1          ! Index along 3rd dim of mask_var (used only if mask_file set)
 
     ! Climate snow line  z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean)
-    a1          = 3750.0     ! [m]
+    a1          = 3900.0     ! [m]   tuned to NH smbpal (LGM)
     a2          = -50.0      ! [m/degN]
     a3          = 0.0        ! [m/ppm]
     a4          = 0.0        ! [m/(W/m2)]
     fmean       = 494.5      ! [W/m2]
 
     ! Ablation lapse rate  beta = max(beta_floor, beta0 + beta1*(phiref - phi))
-    beta0       = 4.0        ! [(mm/yr)/m] at phiref
+    beta0       = 5.0        ! [(mm/yr)/m] at phiref   tuned to NH smbpal (LGM)
     beta1       = 0.05       ! [(mm/yr)/m] per degN
     phiref      = 60.0       ! [degN]
     beta_floor  = 0.0        ! [(mm/yr)/m]
@@ -455,8 +455,8 @@
     ! Accumulation: acc = c0 * f_lat(phi) * f_dist(d_in)
     !   f_dist = exp(-d_in_km / L_acc)   maritime decay inland (1 at margin)
     !   f_lat  = clamp(1 - k_acc_lat*max(0, phi - phi_acc_ref), facc_lat_min, 1)
-    c0            = 150.0     ! [mm w.e./yr] maximum (coastal) accumulation at the margin
-    L_acc         = 1000.0    ! [km]     e-folding length of inland accumulation decay
+    c0            = 300.0     ! [mm w.e./yr] maximum (coastal) accumulation at the margin   tuned
+    L_acc         = 300.0     ! [km]     e-folding length of inland accumulation decay   tuned
     k_acc_lat     = 0.0       ! [1/degN] frac. accum decrease per degN beyond phi_acc_ref (0=off)
     phi_acc_ref   = 0.0       ! [degN]   latitude above which accum starts dropping
     facc_lat_min  = 0.3       ! [-]      floor on latitude modifier
