@@ -451,19 +451,14 @@
     phiref      = 60.0       ! [degN]
     beta_floor  = 0.0        ! [(mm/yr)/m]
 
-    ! Accumulation
-    c0          = 150.0      ! [mm w.e./yr] ceiling
-    gamma_acc   = 1.0        ! [(mm/yr)/m]
-
-    ! Accumulation-ceiling spatial modifiers (multiplicative on c0; k=0 => disabled)
-    !   c_acc = c0 * f_lat(phi) * f_dist(d_in)
-    !   f_lat  = clamp(1 - k_acc_lat *max(0, phi - phi_acc_ref),  facc_lat_min,  1)
-    !   f_dist = clamp(1 - k_acc_dist*max(0, d_in_km),            facc_dist_min, 1)
-    k_acc_lat     = 0.0      ! [1/degN] frac. accum decrease per degN beyond phi_acc_ref
-    phi_acc_ref   = 0.0      ! [degN]   latitude above which accum starts dropping
-    facc_lat_min  = 0.3      ! [-]      floor on latitude modifier
-    k_acc_dist    = 0.0      ! [1/km]   frac. accum decrease per km inland from margin
-    facc_dist_min = 0.5      ! [-]      floor on distance modifier (keeps it weak)
+    ! Accumulation: acc = c0 * f_lat(phi) * f_dist(d_in)
+    !   f_dist = exp(-d_in_km / L_acc)   maritime decay inland (1 at margin)
+    !   f_lat  = clamp(1 - k_acc_lat*max(0, phi - phi_acc_ref), facc_lat_min, 1)
+    c0            = 150.0     ! [mm w.e./yr] maximum (coastal) accumulation at the margin
+    L_acc         = 1000.0    ! [km]     e-folding length of inland accumulation decay
+    k_acc_lat     = 0.0       ! [1/degN] frac. accum decrease per degN beyond phi_acc_ref (0=off)
+    phi_acc_ref   = 0.0       ! [degN]   latitude above which accum starts dropping
+    facc_lat_min  = 0.3       ! [-]      floor on latitude modifier
 
     ! Synthetic-elevation profile
     use_plastic = True       ! True => plastic Nye/Vialov; False => linear wedge

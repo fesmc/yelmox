@@ -11,10 +11,12 @@
 !         surface-temperature field t_srf (K, sea-level temperature +
 !         elevation lapse rate).
 !
-!         Profile per cell:
-!             SMB(z) = min(c_acc, gamma_acc*(z - z_SL))   if z >  z_SL
-!                    = -beta_abl(phi)*(z_SL - z)          if z <= z_SL
-!         evaluated on z = z_syn(target mask, real elevation).
+!         Profile per cell (accumulation minus ablation):
+!             SMB = acc - abl
+!             acc = c0 * f_lat(phi) * f_dist(d_in)    [maritime; decays inland]
+!             abl = beta_abl(phi) * max(0, z_SL - z)  [ablation below the snow line]
+!         evaluated on z = z_syn(target mask, real elevation). acc applies
+!         everywhere and is continuous at the snow line (abl -> 0 there).
 !
 !   * calc_smb_simple_tg24
 !         Original Talento-Ganopolski (2023) "simple" scheme:
@@ -92,20 +94,15 @@ module smb_simple_m
         real(sp) :: phiref     = 60.0_sp    ! deg N
         real(sp) :: beta_floor = 0.0_sp     ! (mm/yr)/m
 
-        ! Accumulation
-        real(sp) :: c0         = 150.0_sp   ! mm w.e./yr (ceiling)
-        real(sp) :: gamma_acc  = 1.0_sp     ! (mm/yr)/m
-
-        ! Accumulation-ceiling spatial modifiers (multiplicative on c0).
-        !   c_acc = c0 * f_lat(phi) * f_dist(d_in)
-        !   f_lat  = clamp(1 - k_acc_lat *max(0, phi - phi_acc_ref),  facc_lat_min,  1)
-        !   f_dist = clamp(1 - k_acc_dist*max(0, d_in_km),            facc_dist_min, 1)
-        ! d_in_km is distance inland from the margin (km); defaults are no-ops (k=0 => 1).
-        real(sp) :: k_acc_lat     = 0.0_sp    ! frac. accum decrease per deg N beyond phi_acc_ref
-        real(sp) :: phi_acc_ref   = 0.0_sp    ! deg N, latitude above which accum starts dropping
-        real(sp) :: facc_lat_min  = 0.3_sp    ! floor on latitude modifier
-        real(sp) :: k_acc_dist    = 0.0_sp    ! frac. accum decrease per km inland from margin
-        real(sp) :: facc_dist_min = 0.5_sp    ! floor on distance modifier (keeps it weak)
+        ! Accumulation: acc = c0 * f_lat(phi) * f_dist(d_in)
+        !   f_dist = exp(-d_in_km / L_acc)   maritime decay inland (1 at margin -> 0 deep inland)
+        !   f_lat  = clamp(1 - k_acc_lat*max(0, phi - phi_acc_ref), facc_lat_min, 1)
+        ! d_in_km is distance inland from the target-mask margin (km).
+        real(sp) :: c0    = 150.0_sp   ! mm w.e./yr, maximum (coastal) accumulation at the margin
+        real(sp) :: L_acc = 1000.0_sp  ! km, e-folding length of inland accumulation decay
+        real(sp) :: k_acc_lat    = 0.0_sp   ! frac. accum decrease per deg N beyond phi_acc_ref (0 => off)
+        real(sp) :: phi_acc_ref  = 0.0_sp   ! deg N, latitude above which accum starts dropping
+        real(sp) :: facc_lat_min = 0.3_sp   ! floor on latitude modifier
 
         ! Synthetic-elevation profile
         logical  :: use_plastic = .true.      ! .true. → plastic Nye/Vialov; .false. → linear
@@ -317,9 +314,9 @@ contains
     !>      Cartesian, "degrees" lon/lat)
     !>   2. z_syn from (d, z_sur, mask_target) per p%use_plastic
     !>      (.true. → plastic Nye/Vialov; .false. → linear wedge)
-    !>   3. piecewise-linear SMB(z) kernel on z_syn
-    !>      (dz_SL = 0, c_acc = p%c0); the kernel and all tuned params are
-    !>      in mm w.e./yr, so no unit conversion is needed.
+    !>   3. SMB = acc - abl kernel on z_syn (dz_SL = 0), with acc the maritime
+    !>      accumulation field from compute_acc; all tuned params are in
+    !>      mm w.e./yr, so no unit conversion is needed.
     !>   4. outside-mask SMB floor at p%smb_min
     !>   5. t_srf = t_sl - p%gamma_t*max(z_syn, 0), capped at p%t_ice_max
     !>      over ice-covered (target-mask) cells; ocean / below-sea-level
@@ -347,7 +344,7 @@ contains
 
         integer :: nx, ny
         real(sp), allocatable :: d_m(:,:), z_syn(:,:)
-        real(sp), allocatable :: dz_SL(:,:), c_acc(:,:)
+        real(sp), allocatable :: dz_SL(:,:), acc(:,:)
         character(len=16) :: units_use
 
         nx = size(z_sur, 1)
@@ -368,9 +365,12 @@ contains
         if (p%smb_min > 0.0_sp) then
             error stop "calc_smb_simple_syn: p%smb_min must be <= 0"
         end if
+        if (p%L_acc <= 0.0_sp) then
+            error stop "calc_smb_simple_syn: p%L_acc must be > 0"
+        end if
 
         allocate(d_m  (nx, ny), z_syn(nx, ny), dz_SL(nx, ny), &
-                 c_acc(nx, ny))
+                 acc  (nx, ny))
 
         call compute_signed_distance(d_m, mask_target, x, y, units_use)
 
@@ -385,14 +385,14 @@ contains
         end if
 
         dz_SL = 0.0_sp
-        call compute_c_acc(c_acc, d_m, lat, mask_target, p)
+        call compute_acc(acc, d_m, lat, p)
 
-        call calc_smb_simple_pwl(smb, z_syn, dz_SL, c_acc, lat, CO2, f, p)
+        call calc_smb_simple_pwl(smb, z_syn, dz_SL, acc, lat, CO2, f, p)
         call apply_smb_min_outside(smb, mask_target, p%smb_min)
         call compute_t_srf_lapse(t_srf, z_syn, t_sl, mask_target, &
                                  p%gamma_t, p%t_ice_max)
 
-        deallocate(d_m, z_syn, dz_SL, c_acc)
+        deallocate(d_m, z_syn, dz_SL, acc)
     end subroutine calc_smb_simple_syn
 
     !=================================================================
@@ -400,29 +400,32 @@ contains
     !=================================================================
 
     !-----------------------------------------------------------------
-    !> Piecewise-linear SMB given a fully-specified elevation field z,
-    !> dz_SL(:,:) offset, and c_acc(:,:) ceiling. The kernel is
-    !> agnostic to whether z is the real surface or a synthetic field.
+    !> SMB = accumulation - ablation on a fully-specified elevation field z,
+    !> with snow-line offset dz_SL(:,:) and accumulation field acc(:,:).
+    !> Accumulation applies everywhere; ablation grows linearly with depth
+    !> below the snow line and is zero above it, so SMB is continuous across
+    !> the snow line. The kernel is agnostic to whether z is the real surface
+    !> or a synthetic field.
     !-----------------------------------------------------------------
-    subroutine calc_smb_simple_pwl(smb, z, dz_SL, c_acc, lat, CO2, f, p)
+    subroutine calc_smb_simple_pwl(smb, z, dz_SL, acc, lat, CO2, f, p)
         real(sp),             intent(out) :: smb(:,:)
         real(sp),             intent(in)  :: z(:,:)
         real(sp),             intent(in)  :: dz_SL(:,:)
-        real(sp),             intent(in)  :: c_acc(:,:)
+        real(sp),             intent(in)  :: acc(:,:)
         real(sp),             intent(in)  :: lat(:,:)
         real(sp),             intent(in)  :: CO2
         real(sp),             intent(in)  :: f
         type(smb_params_syn), intent(in)  :: p
 
         integer  :: i, j, nx, ny
-        real(sp) :: df, phi, zSL_clim, beta, dz
+        real(sp) :: df, phi, zSL, beta, dz_abl
 
         nx = size(z, 1)
         ny = size(z, 2)
 
         if (.not. (size(smb,1)   == nx .and. size(smb,2)   == ny .and. &
                    size(dz_SL,1) == nx .and. size(dz_SL,2) == ny .and. &
-                   size(c_acc,1) == nx .and. size(c_acc,2) == ny .and. &
+                   size(acc,1)   == nx .and. size(acc,2)   == ny .and. &
                    size(lat,1)   == nx .and. size(lat,2)   == ny)) then
             error stop "calc_smb_simple_pwl: shape mismatch among inputs"
         end if
@@ -431,50 +434,43 @@ contains
 
         do j = 1, ny
             do i = 1, nx
-                phi      = lat(i, j)
-                zSL_clim = p%a1 + p%a2 * phi + p%a3 * CO2 + p%a4 * df
-                beta     = max(p%beta_floor, p%beta0 + p%beta1 * (p%phiref - phi))
-                dz       = z(i, j) - (zSL_clim + dz_SL(i, j))
-                if (dz > 0.0_sp) then
-                    smb(i, j) = min(c_acc(i, j), p%gamma_acc * dz)
-                else
-                    smb(i, j) = -beta * (-dz)
-                end if
+                phi    = lat(i, j)
+                zSL    = p%a1 + p%a2 * phi + p%a3 * CO2 + p%a4 * df + dz_SL(i, j)
+                beta   = max(p%beta_floor, p%beta0 + p%beta1 * (p%phiref - phi))
+                dz_abl = max(0.0_sp, zSL - z(i, j))
+                smb(i, j) = acc(i, j) - beta * dz_abl
             end do
         end do
     end subroutine calc_smb_simple_pwl
 
     !-----------------------------------------------------------------
-    !> Spatially-varying accumulation ceiling: scales c0 down (weakly)
-    !> with latitude and with distance inland from the margin.
+    !> Maritime accumulation field: maximal at the ice margin and decaying
+    !> exponentially inland (continentality), optionally modulated by latitude.
     !>
-    !>   c_acc = c0 * f_lat(phi) * f_dist(d_in)
-    !>   f_lat  = clamp(1 - k_acc_lat *max(0, phi - phi_acc_ref),  facc_lat_min,  1)
-    !>   f_dist = clamp(1 - k_acc_dist*max(0, d_in_km),            facc_dist_min, 1)
+    !>   acc    = c0 * f_lat(phi) * f_dist(d_in)
+    !>   f_lat  = clamp(1 - k_acc_lat*max(0, phi - phi_acc_ref), facc_lat_min, 1)
+    !>   f_dist = exp(-d_in_km / L_acc)
     !>
-    !> d_m is the signed distance to the mask boundary in metres
-    !> (positive inside); only the inland part (d_m > 0) reduces the
-    !> ceiling. Outside the mask the distance modifier is 1 (accumulation
-    !> there is governed by the ablation branch / smb_min floor anyway).
-    !> With the default k_acc_lat = k_acc_dist = 0 this returns c0 exactly.
+    !> d_m is the signed distance to the mask boundary in metres (positive
+    !> inside); only the inland part (d_m > 0) reduces accumulation. Outside the
+    !> mask d_in = 0 (acc = c0*f_lat), but those cells are overwritten by the
+    !> smb_min floor afterwards. With k_acc_lat = 0 the latitude factor is 1.
     !-----------------------------------------------------------------
-    subroutine compute_c_acc(c_acc, d_m, lat, mask_target, p)
-        real(sp),             intent(out) :: c_acc(:,:)
+    subroutine compute_acc(acc, d_m, lat, p)
+        real(sp),             intent(out) :: acc(:,:)
         real(sp),             intent(in)  :: d_m(:,:)
         real(sp),             intent(in)  :: lat(:,:)
-        logical,              intent(in)  :: mask_target(:,:)
         type(smb_params_syn), intent(in)  :: p
 
         integer  :: i, j, nx, ny
         real(sp) :: phi, d_in_km, f_lat, f_dist
 
-        nx = size(c_acc, 1)
-        ny = size(c_acc, 2)
+        nx = size(acc, 1)
+        ny = size(acc, 2)
 
-        if (size(d_m,1)         /= nx .or. size(d_m,2)         /= ny .or. &
-            size(lat,1)         /= nx .or. size(lat,2)         /= ny .or. &
-            size(mask_target,1) /= nx .or. size(mask_target,2) /= ny) then
-            error stop "compute_c_acc: shape mismatch among inputs"
+        if (size(d_m,1) /= nx .or. size(d_m,2) /= ny .or. &
+            size(lat,1) /= nx .or. size(lat,2) /= ny) then
+            error stop "compute_acc: shape mismatch among inputs"
         end if
 
         do j = 1, ny
@@ -483,18 +479,13 @@ contains
                 f_lat = 1.0_sp - p%k_acc_lat * max(0.0_sp, phi - p%phi_acc_ref)
                 f_lat = max(p%facc_lat_min, min(1.0_sp, f_lat))
 
-                if (mask_target(i, j)) then
-                    d_in_km = max(0.0_sp, d_m(i, j)) / 1000.0_sp
-                    f_dist  = 1.0_sp - p%k_acc_dist * d_in_km
-                    f_dist  = max(p%facc_dist_min, min(1.0_sp, f_dist))
-                else
-                    f_dist  = 1.0_sp
-                end if
+                d_in_km = max(0.0_sp, d_m(i, j)) / 1000.0_sp
+                f_dist  = exp(-d_in_km / p%L_acc)
 
-                c_acc(i, j) = p%c0 * f_lat * f_dist
+                acc(i, j) = p%c0 * f_lat * f_dist
             end do
         end do
-    end subroutine compute_c_acc
+    end subroutine compute_acc
 
     !=================================================================
     ! TG24 2-D kernel
@@ -961,12 +952,10 @@ contains
         call nml_read(filename,nml_group,"phiref",     smbs%par%phiref,     init=init_pars)
         call nml_read(filename,nml_group,"beta_floor", smbs%par%beta_floor, init=init_pars)
         call nml_read(filename,nml_group,"c0",         smbs%par%c0,         init=init_pars)
-        call nml_read(filename,nml_group,"gamma_acc",  smbs%par%gamma_acc,  init=init_pars)
+        call nml_read(filename,nml_group,"L_acc",      smbs%par%L_acc,      init=init_pars)
         call nml_read(filename,nml_group,"k_acc_lat",    smbs%par%k_acc_lat,    init=init_pars)
         call nml_read(filename,nml_group,"phi_acc_ref",  smbs%par%phi_acc_ref,  init=init_pars)
         call nml_read(filename,nml_group,"facc_lat_min", smbs%par%facc_lat_min, init=init_pars)
-        call nml_read(filename,nml_group,"k_acc_dist",   smbs%par%k_acc_dist,   init=init_pars)
-        call nml_read(filename,nml_group,"facc_dist_min",smbs%par%facc_dist_min,init=init_pars)
         call nml_read(filename,nml_group,"use_plastic",smbs%par%use_plastic,init=init_pars)
         call nml_read(filename,nml_group,"slope",      smbs%par%slope,      init=init_pars)
         call nml_read(filename,nml_group,"tau0",       smbs%par%tau0,       init=init_pars)
