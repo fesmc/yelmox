@@ -25,7 +25,7 @@
 !         optionally + b3*(mask - 1) when use_mask = .true.
 !         smb_cm is in cm/yr; the kernel converts to mm w.e./yr (× 10).
 !
-! Shared snow line:
+! Shared snow line (phi = |latitude|, so the latitude terms are hemisphere-agnostic):
 !     z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean) [ + dz_SL ]
 !
 ! Public interface:
@@ -434,7 +434,7 @@ contains
 
         do j = 1, ny
             do i = 1, nx
-                phi    = lat(i, j)
+                phi    = abs(lat(i, j))    ! poleward latitude: hemisphere-agnostic snow line / ablation
                 zSL    = p%a1 + p%a2 * phi + p%a3 * CO2 + p%a4 * df + dz_SL(i, j)
                 beta   = max(p%beta_floor, p%beta0 + p%beta1 * (p%phiref - phi))
                 dz_abl = max(0.0_sp, zSL - z(i, j))
@@ -475,7 +475,7 @@ contains
 
         do j = 1, ny
             do i = 1, nx
-                phi   = lat(i, j)
+                phi   = abs(lat(i, j))    ! poleward latitude (hemisphere-agnostic)
                 f_lat = 1.0_sp - p%k_acc_lat * max(0.0_sp, phi - p%phi_acc_ref)
                 f_lat = max(p%facc_lat_min, min(1.0_sp, f_lat))
 
@@ -528,7 +528,7 @@ contains
 
         do j = 1, ny
             do i = 1, nx
-                phi        = lat(i, j)
+                phi        = abs(lat(i, j))    ! poleward latitude (hemisphere-agnostic)
                 z_SL       = p%a1 + p%a2 * phi + p%a3 * CO2 + p%a4 * df + dz_SL(i, j)
                 dz         = z_sur(i, j) - z_SL
                 grad_z_mag = sqrt(dzdx(i, j)**2 + dzdy(i, j)**2)
