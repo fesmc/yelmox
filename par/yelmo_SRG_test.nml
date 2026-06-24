@@ -9,6 +9,7 @@
     with_ice_sheet  = True              ! Is the ice sheet active?
     with_isostasy   = True              ! Is isostasy active?
     equil_method    = "none"            ! "none", "relax", "opt"
+    smb_method      = "smbpal"          ! "smbpal" or "smb_simple"
     write_clim_and_kill = False
 /
 
