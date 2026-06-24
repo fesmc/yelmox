@@ -28,7 +28,7 @@ LIB_YELMO = -L${YELMOROOT}/libyelmo/include -lyelmo
 
 # FastHydrology: dependency of yelmo. yelmo's static archive does not pull it
 # in transitively, so the top-level link line must reference it explicitly.
-FASTHYDROROOT = FastHydrology
+FASTHYDROROOT = ${YELMOROOT}/FastHydrology
 INC_FASTHYDRO = -I${FASTHYDROROOT}/include
 LIB_FASTHYDRO = -L${FASTHYDROROOT}/include -lfasthydro
 
