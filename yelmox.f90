@@ -670,7 +670,7 @@ end if
         ! == MODEL OUTPUT =======================================================
 
         if (timeout_check(tm_2D,ts%time)) then
-            call yelmox_write_step(yelmo1,snp1,mshlf1,smbpal1,file2D,ts%time)
+            call yelmox_write_step(bsl,isos1,yelmo1,snp1,mshlf1,smbpal1,file2D,ts%time)
         end if
 
         if (timeout_check(tm_2Dsm,ts%time)) then 
@@ -679,6 +679,7 @@ end if
 
         if (timeout_check(tm_1D,ts%time)) then 
             call yelmo_regions_write(yelmo1,ts%time)
+            call bsl_write_step(bsl, file_bsl, ts%time)
         end if 
 
         if (mod(nint(ts%time*100),nint(ctl%dt_restart*100))==0) then
@@ -1002,10 +1003,12 @@ contains
 
     end subroutine negis_update_cb_ref
 
-    subroutine yelmox_write_step(ylmo,snp,mshlf,srf,filename,time)
+    subroutine yelmox_write_step(bsl,isos,ylmo,snp,mshlf,srf,filename,time)
 
         implicit none 
         
+        type(bsl_class),        intent(IN) :: bsl
+        type(isos_class),       intent(IN) :: isos
         type(yelmo_class),      intent(IN) :: ylmo
         type(snapclim_class),   intent(IN) :: snp 
         type(marshelf_class),   intent(IN) :: mshlf 
