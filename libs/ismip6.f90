@@ -5,8 +5,9 @@ module ismip6
     use, intrinsic :: iso_fortran_env, only : input_unit, output_unit, error_unit
 
     use precision
-    use nml  
-    use ncio 
+    use constants, only : mv
+    use nml
+    use ncio
     use varslice
 
     implicit none 

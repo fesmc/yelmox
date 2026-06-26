@@ -8,8 +8,8 @@ module marine_shelf
 
     use nml 
     use ncio 
-    use mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
-                                            gen_map_filename, nc_read_interp
+    use mapping,     only : map_class, map_read
+    use ncio_interp, only : nc_read_interp
 
     use pico 
 
@@ -2060,7 +2060,7 @@ contains
         integer :: n
         character(len=56) :: restart_domain 
         character(len=56) :: restart_grid_name 
-        type(map_scrip_class) :: mps
+        type(map_class) :: mp
         logical :: restart_interpolated
 
         write(*,*) "marshelf_restart_read:: reading file: "//trim(filename)
@@ -2089,11 +2089,10 @@ contains
 
         if (restart_interpolated) then
             ! Load the scrip map from file (should already have been generated via cdo externally)
-            call map_scrip_init(mps,restart_grid_name,mshlf%par%grid_name, &
-                                    method="con",fldr="maps",load=.TRUE.)
+            call map_read(mp,restart_grid_name,mshlf%par%grid_name,"maps","con")
 
             ! Read the fields, using the mapping object to interpolate to target grid
-            call marshelf_restart_read_fields(mshlf,filename,n,mps)
+            call marshelf_restart_read_fields(mshlf,filename,n,mp)
         
         else
             ! Read the fields assuming the grid of the file matches the target grid
@@ -2104,14 +2103,14 @@ contains
 
     end subroutine marshelf_restart_read
 
-    subroutine marshelf_restart_read_fields(mshlf,filename,n,mps)
+    subroutine marshelf_restart_read_fields(mshlf,filename,n,mp)
 
         implicit none
 
         type(marshelf_class),   intent(INOUT) :: mshlf
         character(len=*),       intent(IN) :: filename
         integer,                intent(IN) :: n
-        type(map_scrip_class),  intent(IN), optional :: mps
+        type(map_class),  intent(IN), optional :: mp
 
         ! Local variables
         integer :: ncid 
@@ -2124,24 +2123,24 @@ contains
 
         call nc_open(filename,ncid,writable=.FALSE.)
 
-        call nc_read_interp(filename,"bmb_shlf",mshlf%now%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"bmb_ref",mshlf%now%bmb_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"bmb_corr",mshlf%now%bmb_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"T_shlf",mshlf%now%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dT_shlf",mshlf%now%dT_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"S_shlf",mshlf%now%S_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"dS_shlf",mshlf%now%dS_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"S_shlf_basin",mshlf%now%S_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"tf_shlf",mshlf%now%tf_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"tf_basin",mshlf%now%tf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"tf_corr",mshlf%now%tf_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"z_base",mshlf%now%z_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"slope_base",mshlf%now%slope_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
-        call nc_read_interp(filename,"mask_ocn",mshlf%now%mask_ocn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],mps=mps)
+        call nc_read_interp(filename,"bmb_shlf",mshlf%now%bmb_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"bmb_ref",mshlf%now%bmb_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"bmb_corr",mshlf%now%bmb_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"T_shlf",mshlf%now%T_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"dT_shlf",mshlf%now%dT_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"S_shlf",mshlf%now%S_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"dS_shlf",mshlf%now%dS_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"T_fp_shlf",mshlf%now%T_fp_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"T_shlf_basin",mshlf%now%T_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"S_shlf_basin",mshlf%now%S_shlf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"tf_shlf",mshlf%now%tf_shlf,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"tf_basin",mshlf%now%tf_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"tf_corr",mshlf%now%tf_corr,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"tf_corr_basin",mshlf%now%tf_corr_basin,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"z_base",mshlf%now%z_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"slope_base",mshlf%now%slope_base,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
+        call nc_read_interp(filename,"mask_ocn",mshlf%now%mask_ocn,ncid=ncid,start=[1,1,n],count=[nx,ny,1],map=mp)
         
         ! Close the netcdf file
         call nc_close(ncid)
