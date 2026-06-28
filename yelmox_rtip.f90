@@ -1095,8 +1095,8 @@ contains
 
     subroutine load_tf_corr_from_restart(tf_corr,file_restart,domain,grid_name)
 
-        use coordinates_mapping_scrip, only : map_scrip_class, map_scrip_init, map_scrip_field, &
-                                            gen_map_filename, nc_read_interp
+        use mapping,     only : map_class, map_read
+        use ncio_interp, only : nc_read_interp
 
         implicit none
 
@@ -1111,7 +1111,7 @@ contains
 
         character(len=56) :: restart_domain
         character(len=56) :: restart_grid_name
-        type(map_scrip_class) :: mps
+        type(map_class) :: mp
         logical :: restart_interpolated
 
         nx = size(tf_corr,1)
@@ -1138,8 +1138,7 @@ contains
 
         if (restart_interpolated) then
             ! Load the scrip map from file (should already have been generated via cdo externally)
-            call map_scrip_init(mps,restart_grid_name,grid_name, &
-                                    method="con",fldr="maps",load=.TRUE.)
+            call map_read(mp,restart_grid_name,grid_name,"maps","con")
         end if
 
         ! Get folder holding the restart file and
@@ -1158,7 +1157,7 @@ contains
         n = nc_size(path_tf_corr,"time")
 
         if (restart_interpolated) then
-            call nc_read_interp(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1],mps=mps)
+            call nc_read_interp(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1],map=mp)
         else
             call nc_read(path_tf_corr,"tf_corr",tf_corr,start=[1,1,n],count=[nx,ny,1])
         end if
