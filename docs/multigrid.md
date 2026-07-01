@@ -69,9 +69,14 @@ but stay flavor-agnostic, so other yelmox variants can reuse them.
 
 ## Coupler (in fesm-utils, `coords` library)
 
-Grids are identified by **string name** in every `remap` call — the name is the
-key the coupler uses to look up the registered grid. Callers pass names sourced
-from config/objects, never grid objects (the grids already live in the coupler).
+Grids are identified by **string name** in every `remap` call. A name resolves to
+its grid definition **from disk by default** — `grid_<name>.txt` in the map
+folder, read via `grid_cdo_read_desc` (extended to parse both the fesm-utils `#`
+header and cdo-native CF projection keys, so the existing `maps/grid_*.txt` are
+used directly). An in-memory registry (`coupler_add_grid`) is an optional
+override that wins when a name is registered. So nothing is hardcoded (no
+`grid_select`): the available grids are whatever `grid_*.txt` files live in
+`maps/`.
 
 Fixed-capacity arrays + counters (not growable allocatables): appending to an
 allocatable array of `map_class` would deep-copy every existing (large) map on
@@ -81,8 +86,8 @@ weight components.
 ```fortran
 module coupler
 
-    use coords, only : grid_class, grid_init, map_class, map_init, map_field
-    ! precision: map_field is dp; wrappers convert wp<->dp
+    use coords, only : grid_class, map_class, map_init, map_field, grid_cdo_read_desc
+    ! remap mirrors map_field's kind coverage (dp/sp/int); no wp<->dp conversion
 
     implicit none
     private
@@ -131,7 +136,8 @@ contains
     ! --- private: find-or-build the directed, method-typed map ---
     function get_map(cpl, src, dst, method) result(im)
         ! 1. linear-search cpl%maps(1:nmaps) for (name1==src, name2==dst, method)
-        ! 2. on miss: find src/dst grids in registry by name; nmaps += 1;
+        ! 2. on miss: resolve src/dst grids (in-memory registry, else read
+        !    grid_<name>.txt from cpl%map_fldr); nmaps += 1;
         !    call map_init(cpl%maps(nmaps), grid_src, grid_dst, method=method,
         !                  fldr=cpl%map_fldr, load=.true.)   ! hits disk cache
         !    return nmaps
@@ -187,12 +193,15 @@ module yelmox_domain
     use snapclim,      only : snapclim_class, snapclim_update
     use smbpal,        only : smbpal_class, smbpal_update_monthly
     use barysealevel,  only : bsl_class, bsl_update
+    use htopo,         only : htopo_class, htopo_init
 
     type domain_ctl
         logical :: with_ice_sheet, with_isostasy, with_marine_shelf, with_climate
-        character(len=256) :: grid_yelmo   ! e.g. "ANT-16KM"  (source of truth
-        character(len=256) :: grid_mshlf   ! e.g. "ANT-2KM"    for grid names)
-        character(len=256) :: grid_topo    ! hi-res topo grid, loaded from file
+        character(len=256) :: domain       ! e.g. "Antarctica"
+        character(len=256) :: grid_name    ! highest-res reference grid = htopo,
+                                           !   e.g. "ANT-16KM" (ctl's top level)
+        character(len=256) :: grid_yelmo   ! Yelmo grid, e.g. "ANT-32KM"
+        character(len=256) :: grid_mshlf   ! marine-shelf grid (may equal grid_name)
         ! ... time control, output config
     end type
 
@@ -203,6 +212,7 @@ module yelmox_domain
         type(snapclim_class) :: snp
         type(smbpal_class)   :: smb
         type(bsl_class)      :: bsl
+        type(htopo_class)    :: topo       ! hi-res geometry reference hub
         type(coupler_class)  :: cpl        ! this region's grids + maps
         type(domain_ctl)     :: ctl
     end type
@@ -210,15 +220,13 @@ module yelmox_domain
 contains
 
     subroutine domain_init(dom, path_par, ...)
-        ! 1. init sub-models
-        ! 2. coupler_init(dom%cpl)
-        ! 3. register grids:
-        !      coupler_add_grid(dom%cpl, ctl%grid_yelmo, <coords grid from ygrid>)
-        !      coupler_add_grid(dom%cpl, ctl%grid_topo,  <coords grid from file>)
-        !      coupler_add_grid(dom%cpl, ctl%grid_mshlf, ...)
+        ! 1. init sub-models (Yelmo etc. on their own grids)
+        ! 2. htopo_init(dom%topo, path_par, "htopo")   ! hi-res reference hub
+        ! 3. coupler_init(dom%cpl)                      ! grids resolve from maps/*.txt
         ! 4. prime known maps (fail fast, cost up front):
-        !      coupler_prime(dom%cpl, ctl%grid_yelmo, ctl%grid_mshlf, "bilin")
-        !      coupler_prime(dom%cpl, ctl%grid_mshlf, ctl%grid_yelmo, "con")
+        !      coupler_prime(dom%cpl, ctl%grid_yelmo, ctl%grid_name, "bilin")
+        !      coupler_prime(dom%cpl, ctl%grid_name, ctl%grid_yelmo, "con")
+        ! No coupler_add_grid needed: names resolve from grid_<name>.txt on disk.
     end subroutine
 
     subroutine yelmox_step(dom, time)
@@ -255,6 +263,34 @@ contains
     ! step_isostasy, step_climate, step_smb, step_icesheet — same shape
 end module yelmox_domain
 ```
+
+### Hi-res topography hub (htopo)
+
+`htopo` sits *above* every physics module (including Yelmo): its grid is the
+finest resolution in the setup, and it is the reference geometry the coupler
+remaps *from*. On the topo grid it holds static masks `regions`/`basins` (loaded
+once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later refreshed
+each step from Yelmo/isostasy). It is configured by its own `[htopo]` namelist
+group, whose `domain`/`grid_name` name the highest-res level and drive the
+`{domain}/{grid_name}` path templating (`ctl%grid_name` mirrors `[htopo]
+grid_name`):
+
+```
+&htopo
+    domain       = "Antarctica"
+    grid_name    = "ANT-16KM"
+    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
+    name_z_bed   = "z_bed"   name_H_ice = "H_ice"   name_z_srf = "z_srf"
+    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
+    name_basins  = "basin"
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    name_regions = "mask"
+/
+```
+
+`htopo_init` resolves the grid from `grid_<name>.txt` (the disk grid table) and
+reads the fields onto it — validated by `tests/test_htopo.f90` against the real
+ANT-16KM data.
 
 ### Buffers
 
@@ -293,15 +329,17 @@ end program
 
 ## Integration gaps to resolve during the build
 
-1. **`ygrid_class` → coords `grid_class`.** `map_init` needs a coords grid; Yelmo
-   exposes `ygrid_class`. Build the coords grid via `grid_init` from Yelmo's
-   projection params + `xc/yc`. Verify projection metadata lines up against a real
-   Yelmo grid before committing.
+1. **Grid definitions come from disk.** `grid_<name>.txt` in `maps/` (parsed by
+   `grid_cdo_read_desc`, incl. cdo-native CF keys) — no `grid_select`, no
+   `ygrid_class`→`grid_class` conversion. Assumes `grid_<yelmo>.txt` matches
+   Yelmo's runtime grid (true for standard full-domain runs); the in-memory
+   registry override is the escape hatch otherwise. *(Done.)*
 2. **Precision.** No external conversion needed — `map_field` already has
    `dp`/`sp`/`int` variants. `remap` provides matching `dp`/`sp`/`int` × 2d/3d
    wrappers under one generic interface, each calling the generic `map_field`.
-3. **`marshelf_grid_class` gains a `name` field** (agreed) for consistency; grid
-   names remain sourced from `domain_ctl` as the source of truth.
+   *(Done.)*
+3. **Grid names** are sourced from `domain_ctl` (and `[htopo]`) as the source of
+   truth for `remap` keys.
 4. **Conservative area basis.** `"con"` weights on projected cell area — sanity
    check mass conservation of `z_bed`/`bmb` aggregation on a real grid pair before
    trusting it as a BC.
@@ -309,12 +347,15 @@ end program
    the 16KM isostasy output rather than making the solver grid-aware. Not in the
    first skeleton.
 
-## Commit order (worktree)
+## Commit order
 
-1. `coupler.f90` in fesm-utils + a standalone unit test (remap a known field
-   16↔2KM both directions; check `con` conservation).
-2. `yelmox_domain.f90` skeleton: `ice_domain`, `domain_ctl`, empty `step_*`.
-3. Fill `step_*` one module at a time; diff behavior against `yelmox.f90` on a
-   single domain.
-4. `yelmox_mg.f90` driver; validate single-domain parity with `yelmox.f90`.
-5. Enable `nd=2` bipolar.
+1. `coupler.f90` in fesm-utils + `test_coupler` (remap 16↔2KM both directions,
+   `con` conservation, cache/prime, disk-driven resolution). *(Done.)*
+2. `grid_cdo_read_desc` cdo-native CF-key parsing + `test_grid_cf_read`;
+   coupler disk resolution of `grid_<name>.txt`. *(Done.)*
+3. `yelmox_domain.f90` skeleton: `ice_domain`, `domain_ctl`, empty `step_*`. *(Done.)*
+4. `htopo.f90` hi-res reference hub + `test_htopo` (load ANT-16KM fields). *(Done.)*
+5. `domain_init` (sub-model init on their grids + htopo + map priming) — next.
+6. Fill `step_*` one module at a time (marine_shelf first); diff vs `yelmox.f90`.
+7. `yelmox_mg.f90` driver; validate single-domain parity with `yelmox.f90`.
+8. Enable `nd=2` bipolar.
