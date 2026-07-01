@@ -62,6 +62,9 @@ module yelmox_domain
         character(len=256) :: grid_yelmo = ""   ! Yelmo grid
         character(len=256) :: grid_mshlf = ""   ! marine-shelf grid ([coupling]; default = grid_name)
         real(wp) :: dx_mshlf = 0.0_wp           ! marine-shelf grid spacing (Yelmo dx units)
+        character(len=256) :: grid_isos = ""    ! isostasy grid ([coupling]; default = grid_yelmo)
+        real(wp) :: dx_isos = 0.0_wp            ! isostasy grid spacing in x (Yelmo dx units)
+        real(wp) :: dy_isos = 0.0_wp            ! isostasy grid spacing in y (Yelmo dy units)
 
         ! Restart bundle folder ([coupling]); "None" = cold start.
         character(len=512) :: restart = "None"
@@ -97,8 +100,8 @@ contains
         real(wp),         intent(in)    :: time_rel   ! time before present [yr]
 
         character(len=256)    :: domain
-        type(grid_class)      :: grid_m, grid_y
-        integer               :: nx_m, ny_m
+        type(grid_class)      :: grid_m, grid_y, grid_i
+        integer               :: nx_m, ny_m, nx_i, ny_i
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
 
         ! --- run control ---
@@ -113,8 +116,17 @@ contains
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
         call bsl_init(dom%bsl, path_par, time_rel)
 
-        call isos_init(dom%isos, path_par, "isos", dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
-                       dom%yelmo%grd%dx, dom%yelmo%grd%dy)
+        ! Isostasy on its configured grid ([coupling] grid_isos; default = grid_yelmo).
+        if (len_trim(dom%ctl%grid_isos) == 0) dom%ctl%grid_isos = trim(dom%ctl%grid_yelmo)
+        call grid_cdo_read_desc(grid_i, trim(dom%ctl%grid_isos),  MAP_FLDR)
+        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_yelmo), MAP_FLDR)
+        nx_i = grid_i%G%nx
+        ny_i = grid_i%G%ny
+        ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
+        dom%ctl%dx_isos = dom%yelmo%grd%dx * (grid_i%G%dx / grid_y%G%dx)
+        dom%ctl%dy_isos = dom%yelmo%grd%dy * (grid_i%G%dy / grid_y%G%dy)
+        call isos_init(dom%isos, path_par, "isos", nx_i, ny_i, &
+                       dom%ctl%dx_isos, dom%ctl%dy_isos)
 
         call snapclim_init(dom%snp, path_par, domain, dom%yelmo%par%grid_name, &
                            dom%yelmo%grd%nx, dom%yelmo%grd%ny, dom%yelmo%bnd%basins)
@@ -140,9 +152,8 @@ contains
         call coupler_prime(dom%cpl, dom%ctl%grid_yelmo, dom%ctl%grid_name, "bilin")  ! Yelmo -> hub
         call coupler_prime(dom%cpl, dom%ctl%grid_name, dom%ctl%grid_yelmo, "con")    ! hub -> Yelmo
 
-        ! --- marine_shelf on its configured grid ---
+        ! --- marine_shelf on its configured grid (grid_y already read above) ---
         call grid_cdo_read_desc(grid_m, trim(dom%ctl%grid_mshlf), MAP_FLDR)
-        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_yelmo), MAP_FLDR)
         nx_m = grid_m%G%nx
         ny_m = grid_m%G%ny
         ! Grid spacing in Yelmo dx units, scaled by the resolution ratio.
@@ -164,12 +175,26 @@ contains
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
-        ! Sea level + isostasy reference state
+        real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
+        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
+        real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
+        character(len=256) :: gi, gy
+
+        gi = trim(dom%ctl%grid_isos)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call bsl_update(dom%bsl, ts%time_rel)
-        call isos_init_ref(dom%isos, dom%yelmo%bnd%z_bed_ref, dom%yelmo%bnd%H_ice_ref)
-        call isos_init_state(dom%isos, dom%yelmo%bnd%z_bed, dom%yelmo%tpo%now%H_ice, ts%time, dom%bsl)
-        dom%yelmo%bnd%z_bed = dom%isos%out%z_bed
-        dom%yelmo%bnd%z_sl  = dom%isos%out%z_ss
+        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
+        call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
+        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
+        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, dom%bsl)
+        call remap_or_copy_2D(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
+        call remap_or_copy_2D(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
+        dom%yelmo%bnd%z_bed = z_bed_y
+        dom%yelmo%bnd%z_sl  = z_ss_y
 
         ! Climate + surface mass balance (note: init uses time_rel for snapclim)
         call snapclim_update(dom%snp, z_srf=dom%yelmo%tpo%now%z_srf, time=ts%time_rel, &
@@ -257,6 +282,8 @@ contains
         ! Component grids + restart bundle ([coupling]).
         ctl%grid_mshlf = ""
         call nml_read(path_par, "coupling", "grid_mshlf", ctl%grid_mshlf)
+        ctl%grid_isos = ""
+        call nml_read(path_par, "coupling", "grid_isos", ctl%grid_isos)
         ctl%restart = "None"
         call nml_read(path_par, "coupling", "restart",    ctl%restart)
     end subroutine domain_ctl_load
@@ -275,15 +302,34 @@ contains
     end subroutine yelmox_step
 
     subroutine step_isostasy(dom, ts)
+        ! Run isostasy on its own grid: ice load from Yelmo (bilin), bedrock/sea
+        ! surface aggregated back to the Yelmo grid (conservative). Assumes
+        ! grid_isos is at least as fine as grid_yelmo (identity when equal).
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+
+        real(wp), allocatable :: H_ice_i(:,:), dwdt_i(:,:)
+        real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
+        character(len=256) :: gi, gy
+
         if (.not. dom%ctl%with_isostasy) return
 
+        gi = trim(dom%ctl%grid_isos)
+        gy = trim(dom%ctl%grid_yelmo)
+
         call bsl_update(dom%bsl, ts%time_rel)
-        call isos_update(dom%isos, dom%yelmo%tpo%now%H_ice, ts%time, dom%bsl, &
-                         dwdt_corr=dom%yelmo%bnd%dzbdt_corr)
-        dom%yelmo%bnd%z_bed = dom%isos%out%z_bed
-        dom%yelmo%bnd%z_sl  = dom%isos%out%z_ss
+
+        ! ice load + correction: Yelmo -> isos grid
+        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i, gi, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, "bilin")
+
+        call isos_update(dom%isos, H_ice_i, ts%time, dom%bsl, dwdt_corr=dwdt_i)
+
+        ! aggregate outputs -> Yelmo grid (conservative)
+        call remap_or_copy_2D(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
+        call remap_or_copy_2D(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
+        dom%yelmo%bnd%z_bed = z_bed_y
+        dom%yelmo%bnd%z_sl  = z_ss_y
     end subroutine step_isostasy
 
     subroutine step_icesheet(dom, ts)
