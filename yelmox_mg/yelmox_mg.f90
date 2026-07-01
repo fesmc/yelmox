@@ -9,7 +9,9 @@ program yelmox_mg
 
     use nml
     use timestepping
-    use yelmo, only : yelmo_load_command_line_args, wp
+    use timeout
+    use yelmo, only : yelmo_load_command_line_args, wp, &
+                      yelmo_write_init, yelmo_write_step, yelmo_end
     use yelmox_domain
 
     implicit none
@@ -17,7 +19,9 @@ program yelmox_mg
     character(len=512) :: path_par
     type(tstep_class)  :: ts
     type(ice_domain)   :: dom
+    type(timeout_class) :: tm_2D
 
+    character(len=512) :: file2D
     character(len=56)  :: tstep_method
     real(wp)           :: tstep_const, time_init, time_end
 
@@ -46,13 +50,33 @@ program yelmox_mg
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)
 
-    ! === main time loop (no output yet) ===
+    ! === output setup (2D; run from the output folder, yelmox convention) ===
+    file2D = "yelmo2D.nc"
+    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
+    if (tm_2D%active) then
+        call yelmo_write_init(dom%yelmo, file2D, time_init=ts%time, units="years")
+        call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+    end if
+
+    ! === main time loop ===
     call tstep_print_header(ts)
     do while (.not. ts%is_finished)
         call tstep_update(ts, dom%ctl%dtt)
         call tstep_print(ts)
+
         call yelmox_step(dom, ts)
+
+        if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
+            call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+        end if
     end do
+
+    ! Always capture the final state.
+    if (tm_2D%active) call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+
+    ! NOTE: yelmo_end is deferred until the region-of-interest setup
+    ! (yelmo_regions_init) is lifted in — it finalizes those structures. ncio
+    ! closes each write, so yelmo2D.nc is complete without it.
 
     write(*,*)
     write(*,*) "yelmox_mg: run complete at time =", ts%time
