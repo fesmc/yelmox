@@ -9,8 +9,8 @@ module yelmox_domain
     ! component's grid is just a string, so e.g. marine_shelf can run on the
     ! hi-res hub grid or on the Yelmo grid simply by changing grid_mshlf.
     !
-    ! Status: marine_shelf coupled through the hub on a configurable grid. Other
-    ! components remain on the Yelmo grid for now.
+    ! Status: isostasy, climate, smb and marine_shelf are each coupled through the
+    ! hub on their own configurable grids (grid_isos/grid_clim/grid_smb/grid_mshlf).
 
     use nml,          only : nml_read
     use timestepping, only : tstep_class
@@ -32,7 +32,7 @@ module yelmox_domain
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
     use htopo,        only : htopo_class, htopo_init
-    use coupler,      only : coupler_class, coupler_init, coupler_prime, remap
+    use coupler,      only : coupler_class, coupler_init, coupler_prime, cpl_remap => remap
 
     implicit none
     private
@@ -93,6 +93,11 @@ module yelmox_domain
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
     public :: domain_restart_write, domain_restart_read
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
+
+    ! Domain-level remap: identity-copy when src == dst, else remap via the coupler.
+    interface remap
+        module procedure remap_2D, remap_3D
+    end interface remap
 
 contains
 
@@ -160,7 +165,7 @@ contains
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny
         dom%ctl%dx_clim = dom%yelmo%grd%dx * (grid_c%G%dx / grid_y%G%dx)
-        call remap_or_copy_2D(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
+        call remap(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
         call snapclim_init(dom%snp, path_par, domain, trim(dom%ctl%grid_clim), &
                            nx_c, ny_c, basins_c)
 
@@ -184,8 +189,8 @@ contains
         dom%ctl%dx_mshlf = dom%yelmo%grd%dx * (grid_m%G%dx / grid_y%G%dx)
 
         ! Region/basin masks on the mshlf grid (from the hub).
-        call remap_or_copy_2D(dom, dom%topo%regions, dom%ctl%grid_name, regions_m, dom%ctl%grid_mshlf, "nn")
-        call remap_or_copy_2D(dom, dom%topo%basins,  dom%ctl%grid_name, basins_m,  dom%ctl%grid_mshlf, "nn")
+        call remap(dom, dom%topo%regions, dom%ctl%grid_name, regions_m, dom%ctl%grid_mshlf, "nn")
+        call remap(dom, dom%topo%basins,  dom%ctl%grid_name, basins_m,  dom%ctl%grid_mshlf, "nn")
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf", nx_m, ny_m, &
                            domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m)
@@ -255,14 +260,14 @@ contains
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call bsl_update(dom%bsl, ts%time_rel)
-        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
+        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
+        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
         call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
-        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
+        call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, dom%bsl)
-        call remap_or_copy_2D(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
-        call remap_or_copy_2D(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
+        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
+        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
         dom%yelmo%bnd%z_bed = z_bed_y
         dom%yelmo%bnd%z_sl  = z_ss_y
 
@@ -270,23 +275,23 @@ contains
         call refresh_htopo(dom)
 
         ! Climate on grid_clim (note: init uses time_rel for snapclim)
-        call remap_or_copy_2D(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%basins, gn, basins_c, gc, "nn")
+        call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
+        call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
         call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
                              domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
 
         ! Surface mass balance on grid_smb
-        call remap_or_copy_3D(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
-        call remap_or_copy_3D(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
+        call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
+        call remap(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
+        call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
+        call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
         if (trim(dom%smb%par%abl_method) == "itm") then
             call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
                     ts%time_rel, time_equil=100.0_wp)
         end if
         call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
-        call remap_or_copy_2D(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-        call remap_or_copy_2D(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+        call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
         dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
         dom%yelmo%bnd%T_srf = tsrf_y
 
@@ -404,14 +409,14 @@ contains
         call bsl_update(dom%bsl, ts%time_rel)
 
         ! ice load + correction: Yelmo -> isos grid
-        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i, gi, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, "bilin")
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i, gi, "bilin")
+        call remap(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, "bilin")
 
         call isos_update(dom%isos, H_ice_i, ts%time, dom%bsl, dwdt_corr=dwdt_i)
 
         ! aggregate outputs -> Yelmo grid (conservative)
-        call remap_or_copy_2D(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
-        call remap_or_copy_2D(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
+        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
+        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
         dom%yelmo%bnd%z_bed = z_bed_y
         dom%yelmo%bnd%z_sl  = z_ss_y
     end subroutine step_isostasy
@@ -446,22 +451,22 @@ contains
 
         ! snapclim snapshot on grid_clim, updated on the dt_clim cadence
         if (mod(nint(ts%time_elapsed*100), nint(dom%ctl%dt_clim*100)) == 0) then
-            call remap_or_copy_2D(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
-            call remap_or_copy_2D(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
+            call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
+            call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
             call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &
                                  domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
         end if
 
         ! surface mass balance (smbpal) on grid_smb
-        call remap_or_copy_3D(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
-        call remap_or_copy_3D(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
+        call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
+        call remap(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
+        call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
+        call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
         call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
 
         ! aggregate smb outputs -> Yelmo grid (conservative)
-        call remap_or_copy_2D(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-        call remap_or_copy_2D(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+        call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
         dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
         dom%yelmo%bnd%T_srf = tsrf_y
     end subroutine step_climate
@@ -472,15 +477,15 @@ contains
         ! coupling steps. Static masks (regions/basins) are not refreshed.
         type(ice_domain), intent(inout) :: dom
 
-        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_yelmo, &
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_yelmo, &
                               dom%topo%H_ice,  dom%ctl%grid_name, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_bed,      dom%ctl%grid_yelmo, &
+        call remap(dom, dom%yelmo%bnd%z_bed,      dom%ctl%grid_yelmo, &
                               dom%topo%z_bed,  dom%ctl%grid_name, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%f_grnd, dom%ctl%grid_yelmo, &
+        call remap(dom, dom%yelmo%tpo%now%f_grnd, dom%ctl%grid_yelmo, &
                               dom%topo%f_grnd, dom%ctl%grid_name, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_yelmo, &
+        call remap(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_yelmo, &
                               dom%topo%z_sl,   dom%ctl%grid_name, "bilin")
-        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_yelmo, &
+        call remap(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_yelmo, &
                               dom%topo%z_srf,  dom%ctl%grid_name, "bilin")
     end subroutine refresh_htopo
 
@@ -504,18 +509,18 @@ contains
         gc = trim(dom%ctl%grid_clim)
 
         ! geometry + masks: hub -> mshlf grid
-        call remap_or_copy_2D(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
-        call remap_or_copy_2D(dom, dom%topo%regions, gn, regions_m, gm, "nn")
-        call remap_or_copy_2D(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
+        call remap(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
+        call remap(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
+        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
+        call remap(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
+        call remap(dom, dom%topo%regions, gn, regions_m, gm, "nn")
+        call remap(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
 
         ! ocean forcing (3D): snapclim (grid_clim) -> mshlf grid
-        call remap_or_copy_3D(dom, dom%snp%now%to_ann, gc, to_m, gm, "bilin")
-        call remap_or_copy_3D(dom, dom%snp%now%so_ann, gc, so_m, gm, "bilin")
+        call remap(dom, dom%snp%now%to_ann, gc, to_m, gm, "bilin")
+        call remap(dom, dom%snp%now%so_ann, gc, so_m, gm, "bilin")
         dto_y = dom%snp%now%to_ann - dom%snp%clim0%to_ann
-        call remap_or_copy_3D(dom, dto_y, gc, dto_m, gm, "bilin")
+        call remap(dom, dto_y, gc, dto_m, gm, "bilin")
 
         ! run marine_shelf on grid_mshlf
         call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
@@ -524,15 +529,15 @@ contains
                 z_sl_m, dx=dom%ctl%dx_mshlf)
 
         ! aggregate outputs -> Yelmo grid (conservative)
-        call remap_or_copy_2D(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
-        call remap_or_copy_2D(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
+        call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
+        call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
         dom%yelmo%bnd%bmb_shlf = bmb_y
         dom%yelmo%bnd%T_shlf   = Tshlf_y
     end subroutine step_marine_shelf
 
-    ! ----- remap helpers: identity-copy when src == dst, else via the coupler ---
+    ! ----- remap: identity-copy when src == dst, else via the coupler ---
 
-    subroutine remap_or_copy_2D(dom, var_src, src, var_dst, dst, method)
+    subroutine remap_2D(dom, var_src, src, var_dst, dst, method)
         type(ice_domain),      intent(inout) :: dom
         real(wp),              intent(in)    :: var_src(:,:)
         character(len=*),      intent(in)    :: src, dst, method
@@ -546,11 +551,11 @@ contains
             if (.not. allocated(var_dst)) allocate(var_dst(size(var_src,1), size(var_src,2)))
             var_dst = var_src
         else
-            call remap(dom%cpl, var_src, src, var_dst, dst, method=method)
+            call cpl_remap(dom%cpl, var_src, src, var_dst, dst, method=method)
         end if
-    end subroutine remap_or_copy_2D
+    end subroutine remap_2D
 
-    subroutine remap_or_copy_3D(dom, var_src, src, var_dst, dst, method)
+    subroutine remap_3D(dom, var_src, src, var_dst, dst, method)
         type(ice_domain),      intent(inout) :: dom
         real(wp),              intent(in)    :: var_src(:,:,:)
         character(len=*),      intent(in)    :: src, dst, method
@@ -566,8 +571,8 @@ contains
                 allocate(var_dst(size(var_src,1), size(var_src,2), size(var_src,3)))
             var_dst = var_src
         else
-            call remap(dom%cpl, var_src, src, var_dst, dst, method=method)
+            call cpl_remap(dom%cpl, var_src, src, var_dst, dst, method=method)
         end if
-    end subroutine remap_or_copy_3D
+    end subroutine remap_3D
 
 end module yelmox_domain
