@@ -2,10 +2,10 @@ program yelmox_mg
     ! Multigrid yelmox driver.
     !
     ! Bring-up stage: initialize one ice_domain (all sub-models on the Yelmo grid
-    ! for now) plus the hi-res topography reference hub and the coupler maps, then
-    ! report. The initial boundary state and the coupling time loop are filled in
-    ! incrementally, lifting and adapting yelmox.f90 into the ice_domain / step_*
-    ! structure (see docs/multigrid.md).
+    ! for now) plus the hi-res topography reference hub and the coupler maps,
+    ! build the initial boundary state, and run the coupling time loop. No
+    ! NetCDF output yet -- output + parity checks against yelmox.f90 come next.
+    ! Lifted and adapted from yelmox.f90 (see docs/multigrid.md).
 
     use nml
     use timestepping
@@ -35,12 +35,27 @@ program yelmox_mg
     ! Initialize the domain: sub-models + hi-res hub + coupler maps.
     call domain_init(dom, path_par, ts%time, ts%time_rel)
 
+    ! Build the initial boundary state and Yelmo state variables.
+    call domain_init_state(dom, ts)
+
     write(*,*)
     write(*,*) "yelmox_mg: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
     write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
     write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
-    write(*,*) "yelmox_mg: init complete (initial boundary state + time loop to follow)."
+    write(*,*)
+
+    ! === main time loop (no output yet) ===
+    call tstep_print_header(ts)
+    do while (.not. ts%is_finished)
+        call tstep_update(ts, dom%ctl%dtt)
+        call tstep_print(ts)
+        call yelmox_step(dom, ts)
+    end do
+
+    write(*,*)
+    write(*,*) "yelmox_mg: run complete at time =", ts%time
+    write(*,*) "  H_ice max   =", maxval(dom%yelmo%tpo%now%H_ice)
 
 end program yelmox_mg
