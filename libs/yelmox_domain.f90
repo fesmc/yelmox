@@ -2,21 +2,19 @@ module yelmox_domain
     ! Multigrid yelmox: one region's full model state bundled as an ice_domain,
     ! advanced by composable step_* primitives.
     !
-    ! Each helper model may live on its own grid; fields that cross a grid
-    ! boundary are remapped through the domain's coupler (dom%cpl) at the moment
-    ! of coupling. The step_* routines are the reusable pieces -- they are guarded
-    ! internally by domain_ctl flags, and yelmox_step composes them. Bipolar runs
-    ! are just an array of ice_domain looped through yelmox_step, so north and
-    ! south share no state.
+    ! The hi-res topography hub (dom%topo) is the geometry source of truth: it is
+    ! refreshed from the prognostic models each step (refresh_htopo), and the
+    ! coupling steps remap fields to/from it through the domain's coupler
+    ! (dom%cpl). Each helper model runs on its own grid, named in domain_ctl; a
+    ! component's grid is just a string, so e.g. marine_shelf can run on the
+    ! hi-res hub grid or on the Yelmo grid simply by changing grid_mshlf.
     !
-    ! Status: minimal core, everything on the Yelmo grid (lift-and-adapt of
-    ! yelmox.f90's init + main loop). domain_init sets up the sub-models, the
-    ! htopo reference hub and the coupler maps; domain_init_state builds the
-    ! initial boundary state; yelmox_step advances one coupling step. Moving
-    ! marine_shelf onto the hi-res hub (via the coupler) comes next.
+    ! Status: marine_shelf coupled through the hub on a configurable grid. Other
+    ! components remain on the Yelmo grid for now.
 
     use nml,          only : nml_read
     use timestepping, only : tstep_class
+    use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, &
                              yelmo_init_state, yelmo_print_bound
     use marine_shelf, only : marshelf_class, marshelf_init, marshelf_update, &
@@ -33,6 +31,8 @@ module yelmox_domain
 
     implicit none
     private
+
+    character(len=*), parameter :: MAP_FLDR = "maps"
 
     type domain_ctl
         ! Run control (from the [ctrl] namelist group).
@@ -57,7 +57,8 @@ module yelmox_domain
         character(len=256) :: domain     = ""   ! e.g. "Antarctica"
         character(len=256) :: grid_name  = ""   ! hi-res reference (htopo), highest res
         character(len=256) :: grid_yelmo = ""   ! Yelmo grid
-        character(len=256) :: grid_mshlf = ""   ! marine-shelf grid (defaults to grid_name)
+        character(len=256) :: grid_mshlf = ""   ! marine-shelf grid ([coupling]; default = grid_name)
+        real(wp) :: dx_mshlf = 0.0_wp           ! marine-shelf grid spacing (Yelmo dx units)
     end type domain_ctl
 
     type ice_domain
@@ -76,19 +77,22 @@ module yelmox_domain
 
     public :: domain_ctl, ice_domain
     public :: domain_init, domain_init_state, yelmox_step
-    public :: step_isostasy, step_icesheet, step_climate, step_marine_shelf
+    public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
 
 contains
 
     subroutine domain_init(dom, path_par, time, time_rel)
-        ! Initialize all sub-models of one domain (currently all on the Yelmo
-        ! grid), load the hi-res reference hub, and prime the Yelmo<->topo maps.
+        ! Initialize all sub-models of one domain, load the hi-res reference hub,
+        ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
         real(wp),         intent(in)    :: time_rel   ! time before present [yr]
 
-        character(len=256) :: domain
+        character(len=256)    :: domain
+        type(grid_class)      :: grid_m, grid_y
+        integer               :: nx_m, ny_m
+        real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
 
         ! --- run control ---
         call domain_ctl_load(dom%ctl, path_par)
@@ -99,7 +103,7 @@ contains
         dom%ctl%domain     = trim(domain)
         dom%ctl%grid_yelmo = trim(dom%yelmo%par%grid_name)
 
-        ! --- external forcing models (all on the Yelmo grid for now) ---
+        ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
         call bsl_init(dom%bsl, path_par, time_rel)
 
         call isos_init(dom%isos, path_par, "isos", dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
@@ -110,9 +114,6 @@ contains
 
         call smbpal_init(dom%smb, path_par, x=dom%yelmo%grd%xc, y=dom%yelmo%grd%yc, &
                          lats=dom%yelmo%grd%lat)
-
-        call marshelf_init(dom%mshlf, path_par, "marine_shelf", dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
-                           domain, dom%yelmo%par%grid_name, dom%yelmo%bnd%regions, dom%yelmo%bnd%basins)
 
         call sediments_init(dom%sed, path_par, dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
                             domain, dom%yelmo%par%grid_name)
@@ -127,10 +128,25 @@ contains
         dom%ctl%grid_name = trim(dom%topo%par%grid_name)
         if (len_trim(dom%ctl%grid_mshlf) == 0) dom%ctl%grid_mshlf = trim(dom%ctl%grid_name)
 
-        ! Grids resolve from maps/grid_<name>.txt; prime the maps we will use.
+        ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
         call coupler_init(dom%cpl)
-        call coupler_prime(dom%cpl, dom%ctl%grid_yelmo, dom%ctl%grid_name, "bilin")  ! downscale
-        call coupler_prime(dom%cpl, dom%ctl%grid_name, dom%ctl%grid_yelmo, "con")    ! aggregate
+        call coupler_prime(dom%cpl, dom%ctl%grid_yelmo, dom%ctl%grid_name, "bilin")  ! Yelmo -> hub
+        call coupler_prime(dom%cpl, dom%ctl%grid_name, dom%ctl%grid_yelmo, "con")    ! hub -> Yelmo
+
+        ! --- marine_shelf on its configured grid ---
+        call grid_cdo_read_desc(grid_m, trim(dom%ctl%grid_mshlf), MAP_FLDR)
+        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_yelmo), MAP_FLDR)
+        nx_m = grid_m%G%nx
+        ny_m = grid_m%G%ny
+        ! Grid spacing in Yelmo dx units, scaled by the resolution ratio.
+        dom%ctl%dx_mshlf = dom%yelmo%grd%dx * (grid_m%G%dx / grid_y%G%dx)
+
+        ! Region/basin masks on the mshlf grid (from the hub).
+        call remap_or_copy_2D(dom, dom%topo%regions, dom%ctl%grid_name, regions_m, dom%ctl%grid_mshlf, "nn")
+        call remap_or_copy_2D(dom, dom%topo%basins,  dom%ctl%grid_name, basins_m,  dom%ctl%grid_mshlf, "nn")
+
+        call marshelf_init(dom%mshlf, path_par, "marine_shelf", nx_m, ny_m, &
+                           domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m)
 
     end subroutine domain_init
 
@@ -161,16 +177,9 @@ contains
         dom%yelmo%bnd%smb   = dom%smb%ann%smb * dom%yelmo%bnd%c%conv_we_ie * 1e-3
         dom%yelmo%bnd%T_srf = dom%smb%ann%tsrf
 
-        ! Marine shelf
-        call marshelf_update_shelf(dom%mshlf, dom%yelmo%tpo%now%H_ice, dom%yelmo%bnd%z_bed, &
-                dom%yelmo%tpo%now%f_grnd, dom%yelmo%bnd%basins, dom%yelmo%bnd%z_sl, dom%yelmo%grd%dx, &
-                dom%snp%now%depth, dom%snp%now%to_ann, dom%snp%now%so_ann, &
-                dto_ann=dom%snp%now%to_ann - dom%snp%clim0%to_ann)
-        call marshelf_update(dom%mshlf, dom%yelmo%tpo%now%H_ice, dom%yelmo%bnd%z_bed, &
-                dom%yelmo%tpo%now%f_grnd, dom%yelmo%bnd%regions, dom%yelmo%bnd%basins, &
-                dom%yelmo%bnd%z_sl, dx=dom%yelmo%grd%dx)
-        dom%yelmo%bnd%bmb_shlf = dom%mshlf%now%bmb_shlf
-        dom%yelmo%bnd%T_shlf   = dom%mshlf%now%T_shlf
+        ! Marine shelf: refresh the hub, then run mshlf through it.
+        call refresh_htopo(dom)
+        call step_marine_shelf(dom, ts)
 
         ! Initialize state variables (dyn, therm, mat) with a cold base
         call yelmo_print_bound(dom%yelmo%bnd)
@@ -194,6 +203,10 @@ contains
         call nml_read(path_par, "ctrl", "equil_method",   ctl%equil_method)
         ctl%smb_method = "smbpal"
         call nml_read(path_par, "ctrl", "smb_method",     ctl%smb_method)
+
+        ! Component grids ([coupling]; grid_mshlf defaults to the hub grid if unset).
+        ctl%grid_mshlf = ""
+        call nml_read(path_par, "coupling", "grid_mshlf", ctl%grid_mshlf)
     end subroutine domain_ctl_load
 
     subroutine yelmox_step(dom, ts)
@@ -205,6 +218,7 @@ contains
         call step_isostasy(dom, ts)
         call step_icesheet(dom, ts)
         call step_climate(dom, ts)
+        call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
         call step_marine_shelf(dom, ts)
     end subroutine yelmox_step
 
@@ -247,20 +261,105 @@ contains
         dom%yelmo%bnd%T_srf = dom%smb%ann%tsrf
     end subroutine step_climate
 
+    subroutine refresh_htopo(dom)
+        ! Refresh the hi-res geometry hub from the prognostic models (Yelmo grid
+        ! -> hub grid, bilinear). The hub is then the geometry source for the
+        ! coupling steps. Static masks (regions/basins) are not refreshed.
+        type(ice_domain), intent(inout) :: dom
+
+        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_yelmo, &
+                              dom%topo%H_ice,  dom%ctl%grid_name, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_bed,      dom%ctl%grid_yelmo, &
+                              dom%topo%z_bed,  dom%ctl%grid_name, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%f_grnd, dom%ctl%grid_yelmo, &
+                              dom%topo%f_grnd, dom%ctl%grid_name, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_yelmo, &
+                              dom%topo%z_sl,   dom%ctl%grid_name, "bilin")
+    end subroutine refresh_htopo
+
     subroutine step_marine_shelf(dom, ts)
+        ! Run marine_shelf on its own grid: geometry/masks from the hub, ocean
+        ! forcing from snapclim, outputs aggregated back to the Yelmo grid.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+
+        real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
+        real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
+        real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
+        real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
+        character(len=256) :: gm, gn, gy
+
         if (.not. dom%ctl%with_marine_shelf) return
 
-        call marshelf_update_shelf(dom%mshlf, dom%yelmo%tpo%now%H_ice, dom%yelmo%bnd%z_bed, &
-                dom%yelmo%tpo%now%f_grnd, dom%yelmo%bnd%basins, dom%yelmo%bnd%z_sl, dom%yelmo%grd%dx, &
-                dom%snp%now%depth, dom%snp%now%to_ann, dom%snp%now%so_ann, &
-                dto_ann=dom%snp%now%to_ann - dom%snp%clim0%to_ann)
-        call marshelf_update(dom%mshlf, dom%yelmo%tpo%now%H_ice, dom%yelmo%bnd%z_bed, &
-                dom%yelmo%tpo%now%f_grnd, dom%yelmo%bnd%regions, dom%yelmo%bnd%basins, &
-                dom%yelmo%bnd%z_sl, dx=dom%yelmo%grd%dx)
-        dom%yelmo%bnd%bmb_shlf = dom%mshlf%now%bmb_shlf
-        dom%yelmo%bnd%T_shlf   = dom%mshlf%now%T_shlf
+        gm = trim(dom%ctl%grid_mshlf)
+        gn = trim(dom%ctl%grid_name)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        ! geometry + masks: hub -> mshlf grid
+        call remap_or_copy_2D(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%regions, gn, regions_m, gm, "nn")
+        call remap_or_copy_2D(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
+
+        ! ocean forcing (3D): snapclim (Yelmo grid) -> mshlf grid
+        call remap_or_copy_3D(dom, dom%snp%now%to_ann, gy, to_m, gm, "bilin")
+        call remap_or_copy_3D(dom, dom%snp%now%so_ann, gy, so_m, gm, "bilin")
+        dto_y = dom%snp%now%to_ann - dom%snp%clim0%to_ann
+        call remap_or_copy_3D(dom, dto_y, gy, dto_m, gm, "bilin")
+
+        ! run marine_shelf on grid_mshlf
+        call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
+                dom%ctl%dx_mshlf, dom%snp%now%depth, to_m, so_m, dto_ann=dto_m)
+        call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
+                z_sl_m, dx=dom%ctl%dx_mshlf)
+
+        ! aggregate outputs -> Yelmo grid (conservative)
+        call remap_or_copy_2D(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
+        call remap_or_copy_2D(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
+        dom%yelmo%bnd%bmb_shlf = bmb_y
+        dom%yelmo%bnd%T_shlf   = Tshlf_y
     end subroutine step_marine_shelf
+
+    ! ----- remap helpers: identity-copy when src == dst, else via the coupler ---
+
+    subroutine remap_or_copy_2D(dom, var_src, src, var_dst, dst, method)
+        type(ice_domain),      intent(inout) :: dom
+        real(wp),              intent(in)    :: var_src(:,:)
+        character(len=*),      intent(in)    :: src, dst, method
+        real(wp), allocatable, intent(inout) :: var_dst(:,:)
+
+        if (trim(src) == trim(dst)) then
+            if (allocated(var_dst)) then
+                if (size(var_dst,1) /= size(var_src,1) .or. &
+                    size(var_dst,2) /= size(var_src,2)) deallocate(var_dst)
+            end if
+            if (.not. allocated(var_dst)) allocate(var_dst(size(var_src,1), size(var_src,2)))
+            var_dst = var_src
+        else
+            call remap(dom%cpl, var_src, src, var_dst, dst, method=method)
+        end if
+    end subroutine remap_or_copy_2D
+
+    subroutine remap_or_copy_3D(dom, var_src, src, var_dst, dst, method)
+        type(ice_domain),      intent(inout) :: dom
+        real(wp),              intent(in)    :: var_src(:,:,:)
+        character(len=*),      intent(in)    :: src, dst, method
+        real(wp), allocatable, intent(inout) :: var_dst(:,:,:)
+
+        if (trim(src) == trim(dst)) then
+            if (allocated(var_dst)) then
+                if (size(var_dst,1) /= size(var_src,1) .or. &
+                    size(var_dst,2) /= size(var_src,2) .or. &
+                    size(var_dst,3) /= size(var_src,3)) deallocate(var_dst)
+            end if
+            if (.not. allocated(var_dst)) &
+                allocate(var_dst(size(var_src,1), size(var_src,2), size(var_src,3)))
+            var_dst = var_src
+        else
+            call remap(dom%cpl, var_src, src, var_dst, dst, method=method)
+        end if
+    end subroutine remap_or_copy_3D
 
 end module yelmox_domain

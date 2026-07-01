@@ -47,6 +47,9 @@ module htopo
         real(wp), allocatable :: z_srf(:,:)   ! [m] surface elevation
         real(wp), allocatable :: regions(:,:) ! region mask
         real(wp), allocatable :: basins(:,:)  ! basin mask
+        ! Dynamic geometry refreshed from the models each step (not file-loaded).
+        real(wp), allocatable :: f_grnd(:,:)  ! [1] grounded-ice fraction
+        real(wp), allocatable :: z_sl(:,:)    ! [m] sea-surface / sea-level height
     end type
 
     public :: htopo_class, htopo_init
@@ -78,6 +81,8 @@ contains
         allocate(htopo%z_srf(htopo%nx,htopo%ny))
         allocate(htopo%regions(htopo%nx,htopo%ny))
         allocate(htopo%basins(htopo%nx,htopo%ny))
+        allocate(htopo%f_grnd(htopo%nx,htopo%ny)); htopo%f_grnd = 0.0_wp
+        allocate(htopo%z_sl(htopo%nx,htopo%ny));   htopo%z_sl   = 0.0_wp
 
         call nc_read(htopo%par%topo_path,    htopo%par%name_z_bed,   htopo%z_bed)
         call nc_read(htopo%par%topo_path,    htopo%par%name_H_ice,   htopo%H_ice)
