@@ -13,12 +13,14 @@ module yelmox_domain
     ! hub on their own configurable grids (grid_isos/grid_clim/grid_smb/grid_mshlf).
 
     use nml,          only : nml_read
+    use ncio
     use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, &
                              yelmo_init_state, yelmo_print_bound, &
                              yelmo_restart_write, yelmo_restart_read, &
-                             yelmo_regions_init, yelmo_region_init
+                             yelmo_regions_init, yelmo_region_init, &
+                             yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use ice_sub_regions, only : get_ice_sub_region
     use marine_shelf, only : marshelf_class, marshelf_init, marshelf_update, &
                              marshelf_update_shelf, marshelf_restart_write, &
@@ -31,7 +33,7 @@ module yelmox_domain
                              smbpal_update_monthly_equil
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
-    use htopo,        only : htopo_class, htopo_init
+    use htopo,        only : htopo_class, htopo_init, htopo_write_init, htopo_write_step
     use coupler,      only : coupler_class, coupler_init, coupler_prime, cpl_remap => remap
 
     implicit none
@@ -73,6 +75,14 @@ module yelmox_domain
 
         ! Restart bundle folder ([coupling]); "None" = cold start.
         character(len=512) :: restart = "None"
+
+        ! Per-module output switches ([output]); each module -> its own file.
+        logical :: write_yelmo = .true.
+        logical :: write_isos  = .true.
+        logical :: write_mshlf = .true.
+        logical :: write_smb   = .true.
+        logical :: write_snap  = .true.
+        logical :: write_htopo = .true.
     end type domain_ctl
 
     type ice_domain
@@ -92,6 +102,7 @@ module yelmox_domain
     public :: domain_ctl, ice_domain
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
     public :: domain_restart_write, domain_restart_read
+    public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
 
     ! Domain-level remap: identity-copy when src == dst, else remap via the coupler.
@@ -207,6 +218,7 @@ contains
 
         logical, allocatable :: tmp_mask(:,:)
         character(len=256)   :: domain, grid_name
+        integer              :: i
 
         domain    = trim(dom%ctl%domain)
         grid_name = trim(dom%ctl%grid_yelmo)
@@ -234,6 +246,16 @@ contains
                 call yelmo_regions_init(dom%yelmo, n=0)
 
         end select
+
+        ! Rename the regional 1D files to the climber-x timeseries convention:
+        !   global -> yelmo_<grid>_ts.nc, sub-region k -> yelmo_<grid>_ts_<name>.nc
+        dom%yelmo%reg%fnm = trim(outfldr)//"yelmo_"//trim(grid_name)//"_ts.nc"
+        if (dom%yelmo%par%n_reg > 0) then
+            do i = 1, dom%yelmo%par%n_reg
+                dom%yelmo%regs(i)%fnm = trim(outfldr)//"yelmo_"//trim(grid_name)// &
+                                        "_ts_"//trim(dom%yelmo%regs(i)%name)//".nc"
+            end do
+        end if
 
     end subroutine domain_regions_init
 
@@ -375,6 +397,14 @@ contains
         call nml_read(path_par, "coupling", "grid_smb", ctl%grid_smb)
         ctl%restart = "None"
         call nml_read(path_par, "coupling", "restart",    ctl%restart)
+
+        ! Per-module output switches ([output]); default = write everything.
+        call nml_read(path_par, "output", "write_yelmo", ctl%write_yelmo)
+        call nml_read(path_par, "output", "write_isos",  ctl%write_isos)
+        call nml_read(path_par, "output", "write_mshlf", ctl%write_mshlf)
+        call nml_read(path_par, "output", "write_smb",   ctl%write_smb)
+        call nml_read(path_par, "output", "write_snap",  ctl%write_snap)
+        call nml_read(path_par, "output", "write_htopo", ctl%write_htopo)
     end subroutine domain_ctl_load
 
     subroutine yelmox_step(dom, ts)
@@ -534,6 +564,196 @@ contains
         dom%yelmo%bnd%bmb_shlf = bmb_y
         dom%yelmo%bnd%T_shlf   = Tshlf_y
     end subroutine step_marine_shelf
+
+    ! ----- output (climber-x convention: one file per module, on its own grid,
+    !        named <module>_<grid>.nc; 1D timeseries as <module>_<grid>_ts.nc) ---
+
+    function io_fname(outfldr, base, grid) result(fnm)
+        character(len=*), intent(in) :: outfldr, base, grid
+        character(len=512) :: fnm
+        fnm = trim(outfldr)//trim(base)//"_"//trim(grid)//".nc"
+    end function io_fname
+
+    subroutine domain_write_init(dom, outfldr, time)
+        ! Create the enabled per-module 2D output files (dims + static fields).
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: outfldr
+        real(wp),         intent(in)    :: time
+
+        if (dom%ctl%write_yelmo) &
+            call yelmo_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo",dom%ctl%grid_yelmo)), &
+                                  time_init=time, units="years")
+        if (dom%ctl%write_htopo) &
+            call htopo_write_init(dom%topo, trim(io_fname(outfldr,"htopo",dom%ctl%grid_name)), time_init=time)
+        if (dom%ctl%write_isos) &
+            call io_dims_init(trim(io_fname(outfldr,"isos",dom%ctl%grid_isos)),  dom%ctl%grid_isos,  time)
+        if (dom%ctl%write_mshlf) &
+            call io_dims_init(trim(io_fname(outfldr,"mshlf",dom%ctl%grid_mshlf)), dom%ctl%grid_mshlf, time)
+        if (dom%ctl%write_smb) &
+            call io_dims_init(trim(io_fname(outfldr,"smbpal",dom%ctl%grid_smb)),  dom%ctl%grid_smb,   time)
+        if (dom%ctl%write_snap) &
+            call io_dims_init(trim(io_fname(outfldr,"snap",dom%ctl%grid_clim)),   dom%ctl%grid_clim,  time)
+    end subroutine domain_write_init
+
+    subroutine domain_write_step(dom, outfldr, time)
+        ! Append one time record to each enabled per-module 2D output file.
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: outfldr
+        real(wp),         intent(in)    :: time
+
+        if (dom%ctl%write_yelmo) &
+            call yelmo_write_step(dom%yelmo, trim(io_fname(outfldr,"yelmo",dom%ctl%grid_yelmo)), &
+                                  time, compare_pd=.FALSE.)
+        if (dom%ctl%write_htopo) &
+            call htopo_write_step(dom%topo, trim(io_fname(outfldr,"htopo",dom%ctl%grid_name)), time)
+        if (dom%ctl%write_isos) &
+            call isos_write_step(dom%isos, trim(io_fname(outfldr,"isos",dom%ctl%grid_isos)), time)
+        if (dom%ctl%write_mshlf) &
+            call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf",dom%ctl%grid_mshlf)), time)
+        if (dom%ctl%write_smb) &
+            call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal",dom%ctl%grid_smb)), time)
+        if (dom%ctl%write_snap) &
+            call snap_write_step(dom%snp, trim(io_fname(outfldr,"snap",dom%ctl%grid_clim)), time)
+    end subroutine domain_write_step
+
+    subroutine domain_write_1D(dom, outfldr, time, init)
+        ! Write 1D timeseries: Yelmo regional aggregates + isostasy diagnostics.
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: outfldr
+        real(wp),         intent(in)    :: time
+        logical, intent(in), optional   :: init
+
+        logical :: is_init
+        character(len=512) :: fnm_isos
+
+        is_init = .false.
+        if (present(init)) is_init = init
+
+        if (dom%ctl%write_yelmo) then
+            if (is_init) then
+                call yelmo_regions_write(dom%yelmo, time, init=.TRUE., units="years")
+            else
+                call yelmo_regions_write(dom%yelmo, time)
+            end if
+        end if
+
+        if (dom%ctl%write_isos) then
+            fnm_isos = trim(outfldr)//"isos_"//trim(dom%ctl%grid_isos)//"_ts.nc"
+            if (is_init) call isos_write_1D_init(trim(fnm_isos), time)
+            call isos_write_1D_step(dom%isos, trim(fnm_isos), time)
+        end if
+    end subroutine domain_write_1D
+
+    ! --- private output helpers ---
+
+    subroutine io_dims_init(filename, grid_name, time)
+        ! Create a 2D output file with xc/yc (from the grid table) + time dims.
+        character(len=*), intent(in) :: filename, grid_name
+        real(wp),         intent(in) :: time
+        type(grid_class) :: g
+        call grid_cdo_read_desc(g, trim(grid_name), MAP_FLDR)
+        call nc_create(filename)
+        call nc_write_dim(filename, "xc", x=g%G%x, units="km")
+        call nc_write_dim(filename, "yc", x=g%G%y, units="km")
+        call nc_write_dim(filename, "time", x=time, dx=1.0_wp, nx=1, units="year", unlimited=.TRUE.)
+    end subroutine io_dims_init
+
+    subroutine io_var2D(filename, vnm, var, n, ncid, units, long_name)
+        character(len=*), intent(in) :: filename, vnm, units, long_name
+        real(wp),         intent(in) :: var(:,:)
+        integer,          intent(in) :: n, ncid
+        call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3="time", &
+                      start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
+                      units=units, long_name=long_name)
+    end subroutine io_var2D
+
+    subroutine io_ts(filename, vnm, val, n, ncid, units, long_name)
+        character(len=*), intent(in) :: filename, vnm, units, long_name
+        real(wp),         intent(in) :: val
+        integer,          intent(in) :: n, ncid
+        call nc_write(filename, vnm, val, dim1="time", start=[n], count=[1], ncid=ncid, &
+                      units=units, long_name=long_name)
+    end subroutine io_ts
+
+    subroutine isos_write_step(isos, filename, time)
+        type(isos_class), intent(in) :: isos
+        character(len=*), intent(in) :: filename
+        real(wp),         intent(in) :: time
+        integer :: ncid, n
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_var2D(filename, "z_bed", isos%out%z_bed, n, ncid, "m", "Bedrock elevation")
+        call io_var2D(filename, "z_ss",  isos%out%z_ss,  n, ncid, "m", "Sea-surface height")
+        call io_var2D(filename, "w",     isos%out%w,     n, ncid, "m", "Viscous displacement")
+        call io_var2D(filename, "we",    isos%out%we,    n, ncid, "m", "Elastic displacement")
+        call nc_close(ncid)
+    end subroutine isos_write_step
+
+    subroutine mshlf_write_step(mshlf, filename, time)
+        type(marshelf_class), intent(in) :: mshlf
+        character(len=*),     intent(in) :: filename
+        real(wp),             intent(in) :: time
+        integer :: ncid, n
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_var2D(filename, "bmb_shlf", mshlf%now%bmb_shlf, n, ncid, "m/yr", "Shelf basal mass balance")
+        call io_var2D(filename, "T_shlf",   mshlf%now%T_shlf,   n, ncid, "K", "Shelf temperature")
+        call io_var2D(filename, "tf_shlf",  mshlf%now%tf_shlf,  n, ncid, "K", "Thermal forcing")
+        call nc_close(ncid)
+    end subroutine mshlf_write_step
+
+    subroutine smb_write_step(smb, filename, time)
+        type(smbpal_class), intent(in) :: smb
+        character(len=*),   intent(in) :: filename
+        real(wp),           intent(in) :: time
+        integer :: ncid, n
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "m ie/yr", "Surface mass balance")
+        call io_var2D(filename, "tsrf", smb%ann%tsrf, n, ncid, "K", "Surface temperature")
+        call nc_close(ncid)
+    end subroutine smb_write_step
+
+    subroutine snap_write_step(snp, filename, time)
+        type(snapclim_class), intent(in) :: snp
+        character(len=*),     intent(in) :: filename
+        real(wp),             intent(in) :: time
+        integer :: ncid, n
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_var2D(filename, "t2m_ann", snp%now%ta_ann, n, ncid, "K", "Annual mean air temperature")
+        call io_var2D(filename, "pr_ann",  snp%now%pr_ann, n, ncid, "mm/a", "Annual mean precipitation")
+        call nc_close(ncid)
+    end subroutine snap_write_step
+
+    subroutine isos_write_1D_init(filename, time)
+        character(len=*), intent(in) :: filename
+        real(wp),         intent(in) :: time
+        call nc_create(filename)
+        call nc_write_dim(filename, "time", x=time, dx=1.0_wp, nx=1, units="year", unlimited=.TRUE.)
+    end subroutine isos_write_1D_init
+
+    subroutine isos_write_1D_step(isos, filename, time)
+        type(isos_class), intent(in) :: isos
+        character(len=*), intent(in) :: filename
+        real(wp),         intent(in) :: time
+        integer :: ncid, n, np
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        np = size(isos%out%z_bed)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_ts(filename, "bsl",        isos%now%bsl,                       n, ncid, "m", "Barystatic sea level")
+        call io_ts(filename, "z_bed_mean", sum(isos%out%z_bed)/real(np,wp),    n, ncid, "m", "Mean bedrock elevation")
+        call io_ts(filename, "z_bed_min",  minval(isos%out%z_bed),             n, ncid, "m", "Min bedrock elevation")
+        call io_ts(filename, "z_bed_max",  maxval(isos%out%z_bed),             n, ncid, "m", "Max bedrock elevation")
+        call io_ts(filename, "w_mean",     sum(isos%out%w)/real(np,wp),        n, ncid, "m", "Mean viscous displacement")
+        call io_ts(filename, "we_mean",    sum(isos%out%we)/real(np,wp),       n, ncid, "m", "Mean elastic displacement")
+        call nc_close(ncid)
+    end subroutine isos_write_1D_step
 
     ! ----- remap: identity-copy when src == dst, else via the coupler ---
 

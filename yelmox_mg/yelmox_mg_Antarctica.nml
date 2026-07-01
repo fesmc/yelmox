@@ -733,3 +733,12 @@
     grid_smb   = "ANT-32KM"    ! smb grid; default = grid_clim
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 /
+
+&output
+    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos  = True
+    write_mshlf = True
+    write_smb   = True
+    write_snap  = True
+    write_htopo = True
+/

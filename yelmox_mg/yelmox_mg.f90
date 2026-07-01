@@ -10,9 +10,7 @@ program yelmox_mg
     use nml
     use timestepping
     use timeout
-    use yelmo, only : yelmo_load_command_line_args, wp, &
-                      yelmo_write_init, yelmo_write_step, yelmo_regions_write, yelmo_end
-    use htopo, only : htopo_write_init, htopo_write_step
+    use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use yelmox_domain
 
     implicit none
@@ -22,7 +20,7 @@ program yelmox_mg
     type(ice_domain)   :: dom
     type(timeout_class) :: tm_2D, tm_1D
 
-    character(len=512) :: file2D, file2D_topo
+    character(len=512) :: outfldr
     character(len=56)  :: tstep_method
     real(wp)           :: tstep_const, time_init, time_end
 
@@ -37,11 +35,15 @@ program yelmox_mg
     call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
                     time_ref=1950.0_wp, const_rel=tstep_const)
 
+    ! Output folder (single-domain runs write to the run dir; bipolar would use
+    ! a per-domain subfolder here).
+    outfldr = "./"
+
     ! Initialize the domain: sub-models + hi-res hub + coupler maps.
     call domain_init(dom, path_par, ts%time, ts%time_rel)
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
-    call domain_regions_init(dom, outfldr="./")
+    call domain_regions_init(dom, trim(outfldr))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! and rebuild the hi-res hub from the restored models.
@@ -60,21 +62,17 @@ program yelmox_mg
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)
 
-    ! === output setup (2D; run from the output folder, yelmox convention) ===
-    file2D      = "yelmo2D.nc"
-    file2D_topo = "htopo2D.nc"     ! hi-res reference geometry over time
+    ! === output setup (2D; one file per module, on its own grid) ===
     call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
     if (tm_2D%active) then
-        call yelmo_write_init(dom%yelmo, file2D, time_init=ts%time, units="years")
-        call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
-        call htopo_write_init(dom%topo, file2D_topo, time_init=ts%time)
-        call htopo_write_step(dom%topo, file2D_topo, ts%time)
+        call domain_write_init(dom, trim(outfldr), ts%time)
+        call domain_write_step(dom, trim(outfldr), ts%time)
     end if
 
-    ! === output setup (1D regional) ===
+    ! === output setup (1D timeseries) ===
     call timeout_init(tm_1D, path_par, "tm_1D", "small", time_init, time_end)
     if (tm_1D%active) then
-        call yelmo_regions_write(dom%yelmo, ts%time, init=.TRUE., units="years")
+        call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
     end if
 
     ! === main time loop ===
@@ -86,12 +84,11 @@ program yelmox_mg
         call yelmox_step(dom, ts)
 
         if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
-            call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
-            call htopo_write_step(dom%topo, file2D_topo, ts%time)
+            call domain_write_step(dom, trim(outfldr), ts%time)
         end if
 
         if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
-            call yelmo_regions_write(dom%yelmo, ts%time)
+            call domain_write_1D(dom, trim(outfldr), ts%time)
         end if
 
         if (dom%ctl%dt_restart > 0.0_wp .and. &
@@ -101,13 +98,8 @@ program yelmox_mg
     end do
 
     ! Always capture the final state + a final restart bundle.
-    if (tm_2D%active) then
-        call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
-        call htopo_write_step(dom%topo, file2D_topo, ts%time)
-    end if
-    if (tm_1D%active) then
-        call yelmo_regions_write(dom%yelmo, ts%time)
-    end if
+    if (tm_2D%active) call domain_write_step(dom, trim(outfldr), ts%time)
+    if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time)
     call domain_restart_write(dom, ts%time)
 
     write(*,*)
