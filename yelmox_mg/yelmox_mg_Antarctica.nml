@@ -729,5 +729,7 @@
 &coupling
     grid_mshlf = "ANT-16KM"    ! hi-res hub grid; set "ANT-32KM" to keep mshlf on the Yelmo grid
     grid_isos  = "ANT-32KM"    ! isostasy grid; default = grid_yelmo (identity, exact parity)
+    grid_clim  = "ANT-32KM"    ! climate grid; must have forcing data (default = grid_yelmo)
+    grid_smb   = "ANT-32KM"    ! smb grid; default = grid_clim
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 /

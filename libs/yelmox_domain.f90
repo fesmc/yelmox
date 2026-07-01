@@ -65,6 +65,9 @@ module yelmox_domain
         character(len=256) :: grid_isos = ""    ! isostasy grid ([coupling]; default = grid_yelmo)
         real(wp) :: dx_isos = 0.0_wp            ! isostasy grid spacing in x (Yelmo dx units)
         real(wp) :: dy_isos = 0.0_wp            ! isostasy grid spacing in y (Yelmo dy units)
+        character(len=256) :: grid_clim = ""    ! climate grid ([coupling]; default = grid_yelmo)
+        real(wp) :: dx_clim = 0.0_wp            ! climate grid spacing (Yelmo dx units)
+        character(len=256) :: grid_smb = ""     ! smb grid ([coupling]; default = grid_clim)
 
         ! Restart bundle folder ([coupling]); "None" = cold start.
         character(len=512) :: restart = "None"
@@ -100,9 +103,10 @@ contains
         real(wp),         intent(in)    :: time_rel   ! time before present [yr]
 
         character(len=256)    :: domain
-        type(grid_class)      :: grid_m, grid_y, grid_i
-        integer               :: nx_m, ny_m, nx_i, ny_i
-        real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
+        type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
+        integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
+        real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
+        real(wp), allocatable :: xs(:), ys(:), lats_s(:,:)
 
         ! --- run control ---
         call domain_ctl_load(dom%ctl, path_par)
@@ -128,12 +132,6 @@ contains
         call isos_init(dom%isos, path_par, "isos", nx_i, ny_i, &
                        dom%ctl%dx_isos, dom%ctl%dy_isos)
 
-        call snapclim_init(dom%snp, path_par, domain, dom%yelmo%par%grid_name, &
-                           dom%yelmo%grd%nx, dom%yelmo%grd%ny, dom%yelmo%bnd%basins)
-
-        call smbpal_init(dom%smb, path_par, x=dom%yelmo%grd%xc, y=dom%yelmo%grd%yc, &
-                         lats=dom%yelmo%grd%lat)
-
         call sediments_init(dom%sed, path_par, dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
                             domain, dom%yelmo%par%grid_name)
         dom%yelmo%bnd%H_sed = dom%sed%now%H
@@ -151,6 +149,30 @@ contains
         call coupler_init(dom%cpl)
         call coupler_prime(dom%cpl, dom%ctl%grid_yelmo, dom%ctl%grid_name, "bilin")  ! Yelmo -> hub
         call coupler_prime(dom%cpl, dom%ctl%grid_name, dom%ctl%grid_yelmo, "con")    ! hub -> Yelmo
+
+        ! --- climate on its configured grid ([coupling] grid_clim; default = grid_yelmo) ---
+        ! snapclim reads grid-specific input data, so grid_clim must be a grid whose
+        ! forcing files exist (the Yelmo grid for the standard setup).
+        if (len_trim(dom%ctl%grid_clim) == 0) dom%ctl%grid_clim = trim(dom%ctl%grid_yelmo)
+        call grid_cdo_read_desc(grid_c, trim(dom%ctl%grid_clim), MAP_FLDR)
+        nx_c = grid_c%G%nx
+        ny_c = grid_c%G%ny
+        dom%ctl%dx_clim = dom%yelmo%grd%dx * (grid_c%G%dx / grid_y%G%dx)
+        call remap_or_copy_2D(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
+        call snapclim_init(dom%snp, path_par, domain, trim(dom%ctl%grid_clim), &
+                           nx_c, ny_c, basins_c)
+
+        ! --- smb on its configured grid ([coupling] grid_smb; default = grid_clim) ---
+        ! smbpal reads no grid-specific data; only lats (insolation) is physical.
+        if (len_trim(dom%ctl%grid_smb) == 0) dom%ctl%grid_smb = trim(dom%ctl%grid_clim)
+        call grid_cdo_read_desc(grid_s, trim(dom%ctl%grid_smb), MAP_FLDR)
+        nx_s = grid_s%G%nx
+        ny_s = grid_s%G%ny
+        allocate(xs(nx_s), ys(ny_s), lats_s(nx_s, ny_s))
+        xs     = real(grid_s%G%x, wp)
+        ys     = real(grid_s%G%y, wp)
+        lats_s = real(grid_s%lat, wp)
+        call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s)
 
         ! --- marine_shelf on its configured grid (grid_y already read above) ---
         call grid_cdo_read_desc(grid_m, trim(dom%ctl%grid_mshlf), MAP_FLDR)
@@ -178,10 +200,16 @@ contains
         real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
-        character(len=256) :: gi, gy
+        real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
+        real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
+        real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:)
+        character(len=256) :: gi, gy, gc, gs, gn
 
         gi = trim(dom%ctl%grid_isos)
         gy = trim(dom%ctl%grid_yelmo)
+        gc = trim(dom%ctl%grid_clim)
+        gs = trim(dom%ctl%grid_smb)
+        gn = trim(dom%ctl%grid_name)
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call bsl_update(dom%bsl, ts%time_rel)
@@ -196,21 +224,31 @@ contains
         dom%yelmo%bnd%z_bed = z_bed_y
         dom%yelmo%bnd%z_sl  = z_ss_y
 
-        ! Climate + surface mass balance (note: init uses time_rel for snapclim)
-        call snapclim_update(dom%snp, z_srf=dom%yelmo%tpo%now%z_srf, time=ts%time_rel, &
-                             domain=dom%ctl%domain, dx=dom%yelmo%grd%dx, basins=dom%yelmo%bnd%basins)
-
-        if (trim(dom%smb%par%abl_method) == "itm") then
-            call smbpal_update_monthly_equil(dom%smb, dom%snp%now%tas, dom%snp%now%pr, &
-                    dom%yelmo%tpo%now%z_srf, dom%yelmo%tpo%now%H_ice, ts%time_rel, time_equil=100.0_wp)
-        end if
-        call smbpal_update_monthly(dom%smb, dom%snp%now%tas, dom%snp%now%pr, &
-                dom%yelmo%tpo%now%z_srf, dom%yelmo%tpo%now%H_ice, ts%time_rel)
-        dom%yelmo%bnd%smb   = dom%smb%ann%smb * dom%yelmo%bnd%c%conv_we_ie * 1e-3
-        dom%yelmo%bnd%T_srf = dom%smb%ann%tsrf
-
-        ! Marine shelf: refresh the hub, then run mshlf through it.
+        ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call refresh_htopo(dom)
+
+        ! Climate on grid_clim (note: init uses time_rel for snapclim)
+        call remap_or_copy_2D(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%basins, gn, basins_c, gc, "nn")
+        call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
+                             domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
+
+        ! Surface mass balance on grid_smb
+        call remap_or_copy_3D(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
+        call remap_or_copy_3D(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
+        if (trim(dom%smb%par%abl_method) == "itm") then
+            call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
+                    ts%time_rel, time_equil=100.0_wp)
+        end if
+        call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
+        call remap_or_copy_2D(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+        call remap_or_copy_2D(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
+        dom%yelmo%bnd%T_srf = tsrf_y
+
+        ! Marine shelf through the (already refreshed) hub.
         call step_marine_shelf(dom, ts)
 
         ! Initialize state variables (dyn, therm, mat) with a cold base
@@ -284,6 +322,10 @@ contains
         call nml_read(path_par, "coupling", "grid_mshlf", ctl%grid_mshlf)
         ctl%grid_isos = ""
         call nml_read(path_par, "coupling", "grid_isos", ctl%grid_isos)
+        ctl%grid_clim = ""
+        call nml_read(path_par, "coupling", "grid_clim", ctl%grid_clim)
+        ctl%grid_smb = ""
+        call nml_read(path_par, "coupling", "grid_smb", ctl%grid_smb)
         ctl%restart = "None"
         call nml_read(path_par, "coupling", "restart",    ctl%restart)
     end subroutine domain_ctl_load
@@ -296,8 +338,8 @@ contains
 
         call step_isostasy(dom, ts)
         call step_icesheet(dom, ts)
-        call step_climate(dom, ts)
         call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
+        call step_climate(dom, ts)       ! climate/smb read geometry from the hub
         call step_marine_shelf(dom, ts)
     end subroutine yelmox_step
 
@@ -342,21 +384,44 @@ contains
     end subroutine step_icesheet
 
     subroutine step_climate(dom, ts)
+        ! Run climate on grid_clim and smb on grid_smb: geometry (z_srf/H_ice) from
+        ! the hub, ocean/atmosphere forcing produced by snapclim, smb aggregated
+        ! back to the Yelmo grid (conservative).
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+
+        real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
+        real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
+        real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:)
+        character(len=256) :: gc, gs, gn, gy
+
         if (.not. dom%ctl%with_climate) return
 
-        ! snapclim snapshot, updated on the dt_clim cadence
+        gc = trim(dom%ctl%grid_clim)
+        gs = trim(dom%ctl%grid_smb)
+        gn = trim(dom%ctl%grid_name)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        ! snapclim snapshot on grid_clim, updated on the dt_clim cadence
         if (mod(nint(ts%time_elapsed*100), nint(dom%ctl%dt_clim*100)) == 0) then
-            call snapclim_update(dom%snp, z_srf=dom%yelmo%tpo%now%z_srf, time=ts%time, &
-                                 domain=dom%ctl%domain, dx=dom%yelmo%grd%dx, basins=dom%yelmo%bnd%basins)
+            call remap_or_copy_2D(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
+            call remap_or_copy_2D(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
+            call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &
+                                 domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
         end if
 
-        ! surface mass balance (smbpal)
-        call smbpal_update_monthly(dom%smb, dom%snp%now%tas, dom%snp%now%pr, &
-                dom%yelmo%tpo%now%z_srf, dom%yelmo%tpo%now%H_ice, ts%time_rel)
-        dom%yelmo%bnd%smb   = dom%smb%ann%smb * dom%yelmo%bnd%c%conv_we_ie * 1e-3
-        dom%yelmo%bnd%T_srf = dom%smb%ann%tsrf
+        ! surface mass balance (smbpal) on grid_smb
+        call remap_or_copy_3D(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
+        call remap_or_copy_3D(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
+        call remap_or_copy_2D(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
+        call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
+
+        ! aggregate smb outputs -> Yelmo grid (conservative)
+        call remap_or_copy_2D(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+        call remap_or_copy_2D(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
+        dom%yelmo%bnd%T_srf = tsrf_y
     end subroutine step_climate
 
     subroutine refresh_htopo(dom)
@@ -387,13 +452,14 @@ contains
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
         real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
-        character(len=256) :: gm, gn, gy
+        character(len=256) :: gm, gn, gy, gc
 
         if (.not. dom%ctl%with_marine_shelf) return
 
         gm = trim(dom%ctl%grid_mshlf)
         gn = trim(dom%ctl%grid_name)
         gy = trim(dom%ctl%grid_yelmo)
+        gc = trim(dom%ctl%grid_clim)
 
         ! geometry + masks: hub -> mshlf grid
         call remap_or_copy_2D(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
@@ -403,11 +469,11 @@ contains
         call remap_or_copy_2D(dom, dom%topo%regions, gn, regions_m, gm, "nn")
         call remap_or_copy_2D(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
 
-        ! ocean forcing (3D): snapclim (Yelmo grid) -> mshlf grid
-        call remap_or_copy_3D(dom, dom%snp%now%to_ann, gy, to_m, gm, "bilin")
-        call remap_or_copy_3D(dom, dom%snp%now%so_ann, gy, so_m, gm, "bilin")
+        ! ocean forcing (3D): snapclim (grid_clim) -> mshlf grid
+        call remap_or_copy_3D(dom, dom%snp%now%to_ann, gc, to_m, gm, "bilin")
+        call remap_or_copy_3D(dom, dom%snp%now%so_ann, gc, so_m, gm, "bilin")
         dto_y = dom%snp%now%to_ann - dom%snp%clim0%to_ann
-        call remap_or_copy_3D(dom, dto_y, gy, dto_m, gm, "bilin")
+        call remap_or_copy_3D(dom, dto_y, gc, dto_m, gm, "bilin")
 
         ! run marine_shelf on grid_mshlf
         call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
