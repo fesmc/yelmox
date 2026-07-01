@@ -53,6 +53,7 @@ module htopo
     end type
 
     public :: htopo_class, htopo_init
+    public :: htopo_write_init, htopo_write_step
 
 contains
 
@@ -113,6 +114,54 @@ contains
         call parse_path(par%regions_path, par%domain, par%grid_name)
 
     end subroutine htopo_par_load
+
+    subroutine htopo_write_init(htopo, filename, time_init)
+        ! Create a 2D output file on the topo grid, with the static masks.
+        type(htopo_class), intent(in) :: htopo
+        character(len=*),  intent(in) :: filename
+        real(wp),          intent(in) :: time_init
+
+        call nc_create(filename)
+        call nc_write_dim(filename, "xc", x=htopo%grid%G%x, units="km")
+        call nc_write_dim(filename, "yc", x=htopo%grid%G%y, units="km")
+        call nc_write_dim(filename, "time", x=time_init, dx=1.0_wp, nx=1, &
+                          units="year", unlimited=.TRUE.)
+
+        call nc_write(filename, "regions", htopo%regions, dim1="xc", dim2="yc", &
+                      start=[1,1], long_name="Region mask", units="")
+        call nc_write(filename, "basins", htopo%basins, dim1="xc", dim2="yc", &
+                      start=[1,1], long_name="Basin mask", units="")
+    end subroutine htopo_write_init
+
+    subroutine htopo_write_step(htopo, filename, time)
+        ! Append the dynamic hi-res geometry at `time`.
+        type(htopo_class), intent(in) :: htopo
+        character(len=*),  intent(in) :: filename
+        real(wp),          intent(in) :: time
+
+        integer :: ncid, n
+
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+
+        call nc_write(filename, "z_bed", htopo%z_bed, dim1="xc", dim2="yc", dim3="time", &
+                      start=[1,1,n], count=[htopo%nx,htopo%ny,1], ncid=ncid, units="m", &
+                      long_name="Bedrock elevation")
+        call nc_write(filename, "H_ice", htopo%H_ice, dim1="xc", dim2="yc", dim3="time", &
+                      start=[1,1,n], count=[htopo%nx,htopo%ny,1], ncid=ncid, units="m", &
+                      long_name="Ice thickness")
+        call nc_write(filename, "z_srf", htopo%z_srf, dim1="xc", dim2="yc", dim3="time", &
+                      start=[1,1,n], count=[htopo%nx,htopo%ny,1], ncid=ncid, units="m", &
+                      long_name="Surface elevation")
+        call nc_write(filename, "f_grnd", htopo%f_grnd, dim1="xc", dim2="yc", dim3="time", &
+                      start=[1,1,n], count=[htopo%nx,htopo%ny,1], ncid=ncid, units="1", &
+                      long_name="Grounded-ice fraction")
+        call nc_write(filename, "z_sl", htopo%z_sl, dim1="xc", dim2="yc", dim3="time", &
+                      start=[1,1,n], count=[htopo%nx,htopo%ny,1], ncid=ncid, units="m", &
+                      long_name="Sea-surface height")
+        call nc_close(ncid)
+    end subroutine htopo_write_step
 
     subroutine parse_path(path, domain, grid_name)
         character(len=*), intent(inout) :: path

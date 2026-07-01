@@ -327,6 +327,8 @@ contains
                               dom%topo%f_grnd, dom%ctl%grid_name, "bilin")
         call remap_or_copy_2D(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_yelmo, &
                               dom%topo%z_sl,   dom%ctl%grid_name, "bilin")
+        call remap_or_copy_2D(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_yelmo, &
+                              dom%topo%z_srf,  dom%ctl%grid_name, "bilin")
     end subroutine refresh_htopo
 
     subroutine step_marine_shelf(dom, ts)

@@ -12,6 +12,7 @@ program yelmox_mg
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, &
                       yelmo_write_init, yelmo_write_step, yelmo_end
+    use htopo, only : htopo_write_init, htopo_write_step
     use yelmox_domain
 
     implicit none
@@ -21,7 +22,7 @@ program yelmox_mg
     type(ice_domain)   :: dom
     type(timeout_class) :: tm_2D
 
-    character(len=512) :: file2D
+    character(len=512) :: file2D, file2D_topo
     character(len=56)  :: tstep_method
     real(wp)           :: tstep_const, time_init, time_end
 
@@ -57,11 +58,14 @@ program yelmox_mg
     write(*,*)
 
     ! === output setup (2D; run from the output folder, yelmox convention) ===
-    file2D = "yelmo2D.nc"
+    file2D      = "yelmo2D.nc"
+    file2D_topo = "htopo2D.nc"     ! hi-res reference geometry over time
     call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
     if (tm_2D%active) then
         call yelmo_write_init(dom%yelmo, file2D, time_init=ts%time, units="years")
         call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+        call htopo_write_init(dom%topo, file2D_topo, time_init=ts%time)
+        call htopo_write_step(dom%topo, file2D_topo, ts%time)
     end if
 
     ! === main time loop ===
@@ -74,6 +78,7 @@ program yelmox_mg
 
         if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
             call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+            call htopo_write_step(dom%topo, file2D_topo, ts%time)
         end if
 
         if (dom%ctl%dt_restart > 0.0_wp .and. &
@@ -83,7 +88,10 @@ program yelmox_mg
     end do
 
     ! Always capture the final state + a final restart bundle.
-    if (tm_2D%active) call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+    if (tm_2D%active) then
+        call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+        call htopo_write_step(dom%topo, file2D_topo, ts%time)
+    end if
     call domain_restart_write(dom, ts%time)
 
     ! NOTE: yelmo_end is deferred until the region-of-interest setup
