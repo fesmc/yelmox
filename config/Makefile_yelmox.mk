@@ -48,6 +48,11 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
+# Multigrid coupling driver support (ice_domain + step_* primitives)
+$(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o \
+						$(objdir)/snapclim.o $(objdir)/smbpal.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
 # $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
 # 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -155,6 +160,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/smb_simple.o \
 					    $(objdir)/snapclim.o \
+						$(objdir)/yelmox_domain.o \
 						$(objdir)/ice_sub_regions.o\
 						$(objdir)/obm_defs.o\
 						$(objdir)/ice2ocean.o\
