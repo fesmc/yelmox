@@ -50,7 +50,7 @@ program yelmox_mg
     if (trim(dom%ctl%restart) == "None") then
         call domain_init_state(dom, ts)
     else
-        call domain_restart_read(dom, trim(dom%ctl%restart), ts%time)
+        call domain_restart_read(dom, trim(dom%ctl%restart), ts)
         call refresh_htopo(dom)
     end if
 

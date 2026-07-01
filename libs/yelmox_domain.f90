@@ -19,7 +19,7 @@ module yelmox_domain
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, &
                              yelmo_init_state, yelmo_print_bound, &
                              yelmo_restart_write, yelmo_restart_read, &
-                             yelmo_regions_init, yelmo_region_init, &
+                             yelmo_regions_init, yelmo_region_init, yelmo_regions_update, &
                              yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use ice_sub_regions, only : get_ice_sub_region
     use marine_shelf, only : marshelf_class, marshelf_init, marshelf_update, &
@@ -354,17 +354,49 @@ contains
         write(*,*) "domain_restart_write:: wrote bundle "//trim(outfldr)
     end subroutine domain_restart_write
 
-    subroutine domain_restart_read(dom, fldr, time)
-        ! Restore all stateful sub-models from a restart bundle folder. One call,
-        ! fixed filenames -- no per-file configuration. bsl is not read (it is
-        ! reconstructed by bsl_init + bsl_update at the restart time).
-        type(ice_domain), intent(inout) :: dom
-        character(len=*), intent(in)    :: fldr
-        real(wp),         intent(in)    :: time
+    subroutine domain_restart_read(dom, fldr, ts)
+        ! Restore all stateful sub-models from a restart bundle folder. bsl is not
+        ! read (it is reconstructed by bsl_init + bsl_update at the restart time).
+        !
+        ! Isostasy is restored through its proper init-from-restart path
+        ! (isos_init_state with use_restart), NOT a bare isos_restart_read: the
+        ! latter loads the state arrays but skips the post-read setup that
+        ! isos_init_state performs (ODE state = now%w, calc_z_ss / calc_Haf /
+        ! calc_masks, time_prognostics), without which the isostasy ODE solver
+        ! restarts from an uninitialized state and the run is discontinuous.
+        type(ice_domain),  intent(inout) :: dom
+        character(len=*),  intent(in)    :: fldr
+        type(tstep_class), intent(in)    :: ts
 
-        call isos_restart_read(dom%isos,       trim(fldr)//"/isos_restart.nc",  time)
-        call yelmo_restart_read(dom%yelmo,     trim(fldr)//"/yelmo_restart.nc", time)
-        call marshelf_restart_read(dom%mshlf,  trim(fldr)//"/marine_shelf.nc")
+        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:), z_bed_y(:,:), z_ss_y(:,:)
+        character(len=256) :: gi, gy
+
+        gi = trim(dom%ctl%grid_isos)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        ! Restore Yelmo first: it provides the current H_ice/z_bed for isostasy.
+        call yelmo_restart_read(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
+
+        ! Restore isostasy via isos_init_state (reads state + reference from the
+        ! bundle and runs the full post-read setup), on the isos grid.
+        call bsl_update(dom%bsl, ts%time_rel)
+        dom%isos%par%use_restart = .true.
+        dom%isos%par%restart     = trim(fldr)//"/isos_restart.nc"
+        call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
+        call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
+        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, dom%bsl)
+        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
+        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
+        dom%yelmo%bnd%z_bed = z_bed_y
+        dom%yelmo%bnd%z_sl  = z_ss_y
+
+        ! Restore marine shelf.
+        call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
+
+        ! Recompute regional aggregates so the first 1D output after a restart
+        ! reflects the restored state (yelmo_update would otherwise do this only
+        ! on the first step).
+        call yelmo_regions_update(dom%yelmo)
 
         write(*,*) "domain_restart_read:: restored bundle "//trim(fldr)
     end subroutine domain_restart_read
