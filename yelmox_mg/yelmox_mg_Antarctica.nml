@@ -728,4 +728,5 @@
 
 &coupling
     grid_mshlf = "ANT-16KM"    ! hi-res hub grid; set "ANT-32KM" to keep mshlf on the Yelmo grid
+    restart    = "None"        ! restart bundle folder, or "None" for a cold start
 /

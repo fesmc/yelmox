@@ -39,8 +39,14 @@ program yelmox_mg
     ! Initialize the domain: sub-models + hi-res hub + coupler maps.
     call domain_init(dom, path_par, ts%time, ts%time_rel)
 
-    ! Build the initial boundary state and Yelmo state variables.
-    call domain_init_state(dom, ts)
+    ! Cold start: build the initial boundary state. Restart: restore the bundle
+    ! and rebuild the hi-res hub from the restored models.
+    if (trim(dom%ctl%restart) == "None") then
+        call domain_init_state(dom, ts)
+    else
+        call domain_restart_read(dom, trim(dom%ctl%restart), ts%time)
+        call refresh_htopo(dom)
+    end if
 
     write(*,*)
     write(*,*) "yelmox_mg: domain initialized"
@@ -69,10 +75,16 @@ program yelmox_mg
         if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
             call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
         end if
+
+        if (dom%ctl%dt_restart > 0.0_wp .and. &
+            mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
+            call domain_restart_write(dom, ts%time)
+        end if
     end do
 
-    ! Always capture the final state.
+    ! Always capture the final state + a final restart bundle.
     if (tm_2D%active) call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
+    call domain_restart_write(dom, ts%time)
 
     ! NOTE: yelmo_end is deferred until the region-of-interest setup
     ! (yelmo_regions_init) is lifted in — it finalizes those structures. ncio

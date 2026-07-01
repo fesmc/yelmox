@@ -16,11 +16,14 @@ module yelmox_domain
     use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, &
-                             yelmo_init_state, yelmo_print_bound
+                             yelmo_init_state, yelmo_print_bound, &
+                             yelmo_restart_write, yelmo_restart_read
     use marine_shelf, only : marshelf_class, marshelf_init, marshelf_update, &
-                             marshelf_update_shelf
+                             marshelf_update_shelf, marshelf_restart_write, &
+                             marshelf_restart_read
     use fastisostasy, only : isos_class, isos_init, isos_update, isos_init_ref, &
-                             isos_init_state, bsl_class, bsl_init, bsl_update
+                             isos_init_state, isos_restart_write, isos_restart_read, &
+                             bsl_class, bsl_init, bsl_update, bsl_restart_write
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil
@@ -59,6 +62,9 @@ module yelmox_domain
         character(len=256) :: grid_yelmo = ""   ! Yelmo grid
         character(len=256) :: grid_mshlf = ""   ! marine-shelf grid ([coupling]; default = grid_name)
         real(wp) :: dx_mshlf = 0.0_wp           ! marine-shelf grid spacing (Yelmo dx units)
+
+        ! Restart bundle folder ([coupling]); "None" = cold start.
+        character(len=512) :: restart = "None"
     end type domain_ctl
 
     type ice_domain
@@ -77,6 +83,7 @@ module yelmox_domain
 
     public :: domain_ctl, ice_domain
     public :: domain_init, domain_init_state, yelmox_step
+    public :: domain_restart_write, domain_restart_read
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
 
 contains
@@ -187,6 +194,49 @@ contains
 
     end subroutine domain_init_state
 
+    subroutine domain_restart_write(dom, time, fldr)
+        ! Write a restart bundle: a folder (per time, or `fldr`) holding one
+        ! restart file per stateful sub-model with fixed names. The hi-res hub is
+        ! not written -- it is rebuilt by refresh_htopo from the restored models.
+        type(ice_domain), intent(inout) :: dom
+        real(wp),         intent(in)    :: time
+        character(len=*), intent(in), optional :: fldr
+
+        character(len=1024) :: outfldr
+        character(len=32)   :: time_str
+
+        if (present(fldr)) then
+            outfldr = trim(fldr)
+        else
+            write(time_str,"(f20.3)") time*1e-3
+            outfldr = "restart-"//trim(adjustl(time_str))//"-kyr"
+        end if
+
+        call execute_command_line('mkdir -p "'//trim(outfldr)//'"')
+
+        call bsl_restart_write(dom%bsl,      trim(outfldr)//"/bsl_restart.nc",   time)
+        call isos_restart_write(dom%isos,    trim(outfldr)//"/isos_restart.nc",  time)
+        call yelmo_restart_write(dom%yelmo,  trim(outfldr)//"/yelmo_restart.nc", time)
+        call marshelf_restart_write(dom%mshlf, trim(outfldr)//"/marine_shelf.nc", time)
+
+        write(*,*) "domain_restart_write:: wrote bundle "//trim(outfldr)
+    end subroutine domain_restart_write
+
+    subroutine domain_restart_read(dom, fldr, time)
+        ! Restore all stateful sub-models from a restart bundle folder. One call,
+        ! fixed filenames -- no per-file configuration. bsl is not read (it is
+        ! reconstructed by bsl_init + bsl_update at the restart time).
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: fldr
+        real(wp),         intent(in)    :: time
+
+        call isos_restart_read(dom%isos,       trim(fldr)//"/isos_restart.nc",  time)
+        call yelmo_restart_read(dom%yelmo,     trim(fldr)//"/yelmo_restart.nc", time)
+        call marshelf_restart_read(dom%mshlf,  trim(fldr)//"/marine_shelf.nc")
+
+        write(*,*) "domain_restart_read:: restored bundle "//trim(fldr)
+    end subroutine domain_restart_read
+
     subroutine domain_ctl_load(ctl, path_par)
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
@@ -204,9 +254,11 @@ contains
         ctl%smb_method = "smbpal"
         call nml_read(path_par, "ctrl", "smb_method",     ctl%smb_method)
 
-        ! Component grids ([coupling]; grid_mshlf defaults to the hub grid if unset).
+        ! Component grids + restart bundle ([coupling]).
         ctl%grid_mshlf = ""
         call nml_read(path_par, "coupling", "grid_mshlf", ctl%grid_mshlf)
+        ctl%restart = "None"
+        call nml_read(path_par, "coupling", "restart",    ctl%restart)
     end subroutine domain_ctl_load
 
     subroutine yelmox_step(dom, ts)
