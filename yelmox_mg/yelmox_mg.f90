@@ -11,7 +11,7 @@ program yelmox_mg
     use timestepping
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, &
-                      yelmo_write_init, yelmo_write_step, yelmo_end
+                      yelmo_write_init, yelmo_write_step, yelmo_regions_write, yelmo_end
     use htopo, only : htopo_write_init, htopo_write_step
     use yelmox_domain
 
@@ -20,7 +20,7 @@ program yelmox_mg
     character(len=512) :: path_par
     type(tstep_class)  :: ts
     type(ice_domain)   :: dom
-    type(timeout_class) :: tm_2D
+    type(timeout_class) :: tm_2D, tm_1D
 
     character(len=512) :: file2D, file2D_topo
     character(len=56)  :: tstep_method
@@ -39,6 +39,9 @@ program yelmox_mg
 
     ! Initialize the domain: sub-models + hi-res hub + coupler maps.
     call domain_init(dom, path_par, ts%time, ts%time_rel)
+
+    ! Define regions of interest for 1D output (must precede the first yelmo_update).
+    call domain_regions_init(dom, outfldr="./")
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! and rebuild the hi-res hub from the restored models.
@@ -68,6 +71,12 @@ program yelmox_mg
         call htopo_write_step(dom%topo, file2D_topo, ts%time)
     end if
 
+    ! === output setup (1D regional) ===
+    call timeout_init(tm_1D, path_par, "tm_1D", "small", time_init, time_end)
+    if (tm_1D%active) then
+        call yelmo_regions_write(dom%yelmo, ts%time, init=.TRUE., units="years")
+    end if
+
     ! === main time loop ===
     call tstep_print_header(ts)
     do while (.not. ts%is_finished)
@@ -81,6 +90,10 @@ program yelmox_mg
             call htopo_write_step(dom%topo, file2D_topo, ts%time)
         end if
 
+        if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
+            call yelmo_regions_write(dom%yelmo, ts%time)
+        end if
+
         if (dom%ctl%dt_restart > 0.0_wp .and. &
             mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
             call domain_restart_write(dom, ts%time)
@@ -92,14 +105,17 @@ program yelmox_mg
         call yelmo_write_step(dom%yelmo, file2D, ts%time, compare_pd=.FALSE.)
         call htopo_write_step(dom%topo, file2D_topo, ts%time)
     end if
+    if (tm_1D%active) then
+        call yelmo_regions_write(dom%yelmo, ts%time)
+    end if
     call domain_restart_write(dom, ts%time)
-
-    ! NOTE: yelmo_end is deferred until the region-of-interest setup
-    ! (yelmo_regions_init) is lifted in — it finalizes those structures. ncio
-    ! closes each write, so yelmo2D.nc is complete without it.
 
     write(*,*)
     write(*,*) "yelmox_mg: run complete at time =", ts%time
     write(*,*) "  H_ice max   =", maxval(dom%yelmo%tpo%now%H_ice)
+
+    ! Finalize Yelmo (deallocates model state) -- must come after the last
+    ! access to dom%yelmo (it deallocates tpo%now%H_ice etc).
+    call yelmo_end(dom%yelmo, time=ts%time)
 
 end program yelmox_mg

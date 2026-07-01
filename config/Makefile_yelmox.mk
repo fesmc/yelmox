@@ -55,7 +55,8 @@ $(objdir)/htopo.o: $(libdir)/htopo.f90
 # Multigrid coupling driver support (ice_domain + step_* primitives)
 $(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/snapclim.o $(objdir)/smbpal.o $(objdir)/htopo.o \
-						$(objdir)/sediments.o $(objdir)/geothermal.o
+						$(objdir)/sediments.o $(objdir)/geothermal.o \
+						$(objdir)/ice_sub_regions.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 # $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o

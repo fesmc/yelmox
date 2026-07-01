@@ -17,7 +17,9 @@ module yelmox_domain
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, &
                              yelmo_init_state, yelmo_print_bound, &
-                             yelmo_restart_write, yelmo_restart_read
+                             yelmo_restart_write, yelmo_restart_read, &
+                             yelmo_regions_init, yelmo_region_init
+    use ice_sub_regions, only : get_ice_sub_region
     use marine_shelf, only : marshelf_class, marshelf_init, marshelf_update, &
                              marshelf_update_shelf, marshelf_restart_write, &
                              marshelf_restart_read
@@ -88,7 +90,7 @@ module yelmox_domain
     end type ice_domain
 
     public :: domain_ctl, ice_domain
-    public :: domain_init, domain_init_state, yelmox_step
+    public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
     public :: domain_restart_write, domain_restart_read
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
 
@@ -189,6 +191,46 @@ contains
                            domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m)
 
     end subroutine domain_init
+
+    subroutine domain_regions_init(dom, outfldr)
+        ! Define the domain's regions of interest for 1D regional output. Masks are
+        ! resolved on the Yelmo grid (get_ice_sub_region); regional files land in
+        ! outfldr. Domains without defined sub-regions get n=0 (global region only).
+        ! Must be called after domain_init and before the first yelmo_update.
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: outfldr
+
+        logical, allocatable :: tmp_mask(:,:)
+        character(len=256)   :: domain, grid_name
+
+        domain    = trim(dom%ctl%domain)
+        grid_name = trim(dom%ctl%grid_yelmo)
+        allocate(tmp_mask(dom%yelmo%grd%nx, dom%yelmo%grd%ny))
+
+        select case(trim(domain))
+
+            case("Antarctica")
+                call yelmo_regions_init(dom%yelmo, n=3)
+
+                call get_ice_sub_region(tmp_mask, "APIS", domain, grid_name)
+                call yelmo_region_init(dom%yelmo%regs(1), "APIS", mask=tmp_mask, &
+                                       write_to_file=.true., outfldr=outfldr)
+
+                call get_ice_sub_region(tmp_mask, "WAIS", domain, grid_name)
+                call yelmo_region_init(dom%yelmo%regs(2), "WAIS", mask=tmp_mask, &
+                                       write_to_file=.true., outfldr=outfldr)
+
+                call get_ice_sub_region(tmp_mask, "EAIS", domain, grid_name)
+                call yelmo_region_init(dom%yelmo%regs(3), "EAIS", mask=tmp_mask, &
+                                       write_to_file=.true., outfldr=outfldr)
+
+            case default
+                ! No sub-regions defined for this domain; global region only.
+                call yelmo_regions_init(dom%yelmo, n=0)
+
+        end select
+
+    end subroutine domain_regions_init
 
     subroutine domain_init_state(dom, ts)
         ! Build the initial boundary state and initialize the Yelmo state
