@@ -194,6 +194,13 @@ test_timestepping : fesmutils-static yelmo-static $(objdir)/nml.o $(objdir)/ncio
 	@echo " "
 
 
+test_htopo : fesmutils-static yelmo-static isostasy-static $(objdir)/htopo.o
+	$(FC) $(DFLAGS) $(FFLAGS) -o $(bindir)/test_htopo.x tests/test_htopo.f90 \
+		$(objdir)/htopo.o $(LFLAGS)
+	@echo " "
+	@echo "    $(bindir)/test_htopo.x is ready."
+	@echo " "
+
 .PHONY : usage
 usage:
 	@echo ""
