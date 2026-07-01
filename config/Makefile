@@ -109,11 +109,11 @@ yelmox : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 	@echo "    yelmox.x is ready."
 	@echo " "
 
-yelmoxmg : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmoxmg.x yelmox.f90 \
+yelmox_mg : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_mg.x yelmox_mg/yelmox_mg.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
-	@echo "    yelmoxmg.x is ready."
+	@echo "    yelmox_mg.x is ready."
 	@echo " "
 
 yelmox_hyst : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
