@@ -40,7 +40,9 @@
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 1e-2              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     cf_min          = 1e-4              ! [--] Minimum allowed cf value
-    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
+    use_yelmo_cf_min = True             ! Use Yelmo's till_cf_min as the cf lower bound
+    opt_cf_min      = 1e-4              ! [--] Fallback cf lower bound (if not using Yelmo's)
+    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
 
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref

@@ -6,7 +6,7 @@
 
     "exe_aliases" :
         {   "yelmox"    : "libyelmox/bin/yelmox.x",
-            "mg"        : "libyelmox/bin/yelmoxmg.x",
+            "mg"        : "libyelmox/bin/yelmox_mg.x",
             "iso"       : "libyelmox/bin/yelmox_iso.x",
             "hyst"      : "libyelmox/bin/yelmox_hyst.x",
             "rembo"     : "libyelmox/bin/yelmox_rembo.x",

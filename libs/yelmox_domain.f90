@@ -34,6 +34,8 @@ module yelmox_domain
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
+    use ice_optimization, only : ice_opt_params, optimize_par_load, &
+                             optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
     use htopo,        only : htopo_class, htopo_init, htopo_write_init, htopo_write_step
@@ -99,6 +101,7 @@ module yelmox_domain
         type(geothermal_class) :: gthrm
         type(htopo_class)      :: topo    ! hi-res geometry reference hub
         type(coupler_class)    :: cpl     ! this region's grid resolution + map cache
+        type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
         type(domain_ctl)       :: ctl
     end type ice_domain
 
@@ -107,6 +110,7 @@ module yelmox_domain
     public :: domain_restart_write, domain_restart_read
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
+    public :: step_optimize
 
     ! Domain-level remap: identity-copy when src == dst, else remap via the coupler.
     interface remap
@@ -209,7 +213,38 @@ contains
         call marshelf_init(dom%mshlf, path_par, "marine_shelf", nx_m, ny_m, &
                            domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m)
 
+        ! Optimization state (basal friction + thermal forcing); no-op unless
+        ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
+        call domain_opt_init(dom, path_par)
+
     end subroutine domain_init
+
+    subroutine domain_opt_init(dom, path_par)
+        ! Load optimization parameters and prepare Yelmo for external cb_ref:
+        ! allocate/seed the friction bounds (cf_min/cf_max) on the Yelmo grid and
+        ! switch till_method to external (-1) so yelmo_update uses the optimized
+        ! cb_ref. The initial cb_ref guess (cold start) is set in domain_init_state
+        ! after yelmo_init_state; on restart cb_ref is restored from the bundle.
+        ! No-op unless equil_method == "opt".
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: path_par
+
+        integer :: nx, ny
+
+        if (trim(dom%ctl%equil_method) /= "opt") return
+
+        dom%opt%tf_basins = 0
+        call optimize_par_load(dom%opt, path_par, "opt")
+
+        nx = dom%yelmo%grd%nx
+        ny = dom%yelmo%grd%ny
+        allocate(dom%opt%cf_min(nx, ny), dom%opt%cf_max(nx, ny))
+        dom%opt%cf_min = dom%yelmo%dyn%par%till_cf_min
+        dom%opt%cf_max = dom%yelmo%dyn%par%till_cf_ref
+
+        ! cb_ref is set externally by the optimization from here on.
+        dom%yelmo%dyn%par%till_method = -1
+    end subroutine domain_opt_init
 
     subroutine domain_regions_init(dom, outfldr)
         ! Define the domain's regions of interest for 1D regional output. Masks are
@@ -326,6 +361,11 @@ contains
         ! Initialize state variables (dyn, therm, mat) with a cold base
         call yelmo_print_bound(dom%yelmo%bnd)
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
+
+        ! Cold-start friction guess for the optimization (restart restores cb_ref).
+        if (trim(dom%ctl%equil_method) == "opt") then
+            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        end if
 
     end subroutine domain_init_state
 
@@ -468,12 +508,74 @@ contains
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
+        call step_optimize(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
         call step_isostasy(dom, ts)
         call step_icesheet(dom, ts)
         call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
         call step_climate(dom, ts)       ! climate/smb read geometry from the hub
         call step_marine_shelf(dom, ts)
     end subroutine yelmox_step
+
+    subroutine step_optimize(dom, ts)
+        ! Spin-up tuning (equil_method == "opt"): ramp the topography relaxation
+        ! timescale, then nudge the basal-friction field cb_ref and the marine
+        ! thermal-forcing correction tf_corr toward present-day observations.
+        !
+        ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr lives on the
+        ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
+        ! Yelmo grid, so the correction is lifted to the Yelmo grid (tf_corr_y),
+        ! optimized there, and remapped back to the shelf grid. At identity grids
+        ! both remaps are copies, reproducing yelmox.f90 exactly.
+        type(ice_domain),  intent(inout) :: dom
+        type(tstep_class), intent(in)    :: ts
+
+        real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
+        character(len=256) :: gm, gy
+
+        if (trim(dom%ctl%equil_method) /= "opt") return
+
+        gm = trim(dom%ctl%grid_mshlf)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        ! Topography relaxation ramp (gl + grounding-zone relaxing while active).
+        if (ts%time_elapsed <= dom%opt%rel_time2) then
+            call optimize_set_transient_param(dom%opt%rel_tau, ts%time_elapsed, &
+                    time1=dom%opt%rel_time1, time2=dom%opt%rel_time2, &
+                    p1=dom%opt%rel_tau1, p2=dom%opt%rel_tau2, m=dom%opt%rel_m)
+            dom%yelmo%tpo%par%topo_rel_tau = dom%opt%rel_tau
+            dom%yelmo%tpo%par%topo_rel     = 4
+        else
+            dom%yelmo%tpo%par%topo_rel = 0
+        end if
+
+        ! Basal friction (cb_ref) optimization -- Yelmo grid, in place.
+        if (dom%opt%opt_cf .and. ts%time_elapsed >= dom%opt%cf_time_init &
+                            .and. ts%time_elapsed <= dom%opt%cf_time_end) then
+            call optimize_cb_ref(dom%yelmo%dyn%now%cb_ref, dom%yelmo%tpo%now%H_ice, &
+                    dom%yelmo%tpo%now%dHidt, dom%yelmo%bnd%z_bed, dom%yelmo%bnd%z_sl, &
+                    dom%yelmo%dyn%now%ux_s, dom%yelmo%dyn%now%uy_s, &
+                    dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%uxy_s, dom%yelmo%dta%pd%H_grnd, &
+                    dom%opt%cf_min, dom%opt%cf_max, dom%yelmo%tpo%par%dx, &
+                    dom%opt%sigma_err, dom%opt%sigma_vel, dom%opt%tau_c, dom%opt%H0, &
+                    dt=dom%ctl%dtt, fill_method=dom%opt%fill_method, fill_dist=dom%opt%sigma_err, &
+                    cb_tgt=dom%yelmo%dyn%now%cb_tgt)
+        end if
+
+        ! Thermal-forcing correction (tf_corr) optimization -- lift shelf-grid
+        ! correction to the Yelmo grid, optimize against Yelmo-grid targets, remap
+        ! back. tf_corr persists on the shelf grid (in mshlf, incl. its restart).
+        if (dom%opt%opt_tf .and. ts%time_elapsed >= dom%opt%tf_time_init &
+                            .and. ts%time_elapsed <= dom%opt%tf_time_end) then
+            call remap(dom, dom%mshlf%now%tf_corr, gm, tf_corr_y, gy, "con")
+            call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
+                    dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
+                    dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
+                    dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
+                    dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+            call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
+            dom%mshlf%now%tf_corr = tf_corr_m
+        end if
+    end subroutine step_optimize
 
     subroutine step_isostasy(dom, ts)
         ! Run isostasy on its own grid: ice load from Yelmo (bilin), bedrock/sea
