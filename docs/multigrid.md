@@ -1,6 +1,9 @@
 # Multigrid coupling (`yelmox_mg`)
 
-Design doc for a multigrid rewrite of the yelmox driver. Status: **design, pre-implementation.**
+Design doc for a multigrid rewrite of the yelmox driver. Status: **implemented**
+(`yelmox_mg.f90` + `libs/yelmox_domain.f90`); single-domain parity with
+`yelmox.f90` validated, multi-domain (bipolar) runs, optimization + smb_simple +
+domain-specific startups ported. Remaining: FastIsostasy hi-res output (below).
 
 ## Motivation
 
@@ -355,7 +358,12 @@ end program
    coupler disk resolution of `grid_<name>.txt`. *(Done.)*
 3. `yelmox_domain.f90` skeleton: `ice_domain`, `domain_ctl`, empty `step_*`. *(Done.)*
 4. `htopo.f90` hi-res reference hub + `test_htopo` (load ANT-16KM fields). *(Done.)*
-5. `domain_init` (sub-model init on their grids + htopo + map priming) — next.
-6. Fill `step_*` one module at a time (marine_shelf first); diff vs `yelmox.f90`.
-7. `yelmox_mg.f90` driver; validate single-domain parity with `yelmox.f90`.
-8. Enable `nd=2` bipolar.
+5. `domain_init` (sub-model init on their grids + htopo + map priming). *(Done.)*
+6. Fill `step_*` one module at a time (marine_shelf first); diff vs `yelmox.f90`. *(Done: isostasy, ice sheet, climate, smb, marine_shelf, optimization.)*
+7. `yelmox_mg.f90` driver; validate single-domain parity with `yelmox.f90`. *(Done: identity-grid parity tracks the reference; the residual is a small deterministic startup offset, independent of isostasy — bit parity not required for the move.)*
+8. Enable `nd=2` bipolar. *(Done: driver takes one par file per domain; AIS+GRL runs on a shared timeline to per-domain subfolders.)*
+
+Also ported from `yelmox.f90`: `equil_method="opt"` (basal-friction + thermal-forcing
+optimization, `step_optimize`), `smb_method="smb_simple"` + `calc_glacial_smb`, and
+domain-specific cold-start setup (Antarctica equilibration, Greenland masks/marine-ice/
+NEGIS, Laurentide/North LGM initialization).
