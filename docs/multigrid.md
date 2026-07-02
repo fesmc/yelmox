@@ -3,7 +3,11 @@
 Design doc for a multigrid rewrite of the yelmox driver. Status: **implemented**
 (`yelmox_mg.f90` + `libs/yelmox_domain.f90`); single-domain parity with
 `yelmox.f90` validated, multi-domain (bipolar) runs, optimization + smb_simple +
-domain-specific startups ported. Remaining: FastIsostasy hi-res output (below).
+domain-specific startups ported. The bipolar driver (`yelmox_mgbi.f90`) also
+carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level
+and a shared Ocean Box Model exchanging freshwater flux / ocean temperature
+between hemispheres (`libs/obm/obm_coupling.f90`). Remaining: FastIsostasy hi-res
+output (below).
 
 ## Motivation
 
@@ -181,10 +185,13 @@ awkward requirements fall out naturally:
 - **Coupling strategies** (which components are on/off): each component update is
   a reusable `step_*` primitive guarded internally by its `ctl` flag; the
   sequence is thin composition in `yelmox_step`.
-- **Bipolar** (north + south): `type(ice_domain) :: dom(2)`, loop over them
-  through the same `yelmox_step`. Each domain carries its own coupler/grids, so
-  north and south never collide. Buffers are step-local allocatables (see below),
-  which are inherently reentrant across domains.
+- **Bipolar** (north + south): two explicit `type(ice_domain) :: dom_north,
+  dom_south`. Each domain carries its own coupler/grids, so north and south never
+  collide. Buffers are step-local allocatables (see below), inherently reentrant
+  across domains. The single-domain driver runs the whole `yelmox_step`; the
+  bipolar driver breaks it into its `step_*` primitives and interleaves them with
+  the shared Ocean Box Model (see Drivers). Cross-hemisphere state — the
+  barystatic sea level and the OBM — is driver-owned and shared, not per-domain.
 
 ```fortran
 module yelmox_domain
@@ -214,7 +221,8 @@ module yelmox_domain
         type(isos_class)     :: isos
         type(snapclim_class) :: snp
         type(smbpal_class)   :: smb
-        type(bsl_class)      :: bsl
+        ! NB: bsl (barystatic sea level) is NOT here -- it is a shared,
+        !     driver-owned bsl_class, passed into the isostasy steps.
         type(htopo_class)    :: topo       ! hi-res geometry reference hub
         type(coupler_class)  :: cpl        ! this region's grids + maps
         type(domain_ctl)     :: ctl
@@ -232,8 +240,8 @@ contains
         ! No coupler_add_grid needed: names resolve from grid_<name>.txt on disk.
     end subroutine
 
-    subroutine yelmox_step(dom, time)
-        call step_isostasy(dom, time)       ! guarded by ctl%with_isostasy
+    subroutine yelmox_step(dom, time, bsl)  ! bsl: shared, driver-owned
+        call step_isostasy(dom, time, bsl)  ! guarded by ctl%with_isostasy
         call step_icesheet(dom, time)       ! guarded by ctl%with_ice_sheet
         call step_climate(dom, time)        ! guarded by ctl%with_climate
         call step_marine_shelf(dom, time)   ! guarded by ctl%with_marine_shelf
@@ -313,34 +321,48 @@ there, so the drivers only differ in config parsing + the loop over domains):
 
 - **`yelmox_mg`** (single domain) — argument is one domain nml; one `ice_domain`,
   output to the run dir.
-- **`yelmox_mgbi`** (bipolar / multi-domain, in `yelmox_mgbi/`) — argument is a
-  single parameter file holding every domain, in the original `yelmox_bipolar`
-  convention: each domain's instance groups carry a domain suffix (`yelmo_south`,
-  `coupling_north`, `snap_south`, …), while `[ctrl]`, `[barysealevel]` and the
-  yelmo physics groups (`ydyn`, `ytopo`, …) are shared. `[domains] names` lists
-  the suffix tags; `domain_init(..., group_suffix="_"//name)` threads the suffix
-  into every `group=`. Distinct group names also let `runme -p group.name=val`
-  target one domain unambiguously. Each domain writes to a subfolder named after
-  its domain; invoke with `runme -e mgbi -n yelmox_mgbi/yelmox_mgbi_Bipolar.nml`.
+- **`yelmox_mgbi`** (bipolar, in `yelmox_mgbi/`) — argument is a single parameter
+  file holding both hemispheres, in the original `yelmox_bipolar` convention: each
+  domain's instance groups carry a hemisphere suffix (`yelmo_south`,
+  `coupling_north`, `snap_south`, …), while `[ctrl]`, `[barysealevel]`, the
+  `[nautilus]`/`[stommel]` OBM block and the yelmo physics groups (`ydyn`,
+  `ytopo`, …) are shared. `[ctrl] active_north`/`active_south` select the
+  hemispheres (hardcoded `_north`/`_south` suffixes threaded into every `group=`
+  via `domain_init(..., group_suffix=…)`). Distinct group names also let
+  `runme -p group.name=val` target one hemisphere unambiguously. Each domain
+  writes to a subfolder named after its domain; invoke with
+  `runme -e mgbi -n yelmox_mgbi/yelmox_mgbi_Bipolar.nml`.
+
+  A bipolar run is never more than north + south, so the two domains are explicit
+  variables, not an array — the ocean coupling is asymmetric (north ↔
+  `obm%fn/thetan/tn`, south ↔ `obm%fs/thetas/ts`). The driver owns the shared
+  `bsl` and `obm`, breaks `yelmox_step` into its `step_*` primitives, and
+  interleaves the OBM exactly as in `yelmox_bipolar` (below). The ocean exchanges
+  live in `libs/obm/obm_coupling.f90`; they and the OBM default off (`[ctrl]
+  active_obm=False`), so the config runs as two independent domains until enabled.
 
 ```fortran
 program yelmox_mgbi
     use yelmox_domain
-    type(ice_domain), allocatable :: dom(:)
-    integer :: nd, k
+    use obm, only : obm_update
+    use obm_coupling
+    type(ice_domain) :: dom_north, dom_south
+    type(bsl_class)  :: bsl        ! shared, driver-owned
+    type(obm_class)  :: obm        ! shared, driver-owned
 
-    ! read one file -> shared timeline + [domains] names -> nd
-    allocate(dom(nd))
-    do k = 1, nd
-        call domain_init(dom(k), path_par, ..., group_suffix="_"//names(k))
-    end do
+    ! read one file -> shared timeline + active_north/active_south
+    if (active_north) call domain_init(dom_north, path_par, ..., group_suffix="_north")
+    if (active_south) call domain_init(dom_south, path_par, ..., group_suffix="_south")
 
     do while (time < time_end)
-        do k = 1, nd
-            call yelmox_step(dom(k), time)           ! shared dtt
-        end do
-        ! per-domain restart + output writing (subfolder per domain)
-        time = time + dt
+        call bsl_update(bsl, ...)                          ! once, shared
+        call advance_isostasy(dom_north); call advance_isostasy(dom_south)
+        if (active_obm) call obm_update(obm, dtt, obm_name)
+        call advance_dynamics(dom_north); call advance_dynamics(dom_south)
+        ! ocean coupling (per hemisphere): atm2obm, ism2obm (fwf), hyster, obm2ism
+        call step_marine_shelf(dom_north, ...); call step_marine_shelf(dom_south, ...)
+        ! per-domain output/restart (subfolder each) + shared bsl/obm restart
+        time = time + dtt
     end do
 end program
 ```
