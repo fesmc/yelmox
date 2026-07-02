@@ -29,7 +29,8 @@ module yelmox_domain
                              marshelf_restart_read
     use fastisostasy, only : isos_class, isos_init, isos_update, isos_init_ref, &
                              isos_init_state, isos_restart_write, isos_restart_read, &
-                             bsl_class, bsl_init, bsl_update, bsl_restart_write
+                             bsl_class, bsl_init, bsl_update, bsl_restart_write, &
+                             bsl_restart_read
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
@@ -358,8 +359,10 @@ contains
     end subroutine domain_restart_write
 
     subroutine domain_restart_read(dom, fldr, ts)
-        ! Restore all stateful sub-models from a restart bundle folder. bsl is not
-        ! read (it is reconstructed by bsl_init + bsl_update at the restart time).
+        ! Restore all stateful sub-models from a restart bundle folder. The
+        ! barystatic sea level is prognostic under method="fastiso"/"mixed" and
+        ! cannot be re-derived from time, so bsl_now is read back from the bundle
+        ! (bsl_restart_read); bsl_update then only refreshes A_ocean_now.
         !
         ! Isostasy is restored through its proper init-from-restart path
         ! (isos_init_state with use_restart), NOT a bare isos_restart_read: the
@@ -392,7 +395,9 @@ contains
         dom%yelmo%time%pc_active  = .true.
 
         ! Restore isostasy via isos_init_state (reads state + reference from the
-        ! bundle and runs the full post-read setup), on the isos grid.
+        ! bundle and runs the full post-read setup), on the isos grid. Restore the
+        ! prognostic bsl_now first (bsl_update then only refreshes A_ocean_now).
+        call bsl_restart_read(dom%bsl, trim(fldr)//"/bsl_restart.nc")
         call bsl_update(dom%bsl, ts%time_rel)
         dom%isos%par%use_restart = .true.
         dom%isos%par%restart     = trim(fldr)//"/isos_restart.nc"
