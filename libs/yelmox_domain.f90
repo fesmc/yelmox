@@ -144,25 +144,38 @@ module yelmox_domain
 
 contains
 
-    subroutine domain_init(dom, path_par, time, time_rel)
+    subroutine domain_init(dom, path_par, time, time_rel, group_suffix)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
+        !
+        ! group_suffix (optional, default "") is appended to every namelist group
+        ! name (yelmo -> yelmo<suffix>, coupling -> coupling<suffix>, ...), so
+        ! several domains can share one parameter file with disjoint group names
+        ! (the multi-domain / bipolar convention). Yelmo physics sub-groups (ydyn,
+        ! ytopo, ...) stay shared: they are named by pointer fields inside the
+        ! [yelmo<suffix>] block, so the nml decides whether they are shared.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
         real(wp),         intent(in)    :: time_rel   ! time before present [yr]
+        character(len=*), intent(in), optional :: group_suffix
 
         character(len=256)    :: domain
+        character(len=64)     :: sfx
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
         real(wp), allocatable :: xs(:), ys(:), lats_s(:,:), Href_s(:,:)
 
+        sfx = ""
+        if (present(group_suffix)) sfx = trim(group_suffix)
+
         ! --- run control ---
-        call domain_ctl_load(dom%ctl, path_par)
+        call domain_ctl_load(dom%ctl, path_par, trim(sfx))
 
         ! --- ice sheet (grid read from file) ---
-        call yelmo_init(dom%yelmo, filename=path_par, grid_def="file", time=time)
+        call yelmo_init(dom%yelmo, filename=path_par, grid_def="file", time=time, &
+                        group="yelmo"//trim(sfx))
         domain = trim(dom%yelmo%par%domain)
         dom%ctl%domain     = trim(domain)
         dom%ctl%grid_yelmo = trim(dom%yelmo%par%grid_name)
@@ -179,19 +192,19 @@ contains
         ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
         dom%ctl%dx_isos = dom%yelmo%grd%dx * (grid_i%G%dx / grid_y%G%dx)
         dom%ctl%dy_isos = dom%yelmo%grd%dy * (grid_i%G%dy / grid_y%G%dy)
-        call isos_init(dom%isos, path_par, "isos", nx_i, ny_i, &
+        call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
                        dom%ctl%dx_isos, dom%ctl%dy_isos)
 
         call sediments_init(dom%sed, path_par, dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
-                            domain, dom%yelmo%par%grid_name)
+                            domain, dom%yelmo%par%grid_name, group="sed"//trim(sfx))
         dom%yelmo%bnd%H_sed = dom%sed%now%H
 
         call geothermal_init(dom%gthrm, path_par, dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
-                             domain, dom%yelmo%par%grid_name)
+                             domain, dom%yelmo%par%grid_name, group="ghf"//trim(sfx))
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
 
         ! --- hi-res reference hub + coupler ---
-        call htopo_init(dom%topo, path_par, "htopo")
+        call htopo_init(dom%topo, path_par, "htopo"//trim(sfx))
         dom%ctl%grid_name = trim(dom%topo%par%grid_name)
         if (len_trim(dom%ctl%grid_mshlf) == 0) dom%ctl%grid_mshlf = trim(dom%ctl%grid_name)
 
@@ -210,7 +223,7 @@ contains
         dom%ctl%dx_clim = dom%yelmo%grd%dx * (grid_c%G%dx / grid_y%G%dx)
         call remap(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
         call snapclim_init(dom%snp, path_par, domain, trim(dom%ctl%grid_clim), &
-                           nx_c, ny_c, basins_c)
+                           nx_c, ny_c, basins_c, group="snap"//trim(sfx))
 
         ! --- smb on its configured grid ([coupling] grid_smb; default = grid_clim) ---
         ! smbpal reads no grid-specific data; only lats (insolation) is physical.
@@ -222,14 +235,15 @@ contains
         xs     = real(grid_s%G%x, wp)
         ys     = real(grid_s%G%y, wp)
         lats_s = real(grid_s%lat, wp)
-        call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s)
+        call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s, &
+                         group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx))
 
         ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
         ! smbpal (1D axes), smb_simple takes 2D projected coordinates.
         if (trim(dom%ctl%smb_method) == "smb_simple") then
             call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x, wp), &
                                  y=real(grid_s%y, wp), lat=lats_s, &
-                                 group="smb_simple", units="m")
+                                 group="smb_simple"//trim(sfx), units="m")
             call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_yelmo, &
                        Href_s, dom%ctl%grid_smb, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
@@ -246,16 +260,16 @@ contains
         call remap(dom, dom%topo%regions, dom%ctl%grid_name, regions_m, dom%ctl%grid_mshlf, "nn")
         call remap(dom, dom%topo%basins,  dom%ctl%grid_name, basins_m,  dom%ctl%grid_mshlf, "nn")
 
-        call marshelf_init(dom%mshlf, path_par, "marine_shelf", nx_m, ny_m, &
+        call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
                            domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m)
 
         ! Optimization state (basal friction + thermal forcing); no-op unless
         ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
-        call domain_opt_init(dom, path_par)
+        call domain_opt_init(dom, path_par, trim(sfx))
 
     end subroutine domain_init
 
-    subroutine domain_opt_init(dom, path_par)
+    subroutine domain_opt_init(dom, path_par, suffix)
         ! Load optimization parameters and prepare Yelmo for external cb_ref:
         ! allocate/seed the friction bounds (cf_min/cf_max) on the Yelmo grid and
         ! switch till_method to external (-1) so yelmo_update uses the optimized
@@ -264,13 +278,14 @@ contains
         ! No-op unless equil_method == "opt".
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
+        character(len=*), intent(in)    :: suffix
 
         integer :: nx, ny
 
         if (trim(dom%ctl%equil_method) /= "opt") return
 
         dom%opt%tf_basins = 0
-        call optimize_par_load(dom%opt, path_par, "opt")
+        call optimize_par_load(dom%opt, path_par, "opt"//trim(suffix))
 
         nx = dom%yelmo%grd%nx
         ny = dom%yelmo%grd%ny
@@ -675,44 +690,48 @@ contains
         write(*,*) "domain_restart_read:: restored bundle "//trim(fldr)
     end subroutine domain_restart_read
 
-    subroutine domain_ctl_load(ctl, path_par)
+    subroutine domain_ctl_load(ctl, path_par, suffix)
+        ! Load this domain's setup + coupling + output config. All groups carry an
+        ! optional domain suffix (e.g. "_north"), so several domains can coexist in
+        ! one parameter file without group.name collisions (matters for runme -p).
+        ! The shared timeline (tstep_method, dtt, ...) is NOT read here -- the
+        ! driver owns it and injects tstep_method/dtt into ctl.
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
+        character(len=*), intent(in)    :: suffix
+
+        character(len=256) :: gc, go
 
         ctl%path_par = trim(path_par)
 
-        call nml_read(path_par, "ctrl", "tstep_method",   ctl%tstep_method)
-        call nml_read(path_par, "ctrl", "tstep_const",    ctl%tstep_const)
-        call nml_read(path_par, "ctrl", "time_init",      ctl%time_init)
-        call nml_read(path_par, "ctrl", "time_end",       ctl%time_end)
-        call nml_read(path_par, "ctrl", "time_equil",     ctl%time_equil)
-        call nml_read(path_par, "ctrl", "dtt",            ctl%dtt)
-        call nml_read(path_par, "ctrl", "dt_restart",     ctl%dt_restart)
-        call nml_read(path_par, "ctrl", "with_ice_sheet", ctl%with_ice_sheet)
-        call nml_read(path_par, "ctrl", "with_isostasy",  ctl%with_isostasy)
-        call nml_read(path_par, "ctrl", "equil_method",   ctl%equil_method)
+        ! Domain setup + coupling ([coupling<suffix>]): active components, methods,
+        ! per-component grids, restart bundle, restart cadence.
+        gc = "coupling"//trim(suffix)
+        call nml_read(path_par, gc, "with_ice_sheet", ctl%with_ice_sheet)
+        call nml_read(path_par, gc, "with_isostasy",  ctl%with_isostasy)
+        call nml_read(path_par, gc, "equil_method",   ctl%equil_method)
         ctl%smb_method = "smbpal"
-        call nml_read(path_par, "ctrl", "smb_method",     ctl%smb_method)
-
-        ! Component grids + restart bundle ([coupling]).
+        call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
+        call nml_read(path_par, gc, "dt_restart",     ctl%dt_restart)
         ctl%grid_mshlf = ""
-        call nml_read(path_par, "coupling", "grid_mshlf", ctl%grid_mshlf)
+        call nml_read(path_par, gc, "grid_mshlf",     ctl%grid_mshlf)
         ctl%grid_isos = ""
-        call nml_read(path_par, "coupling", "grid_isos", ctl%grid_isos)
+        call nml_read(path_par, gc, "grid_isos",      ctl%grid_isos)
         ctl%grid_clim = ""
-        call nml_read(path_par, "coupling", "grid_clim", ctl%grid_clim)
+        call nml_read(path_par, gc, "grid_clim",      ctl%grid_clim)
         ctl%grid_smb = ""
-        call nml_read(path_par, "coupling", "grid_smb", ctl%grid_smb)
+        call nml_read(path_par, gc, "grid_smb",       ctl%grid_smb)
         ctl%restart = "None"
-        call nml_read(path_par, "coupling", "restart",    ctl%restart)
+        call nml_read(path_par, gc, "restart",        ctl%restart)
 
-        ! Per-module output switches ([output]); default = write everything.
-        call nml_read(path_par, "output", "write_yelmo", ctl%write_yelmo)
-        call nml_read(path_par, "output", "write_isos",  ctl%write_isos)
-        call nml_read(path_par, "output", "write_mshlf", ctl%write_mshlf)
-        call nml_read(path_par, "output", "write_smb",   ctl%write_smb)
-        call nml_read(path_par, "output", "write_snap",  ctl%write_snap)
-        call nml_read(path_par, "output", "write_htopo", ctl%write_htopo)
+        ! Per-module output switches ([output<suffix>]); default = write everything.
+        go = "output"//trim(suffix)
+        call nml_read(path_par, go, "write_yelmo", ctl%write_yelmo)
+        call nml_read(path_par, go, "write_isos",  ctl%write_isos)
+        call nml_read(path_par, go, "write_mshlf", ctl%write_mshlf)
+        call nml_read(path_par, go, "write_smb",   ctl%write_smb)
+        call nml_read(path_par, go, "write_snap",  ctl%write_snap)
+        call nml_read(path_par, go, "write_htopo", ctl%write_htopo)
     end subroutine domain_ctl_load
 
     subroutine yelmox_step(dom, ts)

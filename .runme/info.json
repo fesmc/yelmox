@@ -25,9 +25,7 @@
 
     "par_paths" :
         {
-            "rembo"  : "par/rembo_Greenland.nml",
-            "mgbi"   : ["yelmox_mgbi/yelmox_mgbi_Antarctica.nml",
-                        "yelmox_mgbi/yelmox_mgbi_Greenland.nml"]
+            "rembo"  : "par/rembo_Greenland.nml"
         },
         
     "files" : ["git_yelmo.txt"], 

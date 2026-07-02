@@ -314,10 +314,14 @@ there, so the drivers only differ in config parsing + the loop over domains):
 - **`yelmox_mg`** (single domain) — argument is one domain nml; one `ice_domain`,
   output to the run dir.
 - **`yelmox_mgbi`** (bipolar / multi-domain, in `yelmox_mgbi/`) — argument is a
-  control file that carries the shared timestepping + output cadence and lists
-  the per-domain nmls (`[domains] par_files`). Each domain writes to a subfolder
-  named after its domain. runme stages the listed nmls via `par_paths["mgbi"]`
-  (see `.runme/info.json`); invoke with `runme -e mgbi -n <control>.nml`.
+  single parameter file holding every domain, in the original `yelmox_bipolar`
+  convention: each domain's instance groups carry a domain suffix (`yelmo_south`,
+  `coupling_north`, `snap_south`, …), while `[ctrl]`, `[barysealevel]` and the
+  yelmo physics groups (`ydyn`, `ytopo`, …) are shared. `[domains] names` lists
+  the suffix tags; `domain_init(..., group_suffix="_"//name)` threads the suffix
+  into every `group=`. Distinct group names also let `runme -p group.name=val`
+  target one domain unambiguously. Each domain writes to a subfolder named after
+  its domain; invoke with `runme -e mgbi -n yelmox_mgbi/yelmox_mgbi_Bipolar.nml`.
 
 ```fortran
 program yelmox_mgbi
@@ -325,10 +329,10 @@ program yelmox_mgbi
     type(ice_domain), allocatable :: dom(:)
     integer :: nd, k
 
-    ! read control file -> shared timeline + [domains] par_files -> nd
+    ! read one file -> shared timeline + [domains] names -> nd
     allocate(dom(nd))
     do k = 1, nd
-        call domain_init(dom(k), path_par(k), ...)   ! path_par(k) from par_files
+        call domain_init(dom(k), path_par, ..., group_suffix="_"//names(k))
     end do
 
     do while (time < time_end)

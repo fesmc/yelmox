@@ -22,16 +22,17 @@ program yelmox_mg
 
     character(len=512) :: outfldr
     character(len=56)  :: tstep_method
-    real(wp)           :: tstep_const, time_init, time_end
+    real(wp)           :: tstep_const, time_init, time_end, dtt
 
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
 
-    ! Timestepping (driver-owned).
+    ! Timestepping (driver-owned; the [ctrl] group holds the shared timeline).
     call nml_read(path_par, "ctrl", "tstep_method", tstep_method)
     call nml_read(path_par, "ctrl", "tstep_const",  tstep_const)
     call nml_read(path_par, "ctrl", "time_init",    time_init)
     call nml_read(path_par, "ctrl", "time_end",     time_end)
+    call nml_read(path_par, "ctrl", "dtt",          dtt)
     call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
                     time_ref=1950.0_wp, const_rel=tstep_const)
 
@@ -40,6 +41,10 @@ program yelmox_mg
 
     ! Initialize the domain: sub-models + hi-res hub + coupler maps.
     call domain_init(dom, path_par, ts%time, ts%time_rel)
+
+    ! Inject the driver-owned timeline values the domain logic needs.
+    dom%ctl%tstep_method = tstep_method
+    dom%ctl%dtt          = dtt
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))

@@ -2,15 +2,18 @@ program yelmox_mgbi
     ! Multigrid yelmox driver -- bipolar / multi-domain.
     !
     ! Advances several ice domains on a shared timeline. The single command-line
-    ! argument is a control file that provides the shared timestepping + output
-    ! cadence ([ctrl], [tm_1D], [tm_2D]) and lists the per-domain parameter files
-    ! ([domains] par_files). Each listed file is a full single-domain nml (as used
-    ! by yelmox_mg); each domain is a self-contained ice_domain (own grids,
-    ! coupler and sub-models) and writes to a subfolder named after its domain.
+    ! argument is one parameter file holding every domain, following the original
+    ! yelmox_bipolar convention: each domain's groups carry a domain suffix
+    ! (yelmo_north, coupling_south, snap_north, ...), while shared blocks ([ctrl],
+    ! [barysealevel], the yelmo physics groups ydyn/ytopo/...) have no suffix.
+    ! Keeping every group name distinct also lets `runme -p group.name=val` target
+    ! a single domain unambiguously.
     !
-    ! All per-domain physics + coupling live in libs/yelmox_domain.f90, shared
-    ! with the single-domain driver (yelmox_mg); this program only adds the
-    ! control-file parsing and the loop over domains. See docs/multigrid.md.
+    ! [domains] names lists the per-domain suffix tags; each domain is a
+    ! self-contained ice_domain (own grids, coupler and sub-models) written to a
+    ! subfolder named after its domain. All per-domain physics + coupling live in
+    ! libs/yelmox_domain.f90, shared with the single-domain driver (yelmox_mg);
+    ! this program only adds the domain loop. See docs/multigrid.md.
 
     use nml
     use timestepping
@@ -22,9 +25,9 @@ program yelmox_mgbi
 
     integer, parameter :: NDOM_MAX = 8
 
-    character(len=512) :: path_ctrl
-    character(len=512) :: par_files(NDOM_MAX)
-    character(len=512), allocatable :: path_par(:), outfldr(:)
+    character(len=512) :: path_par
+    character(len=64)  :: names(NDOM_MAX)
+    character(len=512), allocatable :: outfldr(:)
     type(tstep_class)               :: ts
     type(ice_domain), allocatable   :: dom(:)
     type(timeout_class)             :: tm_2D, tm_1D
@@ -34,33 +37,38 @@ program yelmox_mgbi
     character(len=56) :: tstep_method
     real(wp)          :: tstep_const, time_init, time_end, dtt
 
-    ! Control file from the command line (runme stages the domain files alongside).
-    call yelmo_load_command_line_args(path_ctrl)
+    ! Single parameter file from the command line (holds all domains).
+    call yelmo_load_command_line_args(path_par)
 
-    ! Shared timestepping (driver-owned) from the control file.
-    call nml_read(path_ctrl, "ctrl", "tstep_method", tstep_method)
-    call nml_read(path_ctrl, "ctrl", "tstep_const",  tstep_const)
-    call nml_read(path_ctrl, "ctrl", "time_init",    time_init)
-    call nml_read(path_ctrl, "ctrl", "time_end",     time_end)
-    call nml_read(path_ctrl, "ctrl", "dtt",          dtt)
+    ! Shared timestepping (driver-owned) from the [ctrl] group.
+    call nml_read(path_par, "ctrl", "tstep_method", tstep_method)
+    call nml_read(path_par, "ctrl", "tstep_const",  tstep_const)
+    call nml_read(path_par, "ctrl", "time_init",    time_init)
+    call nml_read(path_par, "ctrl", "time_end",     time_end)
+    call nml_read(path_par, "ctrl", "dtt",          dtt)
     call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
                     time_ref=1950.0_wp, const_rel=tstep_const)
 
-    ! Domain list: [domains] par_files = "fileA.nml" "fileB.nml" ...
-    par_files = ""
-    call nml_read(path_ctrl, "domains", "par_files", par_files)
-    nd = count(len_trim(par_files) > 0)
+    ! Domain suffix tags: [domains] names = "north" "south" ... -> group suffix
+    ! "_north", "_south", etc.
+    names = ""
+    call nml_read(path_par, "domains", "names", names)
+    nd = count(len_trim(names) > 0)
     if (nd < 1) then
-        write(*,*) "yelmox_mgbi: error -- [domains] par_files lists no domains."
+        write(*,*) "yelmox_mgbi: error -- [domains] names lists no domains."
         stop 1
     end if
-    allocate(path_par(nd), outfldr(nd), dom(nd))
-    path_par(1:nd) = par_files(1:nd)
+    allocate(outfldr(nd), dom(nd))
 
     ! === Per-domain initialization ===
     do k = 1, nd
 
-        call domain_init(dom(k), trim(path_par(k)), ts%time, ts%time_rel)
+        call domain_init(dom(k), path_par, ts%time, ts%time_rel, &
+                         group_suffix="_"//trim(names(k)))
+
+        ! Inject the driver-owned timeline values the domain logic needs.
+        dom(k)%ctl%tstep_method = tstep_method
+        dom(k)%ctl%dtt          = dtt
 
         ! Each domain writes to a subfolder named after its domain.
         outfldr(k) = trim(dom(k)%ctl%domain)//"/"
@@ -76,7 +84,7 @@ program yelmox_mgbi
         end if
 
         write(*,*)
-        write(*,*) "yelmox_mgbi: domain initialized"
+        write(*,*) "yelmox_mgbi: domain initialized ("//trim(names(k))//")"
         write(*,*) "  domain      : "//trim(dom(k)%ctl%domain)
         write(*,*) "  Yelmo grid  : "//trim(dom(k)%ctl%grid_yelmo), dom(k)%yelmo%grd%nx, dom(k)%yelmo%grd%ny
         write(*,*) "  topo grid   : "//trim(dom(k)%ctl%grid_name),  dom(k)%topo%nx,      dom(k)%topo%ny
@@ -86,9 +94,9 @@ program yelmox_mgbi
 
     end do
 
-    ! === Output setup (shared cadence, from the control file) ===
-    call timeout_init(tm_2D, path_ctrl, "tm_2D", "heavy", time_init, time_end)
-    call timeout_init(tm_1D, path_ctrl, "tm_1D", "small", time_init, time_end)
+    ! === Output setup (shared cadence, from [tm_1D]/[tm_2D]) ===
+    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
+    call timeout_init(tm_1D, path_par, "tm_1D", "small", time_init, time_end)
     do k = 1, nd
         if (tm_2D%active) then
             call domain_write_init(dom(k), trim(outfldr(k)), ts%time)
