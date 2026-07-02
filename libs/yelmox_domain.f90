@@ -16,7 +16,7 @@ module yelmox_domain
     use ncio
     use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
-    use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, &
+    use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, yelmo_update_equil, &
                              yelmo_init_state, yelmo_print_bound, &
                              yelmo_restart_write, yelmo_restart_read, &
                              yelmo_regions_init, yelmo_region_init, yelmo_regions_update, &
@@ -365,6 +365,14 @@ contains
         ! Cold-start friction guess for the optimization (restart restores cb_ref).
         if (trim(dom%ctl%equil_method) == "opt") then
             dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        end if
+
+        ! Cold-start equilibration: run a few years with constant boundary
+        ! conditions to synchronize the model fields before the main loop
+        ! (mirrors yelmox.f90's DEFAULT startup). Cold start only; restart skips it.
+        if (dom%ctl%with_ice_sheet) then
+            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, dt=1.0_wp, &
+                                    topo_fixed=.FALSE.)
         end if
 
     end subroutine domain_init_state
