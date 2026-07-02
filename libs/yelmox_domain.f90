@@ -52,6 +52,8 @@ module yelmox_domain
     character(len=*), parameter :: MAP_FLDR = "maps"
 
     type domain_ctl
+        ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
+        character(len=512) :: path_par = ""
         ! Run control (from the [ctrl] namelist group).
         character(len=56) :: tstep_method = "const"
         real(wp) :: tstep_const = 0.0_wp
@@ -290,11 +292,13 @@ contains
 
         logical, allocatable :: tmp_mask(:,:)
         character(len=256)   :: domain, grid_name
-        integer              :: i
+        integer              :: i, nx, ny
 
         domain    = trim(dom%ctl%domain)
         grid_name = trim(dom%ctl%grid_yelmo)
-        allocate(tmp_mask(dom%yelmo%grd%nx, dom%yelmo%grd%ny))
+        nx = dom%yelmo%grd%nx
+        ny = dom%yelmo%grd%ny
+        allocate(tmp_mask(nx, ny))
 
         select case(trim(domain))
 
@@ -312,6 +316,51 @@ contains
                 call get_ice_sub_region(tmp_mask, "EAIS", domain, grid_name)
                 call yelmo_region_init(dom%yelmo%regs(3), "EAIS", mask=tmp_mask, &
                                        write_to_file=.true., outfldr=outfldr)
+
+            case("Laurentide")
+                ! Prevent ice growth in Greenland (region 1.30) and on grid borders.
+                where(abs(dom%yelmo%bnd%regions - 1.30) < 1e-3) &
+                    dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
+                dom%yelmo%bnd%mask_ice(1,:)  = MASK_ICE_NONE
+                dom%yelmo%bnd%mask_ice(nx,:) = MASK_ICE_NONE
+                dom%yelmo%bnd%mask_ice(:,1)  = MASK_ICE_NONE
+                dom%yelmo%bnd%mask_ice(:,ny) = MASK_ICE_NONE
+
+                call yelmo_regions_init(dom%yelmo, n=1)
+                call get_ice_sub_region(tmp_mask, "Hudson", domain, grid_name)
+                call yelmo_region_init(dom%yelmo%regs(1), "Hudson", mask=tmp_mask, &
+                                       write_to_file=.true., outfldr=outfldr)
+
+            case("Greenland")
+                ! Prevent ice in Iceland/Svalbard (regions 1.20/1.23/1.31, grid borders).
+                where(abs(dom%yelmo%bnd%regions - 1.20) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
+                where(abs(dom%yelmo%bnd%regions - 1.23) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
+                where(abs(dom%yelmo%bnd%regions - 1.31) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
+
+                ! NEGIS cb_ref modification (off unless ctl%use_negis is set). The
+                ! reference intends this on for Greenland, but its cf_* parameters
+                ! are not present in the param files, so it is disabled by default.
+                dom%ngs%use_negis_par = dom%ctl%use_negis
+
+                ! With external cb_ref (till_method=-1) start from the reference value.
+                if (dom%yelmo%dyn%par%till_method == -1) &
+                    dom%yelmo%dyn%now%cb_ref = dom%yelmo%dyn%par%till_cf_ref
+
+                call yelmo_regions_init(dom%yelmo, n=0)
+
+            case("Patagonia")
+                ! Fix ice on the domain borders, relax to obs outside the icefield.
+                dom%yelmo%bnd%mask_ice        = MASK_ICE_DYNAMIC
+                dom%yelmo%bnd%mask_ice(1,:)   = MASK_ICE_FIXED
+                dom%yelmo%bnd%mask_ice(nx,:)  = MASK_ICE_FIXED
+                dom%yelmo%bnd%mask_ice(:,1)   = MASK_ICE_FIXED
+                dom%yelmo%bnd%mask_ice(:,ny)  = MASK_ICE_FIXED
+                where(abs(dom%yelmo%bnd%regions - 1.0) < 1e-3)
+                    dom%yelmo%bnd%tau_relax = -1.0      ! icefield: free evolution
+                elsewhere
+                    dom%yelmo%bnd%tau_relax = 50.0      ! outside: relax to H_ice_ref
+                end where
+                call yelmo_regions_init(dom%yelmo, n=0)
 
             case default
                 ! No sub-regions defined for this domain; global region only.
@@ -388,15 +437,142 @@ contains
             dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
         end if
 
-        ! Cold-start equilibration: run a few years with constant boundary
-        ! conditions to synchronize the model fields before the main loop
-        ! (mirrors yelmox.f90's DEFAULT startup). Cold start only; restart skips it.
-        if (dom%ctl%with_ice_sheet) then
-            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, dt=1.0_wp, &
-                                    topo_fixed=.FALSE.)
-        end if
+        ! Domain-specific cold-start setup (equilibration / LGM initialization /
+        ! Greenland marine-ice). Cold start only; restart skips it.
+        call domain_init_special(dom, ts)
 
     end subroutine domain_init_state
+
+    subroutine domain_init_special(dom, ts)
+        ! Domain-specific cold-start startup, dispatched on domain name. Mirrors
+        ! yelmox.f90's per-domain startup block. The DEFAULT (incl. Antarctica)
+        ! path runs a short equilibration to synchronize the model fields.
+        type(ice_domain),  intent(inout) :: dom
+        type(tstep_class), intent(in)    :: ts
+
+        select case(trim(dom%ctl%domain))
+
+            case("Laurentide")
+                ! Steady-state: LGM reconstruction; transient: grow from zero ice.
+                if (trim(dom%ctl%tstep_method) == "const") then
+                    call domain_init_lgm_north(dom, ts, "Laurentide", "ref_lgm")
+                else
+                    call domain_init_lgm_north(dom, ts, "Laurentide", "zero")
+                end if
+
+            case("North")
+                ! Steady-state only: whole-NH LGM reconstruction (ICE-6G_C).
+                if (trim(dom%ctl%tstep_method) == "const") then
+                    call domain_init_lgm_north(dom, ts, "North", "ref_lgm")
+                end if
+
+            case("Greenland")
+                ! Optionally impose LGM-like marine ice; otherwise no startup equil.
+                if (dom%ctl%greenland_init_marine_H) then
+                    where(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE .and. &
+                          dom%yelmo%tpo%now%H_ice < 600.0_wp .and. &
+                          dom%yelmo%bnd%z_bed > -500.0_wp)
+                        dom%yelmo%tpo%now%H_ice = 800.0_wp
+                    end where
+                    if (dom%ctl%with_ice_sheet) &
+                        call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, &
+                                                dt=1.0_wp, topo_fixed=.FALSE.)
+                end if
+
+            case default
+                ! Antarctica etc.: short equilibration with constant boundaries.
+                if (dom%ctl%with_ice_sheet) &
+                    call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, &
+                                            dt=1.0_wp, topo_fixed=.FALSE.)
+
+        end select
+
+    end subroutine domain_init_special
+
+    subroutine domain_init_lgm_north(dom, ts, region, method)
+        ! Initialize a Northern-Hemisphere domain (Laurentide or whole "North")
+        ! from the ICE-6G_C LGM reconstruction. Sets the reconstructed grounded
+        ! ice as the initial thickness (method-dependent), refreshes the surface
+        ! and (via the hub) the climate/smb, and stabilizes the dynamic fields.
+        ! Ported from yelmox.f90's yelmox_init_{laurentide,north}_lgm.
+        type(ice_domain),  intent(inout) :: dom
+        type(tstep_class), intent(in)    :: ts
+        character(len=*),  intent(in)    :: region   ! "Laurentide" or "North"
+        character(len=*),  intent(in)    :: method   ! "const", "ref_lgm", else zero
+
+        character(len=1024) :: path_lgm, grid_name
+        integer  :: nx, ny
+        real(wp) :: beta_min_save
+
+        nx = dom%yelmo%tpo%par%nx
+        ny = dom%yelmo%tpo%par%ny
+        grid_name = trim(dom%yelmo%par%grid_name)
+
+        ! Load LGM reconstruction (slice 1) into the reference ice thickness.
+        path_lgm = "ice_data/"//trim(region)//"/"//trim(grid_name)//"/"// &
+                   trim(grid_name)//"_TOPO-ICE-6G_C.nc"
+        call nc_read(path_lgm, "dz", dom%yelmo%bnd%H_ice_ref, start=[1,1,1], &
+                     count=[nx,ny,1])
+
+        ! Determine the initial ice thickness.
+        select case(trim(method))
+            case("const")
+                dom%yelmo%tpo%now%H_ice = 0.0_wp
+                where (dom%yelmo%bnd%regions == 1.1_wp .and. dom%yelmo%bnd%z_bed > 0.0_wp) &
+                    dom%yelmo%tpo%now%H_ice = 1000.0_wp
+                where (dom%yelmo%bnd%regions == 1.12_wp) dom%yelmo%tpo%now%H_ice = 1000.0_wp
+                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=dom%yelmo%grd%dx, f_sigma=3.0_wp)
+                call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
+                                     dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
+            case("ref_lgm")
+                where ( dom%yelmo%bnd%z_bed > -500.0_wp .and. &
+                        (dom%yelmo%bnd%regions == 1.1_wp  .or. &
+                         dom%yelmo%bnd%regions == 1.11_wp .or. &
+                         dom%yelmo%bnd%regions == 1.12_wp) )
+                    dom%yelmo%tpo%now%H_ice = dom%yelmo%bnd%H_ice_ref
+                end where
+                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=dom%yelmo%grd%dx, f_sigma=2.0_wp)
+                call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
+                                     dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
+            case default
+                ! Zero ice thickness (transient start): do nothing.
+        end select
+
+        ! Update surface topography fields (fixed H), then remove thin floating ice.
+        call yelmo_update_equil(dom%yelmo, ts%time, time_tot=1.0_wp, dt=1.0_wp, topo_fixed=.TRUE.)
+        where(dom%yelmo%tpo%now%mask_bed == 5 .and. dom%yelmo%tpo%now%H_ice < 50.0_wp) &
+            dom%yelmo%tpo%now%H_ice = 0.0_wp
+        call yelmo_update_equil(dom%yelmo, ts%time, time_tot=1.0_wp, dt=1.0_wp, topo_fixed=.TRUE.)
+
+        if (trim(method) == "ref_lgm") then
+            ! Store the clean thickness as the reference state (drives smb masks).
+            dom%yelmo%bnd%H_ice_ref = dom%yelmo%tpo%now%H_ice
+        end if
+
+        ! Refresh the hub and climate/smb to reflect the new geometry.
+        call refresh_htopo(dom)
+        call step_climate(dom, ts)
+
+        if (trim(method) == "const") then
+            ! Ensure ice can grow on high-latitude land (mainly Cordilleran).
+            where (dom%yelmo%bnd%regions == 1.1_wp .and. dom%yelmo%grd%lat > 50.0_wp .and. &
+                   dom%yelmo%bnd%z_bed > 0.0_wp .and. dom%yelmo%bnd%smb < 0.0_wp) &
+                dom%yelmo%bnd%smb = 0.5_wp
+            if (dom%ctl%with_ice_sheet) &
+                call yelmo_update_equil(dom%yelmo, ts%time, time_tot=5e3_wp, dt=5.0_wp, &
+                                        topo_fixed=.FALSE.)
+        else
+            ! ref_lgm / zero: stabilize dynamic fields with a raised beta_min.
+            if (dom%ctl%with_ice_sheet) then
+                beta_min_save = dom%yelmo%dyn%par%beta_min
+                dom%yelmo%dyn%par%beta_min = 100.0_wp
+                call yelmo_update_equil(dom%yelmo, ts%time, time_tot=2e2_wp, dt=5.0_wp, &
+                                        topo_fixed=.FALSE.)
+                dom%yelmo%dyn%par%beta_min = beta_min_save
+            end if
+        end if
+
+    end subroutine domain_init_lgm_north
 
     subroutine domain_restart_write(dom, time, fldr)
         ! Write a restart bundle: a folder (per time, or `fldr`) holding one
@@ -496,6 +672,8 @@ contains
     subroutine domain_ctl_load(ctl, path_par)
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
+
+        ctl%path_par = trim(path_par)
 
         call nml_read(path_par, "ctrl", "tstep_method",   ctl%tstep_method)
         call nml_read(path_par, "ctrl", "tstep_const",    ctl%tstep_const)
@@ -640,11 +818,59 @@ contains
     subroutine step_icesheet(dom, ts)
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+
+        ! Greenland NEGIS: update cb_ref from bed properties + NEGIS scaling.
+        if (trim(dom%ctl%domain) == "Greenland" .and. dom%ngs%use_negis_par) &
+            call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time)
+
         if (.not. dom%ctl%with_ice_sheet) return
         if (ts%n == 0 .and. dom%yelmo%par%use_restart) return
 
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
+
+    subroutine negis_update_cb_ref(ylmo, ngs, time)
+        ! Northeast Greenland Ice Stream cb_ref modification: recompute cb_ref from
+        ! bed properties (calc_cb_ref), then scale the NEGIS basins (9.1/9.2/9.3)
+        ! by time-dependent factors. Ported from yelmox.f90. Requires the [negis]
+        ! cf_* parameters to be loaded; disabled by default (see domain_regions_init).
+        type(yelmo_class),  intent(inout) :: ylmo
+        type(negis_params), intent(inout) :: ngs
+        real(wp),           intent(in)    :: time
+
+        integer :: i, j, nx, ny
+
+        nx = ylmo%grd%nx
+        ny = ylmo%grd%ny
+
+        if (time < -11e3_wp) then
+            ngs%cf_x = ngs%cf_0
+        else
+            ngs%cf_x = ngs%cf_0 + (time - (-11e3_wp)) / (0.0_wp - (-11e3_wp)) * (ngs%cf_1 - ngs%cf_0)
+        end if
+
+        if (time < -4e3_wp) then
+            ngs%cf_south = 1.0_wp
+        else
+            ngs%cf_north = 1.0_wp
+        end if
+
+        ! Recompute cb_ref like the standard till function.
+        call calc_cb_ref(ylmo%dyn%now%cb_ref, ylmo%bnd%z_bed, ylmo%bnd%z_bed_sd, ylmo%bnd%z_sl, &
+                ylmo%bnd%H_sed, ylmo%dyn%par%till_f_sed, ylmo%dyn%par%till_sed_min, ylmo%dyn%par%till_sed_max, &
+                ylmo%dyn%par%till_cf_ref, ylmo%dyn%par%till_cf_min, ylmo%dyn%par%till_z0, ylmo%dyn%par%till_z1, &
+                ylmo%dyn%par%till_n_sd, ylmo%dyn%par%till_scale_zb, ylmo%dyn%par%till_scale_sed)
+
+        ! Apply NEGIS basin scaling.
+        do j = 1, ny
+        do i = 1, nx
+            if (ylmo%bnd%basins(i,j) == 9.1_wp) ylmo%dyn%now%cb_ref(i,j) = ylmo%dyn%now%cb_ref(i,j) * ngs%cf_centre
+            if (ylmo%bnd%basins(i,j) == 9.2_wp) ylmo%dyn%now%cb_ref(i,j) = ylmo%dyn%now%cb_ref(i,j) * ngs%cf_south
+            if (ylmo%bnd%basins(i,j) == 9.3_wp) ylmo%dyn%now%cb_ref(i,j) = ylmo%dyn%now%cb_ref(i,j) * ngs%cf_north
+        end do
+        end do
+
+    end subroutine negis_update_cb_ref
 
     subroutine step_climate(dom, ts)
         ! Run climate on grid_clim and smb on grid_smb: geometry (z_srf/H_ice) from
