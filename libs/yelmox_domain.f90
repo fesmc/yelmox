@@ -32,7 +32,7 @@ module yelmox_domain
                              bsl_class, bsl_init, bsl_update, bsl_restart_write
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
-                             smbpal_update_monthly_equil
+                             smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
     use htopo,        only : htopo_class, htopo_init, htopo_write_init, htopo_write_step
@@ -352,6 +352,7 @@ contains
         call isos_restart_write(dom%isos,    trim(outfldr)//"/isos_restart.nc",  time)
         call yelmo_restart_write(dom%yelmo,  trim(outfldr)//"/yelmo_restart.nc", time)
         call marshelf_restart_write(dom%mshlf, trim(outfldr)//"/marine_shelf.nc", time)
+        call smbpal_restart_write(dom%smb,   trim(outfldr)//"/smbpal_restart.nc", time)
 
         write(*,*) "domain_restart_write:: wrote bundle "//trim(outfldr)
     end subroutine domain_restart_write
@@ -403,8 +404,9 @@ contains
         dom%yelmo%bnd%z_bed = z_bed_y
         dom%yelmo%bnd%z_sl  = z_ss_y
 
-        ! Restore marine shelf.
+        ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
+        call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc")
 
         ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) from the
         ! restored H_ice and the isostasy-updated z_bed/z_sl, then recompute the

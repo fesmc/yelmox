@@ -56,8 +56,9 @@
     public :: smbpal_init 
     public :: smbpal_update_2temp, smbpal_update_monthly 
     public :: smbpal_update_monthly_equil
-    public :: smbpal_end 
+    public :: smbpal_end
     public :: smbpal_write_init, smbpal_write
+    public :: smbpal_restart_write, smbpal_restart_read
 
 contains 
 
@@ -804,7 +805,63 @@ contains
 
         return 
 
-    end subroutine smbpal_write 
+    end subroutine smbpal_write
+
+    subroutine smbpal_restart_write(smb,filename,time)
+        ! Write the prognostic snowpack state carried across timesteps
+        ! (H_snow, alb_s). With the ITM ablation method the snowpack is
+        ! prognostic, so it must be restored to continue a run seamlessly.
+
+        implicit none
+
+        type(smbpal_class), intent(IN) :: smb
+        character(len=*),   intent(IN) :: filename
+        real(prec),         intent(IN) :: time
+
+        ! Local variables
+        integer :: ncid, nx, ny
+
+        nx = size(smb%now%H_snow,1)
+        ny = size(smb%now%H_snow,2)
+
+        call nc_create(filename)
+        call nc_write_dim(filename,"xc",  x=smb%par%x)
+        call nc_write_dim(filename,"yc",  x=smb%par%y)
+        call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="year",unlimited=.TRUE.)
+
+        call nc_open(filename,ncid,writable=.TRUE.)
+        call nc_write(filename,"H_snow",smb%now%H_snow,dim1="xc",dim2="yc",dim3="time", &
+                      start=[1,1,1],count=[nx,ny,1],ncid=ncid)
+        call nc_write(filename,"alb_s", smb%now%alb_s, dim1="xc",dim2="yc",dim3="time", &
+                      start=[1,1,1],count=[nx,ny,1],ncid=ncid)
+        call nc_close(ncid)
+
+        return
+
+    end subroutine smbpal_restart_write
+
+    subroutine smbpal_restart_read(smb,filename)
+        ! Restore the prognostic snowpack state (H_snow, alb_s).
+
+        implicit none
+
+        type(smbpal_class), intent(INOUT) :: smb
+        character(len=*),   intent(IN)    :: filename
+
+        ! Local variables
+        integer :: nx, ny
+
+        nx = size(smb%now%H_snow,1)
+        ny = size(smb%now%H_snow,2)
+
+        call nc_read(filename,"H_snow",smb%now%H_snow,start=[1,1,1],count=[nx,ny,1])
+        call nc_read(filename,"alb_s", smb%now%alb_s, start=[1,1,1],count=[nx,ny,1])
+
+        write(*,*) "smbpal_restart_read:: read "//trim(filename)
+
+        return
+
+    end subroutine smbpal_restart_read
 
     ! =======================================================
     !
