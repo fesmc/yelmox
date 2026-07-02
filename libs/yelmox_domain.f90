@@ -574,33 +574,39 @@ contains
 
     end subroutine domain_init_lgm_north
 
-    subroutine domain_restart_write(dom, time, fldr)
+    subroutine domain_restart_write(dom, time, fldr, outfldr)
         ! Write a restart bundle: a folder (per time, or `fldr`) holding one
         ! restart file per stateful sub-model with fixed names. The hi-res hub is
         ! not written -- it is rebuilt by refresh_htopo from the restored models.
+        ! `outfldr` (optional) prefixes the auto-named per-time folder, so each
+        ! domain of a multi-domain run writes into its own subfolder.
         type(ice_domain), intent(inout) :: dom
         real(wp),         intent(in)    :: time
         character(len=*), intent(in), optional :: fldr
+        character(len=*), intent(in), optional :: outfldr
 
-        character(len=1024) :: outfldr
+        character(len=1024) :: bundle, prefix
         character(len=32)   :: time_str
 
+        prefix = ""
+        if (present(outfldr)) prefix = trim(outfldr)
+
         if (present(fldr)) then
-            outfldr = trim(fldr)
+            bundle = trim(fldr)
         else
             write(time_str,"(f20.3)") time*1e-3
-            outfldr = "restart-"//trim(adjustl(time_str))//"-kyr"
+            bundle = trim(prefix)//"restart-"//trim(adjustl(time_str))//"-kyr"
         end if
 
-        call execute_command_line('mkdir -p "'//trim(outfldr)//'"')
+        call execute_command_line('mkdir -p "'//trim(bundle)//'"')
 
-        call bsl_restart_write(dom%bsl,      trim(outfldr)//"/bsl_restart.nc",   time)
-        call isos_restart_write(dom%isos,    trim(outfldr)//"/isos_restart.nc",  time)
-        call yelmo_restart_write(dom%yelmo,  trim(outfldr)//"/yelmo_restart.nc", time)
-        call marshelf_restart_write(dom%mshlf, trim(outfldr)//"/marine_shelf.nc", time)
-        call smbpal_restart_write(dom%smb,   trim(outfldr)//"/smbpal_restart.nc", time)
+        call bsl_restart_write(dom%bsl,      trim(bundle)//"/bsl_restart.nc",   time)
+        call isos_restart_write(dom%isos,    trim(bundle)//"/isos_restart.nc",  time)
+        call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
+        call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
+        call smbpal_restart_write(dom%smb,   trim(bundle)//"/smbpal_restart.nc", time)
 
-        write(*,*) "domain_restart_write:: wrote bundle "//trim(outfldr)
+        write(*,*) "domain_restart_write:: wrote bundle "//trim(bundle)
     end subroutine domain_restart_write
 
     subroutine domain_restart_read(dom, fldr, ts)
