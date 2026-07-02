@@ -7,6 +7,7 @@
     "exe_aliases" :
         {   "yelmox"    : "libyelmox/bin/yelmox.x",
             "mg"        : "libyelmox/bin/yelmox_mg.x",
+            "mgbi"      : "libyelmox/bin/yelmox_mgbi.x",
             "iso"       : "libyelmox/bin/yelmox_iso.x",
             "hyst"      : "libyelmox/bin/yelmox_hyst.x",
             "rembo"     : "libyelmox/bin/yelmox_rembo.x",
@@ -22,9 +23,11 @@
             "bsl" : "barysealevel"
         },
 
-    "par_paths" : 
+    "par_paths" :
         {
-            "rembo"  : "par/rembo_Greenland.nml"
+            "rembo"  : "par/rembo_Greenland.nml",
+            "mgbi"   : ["yelmox_mgbi/yelmox_mgbi_Antarctica.nml",
+                        "yelmox_mgbi/yelmox_mgbi_Greenland.nml"]
         },
         
     "files" : ["git_yelmo.txt"], 

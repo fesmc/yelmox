@@ -1,0 +1,33 @@
+! Control file for the bipolar (multi-domain) multigrid driver, yelmox_mgbi.
+!
+! Provides the shared timestepping + output cadence and lists the per-domain
+! parameter files. Each listed file is a full single-domain nml (the same format
+! used by yelmox_mg); runme stages them into the run directory (see the "mgbi"
+! entry in .runme/info.json par_paths).
+
+&ctrl
+    tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_const     = 0.0               ! Assumed time for "const" method
+    time_init       = 0.0               ! [yr] Starting time
+    time_end        = 40.0              ! [yr] Ending time
+    dtt             = 10.0              ! [yr] Shared main-loop timestep (all domains)
+/
+
+&domains
+    ! One entry per domain; each is a full single-domain nml staged into the run dir.
+    par_files       = "yelmox_mgbi_Antarctica.nml" "yelmox_mgbi_Greenland.nml"
+/
+
+&tm_1D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 10.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_2D
+    method          = "const"           ! "const", "file", "times"
+    dt              = 20.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/

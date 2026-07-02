@@ -306,25 +306,36 @@ coupler. 3D (e.g. monthly) fields use the `remap_3d` overload. Step-local
 allocatables are reentrant, which is what bipolar needs; per-timestep
 reallocation cost is negligible against the physics.
 
-## Driver (`yelmox_mg.f90`)
+## Drivers
+
+Two thin programs share `yelmox_domain` (all per-domain physics/coupling lives
+there, so the drivers only differ in config parsing + the loop over domains):
+
+- **`yelmox_mg`** (single domain) — argument is one domain nml; one `ice_domain`,
+  output to the run dir.
+- **`yelmox_mgbi`** (bipolar / multi-domain, in `yelmox_mgbi/`) — argument is a
+  control file that carries the shared timestepping + output cadence and lists
+  the per-domain nmls (`[domains] par_files`). Each domain writes to a subfolder
+  named after its domain. runme stages the listed nmls via `par_paths["mgbi"]`
+  (see `.runme/info.json`); invoke with `runme -e mgbi -n <control>.nml`.
 
 ```fortran
-program yelmox_mg
+program yelmox_mgbi
     use yelmox_domain
-    type(ice_domain), allocatable :: dom(:)      ! (1) single, (2) bipolar
+    type(ice_domain), allocatable :: dom(:)
     integer :: nd, k
 
-    ! read config -> nd + per-domain path_par
+    ! read control file -> shared timeline + [domains] par_files -> nd
     allocate(dom(nd))
     do k = 1, nd
-        call domain_init(dom(k), path_par(k), ...)
+        call domain_init(dom(k), path_par(k), ...)   ! path_par(k) from par_files
     end do
 
     do while (time < time_end)
         do k = 1, nd
-            call yelmox_step(dom(k), time)
+            call yelmox_step(dom(k), time)           ! shared dtt
         end do
-        ! per-domain restart + output writing
+        ! per-domain restart + output writing (subfolder per domain)
         time = time + dt
     end do
 end program
