@@ -32,8 +32,7 @@ module yelmox_domain
                              marshelf_restart_read
     use fastisostasy, only : isos_class, isos_init, isos_update, isos_init_ref, &
                              isos_init_state, isos_restart_write, isos_restart_read, &
-                             bsl_class, bsl_init, bsl_update, bsl_restart_write, &
-                             bsl_restart_read
+                             bsl_class
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
@@ -120,7 +119,6 @@ module yelmox_domain
         type(snapclim_class)   :: snp
         type(smbpal_class)     :: smb
         type(smb_simple_class) :: smbs    ! alternative SMB (smb_method="smb_simple")
-        type(bsl_class)        :: bsl
         type(sediments_class)  :: sed
         type(geothermal_class) :: gthrm
         type(htopo_class)      :: topo    ! hi-res geometry reference hub
@@ -132,7 +130,7 @@ module yelmox_domain
 
     public :: domain_ctl, ice_domain
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
-    public :: domain_restart_write, domain_restart_read
+    public :: domain_restart_write, domain_restart_read, restart_bundle_dir
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
     public :: step_optimize, domain_update_smb
@@ -144,9 +142,12 @@ module yelmox_domain
 
 contains
 
-    subroutine domain_init(dom, path_par, time, time_rel, group_suffix)
+    subroutine domain_init(dom, path_par, time, group_suffix)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
+        ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
+        ! driver-owned object (one per run, common to every domain), so it is
+        ! initialized by the driver and passed into the isostasy steps.
         !
         ! group_suffix (optional, default "") is appended to every namelist group
         ! name (yelmo -> yelmo<suffix>, coupling -> coupling<suffix>, ...), so
@@ -157,7 +158,6 @@ contains
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
-        real(wp),         intent(in)    :: time_rel   ! time before present [yr]
         character(len=*), intent(in), optional :: group_suffix
 
         character(len=256)    :: domain
@@ -181,8 +181,6 @@ contains
         dom%ctl%grid_yelmo = trim(dom%yelmo%par%grid_name)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
-        call bsl_init(dom%bsl, path_par, time_rel)
-
         ! Isostasy on its configured grid ([coupling] grid_isos; default = grid_yelmo).
         if (len_trim(dom%ctl%grid_isos) == 0) dom%ctl%grid_isos = trim(dom%ctl%grid_yelmo)
         call grid_cdo_read_desc(grid_i, trim(dom%ctl%grid_isos),  MAP_FLDR)
@@ -395,12 +393,15 @@ contains
 
     end subroutine domain_regions_init
 
-    subroutine domain_init_state(dom, ts)
+    subroutine domain_init_state(dom, ts, bsl)
         ! Build the initial boundary state and initialize the Yelmo state
         ! variables. Lifted from yelmox.f90's "update initial boundary conditions"
         ! block (minimal core: no smb_simple / domain-special / optimization).
+        ! bsl is the shared, driver-owned sea level; the driver has already called
+        ! bsl_update for the initial time, so this routine only consumes it.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        type(bsl_class),   intent(inout) :: bsl
 
         real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
@@ -415,13 +416,12 @@ contains
         gn = trim(dom%ctl%grid_name)
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
-        call bsl_update(dom%bsl, ts%time_rel)
         call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
         call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
         call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
         call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
-        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, dom%bsl)
+        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
         call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
         call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
         dom%yelmo%bnd%z_bed = z_bed_y
@@ -589,10 +589,30 @@ contains
 
     end subroutine domain_init_lgm_north
 
+    function restart_bundle_dir(time, outfldr) result(bundle)
+        ! Auto-named per-time restart bundle folder: "<outfldr>restart-<kyr>-kyr".
+        ! Shared by domain_restart_write and the driver (for the shared bsl bundle)
+        ! so a domain's sub-model restarts and the run's bsl restart use identical
+        ! folder naming.
+        real(wp),         intent(in)           :: time
+        character(len=*), intent(in), optional :: outfldr
+        character(len=1024) :: bundle
+
+        character(len=1024) :: prefix
+        character(len=32)   :: time_str
+
+        prefix = ""
+        if (present(outfldr)) prefix = trim(outfldr)
+        write(time_str,"(f20.3)") time*1e-3
+        bundle = trim(prefix)//"restart-"//trim(adjustl(time_str))//"-kyr"
+    end function restart_bundle_dir
+
     subroutine domain_restart_write(dom, time, fldr, outfldr)
         ! Write a restart bundle: a folder (per time, or `fldr`) holding one
         ! restart file per stateful sub-model with fixed names. The hi-res hub is
         ! not written -- it is rebuilt by refresh_htopo from the restored models.
+        ! The shared barystatic sea level is NOT written here -- the driver owns it
+        ! and writes a single bsl_restart.nc for the whole run.
         ! `outfldr` (optional) prefixes the auto-named per-time folder, so each
         ! domain of a multi-domain run writes into its own subfolder.
         type(ice_domain), intent(inout) :: dom
@@ -600,22 +620,16 @@ contains
         character(len=*), intent(in), optional :: fldr
         character(len=*), intent(in), optional :: outfldr
 
-        character(len=1024) :: bundle, prefix
-        character(len=32)   :: time_str
-
-        prefix = ""
-        if (present(outfldr)) prefix = trim(outfldr)
+        character(len=1024) :: bundle
 
         if (present(fldr)) then
             bundle = trim(fldr)
         else
-            write(time_str,"(f20.3)") time*1e-3
-            bundle = trim(prefix)//"restart-"//trim(adjustl(time_str))//"-kyr"
+            bundle = restart_bundle_dir(time, outfldr)
         end if
 
         call execute_command_line('mkdir -p "'//trim(bundle)//'"')
 
-        call bsl_restart_write(dom%bsl,      trim(bundle)//"/bsl_restart.nc",   time)
         call isos_restart_write(dom%isos,    trim(bundle)//"/isos_restart.nc",  time)
         call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
         call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
@@ -624,11 +638,12 @@ contains
         write(*,*) "domain_restart_write:: wrote bundle "//trim(bundle)
     end subroutine domain_restart_write
 
-    subroutine domain_restart_read(dom, fldr, ts)
-        ! Restore all stateful sub-models from a restart bundle folder. The
-        ! barystatic sea level is prognostic under method="fastiso"/"mixed" and
-        ! cannot be re-derived from time, so bsl_now is read back from the bundle
-        ! (bsl_restart_read); bsl_update then only refreshes A_ocean_now.
+    subroutine domain_restart_read(dom, fldr, ts, bsl)
+        ! Restore all stateful sub-models from a restart bundle folder. The shared
+        ! barystatic sea level (bsl) is restored by the driver (bsl is prognostic
+        ! under method="fastiso"/"mixed" and cannot be re-derived from time, so the
+        ! driver reads bsl_now back from the run's bsl_restart.nc and calls
+        ! bsl_update once); this routine only consumes the restored bsl.
         !
         ! Isostasy is restored through its proper init-from-restart path
         ! (isos_init_state with use_restart), NOT a bare isos_restart_read: the
@@ -639,6 +654,7 @@ contains
         type(ice_domain),  intent(inout) :: dom
         character(len=*),  intent(in)    :: fldr
         type(tstep_class), intent(in)    :: ts
+        type(bsl_class),   intent(inout) :: bsl
 
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:), z_bed_y(:,:), z_ss_y(:,:)
         character(len=256) :: gi, gy
@@ -661,15 +677,13 @@ contains
         dom%yelmo%time%pc_active  = .true.
 
         ! Restore isostasy via isos_init_state (reads state + reference from the
-        ! bundle and runs the full post-read setup), on the isos grid. Restore the
-        ! prognostic bsl_now first (bsl_update then only refreshes A_ocean_now).
-        call bsl_restart_read(dom%bsl, trim(fldr)//"/bsl_restart.nc")
-        call bsl_update(dom%bsl, ts%time_rel)
+        ! bundle and runs the full post-read setup), on the isos grid. The shared
+        ! bsl was already restored + updated by the driver before this call.
         dom%isos%par%use_restart = .true.
         dom%isos%par%restart     = trim(fldr)//"/isos_restart.nc"
         call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
-        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, dom%bsl)
+        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
         call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
         call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
         dom%yelmo%bnd%z_bed = z_bed_y
@@ -734,14 +748,18 @@ contains
         call nml_read(path_par, go, "write_htopo", ctl%write_htopo)
     end subroutine domain_ctl_load
 
-    subroutine yelmox_step(dom, ts)
+    subroutine yelmox_step(dom, ts, bsl)
         ! Advance one domain by one coupling step. Component order is fixed here;
-        ! each step_* is a no-op when its ctl flag is off.
+        ! each step_* is a no-op when its ctl flag is off. bsl is the shared,
+        ! driver-owned sea level (the driver calls bsl_update once per step before
+        ! this call); step_isostasy consumes it. Used by the single-domain driver;
+        ! the multi-domain driver interleaves the step_* primitives itself.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        type(bsl_class),   intent(inout) :: bsl
 
         call step_optimize(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
-        call step_isostasy(dom, ts)
+        call step_isostasy(dom, ts, bsl)
         call step_icesheet(dom, ts)
         call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
         call step_climate(dom, ts)       ! climate/smb read geometry from the hub
@@ -809,12 +827,17 @@ contains
         end if
     end subroutine step_optimize
 
-    subroutine step_isostasy(dom, ts)
+    subroutine step_isostasy(dom, ts, bsl)
         ! Run isostasy on its own grid: ice load from Yelmo (bilin), bedrock/sea
         ! surface aggregated back to the Yelmo grid (conservative). Assumes
         ! grid_isos is at least as fine as grid_yelmo (identity when equal).
+        ! bsl is the shared, driver-owned sea level (already updated for this step
+        ! by the driver); isos_update reads it and, under fastiso/mixed, writes
+        ! back the prognostic bsl_now -- so with several domains sharing one bsl the
+        ! sea level integrates every domain's ice load, as in yelmox_bipolar.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        type(bsl_class),   intent(inout) :: bsl
 
         real(wp), allocatable :: H_ice_i(:,:), dwdt_i(:,:)
         real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
@@ -825,13 +848,11 @@ contains
         gi = trim(dom%ctl%grid_isos)
         gy = trim(dom%ctl%grid_yelmo)
 
-        call bsl_update(dom%bsl, ts%time_rel)
-
         ! ice load + correction: Yelmo -> isos grid
         call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i, gi, "bilin")
         call remap(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, "bilin")
 
-        call isos_update(dom%isos, H_ice_i, ts%time, dom%bsl, dwdt_corr=dwdt_i)
+        call isos_update(dom%isos, H_ice_i, ts%time, bsl, dwdt_corr=dwdt_i)
 
         ! aggregate outputs -> Yelmo grid (conservative)
         call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")

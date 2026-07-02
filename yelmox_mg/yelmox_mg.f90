@@ -11,6 +11,8 @@ program yelmox_mg
     use timestepping
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
+    use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
+                             bsl_restart_read, bsl_restart_write
     use yelmox_domain
 
     implicit none
@@ -18,6 +20,7 @@ program yelmox_mg
     character(len=512) :: path_par
     type(tstep_class)  :: ts
     type(ice_domain)   :: dom
+    type(bsl_class)    :: bsl        ! shared, driver-owned barystatic sea level
     type(timeout_class) :: tm_2D, tm_1D
 
     character(len=512) :: outfldr
@@ -39,8 +42,12 @@ program yelmox_mg
     ! Single-domain runs write to the run dir.
     outfldr = "./"
 
+    ! Shared, driver-owned barystatic sea level (one per run).
+    call bsl_init(bsl, path_par, ts%time_rel)
+    call bsl_update(bsl, ts%time_rel)
+
     ! Initialize the domain: sub-models + hi-res hub + coupler maps.
-    call domain_init(dom, path_par, ts%time, ts%time_rel)
+    call domain_init(dom, path_par, ts%time)
 
     ! Inject the driver-owned timeline values the domain logic needs.
     dom%ctl%tstep_method = tstep_method
@@ -50,11 +57,13 @@ program yelmox_mg
     call domain_regions_init(dom, trim(outfldr))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
-    ! and rebuild the hi-res hub from the restored models.
+    ! (incl. the shared bsl) and rebuild the hi-res hub from the restored models.
     if (trim(dom%ctl%restart) == "None") then
-        call domain_init_state(dom, ts)
+        call domain_init_state(dom, ts, bsl)
     else
-        call domain_restart_read(dom, trim(dom%ctl%restart), ts)
+        call bsl_restart_read(bsl, trim(dom%ctl%restart)//"/bsl_restart.nc")
+        call bsl_update(bsl, ts%time_rel)
+        call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
         call refresh_htopo(dom)
     end if
 
@@ -85,7 +94,10 @@ program yelmox_mg
         call tstep_update(ts, dom%ctl%dtt)
         call tstep_print(ts)
 
-        call yelmox_step(dom, ts)
+        ! Shared sea level: update once per step, before the domain advances.
+        call bsl_update(bsl, ts%time_rel)
+
+        call yelmox_step(dom, ts, bsl)
 
         if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
             call domain_write_step(dom, trim(outfldr), ts%time)
@@ -98,13 +110,15 @@ program yelmox_mg
         if (dom%ctl%dt_restart > 0.0_wp .and. &
             mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
             call domain_restart_write(dom, ts%time)
+            call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
         end if
     end do
 
-    ! Always capture the final state + a final restart bundle.
+    ! Always capture the final state + a final restart bundle (incl. shared bsl).
     if (tm_2D%active) call domain_write_step(dom, trim(outfldr), ts%time)
     if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time)
     call domain_restart_write(dom, ts%time)
+    call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
 
     write(*,*)
     write(*,*) "yelmox_mg: run complete at time =", ts%time

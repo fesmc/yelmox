@@ -19,6 +19,8 @@ program yelmox_mgbi
     use timestepping
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
+    use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
+                             bsl_restart_read, bsl_restart_write
     use yelmox_domain
 
     implicit none
@@ -30,8 +32,10 @@ program yelmox_mgbi
     character(len=512), allocatable :: outfldr(:)
     type(tstep_class)               :: ts
     type(ice_domain), allocatable   :: dom(:)
+    type(bsl_class)                 :: bsl        ! shared, driver-owned sea level
+    character(len=512)              :: restart_bsl
     type(timeout_class)             :: tm_2D, tm_1D
-    logical                         :: do_2D, do_1D
+    logical                         :: do_2D, do_1D, do_restart
     integer                         :: nd, k
 
     character(len=56) :: tstep_method
@@ -60,10 +64,22 @@ program yelmox_mgbi
     end if
     allocate(outfldr(nd), dom(nd))
 
+    ! === Shared, driver-owned barystatic sea level (one per run, common to every
+    !     domain, exactly as in yelmox_bipolar). Restored once from a run-level
+    !     bsl_restart.nc ([ctrl] restart_bsl) when restarting. ===
+    call bsl_init(bsl, path_par, ts%time_rel)
+    call bsl_update(bsl, ts%time_rel)
+    restart_bsl = "None"
+    call nml_read(path_par, "ctrl", "restart_bsl", restart_bsl)
+    if (trim(restart_bsl) /= "None") then
+        call bsl_restart_read(bsl, trim(restart_bsl)//"/bsl_restart.nc")
+        call bsl_update(bsl, ts%time_rel)
+    end if
+
     ! === Per-domain initialization ===
     do k = 1, nd
 
-        call domain_init(dom(k), path_par, ts%time, ts%time_rel, &
+        call domain_init(dom(k), path_par, ts%time, &
                          group_suffix="_"//trim(names(k)))
 
         ! Inject the driver-owned timeline values the domain logic needs.
@@ -77,9 +93,9 @@ program yelmox_mgbi
         call domain_regions_init(dom(k), trim(outfldr(k)))
 
         if (trim(dom(k)%ctl%restart) == "None") then
-            call domain_init_state(dom(k), ts)
+            call domain_init_state(dom(k), ts, bsl)
         else
-            call domain_restart_read(dom(k), trim(dom(k)%ctl%restart), ts)
+            call domain_restart_read(dom(k), trim(dom(k)%ctl%restart), ts, bsl)
             call refresh_htopo(dom(k))
         end if
 
@@ -111,22 +127,33 @@ program yelmox_mgbi
         call tstep_update(ts, dtt)
         call tstep_print(ts)
 
+        ! Shared sea level: update once per step, before any domain advances, so
+        ! the two domains' isostasy see (and, under fastiso, contribute to) the
+        ! same barystatic sea level.
+        call bsl_update(bsl, ts%time_rel)
+
         do k = 1, nd
-            call yelmox_step(dom(k), ts)
+            call yelmox_step(dom(k), ts, bsl)
         end do
 
         ! Evaluate the shared output cadence once (timeout_check advances state).
         do_2D = tm_2D%active .and. timeout_check(tm_2D, ts%time)
         do_1D = tm_1D%active .and. timeout_check(tm_1D, ts%time)
 
+        do_restart = .false.
         do k = 1, nd
             if (do_2D) call domain_write_step(dom(k), trim(outfldr(k)), ts%time)
             if (do_1D) call domain_write_1D(dom(k), trim(outfldr(k)), ts%time)
             if (dom(k)%ctl%dt_restart > 0.0_wp .and. &
                 mod(nint(ts%time*100), nint(dom(k)%ctl%dt_restart*100)) == 0) then
                 call domain_restart_write(dom(k), ts%time, outfldr=trim(outfldr(k)))
+                do_restart = .true.
             end if
         end do
+
+        ! One shared bsl restart at the run root when any domain wrote a bundle.
+        if (do_restart) &
+            call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
     end do
 
     ! === Finalize: capture the final state + a final restart bundle per domain ===
@@ -135,6 +162,7 @@ program yelmox_mgbi
         if (tm_1D%active) call domain_write_1D(dom(k), trim(outfldr(k)), ts%time)
         call domain_restart_write(dom(k), ts%time, outfldr=trim(outfldr(k)))
     end do
+    call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
 
     write(*,*)
     write(*,*) "yelmox_mgbi: run complete at time =", ts%time
