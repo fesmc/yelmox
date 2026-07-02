@@ -21,7 +21,7 @@ program yelmox_mgbi
     ! hysteresis forcing, obm->ism ocean temperature), then per domain marine
     ! shelf (which reads the obm-updated ocean temperature). Per-domain physics
     ! live in libs/yelmox_domain.f90; the ocean coupling lives in
-    ! libs/obm/obm_coupling.f90. See docs/multigrid.md.
+    ! libs/obm_coupling.f90. See docs/multigrid.md.
 
     use nml
     use ncio,         only : nc_read
