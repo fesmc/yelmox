@@ -17,10 +17,13 @@ module yelmox_domain
     use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, yelmo_update_equil, &
-                             yelmo_init_state, yelmo_print_bound, &
+                             yelmo_init_state, yelmo_init_topo, yelmo_print_bound, &
                              yelmo_restart_write, yelmo_restart_read, &
                              yelmo_regions_init, yelmo_region_init, yelmo_regions_update, &
                              yelmo_write_init, yelmo_write_step, yelmo_regions_write
+    use yelmo_defs,   only : MASK_ICE_NONE, MASK_ICE_FIXED, MASK_ICE_DYNAMIC
+    use yelmo_tools,  only : smooth_gauss_2D
+    use basal_dragging, only : calc_cb_ref
     use ice_sub_regions, only : get_ice_sub_region
     use yelmo_topography, only : calc_ytopo_diagnostic
     use yelmo_io,         only : yelmo_restart_read_topo_bnd
@@ -34,6 +37,8 @@ module yelmox_domain
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
+    use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask, &
+                             smb_simple_update
     use ice_optimization, only : ice_opt_params, optimize_par_load, &
                              optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr
     use sediments,    only : sediments_class, sediments_init
@@ -58,6 +63,11 @@ module yelmox_domain
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"
+
+        ! Domain-specific startup / physics switches (mirrors yelmox.f90 internals).
+        logical :: greenland_init_marine_H = .false.   ! impose LGM-like marine ice at start
+        logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb (Greenland)
+        logical :: use_negis               = .false.   ! NEGIS cb_ref modification (Greenland)
 
         ! Which components are active in this domain's coupling sequence.
         logical :: with_ice_sheet    = .true.
@@ -90,18 +100,31 @@ module yelmox_domain
         logical :: write_htopo = .true.
     end type domain_ctl
 
+    ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters.
+    type negis_params
+        logical  :: use_negis_par = .false.
+        real(wp) :: cf_0    = 1.0_wp
+        real(wp) :: cf_1    = 1.0_wp
+        real(wp) :: cf_centre = 1.0_wp
+        real(wp) :: cf_north  = 1.0_wp
+        real(wp) :: cf_south  = 1.0_wp
+        real(wp) :: cf_x    = 1.0_wp
+    end type negis_params
+
     type ice_domain
         type(yelmo_class)      :: yelmo
         type(marshelf_class)   :: mshlf
         type(isos_class)       :: isos
         type(snapclim_class)   :: snp
         type(smbpal_class)     :: smb
+        type(smb_simple_class) :: smbs    ! alternative SMB (smb_method="smb_simple")
         type(bsl_class)        :: bsl
         type(sediments_class)  :: sed
         type(geothermal_class) :: gthrm
         type(htopo_class)      :: topo    ! hi-res geometry reference hub
         type(coupler_class)    :: cpl     ! this region's grid resolution + map cache
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
+        type(negis_params)     :: ngs     ! Greenland NEGIS cb_ref modification
         type(domain_ctl)       :: ctl
     end type ice_domain
 
@@ -110,7 +133,7 @@ module yelmox_domain
     public :: domain_restart_write, domain_restart_read
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
-    public :: step_optimize
+    public :: step_optimize, domain_update_smb
 
     ! Domain-level remap: identity-copy when src == dst, else remap via the coupler.
     interface remap
@@ -131,7 +154,7 @@ contains
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
-        real(wp), allocatable :: xs(:), ys(:), lats_s(:,:)
+        real(wp), allocatable :: xs(:), ys(:), lats_s(:,:), Href_s(:,:)
 
         ! --- run control ---
         call domain_ctl_load(dom%ctl, path_par)
@@ -198,6 +221,17 @@ contains
         ys     = real(grid_s%G%y, wp)
         lats_s = real(grid_s%lat, wp)
         call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s)
+
+        ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
+        ! smbpal (1D axes), smb_simple takes 2D projected coordinates.
+        if (trim(dom%ctl%smb_method) == "smb_simple") then
+            call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x, wp), &
+                                 y=real(grid_s%y, wp), lat=lats_s, &
+                                 group="smb_simple", units="m")
+            call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_yelmo, &
+                       Href_s, dom%ctl%grid_smb, "bilin")
+            call smb_simple_set_mask(dom%smbs, Href_s)
+        end if
 
         ! --- marine_shelf on its configured grid (grid_y already read above) ---
         call grid_cdo_read_desc(grid_m, trim(dom%ctl%grid_mshlf), MAP_FLDR)
@@ -308,8 +342,6 @@ contains
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
-        real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:)
         character(len=256) :: gi, gy, gc, gs, gn
 
         gi = trim(dom%ctl%grid_isos)
@@ -340,20 +372,9 @@ contains
         call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
                              domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
 
-        ! Surface mass balance on grid_smb
-        call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
-        call remap(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
-        call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
-        call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
-        if (trim(dom%smb%par%abl_method) == "itm") then
-            call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
-                    ts%time_rel, time_equil=100.0_wp)
-        end if
-        call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
-        call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-        call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
-        dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
-        dom%yelmo%bnd%T_srf = tsrf_y
+        ! Surface mass balance on grid_smb (smbpal or smb_simple; init=.true.
+        ! runs the smbpal ITM equilibration before the first update).
+        call domain_update_smb(dom, ts, init=.true.)
 
         ! Marine shelf through the (already refreshed) hub.
         call step_marine_shelf(dom, ts)
@@ -633,16 +654,12 @@ contains
         type(tstep_class), intent(in)    :: ts
 
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
-        real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:)
-        character(len=256) :: gc, gs, gn, gy
+        character(len=256) :: gc, gn
 
         if (.not. dom%ctl%with_climate) return
 
         gc = trim(dom%ctl%grid_clim)
-        gs = trim(dom%ctl%grid_smb)
         gn = trim(dom%ctl%grid_name)
-        gy = trim(dom%ctl%grid_yelmo)
 
         ! snapclim snapshot on grid_clim, updated on the dt_clim cadence
         if (mod(nint(ts%time_elapsed*100), nint(dom%ctl%dt_clim*100)) == 0) then
@@ -652,19 +669,105 @@ contains
                                  domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
         end if
 
-        ! surface mass balance (smbpal) on grid_smb
-        call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
-        call remap(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
-        call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
-        call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
-        call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
+        ! surface mass balance (smbpal or smb_simple), aggregated to the Yelmo grid
+        call domain_update_smb(dom, ts)
+    end subroutine step_climate
 
-        ! aggregate smb outputs -> Yelmo grid (conservative)
-        call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-        call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+    subroutine domain_update_smb(dom, ts, init)
+        ! Surface mass balance on grid_smb, aggregated (conservative) to the Yelmo
+        ! grid. Two methods: smbpal (default; monthly, needs tas/pr + geometry) or
+        ! smb_simple (needs z_srf + sea-level temperature). Geometry comes from the
+        ! hi-res hub, atmospheric forcing from snapclim (grid_clim). init=.true.
+        ! runs the smbpal ITM equilibration before the first update. Optionally
+        ! applies the Greenland glacial-smb reduction on the Yelmo grid.
+        type(ice_domain),  intent(inout) :: dom
+        type(tstep_class), intent(in)    :: ts
+        logical, intent(in), optional    :: init
+
+        real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
+        real(wp), allocatable :: tsl_s(:,:), Href_s(:,:), smb_y(:,:), tsrf_y(:,:)
+        real(wp), allocatable :: ta_y(:,:), ta_pd_y(:,:)
+        character(len=256) :: gc, gs, gn, gy
+        logical :: is_init
+
+        is_init = .false.
+        if (present(init)) is_init = init
+
+        gc = trim(dom%ctl%grid_clim)
+        gs = trim(dom%ctl%grid_smb)
+        gn = trim(dom%ctl%grid_name)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        if (trim(dom%ctl%smb_method) == "smb_simple") then
+            ! smb_simple: surface elevation + sea-level temperature, masked to the
+            ! reference ice extent (refreshed each call in case H_ice_ref changed).
+            call remap(dom, dom%topo%z_srf,          gn, z_srf_s, gs, "bilin")
+            call remap(dom, dom%snp%now%tsl_ann,      gc, tsl_s,   gs, "bilin")
+            call remap(dom, dom%yelmo%bnd%H_ice_ref,  gy, Href_s,  gs, "bilin")
+            call smb_simple_set_mask(dom%smbs, Href_s)
+            call smb_simple_update(dom%smbs, z_srf_s, tsl_s)
+            call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
+            call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
+        else
+            ! smbpal (monthly)
+            call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
+            call remap(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
+            call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
+            call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
+            if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
+                call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
+                        ts%time_rel, time_equil=100.0_wp)
+            end if
+            call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
+            call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+            call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        end if
+
         dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
         dom%yelmo%bnd%T_srf = tsrf_y
-    end subroutine step_climate
+
+        ! Glacial-smb modification (Greenland): reduce large negative smb toward a
+        ! quasi glacial-interglacial index. Operates on the aggregated Yelmo-grid smb.
+        if (trim(dom%ctl%domain) == "Greenland" .and. dom%ctl%scale_glacial_smb) then
+            call remap(dom, dom%snp%now%ta_ann,   gc, ta_y,    gy, "bilin")
+            call remap(dom, dom%snp%clim0%ta_ann, gc, ta_pd_y, gy, "bilin")
+            call calc_glacial_smb(dom%yelmo%bnd%smb, dom%yelmo%grd%lat, ta_y, ta_pd_y)
+        end if
+    end subroutine domain_update_smb
+
+    subroutine calc_glacial_smb(smb, lat2D, ta_ann, ta_ann_pd)
+        ! Reduce (scale up toward zero) negative surface mass balance during
+        ! glacial conditions, above a latitude limit. Ported verbatim from
+        ! yelmox.f90; the glacial index is derived from the domain-mean cooling.
+        real(wp), intent(inout) :: smb(:,:)
+        real(wp), intent(in)    :: lat2D(:,:)
+        real(wp), intent(in)    :: ta_ann(:,:)
+        real(wp), intent(in)    :: ta_ann_pd(:,:)
+
+        integer  :: i, j, nx, ny
+        real(wp) :: t0, tnow, at
+        real(wp), parameter :: dt_lgm  = -8.0_wp
+        real(wp), parameter :: lat_lim = 55.0_wp
+        real(wp), parameter :: fac_lim = 0.90_wp
+
+        nx = size(smb,1)
+        ny = size(smb,2)
+
+        ! Quasi glacial-interglacial index (0: interglacial, 1: glacial)
+        tnow = sum(ta_ann)    / real(nx*ny,wp)
+        t0   = sum(ta_ann_pd) / real(nx*ny,wp)
+        at = (tnow-t0)/dt_lgm
+        if (at .lt. 0.0_wp) at = 0.0_wp
+        if (at .gt. 1.0_wp) at = 1.0_wp
+
+        do j = 1, ny
+        do i = 1, nx
+            if (smb(i,j) .lt. 0.0_wp .and. lat2D(i,j) .gt. lat_lim) then
+                smb(i,j) = smb(i,j) - smb(i,j) * at * fac_lim
+            end if
+        end do
+        end do
+    end subroutine calc_glacial_smb
 
     subroutine refresh_htopo(dom)
         ! Refresh the hi-res geometry hub from the prognostic models (Yelmo grid
