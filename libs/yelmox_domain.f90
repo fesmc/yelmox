@@ -22,6 +22,8 @@ module yelmox_domain
                              yelmo_regions_init, yelmo_region_init, yelmo_regions_update, &
                              yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use ice_sub_regions, only : get_ice_sub_region
+    use yelmo_topography, only : calc_ytopo_diagnostic
+    use yelmo_io,         only : yelmo_restart_read_topo_bnd
     use marine_shelf, only : marshelf_class, marshelf_init, marshelf_update, &
                              marshelf_update_shelf, marshelf_restart_write, &
                              marshelf_restart_read
@@ -375,7 +377,18 @@ contains
         gy = trim(dom%ctl%grid_yelmo)
 
         ! Restore Yelmo first: it provides the current H_ice/z_bed for isostasy.
+        ! Two reads are needed, mirroring yelmo's native init-from-restart:
+        !   - yelmo_restart_read_topo_bnd loads the geometry [tpo]+[bnd]
+        !     (H_ice, z_bed, ...); the standalone yelmo_restart_read does NOT.
+        !   - yelmo_restart_read loads [dyn,therm,mat] + mask_bed.
+        ! use_restart/pc_active are flags the native path sets; the topo
+        ! diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
+        call yelmo_restart_read_topo_bnd(dom%yelmo%tpo, dom%yelmo%bnd, dom%yelmo%time, &
+                dom%yelmo%par%restart_interpolated, dom%yelmo%grd, dom%yelmo%par%domain, &
+                dom%yelmo%par%grid_name, trim(fldr)//"/yelmo_restart.nc", ts%time)
         call yelmo_restart_read(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
+        dom%yelmo%par%use_restart = .true.
+        dom%yelmo%time%pc_active  = .true.
 
         ! Restore isostasy via isos_init_state (reads state + reference from the
         ! bundle and runs the full post-read setup), on the isos grid.
@@ -393,9 +406,12 @@ contains
         ! Restore marine shelf.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
 
-        ! Recompute regional aggregates so the first 1D output after a restart
-        ! reflects the restored state (yelmo_update would otherwise do this only
-        ! on the first step).
+        ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) from the
+        ! restored H_ice and the isostasy-updated z_bed/z_sl, then recompute the
+        ! regional aggregates -- so the first 1D output after a restart reflects
+        ! the restored state instead of the stale cold-start diagnostics.
+        call calc_ytopo_diagnostic(dom%yelmo%tpo, dom%yelmo%dyn, dom%yelmo%mat, &
+                                   dom%yelmo%thrm, dom%yelmo%bnd)
         call yelmo_regions_update(dom%yelmo)
 
         write(*,*) "domain_restart_read:: restored bundle "//trim(fldr)
