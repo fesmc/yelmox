@@ -110,6 +110,7 @@ program yelmox_mg
         if (dom%ctl%dt_restart > 0.0_wp .and. &
             mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
             call domain_restart_write(dom, ts%time)
+            call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
         end if
     end do
@@ -118,6 +119,7 @@ program yelmox_mg
     if (tm_2D%active) call domain_write_step(dom, trim(outfldr), ts%time)
     if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time)
     call domain_restart_write(dom, ts%time)
+    call restart_bundle_mkdir(ts%time)
     call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
 
     write(*,*)

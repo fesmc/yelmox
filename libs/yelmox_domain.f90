@@ -130,7 +130,7 @@ module yelmox_domain
 
     public :: domain_ctl, ice_domain
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
-    public :: domain_restart_write, domain_restart_read, restart_bundle_dir
+    public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
     public :: step_optimize, domain_update_smb
@@ -606,6 +606,16 @@ contains
         write(time_str,"(f20.3)") time*1e-3
         bundle = trim(prefix)//"restart-"//trim(adjustl(time_str))//"-kyr"
     end function restart_bundle_dir
+
+    subroutine restart_bundle_mkdir(time, outfldr)
+        ! Create the auto-named restart bundle folder (mkdir -p). The driver uses
+        ! this for the shared bsl_restart.nc, which is written outside
+        ! domain_restart_write (which creates its own per-domain bundle folder) and
+        ! so needs its folder created explicitly.
+        real(wp),         intent(in)           :: time
+        character(len=*), intent(in), optional :: outfldr
+        call execute_command_line('mkdir -p "'//trim(restart_bundle_dir(time, outfldr))//'"')
+    end subroutine restart_bundle_mkdir
 
     subroutine domain_restart_write(dom, time, fldr, outfldr)
         ! Write a restart bundle: a folder (per time, or `fldr`) holding one

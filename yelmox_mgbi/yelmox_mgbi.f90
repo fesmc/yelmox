@@ -187,6 +187,7 @@ program yelmox_mgbi
 
         ! Shared bsl (+ obm) restart at the run root when either domain wrote one.
         if (do_restart) then
+            call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
             if (active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
         end if
@@ -195,6 +196,7 @@ program yelmox_mgbi
     ! === Finalize: capture the final state + a final restart bundle per domain ===
     if (active_north) call write_domain_step(dom_north, outfldr_north, force=.true.)
     if (active_south) call write_domain_step(dom_south, outfldr_south, force=.true.)
+    call restart_bundle_mkdir(ts%time)
     call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
     if (active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
 
