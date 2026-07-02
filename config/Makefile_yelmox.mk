@@ -137,7 +137,12 @@ $(objdir)/nautilus.o: $(libdir)/obm/nautilus.f90
 $(objdir)/obm.o: $(libdir)/obm/obm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# General yelmox helper modules for different applications 
+# Bipolar ocean coupling: bridges ice_domain (yelmox_domain) <-> obm box model
+$(objdir)/obm_coupling.o: $(libdir)/obm/obm_coupling.f90 $(objdir)/yelmox_domain.o \
+						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+# General yelmox helper modules for different applications
 $(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -c -o $@ $^
 
@@ -176,6 +181,7 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 						$(objdir)/atm2ocean.o\
 						$(objdir)/stommel.o\
 						$(objdir)/nautilus.o\
-						$(objdir)/obm.o
+						$(objdir)/obm.o\
+						$(objdir)/obm_coupling.o
 
 yelmox_help = 			$(objdir)/yelmox_hysteresis_help.o

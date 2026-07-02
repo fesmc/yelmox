@@ -22,6 +22,20 @@
     active_north    = True              ! Run the Northern-Hemisphere domain?
     active_south    = True              ! Run the Southern-Hemisphere domain?
     restart_bsl     = "None"            ! Shared bsl restart bundle folder, or "None"
+
+    ! --- Ocean box model (OBM) + inter-domain coupling ---
+    active_obm       = False            ! Run the shared ocean box model?
+    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus"/"stommel")
+
+    ism2obm          = False            ! Ice sheet -> OBM freshwater flux coupling?
+    couple_fwf_north = False            ! North freshwater flux -> obm%fn?
+    couple_fwf_south = False            ! South freshwater flux -> obm%fs?
+    fwf_definition   = "dVdt"           ! "dVdt", "mb", "ablation"
+    hydro_mask_north = "ice_data/Greenland/GRL-16KM/GRL-16KM_HYDRO-BASINS_zickfeld2004.nc"
+    hydro_mask_south = "ice_data/Antarctica/ANT-32KM/ANT-32KM_HYDRO-BASINS_zickfeld2004.nc"
+
+    obm2ism          = False            ! OBM ocean temperature -> ice sheet (mshlf)?
+    atm2obm          = False            ! Atmosphere (snapclim) -> OBM forcing?
 /
 
 &tm_1D
@@ -56,6 +70,78 @@
     A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
     A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc"
     restart    = "None"
+/
+
+&nautilus
+    ! Hysteresis (OBM offline forcing)
+    hyster_on = False
+    hyster_forcing = "phit"                  ! "phit", "phin", "fs", "fn", "global_melt"
+    hyster_forcing_method = "triangular"     ! "linear", "triangular", "sin", "noise"
+    hyster_rate = 0.0                        ! rate (amplitude for "sin"/"noise")
+    hyster_positive_branch_time = 0.0        ! branch time (period for "sin")
+
+    ! ctrl
+    use_restart = False
+    restart = "none"
+
+    ! Constants
+    specific_heat_capacity = 4000       ! [Jkg-1C-1] Specific heat capacity of seawater
+    density_of_seawater = 1025          ! [kgm-3] Density of seawater
+    therm_exp_coeff = 1.7e-4            ! [C-1] Thermal expansion coefficient
+    haline_exp_coeff = 8e-4             ! [psu-1] Haline expansion coefficient
+    reference_salinity = 35             ! [psu] Reference salinity
+    overturning_threshold = 0.25         ! [Sv] Minimum value for overturning
+
+    thermal_ampl_north = 1.07           ! Regional temperature constants (Zickfeld et al. 2004, OD)
+    thermal_ampl_tropics = 0.79
+    thermal_ampl_south = 0.86
+
+    nh_temp_constant = 1.07             ! Regional temperature constants
+    sh_temp_constant = 0.93
+
+    nh_hydro_sensitivity = 0.013       ! [SvdegC-1] Hydrological sensitivity of NH
+    sh_hydro_sensitivity = -0.005       ! [SvdegC-1] Hydrological sensitivity of SH
+
+    ! Fixed parameters
+    vol_s = 1.1e17                      ! [m3] Volume of southern box
+    vol_n = 0.4e17                      ! [m3] Volume of northern box
+    vol_t = 0.68e17                     ! [m3] Volume of tropical box
+    vol_td = 0.05e17                    ! [m3] Volume of tropical deep box
+    depth_s = 3000.0                    ! [m] Depth of southern box
+    depth_n = 3000.0                    ! [m] Depth of northern box
+    depth_t = 1000.0                    ! [m] Depth of tropical box
+    depth_td = 2000.0                   ! [m] Depth of tropical deep box
+
+    ! Tunable parameters
+    thermal_coupling_constant = 7.3e8   ! [Ja-1m-2C-1] Thermal coupling constant
+    emp_flow_k = 25.4e17                ! [m3a-1] Empirical flow constant
+
+    ! Initial conditions
+    tn_init = 4.7                       ! [C] Northern box temperature
+    tt_init = 11.4                      ! [C] Tropical box temperature
+    ttd_init = 4.7                      ! [C] Tropical deep box temperature
+    ts_init = 6.5                       ! [C] Southern box temperature
+
+    sn_init = 34.9783185840708          ! [psu] Northern box salinity
+    st_init = 35.07898230088496         ! [psu] Tropical box salinity
+    std_init = 34.9783185840708         ! [psu] Tropical deep box salinity
+    ss_init = 35.0                      ! [psu] Southern box salinity
+
+    fn_init = 0.0                       ! [Sv] External fwf in the north
+    ft_init = 0.0                       ! [Sv] External fwf in the tropics
+    fs_init = 0.0                       ! [Sv] External fwf in the south
+
+    phit_init = 0.014              ! [Sv] Freshwater transport from southern to tropical box
+    phin_init = 0.065              ! [Sv] Freshwater transport from tropical to northern box
+
+    thetas_init = 6.6                   ! [C] Relaxation temperature of the southern box
+    thetan_init = 2.7                   ! [C] Relaxation temperature of the northern box
+    thetat_init = 11.7                  ! [C] Relaxation temperature of the tropical box
+
+    lambdan_init = 0.05934959349593496  ! Gamma / (c * rho * z)
+    lambdas_init = 0.05934959349593496
+    lambdat_init = 0.17804878048780487
+    lambdatd_init = 0.0
 /
 
 &ytopo
