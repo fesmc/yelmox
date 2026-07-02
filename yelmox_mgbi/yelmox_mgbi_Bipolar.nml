@@ -6,10 +6,10 @@
 ! ymat, ytherm, ytill, ycalv, yhyd) are SHARED (no suffix). Distinct group
 ! names also let 'runme -p group.name=val' target one domain unambiguously.
 !
-! [domains] names lists the suffix tags (_south = Antarctica, _north =
-! Greenland). Physics groups are shared here (taken from the south domain);
-! suffix them + repoint the [yelmo_<sfx>] nml_ydyn/... fields for per-domain
-! physics.
+! [ctrl] active_north / active_south select the hemispheres (suffixes _north =
+! Greenland, _south = Antarctica). Physics groups are shared here (taken from
+! the south domain); suffix them + repoint the [yelmo_<sfx>] nml_ydyn/... fields
+! for per-domain physics.
 
 &ctrl
     tstep_method    = "const"
@@ -18,10 +18,10 @@
     time_end        = 40.0
     dtt             = 10.0
     write_clim_and_kill = False
-/
 
-&domains
-    names = "north" "south"
+    active_north    = True              ! Run the Northern-Hemisphere domain?
+    active_south    = True              ! Run the Southern-Hemisphere domain?
+    restart_bsl     = "None"            ! Shared bsl restart bundle folder, or "None"
 /
 
 &tm_1D
