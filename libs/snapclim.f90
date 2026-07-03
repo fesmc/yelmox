@@ -2054,6 +2054,17 @@ contains
                 allocate(depth0(nz0))
                 call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(1),depth0)
 
+                ! Normalize the input vertical axis to positive-down depths [m],
+                ! matching snapclim's internal ocn%depth grid (0..3000 m). Some
+                ! ocean files store the coordinate as height (positive up, z<0,
+                ! e.g. the ISMIP6-J20 file). Without this, both the vertical
+                ! interpolation (interp_linear below) and the ocean-mask depth
+                ! test deliver the wrong water mass / mask to marine_shelf.
+                ! To reproduce the previous (incorrect) behaviour for comparison,
+                ! comment the FIX line and uncomment the LEGACY line.
+                depth0 = abs(depth0)        ! FIX: positive-down depth axis
+                !depth0 = depth0            ! LEGACY: raw file axis (wrong for positive-up 'z')
+
                 ! Allocate additional arrays
                 allocate(mask3D(nx,ny,nz0))
                 allocate(tocn3D(nx,ny,nz0))
@@ -2150,7 +2161,7 @@ contains
         write(*,"(a)") "read_ocean_snapshot:: loaded: "//trim(ocn%par%ocn_path)
         write(*,"(4x,a,2f12.2)") "range: depth      [m]    = ", minval(ocn%depth),  maxval(ocn%depth)
         write(*,"(4x,a,2f12.2)") "range: to_ann     [K]    = ", minval(ocn%to_ann), maxval(ocn%to_ann)
-        write(*,"(a,f12.2)") "snapshot time =", ocn%par%ocn_time 
+        write(*,"(a,f12.2)") "snapshot time =", ocn%par%ocn_time
 
         return 
 
