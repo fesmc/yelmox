@@ -661,17 +661,19 @@
 &coupling
     ! Domain setup: active components + methods, per-component grids, restart.
     ! with_ice_sheet / with_isostasy / equil_method are read here (not from the
-    ! run_step group). Empty grids default to the Yelmo grid, so esm + smbpal +
-    ! marine_shelf all share the Yelmo grid (identity remaps = exact parity).
+    ! run_step group). Empty grids default to the Yelmo grid, so esm (grid_clim),
+    ! smbpal (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
+    ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
+    ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
     with_ice_sheet  = True     ! Is the ice sheet active?
     with_isostasy   = True     ! Is isostasy active?
     equil_method    = "opt"    ! "none", "relax", "opt"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
     dt_restart      = 20e3     ! [yr] Frequency of writing restart files
-    grid_mshlf = ""            ! esm/marine-shelf grid; default = grid_name (= Yelmo grid here)
-    grid_isos  = ""            ! isostasy grid; default = grid_yelmo
-    grid_clim  = ""            ! (unused: esm supplies climate; default = grid_yelmo)
+    grid_clim  = ""            ! esm grid (esm's own working grid); default = grid_yelmo
     grid_smb   = ""            ! smb grid; default = grid_clim
+    grid_mshlf = ""            ! marine-shelf grid; default = grid_name (= Yelmo grid here)
+    grid_isos  = ""            ! isostasy grid; default = grid_yelmo
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 /
 

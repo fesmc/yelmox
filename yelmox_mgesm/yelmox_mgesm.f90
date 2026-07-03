@@ -9,13 +9,16 @@ program yelmox_mgesm
     ! step_climate_esm / step_marine_shelf_esm in place of the snapclim-based
     ! step_climate / step_marine_shelf.
     !
-    ! The ESM forcing modules (esm + smbpal + marine_shelf) share one working
-    ! grid, the "esm grid" = grid_mshlf: esm_clim_update / esm_forcing_update /
-    ! esm_variability_update and the marine-shelf interpolation are co-gridded, as
-    ! in the yelmox_esm.f90 monolith. Geometry is remapped from the hub onto that
-    ! grid and the SMB / ocean boundary conditions are aggregated back to Yelmo.
-    ! With grid_mshlf == grid_smb == grid_yelmo == grid_name every remap is an
-    ! identity copy, reproducing yelmox_esm.f90.
+    ! esm is a first-class multigrid component: it runs entirely on its own grid
+    ! (grid_clim, the climate grid) and each output is remapped to the consumer
+    ! module's grid at coupling time, exactly like snapclim -- atmosphere fields to
+    ! grid_smb (smbpal), the depth-interpolated ocean forcing to grid_mshlf
+    ! (marine_shelf). Geometry comes from the hi-res hub, remapped to whichever grid
+    ! a step needs. marshelf_interp_shelf reads only mshlf%par (grid-agnostic), so
+    ! the ESM ocean interpolation runs on grid_clim and the resulting T_shlf/S_shlf
+    ! are remapped to grid_mshlf. With grid_clim == grid_smb == grid_mshlf ==
+    ! grid_yelmo == grid_name every remap is an identity copy, reproducing
+    ! yelmox_esm.f90; set grid_clim to a coarse ESM grid and it genuinely fans out.
     !
     ! Output (yelmo2D / yelmo2Dsm / yelmo1D_esm and the CMIP-formatted files) is
     ! kept identical to yelmox_esm.f90 via yelmox_esm_output. See docs/multigrid.md.
@@ -151,9 +154,11 @@ program yelmox_mgesm
     ! Regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
 
-    ! Initialize the ESM forcing on the esm grid (= grid_mshlf, shared with mshlf).
+    ! Initialize the ESM forcing on its own grid (grid_clim, the climate grid).
+    ! esm runs entirely on this grid; its outputs are remapped to the consumer
+    ! grids (grid_smb for smbpal, grid_mshlf for marine_shelf) at coupling time.
     esm_path_par = trim(outfldr)//"/"//trim(ec%par_file)
-    call esm_forcing_init(esm, esm_path_par, dom%ctl%domain, trim(dom%ctl%grid_mshlf), &
+    call esm_forcing_init(esm, esm_path_par, dom%ctl%domain, trim(dom%ctl%grid_clim), &
                           run_type=ec%run_step, gcm=ec%esm_name, experiment=ec%experiment, &
                           use_esm=ec%use_esm, use_smb=ec%use_smb, use_var=ec%use_var, &
                           use_hist=ec%use_hist, use_proj=ec%use_proj)
@@ -162,7 +167,9 @@ program yelmox_mgesm
     write(*,*) "yelmox_mgesm: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
     write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
-    write(*,*) "  esm  grid   : "//trim(dom%ctl%grid_mshlf)
+    write(*,*) "  esm  grid   : "//trim(dom%ctl%grid_clim)
+    write(*,*) "  smb  grid   : "//trim(dom%ctl%grid_smb)
+    write(*,*) "  mshlf grid  : "//trim(dom%ctl%grid_mshlf)
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)
 
@@ -330,88 +337,98 @@ contains
 
     ! ---------------------------------------------------------------------------
     subroutine step_climate_esm(dom, esm, ec, ts, init)
-        ! ESM climate + surface mass balance. The esm forcing runs on the esm grid
-        ! (grid_mshlf): geometry is remapped from the hub, the three esm updates
-        ! produce the atmospheric/ocean anomaly fields, smbpal (or the direct-SMB
-        ! path) is evaluated on grid_smb, and smb / T_srf are aggregated back to the
-        ! Yelmo grid. The ocean anomalies (esm%dto/dso, esm%to_ref/so_ref) are left
-        ! for step_marine_shelf_esm, which shares the esm grid.
+        ! ESM climate + surface mass balance. esm runs entirely on its own grid
+        ! (grid_clim): geometry is remapped from the hub onto it, the three esm
+        ! updates produce the atmospheric/ocean anomaly fields there, and the
+        ! atmospheric forcing is remapped to grid_smb for smbpal (or the direct-SMB
+        ! path), with smb / T_srf aggregated back to the Yelmo grid. The ocean
+        ! anomalies (esm%dto/dso, esm%to_ref/so_ref) stay on grid_clim for
+        ! step_marine_shelf_esm.
         type(ice_domain),        intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params),    intent(in)    :: ec
         type(tstep_class),       intent(in)    :: ts
         logical, intent(in), optional          :: init
 
-        real(wp), allocatable :: z_srf_f(:,:), H_ice_f(:,:), z_bed_f(:,:)
-        real(wp), allocatable :: f_grnd_f(:,:), z_sl_f(:,:), basins_f(:,:)
+        real(wp), allocatable :: z_srf_e(:,:), H_ice_e(:,:), z_bed_e(:,:)
+        real(wp), allocatable :: f_grnd_e(:,:), z_sl_e(:,:), basins_e(:,:)
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
+        real(wp), allocatable :: smb_ann_s(:,:), dsmb_s(:,:), dsmbdz_s(:,:)
+        real(wp), allocatable :: pd_zsrf_s(:,:), tsrf_s(:,:)
         real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:), Qd_y(:,:)
-        character(len=256) :: gf, gn, gy, gs
+        character(len=256) :: ge, gn, gy, gs
         logical :: is_init
 
         is_init = .false.
         if (present(init)) is_init = init
 
-        gf = trim(dom%ctl%grid_mshlf)   ! esm grid (shared with marine_shelf)
+        ge = trim(dom%ctl%grid_clim)    ! esm grid (esm's own working grid)
         gn = trim(dom%ctl%grid_name)    ! hub grid
         gy = trim(dom%ctl%grid_yelmo)
         gs = trim(dom%ctl%grid_smb)
 
         ! Geometry: hub -> esm grid.
-        call remap(dom, dom%topo%z_srf,   gn, z_srf_f,  gf, "bilin")
-        call remap(dom, dom%topo%H_ice,   gn, H_ice_f,  gf, "bilin")
-        call remap(dom, dom%topo%z_bed,   gn, z_bed_f,  gf, "bilin")
-        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_f, gf, "bilin")
-        call remap(dom, dom%topo%z_sl,    gn, z_sl_f,   gf, "bilin")
-        call remap(dom, dom%topo%basins,  gn, basins_f, gf, "nn")
+        call remap(dom, dom%topo%z_srf,   gn, z_srf_e,  ge, "bilin")
+        call remap(dom, dom%topo%H_ice,   gn, H_ice_e,  ge, "bilin")
+        call remap(dom, dom%topo%z_bed,   gn, z_bed_e,  ge, "bilin")
+        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_e, ge, "bilin")
+        call remap(dom, dom%topo%z_sl,    gn, z_sl_e,   ge, "bilin")
+        call remap(dom, dom%topo%basins,  gn, basins_e, ge, "nn")
 
         ! Step 1: reference climatology (lapse-rate / precip scaling to z_srf).
-        call esm_clim_update(esm, z_srf_f, ts%time, ec%time_ref, ec%use_smb, &
-                             dom%ctl%domain, gf)
+        call esm_clim_update(esm, z_srf_e, ts%time, ec%time_ref, ec%use_smb, &
+                             dom%ctl%domain, ge)
 
         ! Extrapolate reference ocean into ice-shelf interiors.
         if (dom%mshlf%par%extrap_shlf) then
-            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), H_ice_f, basins_f, &
-                                            -esm%to_var_ref%z, z_bed_f)
-            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), H_ice_f, basins_f, &
-                                            -esm%so_var_ref%z, z_bed_f)
+            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), H_ice_e, basins_e, &
+                                            -esm%to_var_ref%z, z_bed_e)
+            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), H_ice_e, basins_e, &
+                                            -esm%so_var_ref%z, z_bed_e)
         end if
 
-        ! Step 2: anomaly fields (historical / projection / homogeneous).
+        ! Step 2: anomaly fields (historical / projection / homogeneous). mshlf is
+        ! passed for its params only (marshelf_interp_shelf is grid-agnostic), so
+        ! the ocean anomalies dto/dso are produced on the esm grid.
         call esm_forcing_update(esm, dom%mshlf, ts%time, ec%use_esm, ec%time_ref, &
                                 ec%time_hist, ec%time_proj, ec%time_esm_ref, dom%ctl%domain, &
-                                H_ice_f, basins_f, z_bed_f, f_grnd_f, z_sl_f, ec%use_smb, &
+                                H_ice_e, basins_e, z_bed_e, f_grnd_e, z_sl_e, ec%use_smb, &
                                 use_ref_atm=.false., use_ref_ocn=.false.)
 
         ! Step 3: variability anomaly.
         call esm_variability_update(esm, dom%mshlf, ts%time, ec%dtt, ec%clim_var, ec%time_ref, &
-                                    H_ice_f, basins_f, z_bed_f, f_grnd_f, z_sl_f, ec%use_var, &
+                                    H_ice_e, basins_e, z_bed_e, f_grnd_e, z_sl_e, ec%use_var, &
                                     use_ref_atm=.false., use_ref_ocn=.false.)
 
         ! === Atmospheric boundary conditions (SMB on grid_smb) ===
         if (ec%use_smb) then
-            ! Direct SMB from the esm fields (co-gridded on the esm grid gf==gs
-            ! for the standard ESM setup); assign into the smbpal annual fields.
-            dom%smb%ann%smb  = esm%smb_ann + sum(esm%dsmb, dim=3)/12.0_wp &
-                               - esm%dsmbdz*(dom%yelmo%dta%pd%z_srf - dom%yelmo%tpo%now%z_srf)
-            dom%smb%ann%tsrf = sum(esm%t2m + esm%dts + esm%dts_var, dim=3)/12.0_wp
-            where(dom%yelmo%tpo%now%H_ice > 0.0_wp .and. &
-                  sum(esm%t2m + esm%dts + esm%dts_var, dim=3)/12.0_wp > 273.15_wp) &
-                dom%smb%ann%tsrf = 273.15_wp
+            ! Direct SMB from the esm fields: remap each term esm grid -> grid_smb,
+            ! evaluate the elevation correction there against the (remapped) surface.
+            call remap(dom, esm%smb_ann,               ge, smb_ann_s, gs, "bilin")
+            call remap(dom, sum(esm%dsmb, dim=3)/12.0_wp, ge, dsmb_s,  gs, "bilin")
+            call remap(dom, esm%dsmbdz,                ge, dsmbdz_s,  gs, "bilin")
+            call remap(dom, dom%yelmo%dta%pd%z_srf,    gy, pd_zsrf_s, gs, "bilin")
+            call remap(dom, dom%topo%z_srf,            gn, z_srf_s,   gs, "bilin")
+            call remap(dom, dom%topo%H_ice,            gn, H_ice_s,   gs, "bilin")
+            call remap(dom, sum(esm%t2m + esm%dts + esm%dts_var, dim=3)/12.0_wp, &
+                       ge, tsrf_s, gs, "bilin")
+            dom%smb%ann%smb  = smb_ann_s + dsmb_s - dsmbdz_s*(pd_zsrf_s - z_srf_s)
+            dom%smb%ann%tsrf = tsrf_s
+            where(H_ice_s > 0.0_wp .and. tsrf_s > 273.15_wp) dom%smb%ann%tsrf = 273.15_wp
         else
             ! smbpal on grid_smb: atmospheric forcing from the esm grid, geometry
             ! from the hub. init=.true. runs the ITM snowpack equilibration first.
-            call remap(dom, esm%t2m + esm%dts + esm%dts_var, gf, tas_s, gs, "bilin")
-            call remap(dom, esm%pr  * esm%dpr * esm%dpr_var, gf, pr_s,  gs, "bilin")
+            call remap(dom, esm%t2m + esm%dts + esm%dts_var, ge, tas_s, gs, "bilin")
+            call remap(dom, esm%pr  * esm%dpr * esm%dpr_var, ge, pr_s,  gs, "bilin")
             call remap(dom, dom%topo%z_srf, gn, z_srf_s, gs, "bilin")
             call remap(dom, dom%topo%H_ice, gn, H_ice_s, gs, "bilin")
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
-                call remap(dom, esm%t2m + esm%dts, gf, tas_s, gs, "bilin")
-                call remap(dom, esm%pr  * esm%dpr, gf, pr_s,  gs, "bilin")
+                call remap(dom, esm%t2m + esm%dts, ge, tas_s, gs, "bilin")
+                call remap(dom, esm%pr  * esm%dpr, ge, pr_s,  gs, "bilin")
                 call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
                                                  ts%time_rel, time_equil=100.0_wp)
-                call remap(dom, esm%t2m + esm%dts + esm%dts_var, gf, tas_s, gs, "bilin")
-                call remap(dom, esm%pr  * esm%dpr * esm%dpr_var, gf, pr_s,  gs, "bilin")
+                call remap(dom, esm%t2m + esm%dts + esm%dts_var, ge, tas_s, gs, "bilin")
+                call remap(dom, esm%pr  * esm%dpr * esm%dpr_var, ge, pr_s,  gs, "bilin")
             end if
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if
@@ -423,60 +440,80 @@ contains
         dom%yelmo%bnd%T_srf = tsrf_y
 
         ! Subglacial discharge (Greenland frontal melt) -> Yelmo grid.
-        call remap(dom, esm%Qd_ann, gf, Qd_y, gy, "con")
+        call remap(dom, esm%Qd_ann, ge, Qd_y, gy, "con")
         dom%yelmo%bnd%Qd = Qd_y
 
     end subroutine step_climate_esm
 
     ! ---------------------------------------------------------------------------
     subroutine step_marine_shelf_esm(dom, esm, ec, ts)
-        ! ESM ocean boundary conditions + marine-shelf basal melt on the esm grid
-        ! (grid_mshlf): interpolate the reference ocean to shelf depth, add the esm
-        ! ocean anomalies (set by step_climate_esm), run marshelf_update, and
-        ! aggregate bmb_shlf / T_shlf back to the Yelmo grid.
+        ! ESM ocean boundary conditions + marine-shelf basal melt. The ocean forcing
+        ! is produced on the esm grid (grid_clim): interpolate the reference ocean to
+        ! shelf depth (marshelf_interp_shelf reads only mshlf%par, so it is
+        ! grid-agnostic) and add the esm ocean anomalies from step_climate_esm. The
+        ! resulting T_shlf/S_shlf are remapped to grid_mshlf, where marshelf_update
+        ! runs against the hub geometry, and bmb_shlf/T_shlf are aggregated back to
+        ! the Yelmo grid.
         type(ice_domain),        intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params),    intent(in)    :: ec
         type(tstep_class),       intent(in)    :: ts
 
-        real(wp), allocatable :: H_ice_f(:,:), z_bed_f(:,:), f_grnd_f(:,:), z_sl_f(:,:)
-        real(wp), allocatable :: regions_f(:,:), basins_f(:,:)
+        real(wp), allocatable :: H_ice_e(:,:), z_bed_e(:,:), f_grnd_e(:,:), z_sl_e(:,:)
+        real(wp), allocatable :: T_shlf_e(:,:), S_shlf_e(:,:), dT_shlf_e(:,:)
+        real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
+        real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
-        character(len=256) :: gf, gn, gy
+        character(len=256) :: ge, gm, gn, gy
 
         if (.not. dom%ctl%with_marine_shelf) return
 
-        gf = trim(dom%ctl%grid_mshlf)
-        gn = trim(dom%ctl%grid_name)
+        ge = trim(dom%ctl%grid_clim)    ! esm grid (ocean fields live here)
+        gm = trim(dom%ctl%grid_mshlf)   ! marine-shelf grid
+        gn = trim(dom%ctl%grid_name)    ! hub grid
         gy = trim(dom%ctl%grid_yelmo)
 
-        ! Geometry + masks: hub -> esm grid.
-        call remap(dom, dom%topo%H_ice,   gn, H_ice_f,   gf, "bilin")
-        call remap(dom, dom%topo%z_bed,   gn, z_bed_f,   gf, "bilin")
-        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_f,  gf, "bilin")
-        call remap(dom, dom%topo%z_sl,    gn, z_sl_f,    gf, "bilin")
-        call remap(dom, dom%topo%regions, gn, regions_f, gf, "nn")
-        call remap(dom, dom%topo%basins,  gn, basins_f,  gf, "nn")
+        ! --- Ocean forcing on the esm grid ---
+        ! Geometry for the shelf-depth interpolation: hub -> esm grid.
+        call remap(dom, dom%topo%H_ice,  gn, H_ice_e,  ge, "bilin")
+        call remap(dom, dom%topo%z_bed,  gn, z_bed_e,  ge, "bilin")
+        call remap(dom, dom%topo%f_grnd, gn, f_grnd_e, ge, "bilin")
+        call remap(dom, dom%topo%z_sl,   gn, z_sl_e,   ge, "bilin")
 
-        ! Reference ocean interpolated to shelf depth, plus esm anomalies.
-        call marshelf_interp_shelf(dom%mshlf%now%T_shlf, dom%mshlf, esm%to_ref%var(:,:,:,1), &
-                                   H_ice_f, z_bed_f, f_grnd_f, z_sl_f, -esm%to_ref%z)
-        call marshelf_interp_shelf(dom%mshlf%now%S_shlf, dom%mshlf, esm%so_ref%var(:,:,:,1), &
-                                   H_ice_f, z_bed_f, f_grnd_f, z_sl_f, -esm%so_ref%z)
-        dom%mshlf%now%T_shlf = dom%mshlf%now%T_shlf + esm%dto + esm%dto_var
-        dom%mshlf%now%S_shlf = dom%mshlf%now%S_shlf + esm%dso + esm%dso_var
+        allocate(T_shlf_e(size(H_ice_e,1), size(H_ice_e,2)))
+        allocate(S_shlf_e(size(H_ice_e,1), size(H_ice_e,2)))
+        call marshelf_interp_shelf(T_shlf_e, dom%mshlf, esm%to_ref%var(:,:,:,1), &
+                                   H_ice_e, z_bed_e, f_grnd_e, z_sl_e, -esm%to_ref%z)
+        call marshelf_interp_shelf(S_shlf_e, dom%mshlf, esm%so_ref%var(:,:,:,1), &
+                                   H_ice_e, z_bed_e, f_grnd_e, z_sl_e, -esm%so_ref%z)
+        T_shlf_e = T_shlf_e + esm%dto + esm%dto_var
+        S_shlf_e = S_shlf_e + esm%dso + esm%dso_var
+
+        ! Send the ocean forcing to the marine-shelf grid (esm grid -> grid_mshlf).
+        call remap(dom, T_shlf_e, ge, dom%mshlf%now%T_shlf, gm, "bilin")
+        call remap(dom, S_shlf_e, ge, dom%mshlf%now%S_shlf, gm, "bilin")
 
         if (trim(dom%ctl%domain) == "Greenland") then
-            dom%mshlf%now%dT_shlf   = dom%mshlf%now%T_shlf + esm%dto
+            dT_shlf_e = T_shlf_e + esm%dto
+            call remap(dom, dT_shlf_e, ge, dom%mshlf%now%dT_shlf, gm, "bilin")
             dom%mshlf%par%tf_method = 2
         end if
 
-        call marshelf_update(dom%mshlf, H_ice_f, z_bed_f, f_grnd_f, regions_f, basins_f, &
-                             z_sl_f, dx=dom%ctl%dx_mshlf)
+        ! --- Marine-shelf basal melt on grid_mshlf ---
+        ! Geometry + masks: hub -> mshlf grid.
+        call remap(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
+        call remap(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
+        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
+        call remap(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
+        call remap(dom, dom%topo%regions, gn, regions_m, gm, "nn")
+        call remap(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
+
+        call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
+                             z_sl_m, dx=dom%ctl%dx_mshlf)
 
         ! Aggregate outputs -> Yelmo grid (conservative).
-        call remap(dom, dom%mshlf%now%bmb_shlf, gf, bmb_y,   gy, "con")
-        call remap(dom, dom%mshlf%now%T_shlf,   gf, Tshlf_y, gy, "con")
+        call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
+        call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
         dom%yelmo%bnd%bmb_shlf = bmb_y
         dom%yelmo%bnd%T_shlf   = Tshlf_y
 

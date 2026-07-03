@@ -7,9 +7,9 @@ domain-specific startups ported. The bipolar driver (`yelmox_mgbi.f90`) also
 carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level
 and a shared Ocean Box Model exchanging freshwater flux / ocean temperature
 between hemispheres (`libs/obm_coupling.f90`). A third driver (`yelmox_mgesm.f90`)
-swaps snapclim for ESM climatic forcing (`libs/esm.f90`), with its climate/ocean
-steps co-gridded on the marine-shelf grid (see Drivers). Remaining: ESM-native
-source-grid remapping (currently identity to the Yelmo grid) and FastIsostasy
+swaps snapclim for ESM climatic forcing (`libs/esm.f90`), running esm as a
+first-class component on its own grid (`grid_clim`) and remapping its outputs to
+the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy
 hi-res output (below).
 
 ## Motivation
@@ -375,14 +375,19 @@ end program
   snapclim is skipped) plus the shared `step_optimize/step_isostasy/step_icesheet/
   refresh_htopo` primitives and the restart bundle, but the driver owns an
   `esm_forcing_class` and calls its own `step_climate_esm` / `step_marine_shelf_esm`
-  (contained in the program) instead of the snapclim-based steps. The ESM forcing
-  modules (esm + smbpal + marine_shelf) share one working grid, the *esm grid* =
-  `grid_mshlf`: `esm_clim_update`/`esm_forcing_update`/`esm_variability_update` and
-  the marine-shelf interpolation are co-gridded, as in the original `yelmox_esm.f90`
-  monolith. Geometry is remapped from the hub onto that grid and the SMB / ocean
-  boundary conditions are aggregated back to Yelmo; with `grid_mshlf == grid_smb ==
+  (contained in the program) instead of the snapclim-based steps. esm is a
+  first-class multigrid component: it runs entirely on its own grid (*esm grid* =
+  `grid_clim`, exactly like snapclim), and each output is remapped to the consumer
+  module's grid at coupling time — atmosphere to `grid_smb` (smbpal), the
+  depth-interpolated ocean forcing to `grid_mshlf` (marine_shelf). This works
+  because `marshelf_interp_shelf` reads only `mshlf%par` (grid-agnostic), so the ESM
+  ocean interpolation runs on `grid_clim` and the resulting `T_shlf`/`S_shlf` are
+  remapped to `grid_mshlf` before `marshelf_update`; `esm.f90` is untouched.
+  Geometry comes from the hub, remapped to whichever grid a step needs; SMB / ocean
+  BCs aggregate back to Yelmo. With `grid_clim == grid_smb == grid_mshlf ==
   grid_name == grid_yelmo` every remap is an identity copy, reproducing
-  `yelmox_esm.f90`. Config splits ESM-specific control ([esm] + the run_step group
+  `yelmox_esm.f90`; set `grid_clim` to a coarse ESM grid and it genuinely fans out.
+  Config splits ESM-specific control ([esm] + the run_step group
   [spinup]/[transient]: `time_ref/hist/proj/esm_ref`, `use_*`, CMIP output) from
   the shared mg groups ([coupling]/[output]/[htopo]). Output (incl. the
   CMIP-formatted files) is kept identical to `yelmox_esm.f90` via the
@@ -399,7 +404,7 @@ program yelmox_mgesm
     type(esm_forcing_class) :: esm    ! driver-owned climate (replaces snapclim)
 
     call domain_init(dom, path_par, ts%time, init_climate=.false.)   ! skip snapclim
-    call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_mshlf)     ! on the esm grid
+    call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_clim)      ! on esm's own grid
 
     do while (.not. ts%is_finished)
         call bsl_update(bsl, ...)                       ! once, shared
