@@ -134,6 +134,9 @@ module yelmox_domain
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
     public :: step_optimize, domain_update_smb
+    ! Exposed so flavor-specific drivers (e.g. the ESM driver) can remap between
+    ! the hub/Yelmo grids and their own forcing grid via the domain's coupler.
+    public :: remap
 
     ! Domain-level remap: identity-copy when src == dst, else remap via the coupler.
     interface remap
