@@ -20,8 +20,8 @@ program yelmox_mgesm
     ! grid_yelmo == grid_name every remap is an identity copy, reproducing
     ! yelmox_esm.f90; set grid_clim to a coarse ESM grid and it genuinely fans out.
     !
-    ! Output (yelmo2D / yelmo2Dsm / yelmo1D_esm and the CMIP-formatted files) is
-    ! kept identical to yelmox_esm.f90 via yelmox_esm_output. See docs/multigrid.md.
+    ! Output (yelmo / yelmo_sm / yelmo_ts_esm and the CMIP-formatted files) is kept
+    ! identical to yelmox_esm.f90 via yelmox_esm_output. See docs/multigrid.md.
 
     use nml
     use ncio
@@ -120,11 +120,12 @@ program yelmox_mgesm
 
     ! Single-domain runs write to the run dir.
     outfldr     = "./"
-    file2D      = trim(outfldr)//"yelmo2D.nc"
-    file2Dsm    = trim(outfldr)//"yelmo2Dsm.nc"
-    file1D_esm  = trim(outfldr)//"yelmo1D_esm.nc"
-    file1D_cmip = trim(outfldr)//"yelmo1D_cmip.nc"
-    file2D_cmip = trim(outfldr)//"yelmo2D_cmip.nc"
+    ! File naming convention: 2D output -> "yelmo", 1D timeseries -> "yelmo_ts".
+    file2D      = trim(outfldr)//"yelmo.nc"
+    file2Dsm    = trim(outfldr)//"yelmo_sm.nc"
+    file1D_esm  = trim(outfldr)//"yelmo_ts_esm.nc"
+    file1D_cmip = trim(outfldr)//"yelmo_ts_cmip.nc"
+    file2D_cmip = trim(outfldr)//"yelmo_cmip.nc"
     file_isos   = trim(outfldr)//"fastisostasy.nc"
     file_bsl    = trim(outfldr)//"bsl.nc"
 
