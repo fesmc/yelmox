@@ -8,6 +8,7 @@
         {   "yelmox"    : "libyelmox/bin/yelmox.x",
             "mg"        : "libyelmox/bin/yelmox_mg.x",
             "mgbi"      : "libyelmox/bin/yelmox_mgbi.x",
+            "mgesm"     : "libyelmox/bin/yelmox_mgesm.x",
             "iso"       : "libyelmox/bin/yelmox_iso.x",
             "hyst"      : "libyelmox/bin/yelmox_hyst.x",
             "rembo"     : "libyelmox/bin/yelmox_rembo.x",
