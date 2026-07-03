@@ -102,7 +102,9 @@ function fig_ref_map(root, out)
 end
 
 # --- figure 2: core comparison, actual + difference vs 8KM reference -------
-function fig_core_compare(root, out)
+# zoom = ((xmin,xmax),(ymin,ymax)) in km restricts the view (e.g. WAIS); tag is
+# appended to the output filename.
+function fig_core_compare(root, out; zoom = nothing, tag = "")
     ref = findrun("y8KM_m8KM")
     rm = read_map(yelmo2d(root, ref), "bmb_shlf")
     rm === nothing && (@warn "reference run missing, skipping fig 2"; return)
@@ -110,6 +112,8 @@ function fig_core_compare(root, out)
     fr = copy(fr); fr[.!fltr] .= NaN               # reference: floating shelf only
 
     cores = [findrun("y8KM_m8KM"), findrun("y16KM_m16KM"), findrun("y32KM_m32KM")]
+
+    setzoom!(ax) = zoom !== nothing && (xlims!(ax, zoom[1]...); ylims!(ax, zoom[2]...))
 
     fig = Figure(size = (860, 1120))
     for (row, r) in enumerate(cores)
@@ -123,6 +127,7 @@ function fig_core_compare(root, out)
                    title = "bmb_shlf  ($(reslabel(r.ygrid)) core)",
                    ylabel = "yc [km]")
         hml = heatmap!(axl, x, y, f; colormap = Reverse(:dense), colorrange = (-20, 0))
+        setzoom!(axl)
         row == length(cores) && (axl.xlabel = "xc [km]")
         row == 1 && Colorbar(fig[1, 2], hml, label = "bmb_shlf [m/yr]")
 
@@ -132,10 +137,11 @@ function fig_core_compare(root, out)
         axr = Axis(fig[row, 3]; aspect = DataAspect(),
                    title = "difference vs ANT-8KM")
         hmr = heatmap!(axr, xr, yr, d; colormap = :balance, colorrange = (-10, 10))
+        setzoom!(axr)
         row == length(cores) && (axr.xlabel = "xc [km]")
         row == 1 && Colorbar(fig[1, 4], hmr, label = "Δ bmb_shlf [m/yr]")
     end
-    save(joinpath(out, "mg_bmb_shlf_core_compare.png"), fig)
+    save(joinpath(out, "mg_bmb_shlf_core_compare$(tag).png"), fig)
 end
 
 # --- figure 3: permutation timeseries --------------------------------------
@@ -174,6 +180,7 @@ function main()
     mkpath(out)
     fig_ref_map(root, out)
     fig_core_compare(root, out)
+    fig_core_compare(root, out; zoom = ((-2308.0, 452.0), (-1732.0, 1476.0)), tag = "_WAIS")
     fig_perm_timeseries(root, out)
     println("wrote figures to $out")
 end
