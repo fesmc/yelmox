@@ -1167,9 +1167,16 @@ contains
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
 
+        ! Yelmo 2D fields: the yelmo_write_step default set + bmb_shlf, the
+        ! coupled shelf melt (yelmo%bnd%bmb_shlf) aggregated onto the Yelmo grid.
+        character(len=56), parameter :: yelmo_vars(23) = [ character(len=56) :: &
+            "H_ice","z_srf","z_bed","mask_bed","uxy_b","uxy_s","uxy_bar", &
+            "ux_bar","uy_bar","cb_ref","N_eff","beta","taub","taud","visc_bar", &
+            "T_prime_b","hyd_W_til","mb_net","smb","bmb","cmb","z_sl","bmb_shlf" ]
+
         if (dom%ctl%write_yelmo) &
             call yelmo_write_step(dom%yelmo, trim(io_fname(outfldr,"yelmo",dom%ctl%grid_yelmo)), &
-                                  time, compare_pd=.FALSE.)
+                                  time, nms=yelmo_vars, compare_pd=.FALSE.)
         if (dom%ctl%write_htopo) &
             call htopo_write_step(dom%topo, trim(io_fname(outfldr,"htopo",dom%ctl%grid_name)), time)
         if (dom%ctl%write_isos) &
