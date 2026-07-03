@@ -47,7 +47,16 @@ function read_map(path, var)
         x = Float64.(ds["xc"][:])
         y = Float64.(ds["yc"][:])
         f = Float64.(ds[var][:, :, end])
-        return (x, y, f)
+        # Floating-ice mask: bmb_shlf is only physically applied under floating
+        # ice; over grounded ice / open ocean it is a non-physical phantom value.
+        flt = trues(size(f))
+        if all(k -> haskey(ds, k), ("H_ice", "z_srf", "z_bed"))
+            H  = Float64.(ds["H_ice"][:, :, end])
+            zs = Float64.(ds["z_srf"][:, :, end])
+            zb = Float64.(ds["z_bed"][:, :, end])
+            flt = (H .> 1) .& ((zs .- H) .> (zb .+ 1))
+        end
+        return (x, y, f, flt)
     end
 end
 
@@ -81,13 +90,13 @@ function fig_ref_map(root, out)
     r = findrun("y8KM_m8KM")
     m = read_map(yelmo2d(root, r), "bmb_shlf")
     m === nothing && (@warn "reference run missing, skipping fig 1"; return)
-    x, y, f = m
-    fm = copy(f); fm[fm .== 0.0] .= NaN            # hide grounded / no-melt points
+    x, y, f, flt = m
+    fm = copy(f); fm[.!flt] .= NaN                 # show floating shelf melt only
 
     fig = Figure(size = (620, 640))
     ax = Axis(fig[1, 1]; aspect = DataAspect(), title = "bmb_shlf  (ANT-8KM reference)",
               xlabel = "xc [km]", ylabel = "yc [km]")
-    hm = heatmap!(ax, x, y, fm; colormap = :dense, colorrange = (-20, 0))
+    hm = heatmap!(ax, x, y, fm; colormap = Reverse(:dense), colorrange = (-20, 0))
     Colorbar(fig[1, 2], hm, label = "bmb_shlf [m/yr]")
     save(joinpath(out, "mg_bmb_shlf_ref.png"), fig)
 end
@@ -97,7 +106,8 @@ function fig_core_compare(root, out)
     ref = findrun("y8KM_m8KM")
     rm = read_map(yelmo2d(root, ref), "bmb_shlf")
     rm === nothing && (@warn "reference run missing, skipping fig 2"; return)
-    xr, yr, fr = rm
+    xr, yr, fr, fltr = rm
+    fr = copy(fr); fr[.!fltr] .= NaN               # reference: floating shelf only
 
     cores = [findrun("y8KM_m8KM"), findrun("y16KM_m16KM"), findrun("y32KM_m32KM")]
 
@@ -105,14 +115,14 @@ function fig_core_compare(root, out)
     for (row, r) in enumerate(cores)
         m = read_map(yelmo2d(root, r), "bmb_shlf")
         m === nothing && continue
-        x, y, f = m
+        x, y, f, flt = m
+        f = copy(f); f[.!flt] .= NaN               # floating shelf melt only
 
         # left: actual field
         axl = Axis(fig[row, 1]; aspect = DataAspect(),
                    title = "bmb_shlf  ($(reslabel(r.ygrid)) core)",
                    ylabel = "yc [km]")
-        fm = copy(f); fm[fm .== 0.0] .= NaN
-        hml = heatmap!(axl, x, y, fm; colormap = :dense, colorrange = (-20, 0))
+        hml = heatmap!(axl, x, y, f; colormap = Reverse(:dense), colorrange = (-20, 0))
         row == length(cores) && (axl.xlabel = "xc [km]")
         row == 1 && Colorbar(fig[1, 2], hml, label = "bmb_shlf [m/yr]")
 
