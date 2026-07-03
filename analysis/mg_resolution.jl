@@ -188,6 +188,53 @@ function fig_perm_timeseries(root, out)
     save(joinpath(out, "mg_perm_timeseries.png"), fig)
 end
 
+# --- area-mean aggregation of a fine field onto a coarser grid -------------
+"Average fine field ff (grid xf,yf) onto coarse centers (xc,yc); NaN if empty."
+function aggregate_mean(xf, yf, ff, xc, yc)
+    ix = [argmin(abs.(xc .- v)) for v in xf]     # nearest coarse col per fine col
+    iy = [argmin(abs.(yc .- v)) for v in yf]
+    sums = zeros(length(xc), length(yc)); cnts = zeros(Int, length(xc), length(yc))
+    for j in 1:length(yf), i in 1:length(xf)
+        v = ff[i, j]; isnan(v) && continue
+        sums[ix[i], iy[j]] += v; cnts[ix[i], iy[j]] += 1
+    end
+    out = fill(NaN, length(xc), length(yc))
+    for k in eachindex(out); cnts[k] > 0 && (out[k] = sums[k] / cnts[k]); end
+    return out
+end
+
+# --- figure 4: scatter of coarse vs 8KM reference (floating shelf) ----------
+function fig_scatter(root, out)
+    ref = findrun("y8KM_m8KM")
+    rm = read_map(yelmo2d(root, ref), "bmb_shlf")
+    rm === nothing && (@warn "reference run missing, skipping scatter"; return)
+    xr, yr, fr, fltr, _, _ = rm
+    refm = copy(fr); refm[.!fltr] .= NaN           # 8KM floating shelf field
+
+    others = [findrun("y16KM_m16KM"), findrun("y32KM_m32KM")]
+    lo, hi = -30.0, 2.0
+    fig = Figure(size = (920, 480))
+    for (col, r) in enumerate(others)
+        m = read_map(yelmo2d(root, r), "bmb_shlf")
+        m === nothing && continue
+        x, y, f, flt, _, _ = m
+        fc = copy(f); fc[.!flt] .= NaN                       # coarse floating field
+        ragg = aggregate_mean(xr, yr, refm, x, y)            # 8KM ref -> coarse (area mean)
+        pair = .!isnan.(fc) .& .!isnan.(ragg)
+        xs = ragg[pair]; ys = fc[pair]
+        bias = sum(ys .- xs) / length(xs)
+        rmse = sqrt(sum((ys .- xs) .^ 2) / length(xs))
+        ax = Axis(fig[1, col]; aspect = DataAspect(),
+                  title = "$(reslabel(r.ygrid)) vs 8KM   n=$(length(xs))  bias=$(round(bias, digits=2))  RMSE=$(round(rmse, digits=2))",
+                  xlabel = "bmb_shlf  8KM ref (aggregated) [m/yr]",
+                  ylabel = "bmb_shlf  $(reslabel(r.ygrid)) [m/yr]", titlesize = 10)
+        scatter!(ax, xs, ys; markersize = 4, color = (:steelblue, 0.4))
+        lines!(ax, [lo, hi], [lo, hi]; color = :black, linestyle = :dash)
+        xlims!(ax, lo, hi); ylims!(ax, lo, hi)
+    end
+    save(joinpath(out, "mg_bmb_shlf_scatter.png"), fig)
+end
+
 # --- main ------------------------------------------------------------------
 function main()
     root = length(ARGS) >= 1 ? ARGS[1] : "output/mg"
@@ -196,6 +243,7 @@ function main()
     fig_ref_map(root, out)
     fig_core_compare(root, out)
     fig_core_compare(root, out; zoom = ((-2308.0, 452.0), (-1732.0, 1476.0)), tag = "_WAIS")
+    fig_scatter(root, out)
     fig_perm_timeseries(root, out)
     println("wrote figures to $out")
 end
