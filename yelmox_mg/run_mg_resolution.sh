@@ -12,9 +12,11 @@
 # bmb scaling with H_t=100 (gz_Hg1=100). 2D output every 100 yr, including the
 # diagnosed initial state.
 #
-# Grid mapping per run: Yelmo, isostasy, climate and smb share <yelmo_grid>;
-# marine_shelf and the hi-res topography hub share <mshlf_grid> (the finest
-# grid, >= Yelmo resolution). For a core run the two grids are equal.
+# Grid mapping per run: Yelmo, isostasy and smb share <yelmo_grid>; marine_shelf
+# and the hi-res topography hub share <mshlf_grid> (the finest grid, >= Yelmo
+# resolution). For a core run the two grids are equal. Climate (snapclim
+# atmosphere + ocean) always runs on ANT-32KM -- the only grid with the ISMIP6
+# ocean forcing -- and is remapped by the coupler to the consumer grids.
 #
 # Usage (from anywhere):
 #     yelmox_mg/run_mg_resolution.sh
@@ -36,7 +38,7 @@ run_case() {
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
         -p yelmo.grid_name="$ygrid" htopo.grid_name="$mgrid" \
            coupling.grid_mshlf="$mgrid" coupling.grid_isos="$ygrid" \
-           coupling.grid_clim="$ygrid" coupling.grid_smb="$ygrid" \
+           coupling.grid_clim=ANT-32KM coupling.grid_smb="$ygrid" \
            coupling.equil_method=none ctrl.time_end=1000 \
            tm_2D.dt=100 ytopo.gz_Hg1=100
 }
