@@ -47,17 +47,29 @@ function read_map(path, var)
         x = Float64.(ds["xc"][:])
         y = Float64.(ds["yc"][:])
         f = Float64.(ds[var][:, :, end])
-        # Floating-ice mask: bmb_shlf is only physically applied under floating
-        # ice; over grounded ice / open ocean it is a non-physical phantom value.
-        flt = trues(size(f))
+        # Geometry masks. bmb_shlf is only physically applied under floating ice;
+        # over grounded ice / open ocean it is a non-physical phantom value. Also
+        # build 0/1 masks of ice cover and grounded ice for PD outline contours.
+        flt  = trues(size(f))
+        ice  = zeros(size(f))       # ice-covered (grounded + floating)
+        grnd = zeros(size(f))       # grounded ice
         if all(k -> haskey(ds, k), ("H_ice", "z_srf", "z_bed"))
             H  = Float64.(ds["H_ice"][:, :, end])
             zs = Float64.(ds["z_srf"][:, :, end])
             zb = Float64.(ds["z_bed"][:, :, end])
-            flt = (H .> 1) .& ((zs .- H) .> (zb .+ 1))
+            icev = H .> 1
+            flt  = icev .& ((zs .- H) .> (zb .+ 1))
+            ice  = Float64.(icev)
+            grnd = Float64.(icev .& .!flt)
         end
-        return (x, y, f, flt)
+        return (x, y, f, flt, ice, grnd)
     end
+end
+
+# Overlay PD outlines: ice-cover margin + grounding line, as thin black contours.
+function pd_outlines!(ax, x, y, ice, grnd)
+    contour!(ax, x, y, ice;  levels = [0.5], color = :black, linewidth = 0.4)
+    contour!(ax, x, y, grnd; levels = [0.5], color = :black, linewidth = 0.4)
 end
 
 "Read (time, var) from a timeseries file, or nothing if absent."
@@ -90,13 +102,14 @@ function fig_ref_map(root, out)
     r = findrun("y8KM_m8KM")
     m = read_map(yelmo2d(root, r), "bmb_shlf")
     m === nothing && (@warn "reference run missing, skipping fig 1"; return)
-    x, y, f, flt = m
+    x, y, f, flt, ice, grnd = m
     fm = copy(f); fm[.!flt] .= NaN                 # show floating shelf melt only
 
     fig = Figure(size = (620, 640))
     ax = Axis(fig[1, 1]; aspect = DataAspect(), title = "bmb_shlf  (ANT-8KM reference)",
               xlabel = "xc [km]", ylabel = "yc [km]")
     hm = heatmap!(ax, x, y, fm; colormap = Reverse(:dense), colorrange = (-20, 0))
+    pd_outlines!(ax, x, y, ice, grnd)
     Colorbar(fig[1, 2], hm, label = "bmb_shlf [m/yr]")
     save(joinpath(out, "mg_bmb_shlf_ref.png"), fig)
 end
@@ -108,7 +121,7 @@ function fig_core_compare(root, out; zoom = nothing, tag = "")
     ref = findrun("y8KM_m8KM")
     rm = read_map(yelmo2d(root, ref), "bmb_shlf")
     rm === nothing && (@warn "reference run missing, skipping fig 2"; return)
-    xr, yr, fr, fltr = rm
+    xr, yr, fr, fltr, icer, grndr = rm
     fr = copy(fr); fr[.!fltr] .= NaN               # reference: floating shelf only
 
     cores = [findrun("y8KM_m8KM"), findrun("y16KM_m16KM"), findrun("y32KM_m32KM")]
@@ -119,7 +132,7 @@ function fig_core_compare(root, out; zoom = nothing, tag = "")
     for (row, r) in enumerate(cores)
         m = read_map(yelmo2d(root, r), "bmb_shlf")
         m === nothing && continue
-        x, y, f, flt = m
+        x, y, f, flt, ice, grnd = m
         f = copy(f); f[.!flt] .= NaN               # floating shelf melt only
 
         # left: actual field
@@ -127,6 +140,7 @@ function fig_core_compare(root, out; zoom = nothing, tag = "")
                    title = "bmb_shlf  ($(reslabel(r.ygrid)) core)",
                    ylabel = "yc [km]")
         hml = heatmap!(axl, x, y, f; colormap = Reverse(:dense), colorrange = (-20, 0))
+        pd_outlines!(axl, x, y, ice, grnd)
         setzoom!(axl)
         row == length(cores) && (axl.xlabel = "xc [km]")
         row == 1 && Colorbar(fig[1, 2], hml, label = "bmb_shlf [m/yr]")
@@ -137,6 +151,7 @@ function fig_core_compare(root, out; zoom = nothing, tag = "")
         axr = Axis(fig[row, 3]; aspect = DataAspect(),
                    title = "difference vs ANT-8KM")
         hmr = heatmap!(axr, xr, yr, d; colormap = :balance, colorrange = (-10, 10))
+        pd_outlines!(axr, xr, yr, icer, grndr)     # reference geometry (diff is on ref grid)
         setzoom!(axr)
         row == length(cores) && (axr.xlabel = "xc [km]")
         row == 1 && Colorbar(fig[1, 4], hmr, label = "Δ bmb_shlf [m/yr]")
