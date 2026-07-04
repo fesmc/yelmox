@@ -1,5 +1,5 @@
 module yelmox_esm_output
-    ! Output writers for the multigrid ESM driver (yelmox_mgesm).
+    ! Output writers for the multigrid ESM driver (yelmox_esm).
     !
     ! Ported verbatim from yelmox_esm.f90's contained writers so the ESM driver
     ! keeps identical NetCDF output. The two 2D writers that read the (program-

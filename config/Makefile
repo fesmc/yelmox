@@ -102,97 +102,111 @@ coord-static:
 rembo-static: coord-static
 	$(MAKE) -C $(REMBOROOT) rembo-static
 
+# ---------------------------------------------------------------------------
+# Default programs: the new multigrid drivers, one per flavor folder.
+# Legacy single-grid originals live under <flavor>/legacy/ and build via the
+# `<name>-legacy` targets below. Flavors not yet ported print a stub.
+# ---------------------------------------------------------------------------
+
 yelmox : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox.f90 \
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox/yelmox.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox.x is ready."
 	@echo " "
 
-yelmox_mg : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_mg.x yelmox_mg/yelmox_mg.f90 \
+yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_bipolar.x yelmox_bipolar/yelmox_bipolar.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
-	@echo "    yelmox_mg.x is ready."
-	@echo " "
-
-yelmox_mgbi : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_mgbi.x yelmox_mgbi/yelmox_mgbi.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_mgbi.x is ready."
-	@echo " "
-
-yelmox_mgesm : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -c -o $(objdir)/yelmox_esm_output.o yelmox_mgesm/yelmox_esm_output.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_mgesm.x yelmox_mgesm/yelmox_mgesm.f90 \
-		$(objdir)/yelmox_esm_output.o $(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_mgesm.x is ready."
-	@echo " "
-
-yelmox_hyst : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_hyst.x yelmox_hyst.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_hyst.x is ready."
-	@echo " "
-
-yelmox_iso : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_iso.x yelmox_iso.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_iso.x is ready."
-	@echo " "
-
-yelmox_ismip6 : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_ismip6.x yelmox_ismip6.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_ismip6.x is ready."
+	@echo "    yelmox_bipolar.x is ready."
 	@echo " "
 
 yelmox_esm : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_esm.x yelmox_esm.f90 \
-		$(yelmox_libs) $(LFLAGS)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -c -o $(objdir)/yelmox_esm_output.o yelmox_esm/yelmox_esm_output.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_esm.x yelmox_esm/yelmox_esm.f90 \
+		$(objdir)/yelmox_esm_output.o $(yelmox_libs) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox_esm.x is ready."
 	@echo " "
 
+# Glaciers: built fresh from the new yelmox driver, run with the mountain-
+# glacier parameter files in yelmox_glaciers/ (Pyrenees, SRG).
 yelmox_glaciers : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_glaciers.x yelmox_glaciers.f90 \
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_glaciers.x yelmox/yelmox.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox_glaciers.x is ready."
 	@echo " "
 
-yelmox_rtip : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip.x yelmox_rtip.f90 \
+# --- flavors not yet ported to the multigrid driver: stub default targets ---
+.PHONY : yelmox_ismip6 yelmox_nahosmip yelmox_rembo yelmox_rtip
+yelmox_ismip6 yelmox_nahosmip yelmox_rembo yelmox_rtip :
+	@echo ""
+	@echo "    *** $@ is not ported to the new (multigrid) driver yet."
+	@echo "    Build the legacy program instead:  make $@-legacy"
+	@echo ""
+
+# ---------------------------------------------------------------------------
+# Legacy programs (single-grid originals under <flavor>/legacy/).
+# ---------------------------------------------------------------------------
+
+yelmox-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox-legacy.x yelmox/legacy/yelmox.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
-	@echo "    yelmox_rtip.x is ready."
+	@echo "    yelmox-legacy.x is ready."
 	@echo " "
 
-yelmox_nahosmip : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_nahosmip.x yelmox_nahosmip.f90 \
+yelmox_bipolar-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_bipolar-legacy.x yelmox_bipolar/legacy/yelmox_bipolar.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
-	@echo "    yelmox_nahosmip.x is ready."
+	@echo "    yelmox_bipolar-legacy.x is ready."
 	@echo " "
 
-yelmox_rembo: fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -o libyelmox/bin/yelmox_rembo.x \
-			yelmox_rembo.f90 $(LIB_REMBO) $(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    libyelmox/bin/yelmox_rembo.x is ready."
-	@echo " "
-
-yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_YELMO) $(INC_ISOSTASY) -o $(bindir)/yelmox_bipolar.x yelmox_bipolar.f90 \
+yelmox_esm-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_esm-legacy.x yelmox_esm/legacy/yelmox_esm.f90 \
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
-	@echo "    yelmox_bipolar.x is ready."
+	@echo "    yelmox_esm-legacy.x is ready."
 	@echo " "
+
+yelmox_glaciers-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_glaciers-legacy.x yelmox_glaciers/legacy/yelmox_glaciers.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_glaciers-legacy.x is ready."
+	@echo " "
+
+yelmox_ismip6-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_ismip6-legacy.x yelmox_ismip6/legacy/yelmox_ismip6.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_ismip6-legacy.x is ready."
+	@echo " "
+
+yelmox_nahosmip-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_nahosmip-legacy.x yelmox_nahosmip/legacy/yelmox_nahosmip.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_nahosmip-legacy.x is ready."
+	@echo " "
+
+yelmox_rtip-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip-legacy.x yelmox_rtip/legacy/yelmox_rtip.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_rtip-legacy.x is ready."
+	@echo " "
+
+yelmox_rembo-legacy : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -o $(bindir)/yelmox_rembo-legacy.x yelmox_rembo/legacy/yelmox_rembo.f90 \
+		$(yelmox_libs) $(LIB_REMBO) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_rembo-legacy.x is ready."
+	@echo " "
+
 
 check_sim : $(objdir)/ncio.o
 	$(FC) $(DFLAGS) $(FFLAGS) -o ./check_sim.x check_sim.f90 \
@@ -221,7 +235,12 @@ usage:
 	@echo ""
 	@echo "    * USAGE * "
 	@echo ""
-	@echo " make yelmox     : compiles yelmox.x, for running yelmo on a given domain defined in param file."
+	@echo " Default (multigrid) drivers, one per flavor folder:"
+	@echo "   make yelmox | yelmox_bipolar | yelmox_esm | yelmox_glaciers"
+	@echo " Flavors not yet ported (print a stub, build legacy instead):"
+	@echo "   make yelmox_ismip6 | yelmox_nahosmip | yelmox_rembo | yelmox_rtip"
+	@echo " Legacy single-grid originals (in <flavor>/legacy/):"
+	@echo "   make <name>-legacy   e.g. make yelmox-legacy, make yelmox_rembo-legacy"
 	@echo " make clean      : cleans object files"
 	@echo ""
 

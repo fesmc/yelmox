@@ -1,11 +1,11 @@
-program yelmox_mg
+program yelmox
     ! Multigrid yelmox driver (single domain).
     !
     ! Initializes one ice_domain (each sub-model on its own configurable grid)
     ! plus the hi-res topography reference hub and the coupler maps, builds the
     ! initial boundary state (or restores a restart bundle), and runs the coupling
     ! time loop with per-module output. The multi-domain (bipolar) variant lives
-    ! in yelmox_mgbi/. See docs/multigrid.md and libs/yelmox_domain.f90.
+    ! in yelmox_bipolar/. See docs/multigrid.md and libs/yelmox_domain.f90.
 
     use nml
     use timestepping
@@ -68,7 +68,7 @@ program yelmox_mg
     end if
 
     write(*,*)
-    write(*,*) "yelmox_mg: domain initialized"
+    write(*,*) "yelmox: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
     write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
     write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
@@ -123,11 +123,11 @@ program yelmox_mg
     call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
 
     write(*,*)
-    write(*,*) "yelmox_mg: run complete at time =", ts%time
+    write(*,*) "yelmox: run complete at time =", ts%time
     write(*,*) "  H_ice max   =", maxval(dom%yelmo%tpo%now%H_ice)
 
     ! Finalize Yelmo (deallocates model state) -- must come after the last
     ! access to dom%yelmo (it deallocates tpo%now%H_ice etc).
     call yelmo_end(dom%yelmo, time=ts%time)
 
-end program yelmox_mg
+end program yelmox

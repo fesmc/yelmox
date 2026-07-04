@@ -1,4 +1,4 @@
-! Bipolar (multi-domain) control file for yelmox_mgbi.
+! Bipolar (multi-domain) control file for yelmox_bipolar.
 !
 ! One file, original yelmox_bipolar convention: each domain's instance
 ! groups carry a domain suffix (yelmo_south, coupling_north, snap_south, ...),
@@ -660,7 +660,7 @@
     basin_number    = 1             ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
-    tf_correction   = False        ! yelmox_mg bring-up: mshlf runs from remapped snapclim forcing (no grid-specific tf file)
+    tf_correction   = False        ! yelmox bring-up: mshlf runs from remapped snapclim forcing (no grid-specific tf file)
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  

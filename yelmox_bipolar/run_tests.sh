@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Smoke tests for the yelmox_mgbi bipolar driver (ocean-coupling port).
+# Smoke tests for the yelmox_bipolar bipolar driver (ocean-coupling port).
 #
 # Runs short bipolar simulations LOCALLY through the usual runme workflow: `-r`
 # runs the executable directly (use `-rs` instead to submit to a queue). Each
 # test writes to its own directory under tmp/. Run by hand with:
 #
-#     bash yelmox_mgbi/run_tests.sh              # tests 1 + 2
-#     RUN_FWF=1 bash yelmox_mgbi/run_tests.sh    # also the freshwater-flux test
+#     bash yelmox_bipolar/run_tests.sh              # tests 1 + 2
+#     RUN_FWF=1 bash yelmox_bipolar/run_tests.sh    # also the freshwater-flux test
 #
 # Prerequisites:
 #   - ice-sheet input data for GRL-16KM (north/Greenland) and ANT-32KM
@@ -17,12 +17,12 @@
 
 cd "$(dirname "$0")/.." || exit 1        # repo root
 
-NML="yelmox_mgbi/yelmox_mgbi_Bipolar.nml"
-EXE="mgbi"
+NML="yelmox_bipolar/yelmox_bipolar_Bipolar.nml"
+EXE="bipolar"
 RUN_FWF="${RUN_FWF:-0}"
 
-echo "=== building yelmox_mgbi ==="
-make yelmox_mgbi || { echo "build failed"; exit 1; }
+echo "=== building yelmox_bipolar ==="
+make yelmox_bipolar || { echo "build failed"; exit 1; }
 
 status=0
 TIMEOUT="${TIMEOUT:-3600}"               # per-test wall-clock cap [s]
@@ -45,7 +45,7 @@ run_test() {
 
     local log="$outdir/out.out" waited=0
     while true; do
-        if grep -q "yelmox_mgbi: run complete" "$log" 2>/dev/null; then
+        if grep -q "yelmox_bipolar: run complete" "$log" 2>/dev/null; then
             echo "  [PASS] $label (run complete)"; return
         fi
         if grep -qE "STOP [0-9]+|Fortran runtime error|Backtrace for" "$log" 2>/dev/null; then
@@ -54,7 +54,7 @@ run_test() {
             echo "         (yelmo_check_kill), a property of the nml/data, not the driver."
             status=1; return
         fi
-        if ! pgrep -f "yelmox_mgbi.x" >/dev/null 2>&1; then
+        if ! pgrep -f "yelmox_bipolar.x" >/dev/null 2>&1; then
             echo "  [FAIL] $label (process exited without a completion marker; see $log)"; status=1; return
         fi
         sleep 10; waited=$((waited + 10))

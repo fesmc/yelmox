@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Antarctica multigrid resolution test (yelmox_mg).
+# Antarctica multigrid resolution test (yelmox).
 #
 # Steady-state, present-day climate (no warming), 1000 yr each. Six runs:
 #   - three "core" runs: Yelmo and every module on the same grid
@@ -19,7 +19,7 @@
 # ocean forcing -- and is remapped by the coupler to the consumer grids.
 #
 # Usage (from anywhere):
-#     yelmox_mg/run_mg_resolution.sh
+#     yelmox/run_mg_resolution.sh
 #
 # Submits to the queue by default. Set runopts='-r' to run locally instead.
 
@@ -27,8 +27,8 @@ cd "$(dirname "$0")/.." || exit 1        # repo root
 
 runopts='-rs -q 12h -w 06:00:00'
 
-EXE="mg"
-NML="yelmox_mg/yelmox_mg_Antarctica.nml"
+EXE="yelmox"
+NML="yelmox/yelmox_Antarctica.nml"
 OUTROOT="output/mg"
 
 # run_case <yelmo_grid> <mshlf_grid>

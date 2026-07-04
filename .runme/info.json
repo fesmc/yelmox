@@ -5,38 +5,42 @@
     "par_path_as_argument" : true,
 
     "exe_aliases" :
-        {   "yelmox"    : "libyelmox/bin/yelmox.x",
-            "mg"        : "libyelmox/bin/yelmox_mg.x",
-            "mgbi"      : "libyelmox/bin/yelmox_mgbi.x",
-            "mgesm"     : "libyelmox/bin/yelmox_mgesm.x",
-            "iso"       : "libyelmox/bin/yelmox_iso.x",
-            "hyst"      : "libyelmox/bin/yelmox_hyst.x",
-            "rembo"     : "libyelmox/bin/yelmox_rembo.x",
-            "ismip6"    : "libyelmox/bin/yelmox_ismip6.x",
-            "rtip"      : "libyelmox/bin/yelmox_rtip.x",
-            "bipolar"   : "libyelmox/bin/yelmox_bipolar.x",
-	    "esm"       : "libyelmox/bin/yelmox_esm.x",
-	    "glaciers"  : "libyelmox/bin/yelmox_glaciers.x"
+        {   "yelmox"           : "libyelmox/bin/yelmox.x",
+            "yelmox-legacy"    : "libyelmox/bin/yelmox-legacy.x",
+            "bipolar"          : "libyelmox/bin/yelmox_bipolar.x",
+            "bipolar-legacy"   : "libyelmox/bin/yelmox_bipolar-legacy.x",
+            "esm"              : "libyelmox/bin/yelmox_esm.x",
+            "esm-legacy"       : "libyelmox/bin/yelmox_esm-legacy.x",
+            "glaciers"         : "libyelmox/bin/yelmox_glaciers.x",
+            "glaciers-legacy"  : "libyelmox/bin/yelmox_glaciers-legacy.x",
+            "ismip6"           : "libyelmox/bin/yelmox_ismip6-legacy.x",
+            "ismip6-legacy"    : "libyelmox/bin/yelmox_ismip6-legacy.x",
+            "nahosmip"         : "libyelmox/bin/yelmox_nahosmip-legacy.x",
+            "nahosmip-legacy"  : "libyelmox/bin/yelmox_nahosmip-legacy.x",
+            "rembo"            : "libyelmox/bin/yelmox_rembo-legacy.x",
+            "rembo-legacy"     : "libyelmox/bin/yelmox_rembo-legacy.x",
+            "rtip"             : "libyelmox/bin/yelmox_rtip-legacy.x",
+            "rtip-legacy"      : "libyelmox/bin/yelmox_rtip-legacy.x"
         },
 
-    "grp_aliases" : 
+    "grp_aliases" :
         {
             "bsl" : "barysealevel"
         },
 
     "par_paths" :
         {
-            "rembo"  : "par/rembo_Greenland.nml"
+            "rembo"  : "yelmox_rembo/legacy/rembo_Greenland.nml"
         },
-        
-    "files" : ["git_yelmo.txt"], 
+
+    "files" : ["git_yelmo.txt"],
 
     "dir-special" :
     {
         "None" : "target_dir_name"
     },
 
-    "links" : 
+    "links" :
         ["input","ice_data","isostasy_data","maps"]
 
 }

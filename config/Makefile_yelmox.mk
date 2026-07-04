@@ -61,8 +61,9 @@ $(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o 
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 # Bipolar ocean coupling: bridge over ice_domain (yelmox_domain) + the obm box
-# model. Lives at the libs level (not libs/obm) because it uses yelmo + yelmox_domain.
-$(objdir)/obm_coupling.o: $(libdir)/obm_coupling.f90 $(objdir)/yelmox_domain.o \
+# model. Kept alongside the bipolar driver in yelmox_osm/ for direct access; it
+# uses yelmo + yelmox_domain so it is built into the shared yelmox_libs.
+$(objdir)/obm_coupling.o: yelmox_osm/obm_coupling.f90 $(objdir)/yelmox_domain.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 

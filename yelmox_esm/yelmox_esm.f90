@@ -1,4 +1,4 @@
-program yelmox_mgesm
+program yelmox_esm
     ! Multigrid yelmox driver with ESM climatic forcing (single domain).
     !
     ! Reuses the shared multigrid domain machinery (libs/yelmox_domain.f90) for
@@ -130,7 +130,7 @@ program yelmox_mgesm
     file_bsl    = trim(outfldr)//"bsl.nc"
 
     write(*,*)
-    write(*,*) "yelmox_mgesm: run_step = "//trim(ec%run_step)
+    write(*,*) "yelmox_esm: run_step = "//trim(ec%run_step)
     write(*,*) "  time_init/end/dtt: ", ec%time_init, ec%time_end, ec%dtt
     write(*,*) "  esm experiment:    "//trim(ec%experiment)//"  use_esm = ", ec%use_esm
     write(*,*)
@@ -165,7 +165,7 @@ program yelmox_mgesm
                           use_hist=ec%use_hist, use_proj=ec%use_proj)
 
     write(*,*)
-    write(*,*) "yelmox_mgesm: domain initialized"
+    write(*,*) "yelmox_esm: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
     write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
     write(*,*) "  esm  grid   : "//trim(dom%ctl%grid_clim)
@@ -268,7 +268,7 @@ program yelmox_mgesm
     call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
 
     write(*,*)
-    write(*,*) "yelmox_mgesm: run complete at time =", ts%time
+    write(*,*) "yelmox_esm: run complete at time =", ts%time
     write(*,*) "  H_ice max =", maxval(dom%yelmo%tpo%now%H_ice)
 
     call yelmo_end(dom%yelmo, time=ts%time)
@@ -520,4 +520,4 @@ contains
 
     end subroutine step_marine_shelf_esm
 
-end program yelmox_mgesm
+end program yelmox_esm

@@ -1,12 +1,12 @@
-# Multigrid coupling (`yelmox_mg`)
+# Multigrid coupling (`yelmox`)
 
 Design doc for a multigrid rewrite of the yelmox driver. Status: **implemented**
-(`yelmox_mg.f90` + `libs/yelmox_domain.f90`); single-domain parity with
+(`yelmox.f90` + `libs/yelmox_domain.f90`); single-domain parity with
 `yelmox.f90` validated, multi-domain (bipolar) runs, optimization + smb_simple +
-domain-specific startups ported. The bipolar driver (`yelmox_mgbi.f90`) also
+domain-specific startups ported. The bipolar driver (`yelmox_bipolar.f90`) also
 carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level
 and a shared Ocean Box Model exchanging freshwater flux / ocean temperature
-between hemispheres (`libs/obm_coupling.f90`). A third driver (`yelmox_mgesm.f90`)
+between hemispheres (`yelmox_osm/obm_coupling.f90`). A third driver (`yelmox_esm.f90`)
 swaps snapclim for ESM climatic forcing (`libs/esm.f90`), running esm as a
 first-class component on its own grid (`grid_clim`) and remapping its outputs to
 the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy
@@ -70,7 +70,7 @@ fesm-utils/utils/src/coords/coupler.f90    coupler_class + remap
 yelmox/libs/yelmox_domain.f90              ice_domain + step_* + yelmox_step
         │  use coupler, yelmo, marine_shelf, fastisostasy, snapclim, smbpal, bsl
         ▼
-yelmox/yelmox_mg.f90                        thin driver: init → time loop → I/O
+yelmox/yelmox.f90                        thin driver: init → time loop → I/O
 ```
 
 Dependency flow is one-directional. The coupler is pure grid/map machinery and
@@ -322,9 +322,9 @@ reallocation cost is negligible against the physics.
 Three thin programs share `yelmox_domain` (all per-domain physics/coupling lives
 there, so the drivers only differ in config parsing + the loop over domains):
 
-- **`yelmox_mg`** (single domain) — argument is one domain nml; one `ice_domain`,
+- **`yelmox`** (single domain) — argument is one domain nml; one `ice_domain`,
   output to the run dir.
-- **`yelmox_mgbi`** (bipolar, in `yelmox_mgbi/`) — argument is a single parameter
+- **`yelmox_bipolar`** (bipolar, in `yelmox_bipolar/`) — argument is a single parameter
   file holding both hemispheres, in the original `yelmox_bipolar` convention: each
   domain's instance groups carry a hemisphere suffix (`yelmo_south`,
   `coupling_north`, `snap_south`, …), while `[ctrl]`, `[barysealevel]`, the
@@ -334,18 +334,18 @@ there, so the drivers only differ in config parsing + the loop over domains):
   via `domain_init(..., group_suffix=…)`). Distinct group names also let
   `runme -p group.name=val` target one hemisphere unambiguously. Each domain
   writes to a subfolder named after its domain; invoke with
-  `runme -e mgbi -n yelmox_mgbi/yelmox_mgbi_Bipolar.nml`.
+  `runme -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml`.
 
   A bipolar run is never more than north + south, so the two domains are explicit
   variables, not an array — the ocean coupling is asymmetric (north ↔
   `obm%fn/thetan/tn`, south ↔ `obm%fs/thetas/ts`). The driver owns the shared
   `bsl` and `obm`, breaks `yelmox_step` into its `step_*` primitives, and
   interleaves the OBM exactly as in `yelmox_bipolar` (below). The ocean exchanges
-  live in `libs/obm_coupling.f90`; they and the OBM default off (`[ctrl]
+  live in `yelmox_osm/obm_coupling.f90`; they and the OBM default off (`[ctrl]
   active_obm=False`), so the config runs as two independent domains until enabled.
 
 ```fortran
-program yelmox_mgbi
+program yelmox_bipolar
     use yelmox_domain
     use obm, only : obm_update
     use obm_coupling
@@ -370,7 +370,7 @@ program yelmox_mgbi
 end program
 ```
 
-- **`yelmox_mgesm`** (single domain, in `yelmox_mgesm/`) — ESM climatic forcing in
+- **`yelmox_esm`** (single domain, in `yelmox_esm/`) — ESM climatic forcing in
   place of snapclim. Reuses `domain_init` (with `init_climate=.false.`, so
   snapclim is skipped) plus the shared `step_optimize/step_isostasy/step_icesheet/
   refresh_htopo` primitives and the restart bundle, but the driver owns an
@@ -392,10 +392,10 @@ end program
   the shared mg groups ([coupling]/[output]/[htopo]). Output (incl. the
   CMIP-formatted files) is kept identical to `yelmox_esm.f90` via the
   `yelmox_esm_output` module (in the same folder). Invoke with
-  `runme -e mgesm -n yelmox_mgesm/yelmox_mgesm_Antarctica.nml`.
+  `runme -e esm -n yelmox_esm/yelmox_esm_Antarctica.nml`.
 
 ```fortran
-program yelmox_mgesm
+program yelmox_esm
     use yelmox_domain
     use esm
     use yelmox_esm_output
@@ -447,7 +447,7 @@ end program
 4. `htopo.f90` hi-res reference hub + `test_htopo` (load ANT-16KM fields). *(Done.)*
 5. `domain_init` (sub-model init on their grids + htopo + map priming). *(Done.)*
 6. Fill `step_*` one module at a time (marine_shelf first); diff vs `yelmox.f90`. *(Done: isostasy, ice sheet, climate, smb, marine_shelf, optimization.)*
-7. `yelmox_mg.f90` driver; validate single-domain parity with `yelmox.f90`. *(Done: identity-grid parity tracks the reference; the residual is a small deterministic startup offset, independent of isostasy — bit parity not required for the move.)*
+7. `yelmox.f90` driver; validate single-domain parity with `yelmox.f90`. *(Done: identity-grid parity tracks the reference; the residual is a small deterministic startup offset, independent of isostasy — bit parity not required for the move.)*
 8. Enable `nd=2` bipolar. *(Done: driver takes one par file per domain; AIS+GRL runs on a shared timeline to per-domain subfolders.)*
 
 Also ported from `yelmox.f90`: `equil_method="opt"` (basal-friction + thermal-forcing

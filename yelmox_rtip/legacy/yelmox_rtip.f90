@@ -331,9 +331,9 @@ program yelmox_rtip
 
     ! Initialize the isostasy reference state using reference topography fields
     call isos_init_ref(isos1, yelmo1%bnd%z_bed_ref, yelmo1%bnd%H_ice_ref)
-    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, time, bsl)
-    call isos_write_init_extended(isos1, file_isos, time)
-    call isos_write_step_extended(isos1, file_isos, time)
+    call isos_init_state(isos1, yelmo1%bnd%z_bed, yelmo1%tpo%now%H_ice, ts%time, bsl)
+    call isos_write_init_extended(isos1, file_isos, ts%time)
+    call isos_write_step_extended(isos1, file_isos, ts%time)
 
     yelmo1%bnd%z_bed = isos1%out%z_bed
     yelmo1%bnd%z_sl  = isos1%out%z_ss
@@ -570,9 +570,9 @@ program yelmox_rtip
                 call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
             end if
             
-            if (timeout_check(tm_2D_fastiso, time)) then
-                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
-                call isos_write_step_extended(isos1, file_isos, time)
+            if (timeout_check(tm_2D_fastiso, ts%time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
+                call isos_write_step_extended(isos1, file_isos, ts%time)
             end if
             
             if (timeout_check(tm_2Dsm, ts%time)) then
@@ -689,9 +689,9 @@ program yelmox_rtip
 
             ! == MODEL OUTPUT ===================================
 
-            if (timeout_check(tm_1D, time)) then
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
-                call bsl_write_step(bsl, file_bsl, time)
+            if (timeout_check(tm_1D, ts%time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=ts%time)
+                call bsl_write_step(bsl, file_bsl, ts%time)
             end if
 
             if (timeout_check(tm_2D, ts%time)) then
@@ -751,7 +751,7 @@ program yelmox_rtip
         ! === HYST ============
 
         ! Initialize hysteresis module for transient forcing experiments
-        call hyster_init(hyst1,path_par,time)
+        call hyster_init(hyst1,path_par,ts%time)
         f_last_restart = hyst1%f_now
         convert_km3_Gt = yelmo1%bnd%c%rho_ice *1e-3
 
@@ -771,10 +771,10 @@ program yelmox_rtip
 
         ! Initialize hysteresis output files
         ! call yelmo_write_init(yelmo1, file1D, time_init=time, units="years")
-        call yelmo_write_reg_init(yelmo1, file1D, time_init=time, units="years", &
+        call yelmo_write_reg_init(yelmo1, file1D, time_init=ts%time, units="years", &
             mask=(yelmo1%bnd%mask_ice /= MASK_ICE_NONE))
-        call yelmo_write_init(yelmo1, file2D, time_init=time, units="years")
-        call yelmo_write_init(yelmo1, file2D_wais, time, "years", &
+        call yelmo_write_init(yelmo1, file2D, time_init=ts%time, units="years")
+        call yelmo_write_init(yelmo1, file2D_wais, ts%time, "years", &
             irange=[i1wais, i2wais], jrange=[j1wais, j2wais])
         call yelmo_write_init(yelmo1, file2D_small, time_init=ts%time, units="years")
         call yelmo_write_init(yelmo1, file3D, time_init=ts%time, units="years")
@@ -870,33 +870,33 @@ program yelmox_rtip
 
             ! ** Using routines from yelmox_hysteresis_help **
 
-            if (timeout_check(tm_1D, time)) then
-                call yelmo_write_reg_step(yelmo1, file1D, time=time)
-                call bsl_write_step(bsl, file_bsl, time)
+            if (timeout_check(tm_1D, ts%time)) then
+                call yelmo_write_reg_step(yelmo1, file1D, time=ts%time)
+                call bsl_write_step(bsl, file_bsl, ts%time)
             end if
 
-            if (timeout_check(tm_2D, time)) then
-                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
+            if (timeout_check(tm_2D, ts%time)) then
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
             end if
 
-            if (timeout_check(tm_2D_fastiso, time)) then
-                write(*,*) "writing 2D at t=", time
-                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, time)
-                call isos_write_step_extended(isos1, file_isos, time)
+            if (timeout_check(tm_2D_fastiso, ts%time)) then
+                write(*,*) "writing 2D at t=", ts%time
+                call yelmox_write_step(yelmo1, snp1, mshlf1, smbpal1, file2D, ts%time)
+                call isos_write_step_extended(isos1, file_isos, ts%time)
             end if
             
-            if (timeout_check(tm_2Dsm,time)) then
+            if (timeout_check(tm_2Dsm,ts%time)) then
                 call yelmox_write_step_small(yelmo1, isos1, snp1, &
-                    mshlf1,smbpal1,file2D_small,time)
+                    mshlf1,smbpal1,file2D_small,ts%time)
             end if
 
-            if ( timeout_check(tm_2Dwais,time) ) then
-                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, time, &
+            if ( timeout_check(tm_2Dwais,ts%time) ) then
+                call yelmox_write_step_reg2D(yelmo1, mshlf1, file2D_wais, ts%time, &
                     i1wais, i2wais, j1wais, j2wais)
             end if
 
-            if (timeout_check(tm_3D, time)) then
-                call yelmo_write_step(yelmo1, file3D, time, nms=["ux","uy","uz"])
+            if (timeout_check(tm_3D, ts%time)) then
+                call yelmo_write_step(yelmo1, file3D, ts%time, nms=["ux","uy","uz"])
             end if
             
             call timer_step(tmrs,comp=4,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="io")

@@ -1,4 +1,4 @@
-program yelmox_mgbi
+program yelmox_bipolar
     ! Multigrid yelmox driver -- bipolar (two hemispheric domains + ocean box model).
     !
     ! Advances a Northern- and a Southern-Hemisphere ice_domain on a shared
@@ -83,7 +83,7 @@ program yelmox_mgbi
     call nml_read(path_par, "ctrl", "active_north", active_north)
     call nml_read(path_par, "ctrl", "active_south", active_south)
     if (.not. (active_north .or. active_south)) then
-        write(*,*) "yelmox_mgbi: error -- neither active_north nor active_south is set."
+        write(*,*) "yelmox_bipolar: error -- neither active_north nor active_south is set."
         stop 1
     end if
 
@@ -201,7 +201,7 @@ program yelmox_mgbi
     if (active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
 
     write(*,*)
-    write(*,*) "yelmox_mgbi: run complete at time =", ts%time
+    write(*,*) "yelmox_bipolar: run complete at time =", ts%time
     if (active_north) write(*,*) "  "//trim(dom_north%ctl%domain)//" H_ice max =", &
                                  maxval(dom_north%yelmo%tpo%now%H_ice)
     if (active_south) write(*,*) "  "//trim(dom_south%ctl%domain)//" H_ice max =", &
@@ -277,7 +277,7 @@ contains
         end if
 
         write(*,*)
-        write(*,*) "yelmox_mgbi: domain initialized ("//trim(adjustl(suffix))//")"
+        write(*,*) "yelmox_bipolar: domain initialized ("//trim(adjustl(suffix))//")"
         write(*,*) "  domain      : "//trim(dom%ctl%domain)
         write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
         write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
@@ -342,4 +342,4 @@ contains
         end if
     end subroutine write_domain_step
 
-end program yelmox_mgbi
+end program yelmox_bipolar
