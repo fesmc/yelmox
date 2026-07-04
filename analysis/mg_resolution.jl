@@ -14,7 +14,7 @@
 #
 # Usage (from the yelmox root):
 #   julia --project=analysis analysis/mg_resolution.jl [run_root] [out_dir]
-#     run_root  default output/mg
+#     run_root  default output/mg_opt
 #     out_dir   default analysis/figures
 
 using CairoMakie, NCDatasets, Printf
@@ -237,7 +237,7 @@ end
 
 # --- main ------------------------------------------------------------------
 function main()
-    root = length(ARGS) >= 1 ? ARGS[1] : "output/mg"
+    root = length(ARGS) >= 1 ? ARGS[1] : "output/mg_opt"
     out  = length(ARGS) >= 2 ? ARGS[2] : "analysis/figures"
     mkpath(out)
     fig_ref_map(root, out)
