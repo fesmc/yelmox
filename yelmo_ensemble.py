@@ -475,7 +475,7 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     # Determine the base name of the parameter files (no folders)
     #o1_in  = "par/yelmo_ismip6_Antarctica_spinup.nml"
     #o1_out = "yelmo_ismip6_Antarctica_spinup.nml"
-    o1_in  = "par/yelmo_ismip6_Antarctica.nml"
+    o1_in  = "yelmox_ismip6/legacy/yelmo_ismip6_Antarctica.nml"
     o1_out = "yelmo_ismip6_Antarctica.nml"
 
     # Generate a name for the output folder, if desired
@@ -609,7 +609,7 @@ def submitjob(outfldr,executable):
 def main():
 
     # Default values of options #
-    executable = 'yelmox_ismip6.x'        # Exectutable program (default: Ant-40)
+    executable = 'yelmox_ismip6-legacy.x'        # Exectutable program (default: Ant-40)
     submit     = False           # Submit the job to loadleveler (default: no)
     edit       = False           # Interactive editing of options
     outfldr    = 'output/test/'  # Default output folder is just the outbase

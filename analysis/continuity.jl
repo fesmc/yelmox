@@ -1,10 +1,10 @@
-# Diagnostics for yelmox_mg runs:
+# Diagnostics for yelmox runs:
 #   (1) restart continuity  -- overlay a straight-through run and a run restarted
 #       partway, per module, to show state is continuous across the restart seam.
-#   (2) cross-driver parity -- overlay yelmox_mg against the reference yelmox.f90.
+#   (2) cross-driver parity -- overlay yelmox against the reference yelmox/legacy/yelmox.f90.
 #
 # Reads the climber-x per-module timeseries files (<module>_<grid>_ts.nc) written
-# by yelmox_mg, and the yelmo1D.nc written by yelmox.f90.
+# by yelmox, and the yelmo1D.nc written by yelmox/legacy/yelmox.f90.
 #
 # Usage (from the yelmox root):
 #   julia --project=analysis analysis/continuity.jl <run_root> [out_dir]
@@ -12,9 +12,9 @@
 # <run_root> is expected to contain:
 #   straight/   a 0->T run (restart written partway)
 #   restart/    a run restarted from the partway bundle
-#   parity/ref/        yelmox.f90         (yelmo1D.nc)
-#   parity/mg_id/      yelmox_mg identity (all grids = Yelmo grid)
-#   parity/mg_hub16/   yelmox_mg hi-res hub
+#   parity/ref/        yelmox/legacy/yelmox.f90         (yelmo1D.nc)
+#   parity/mg_id/      yelmox identity (all grids = Yelmo grid)
+#   parity/mg_hub16/   yelmox hi-res hub
 # Missing sub-runs are skipped.
 
 using CairoMakie, NCDatasets, Printf
@@ -97,11 +97,11 @@ function fig_parity(root, out)
         ("Yelmo A_ice [1e6 km^2]", "A_ice"),
     ]
     fig = Figure(size=(900, 380))
-    Label(fig[0, 1:2], "Parity: yelmox_mg vs yelmox.f90", fontsize=18)
+    Label(fig[0, 1:2], "Parity: yelmox (multigrid) vs yelmox (legacy)", fontsize=18)
     for (k, (ttl, var)) in enumerate(specs)
         ax = Axis(fig[1, k]; title=ttl, xlabel="time [yr]")
         panel!(ax, [
-            ("yelmox.f90",   yelmo_ts(ref),  var, (;color=:black, linewidth=2)),
+            ("yelmox (legacy)",   yelmo_ts(ref),  var, (;color=:black, linewidth=2)),
             ("mg identity",  yelmo_ts(mid),  var, (;color=:dodgerblue, linestyle=:dash, linewidth=2)),
             ("mg hub 16km",  yelmo_ts(mhub), var, (;color=:orange, linestyle=:dot, linewidth=2)),
         ])

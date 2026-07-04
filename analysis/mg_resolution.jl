@@ -1,6 +1,6 @@
-# Analysis for the Antarctica multigrid resolution test (yelmox_mg).
+# Analysis for the Antarctica multigrid resolution test (yelmox).
 #
-# Reads the six runs staged by yelmox_mg/run_mg_resolution.sh and produces:
+# Reads the six runs staged by yelmox/run_mg_resolution.sh and produces:
 #   (1) map of the shelf basal mass balance (yelmo%bnd%bmb_shlf) for the
 #       ANT-8KM-everywhere reference run;
 #   (2) core comparison -- rows = 8/16/32 km core runs, left column the actual

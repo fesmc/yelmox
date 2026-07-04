@@ -65,5 +65,5 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e esm --omp 8 -n par/yelmo_Antarctica_esm_ismip7.nml -o "${output_path}" \
+runme -rs -q 48h -e esm-legacy --omp 8 -n yelmox_esm/legacy/yelmo_Antarctica_esm_ismip7.nml -o "${output_path}" \
       -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${neff_params[@]}" "${mat_params[@]}"

@@ -16,7 +16,7 @@ ismip6, esm, ...) are out of scope.
 
 Usage:
     scripts/check_par_nml.py                      # check all par/*.nml
-    scripts/check_par_nml.py par/yelmo_Greenland.nml [...]
+    scripts/check_par_nml.py yelmox/legacy/yelmo_Greenland.nml [...]
     scripts/check_par_nml.py --ref par/other.nml  # use a different reference
 
 Exits non-zero if any required parameter is missing, so it can be used as a

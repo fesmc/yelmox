@@ -604,7 +604,7 @@ def submitjob(outfldr,executable):
 def main():
 
     # Default values of options #
-    executable = 'yelmox.x'        # Exectutable program (default: Ant-40)
+    executable = 'yelmox-legacy.x'        # Exectutable program (default: Ant-40)
     submit     = False           # Submit the job to loadleveler (default: no)
     edit       = False           # Interactive editing of options
     outfldr    = 'output/test/'  # Default output folder is just the outbase
