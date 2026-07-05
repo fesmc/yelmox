@@ -49,7 +49,6 @@ REPO_VAR_NAMES = {
     "fesm-utils":   "fesm_utils",
     "yelmo":        "yelmo",
     "FastIsostasy": "fastiso",
-    "coordinates":  "coord",
     "rembo1":       "rembo1",
 }
 
@@ -541,12 +540,6 @@ def install_fesm_utils(state):
     log_raw(state, '# e.g. (cd "$fesm_utils" && ./build.py --variant both --machine dkrz_levante --compiler ifx)')
 
 
-def install_coordinates(state):
-    log_section(state, "coordinates")
-    dest = clone_into(state, "coordinates", "fesmc", "coordinates")
-    do_config(state, "coordinates", dest)
-
-
 def install_yelmo(state):
     log_section(state, "yelmo")
     dest = clone_into(state, "yelmo", "fesmc", "yelmo")
@@ -565,9 +558,7 @@ def install_rembo1(state):
     log_section(state, "rembo1")
     dest = clone_into(state, "rembo1", "alex-robinson", "rembo1")
     do_config(state, "rembo1", dest)
-    libs = dest / "libs"
-    libs.mkdir(exist_ok=True)
-    make_link(state, state.repo_paths["coordinates"], libs / "coordinates")
+    make_link(state, state.repo_paths["fesm-utils"], dest / "fesm-utils")
 
 
 def install_yelmox(state):
@@ -583,10 +574,7 @@ def install_yelmox(state):
         make_link(state, state.repo_paths["yelmo"],        state.yelmox_root / "yelmo")
         make_link(state, state.repo_paths["FastIsostasy"], state.yelmox_root / "FastIsostasy")
         if state.include_rembo:
-            # coordinates also needs a yelmox-root link: the parent Makefile's
-            # COORDROOT = coordinates points here for the coord-static build.
-            make_link(state, state.repo_paths["coordinates"], state.yelmox_root / "coordinates")
-            make_link(state, state.repo_paths["rembo1"],      state.yelmox_root / "rembo1")
+            make_link(state, state.repo_paths["rembo1"], state.yelmox_root / "rembo1")
 
 
 def setup_data_links(state):
@@ -682,7 +670,7 @@ def collect_initial_inputs(yelmox_root, download, do_config_steps,
                                default=str(Path.cwd()))).expanduser().resolve()
         install_dir.mkdir(parents=True, exist_ok=True)
 
-    include_rembo = ask_yn("Include REMBO support (clones coordinates + rembo1)",
+    include_rembo = ask_yn("Include REMBO support (clones rembo1)",
                            default=False)
 
     state = State(
@@ -816,7 +804,7 @@ def print_summary(state):
     print(f"     LIS/FFTW-not-built error (no half-built state).")
     extras = "fesm-utils, yelmo, FastIsostasy"
     if state.include_rembo:
-        extras += ", coordinates, rembo1"
+        extras += ", rembo1"
     print(f"  2. Compile yelmox (builds {extras} too):")
     print(f"       cd {state.yelmox_root}")
     print(f"       make clean")
@@ -886,8 +874,6 @@ def main():
     else:
         print(f"\n=== Installing components into {state.install_dir} ===")
     install_fesm_utils(state)
-    if state.include_rembo:
-        install_coordinates(state)
     install_yelmo(state)
     install_fastisostasy(state)
     if state.include_rembo:

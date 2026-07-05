@@ -9,7 +9,7 @@ your behalf.
 `configme install` performs the following phases:
 
 1. **Clone** the YelmoX checkout and each component repository it needs
-   (`fesm-utils`, `coordinates`, `yelmo`, `FastIsostasy`, `rembo1`).
+   (`fesm-utils`, `yelmo`, `FastIsostasy`, `rembo1`).
 2. **Manifest** — write `.configme/manifest.toml` so the checkout is
    self-describing regardless of its directory name.
 3. **Link** each component into the directories where the build expects it.
@@ -37,8 +37,6 @@ set -euo pipefail
 # --- clone ---
 git clone git@github.com:fesmc/yelmox.git $YELMOXROOT
 git clone git@github.com:fesmc/fesm-utils.git $YELMOXROOT/fesm-utils
-# fesm-utils/utils: component of fesm-utils (not cloned)
-git clone git@github.com:fesmc/coordinates.git $YELMOXROOT/coordinates
 git clone git@github.com:fesmc/yelmo.git $YELMOXROOT/yelmo
 git clone git@github.com:palma-ice/FastIsostasy.git $YELMOXROOT/FastIsostasy
 git clone git@github.com:alex-robinson/rembo1.git $YELMOXROOT/rembo1
@@ -49,7 +47,7 @@ mkdir -p $YELMOXROOT/.configme  # write .configme/manifest.toml
 # --- links ---
 ln -s ../fesm-utils $YELMOXROOT/yelmo/fesm-utils
 ln -s ../fesm-utils $YELMOXROOT/FastIsostasy/fesm-utils
-ln -s ../../coordinates $YELMOXROOT/rembo1/libs/coordinates
+ln -s ../fesm-utils $YELMOXROOT/rembo1/fesm-utils
 
 # --- configure (per package) ---
 # fesm-utils: build with autotools (slow, ~10-30 min):
@@ -58,7 +56,6 @@ ln -s ../../coordinates $YELMOXROOT/rembo1/libs/coordinates
 # fesm-utils/utils: build (serial, omp):
 (cd $YELMOXROOT/fesm-utils/utils && make openmp=0 fesmutils-static)
 (cd $YELMOXROOT/fesm-utils/utils && make openmp=1 fesmutils-static)
-(cd $YELMOXROOT/coordinates && configme config coordinates -m dkrz_levante -c ifx)
 (cd $YELMOXROOT/yelmo && configme config yelmo -m dkrz_levante -c ifx)
 (cd $YELMOXROOT/FastIsostasy && configme config FastIsostasy -m dkrz_levante -c ifx)
 (cd $YELMOXROOT/rembo1 && configme config rembo1 -m dkrz_levante -c ifx)

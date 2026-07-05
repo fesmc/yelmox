@@ -21,7 +21,7 @@ make yelmox
 
 ## What `configme install yelmox` does
 
-`configme install yelmox` clones YelmoX and its component repositories (`fesm-utils`, `coordinates`, `yelmo`, `FastIsostasy`, `rembo1`), configures each for your machine and compiler, links them into the YelmoX directory, and builds `fesm-utils` (LIS + FFTW + utils, which can take 10-30 min). If `configme` can detect your machine from the hostname it does so, otherwise it prompts you.
+`configme install yelmox` clones YelmoX and its component repositories (`fesm-utils`, `yelmo`, `FastIsostasy`, `rembo1`), configures each for your machine and compiler, links them into the YelmoX directory, and builds `fesm-utils` (LIS + FFTW + utils, which can take 10-30 min). If `configme` can detect your machine from the hostname it does so, otherwise it prompts you.
 
 The only system dependency you must install yourself is **netCDF** (see the [Yelmo dependencies notes](https://fesmc.github.io/yelmo/getting-started.html#dependencies) for installation tips). Everything else — LIS, FFTW, the `fesm-utils` libraries, the component repositories, their links, and `runme` — is managed by `configme`.
 

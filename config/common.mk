@@ -36,9 +36,6 @@ REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
-# coordinates is a build dependency of rembo1; only used by `make yelmox_rembo`.
-COORDROOT = coordinates
-
 # OpenMP build (make openmp=1): swap the serial dependency builds for their
 # OpenMP variants and append the compiler's OpenMP flag (set in the compiler
 # fragment as FFLAGS_OPENMP).

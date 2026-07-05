@@ -3,7 +3,6 @@ libyelmox
 unit_tests
 fesm-utils
 libs/lis*
-coordinates
 yelmo
 FastIsostasy
 FastHydrology

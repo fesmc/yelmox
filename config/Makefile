@@ -91,13 +91,11 @@ yelmo-static: fesmutils-static
 isostasy-static: fesmutils-static
 	$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
 
-# Compile static library in its own directory
-coord-static:
-	$(MAKE) -C $(COORDROOT) coord-static
-
 # Compile the static library librembo,
-# using Makefile located in $(REMBOROOT) directory
-rembo-static: coord-static
+# using Makefile located in $(REMBOROOT) directory.
+# rembo1 builds against fesm-utils (which provides the coord/grid modules), so
+# fesmutils-static must run first.
+rembo-static: fesmutils-static
 	$(MAKE) -C $(REMBOROOT) rembo-static
 
 # ---------------------------------------------------------------------------
@@ -251,5 +249,4 @@ cleanall: clean
 	$(MAKE) -C $(FESMUTILSROOT) clean
 	$(MAKE) -C $(ISOSTASYROOT) clean
 	$(MAKE) -C $(YELMOROOT) clean
-	$(MAKE) -C $(COORDROOT) clean
 	$(MAKE) -C $(REMBOROOT) clean

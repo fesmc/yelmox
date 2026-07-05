@@ -37,7 +37,7 @@ From the yelmox root:
 rm fesm-utils FastIsostasy rembo1 yelmo
 
 # 2. Drop the four entries from .gitignore (paths will now be tracked as submodules)
-#    Keep: ice_data, libyelmox, unit_tests, libs/lis*, coordinates, isostasy_data, etc.
+#    Keep: ice_data, libyelmox, unit_tests, libs/lis*, isostasy_data, etc.
 
 # 3. Add each submodule (clones fresh into yelmox/<path>)
 git submodule add git@github.com:fesmc/fesm-utils.git       fesm-utils

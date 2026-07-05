@@ -8,7 +8,7 @@ See the [YelmoX documentation](https://fesmc.github.io/yelmox/) for installation
 
 > **Compatibility (dev): fesm-utils API shift.** YelmoX now requires **fesm-utils dev at
 > `3f415cc` (2026-06-26) or later**. fesm-utils folded its standalone `coordinates` library
-> into `utils/src/coords/` and moved `mv`/`TOL` from `precision` to a new `constants` module
+> into `src/coords/` and moved `mv`/`TOL` from `precision` to a new `constants` module
 > and `nc_read_interp` from `mapping_scrip` to `ncio_interp` (`mps=(map_scrip_class)` →
 > `map=(map_class)`). `ismip6` and `marine_shelf` were updated accordingly, and `rembo1` now
 > relies on fesm-utils for its shared utility modules. All bundled libraries (yelmo,
