@@ -54,7 +54,7 @@ include config/Makefile_yelmox.mk
 ###############################################
 
 # Sanity check: fail early if fesm-utils' external deps (LIS + FFTW) aren't
-# built yet. They are built one-time by ./build.py inside fesm-utils/, which
+# built yet. They are built one-time by `make libs` inside fesm-utils/, which
 # is kept as a manual step because compiling LIS + FFTW is slow (~10-30 min)
 # and machine/compiler-specific.
 fesmutils-deps-check:
@@ -67,12 +67,10 @@ fesmutils-deps-check:
 	  [ $$_lis_ok  -eq 0 ] && echo "      LIS  missing at $(LISROOT)/lib/liblis.a"; \
 	  [ $$_fftw_ok -eq 0 ] && echo "      FFTW missing at $(FFTWROOT)/lib/libfftw3.a"; \
 	  echo ""; \
-	  echo "    Build them in fesm-utils with build.py (--variant both builds serial + omp):"; \
-	  echo "      ./build.py --variant both --machine <machine> --compiler <compiler>"; \
-	  echo "    Supported machines + compilers (./build.py --list-machines for the live list):"; \
-	  echo "      awi_albedo, dkrz_levante, generic, pik_hpc2024 : ifx, ifort, gfortran"; \
-	  echo "      macbook                                        : gfortran"; \
-	  echo "    e.g. ./build.py --variant both --machine dkrz_levante --compiler ifx"; \
+	  echo "    Build them in fesm-utils with make (openmp=0 serial, openmp=1 omp):"; \
+	  echo "      configme config fesm-utils -m <machine> -c <compiler>"; \
+	  echo "      make -C fesm-utils libs openmp=0   # then openmp=1 for the omp variant"; \
+	  echo "    e.g. -m dkrz_levante -c ifx  (see configme list for machines/compilers)"; \
 	  echo ""; \
 	  exit 1; \
 	fi

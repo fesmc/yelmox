@@ -2,7 +2,6 @@
 package = "yelmox"
 deps = [
     "fesm-utils:stable",
-    "fesm-utils/utils",
     "coordinates:stable",
     "yelmo:stable",
     "FastIsostasy:stable",
