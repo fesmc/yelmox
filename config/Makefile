@@ -135,9 +135,19 @@ yelmox_glaciers : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 	@echo "    yelmox_glaciers.x is ready."
 	@echo " "
 
+# REMBO-coupled driver: reuses the multigrid ice_domain, with REMBO as the
+# atmosphere/SMB (step_rembo) and its own combined output module.
+yelmox_rembo : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -c -o $(objdir)/yelmox_rembo_output.o yelmox_rembo/yelmox_rembo_output.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -o $(bindir)/yelmox_rembo.x yelmox_rembo/yelmox_rembo.f90 \
+		$(objdir)/yelmox_rembo_output.o $(yelmox_libs) $(LIB_REMBO) $(LFLAGS)
+	@echo " "
+	@echo "    yelmox_rembo.x is ready."
+	@echo " "
+
 # --- flavors not yet ported to the multigrid driver: stub default targets ---
-.PHONY : yelmox_ismip6 yelmox_nahosmip yelmox_rembo yelmox_rtip
-yelmox_ismip6 yelmox_nahosmip yelmox_rembo yelmox_rtip :
+.PHONY : yelmox_ismip6 yelmox_nahosmip yelmox_rtip
+yelmox_ismip6 yelmox_nahosmip yelmox_rtip :
 	@echo ""
 	@echo "    *** $@ is not ported to the new (multigrid) driver yet."
 	@echo "    Build the legacy program instead:  make $@-legacy"
@@ -232,9 +242,9 @@ usage:
 	@echo "    * USAGE * "
 	@echo ""
 	@echo " Default (multigrid) drivers, one per flavor folder:"
-	@echo "   make yelmox | yelmox_bipolar | yelmox_esm | yelmox_glaciers"
+	@echo "   make yelmox | yelmox_bipolar | yelmox_esm | yelmox_glaciers | yelmox_rembo"
 	@echo " Flavors not yet ported (print a stub, build legacy instead):"
-	@echo "   make yelmox_ismip6 | yelmox_nahosmip | yelmox_rembo | yelmox_rtip"
+	@echo "   make yelmox_ismip6 | yelmox_nahosmip | yelmox_rtip"
 	@echo " Legacy single-grid originals (in <flavor>/legacy/):"
 	@echo "   make <name>-legacy   e.g. make yelmox-legacy, make yelmox_rembo-legacy"
 	@echo " make clean      : cleans object files"
