@@ -1,0 +1,202 @@
+&rembo
+    domain              = "GRL"
+    restart_file        = "none"
+    topo_file           = "ice_data/Greenland/GRL-16KM/GRL-16KM_TOPO-M17.nc"
+    forcing_file        = "in_rembo/forcing/mis11.climber_paleo.dat"
+    emb_clim_file       = "ice_data/Greenland/GRL-80KM/ERA-40/GRL-80KM_ERA-40_195801-200112.nc"
+    clim_file           = "ice_data/Greenland/GRL-16KM/GRL-16KM_MARv3.11-ERA_annmean_1961-1990.nc"
+    precip_mon_file     = "ice_data/Greenland/GRL-16KM/GRL-16KM_MARv3.11-ERA_monmean_1961-1990.nc"
+    precip_mon_nms      = "rf" "sf"
+    dppcorr_max         = 0.0 
+
+!## Program switches
+    climchoice          =  1
+    precip              =  1
+    temper              =  1
+    equili              =  0
+    solver              =  1
+    melt_choice         =  1
+    refreezing          =  0
+    co2_rad             =  1
+    ap_fixed            =  0
+    boundary_forcing    =  0
+    anf_dat             =  1
+    clim_coupled        =  1
+    transient           =  0
+    kill                =  0
+    slow_hyst           =  0
+    timetype            =  0
+    tuning              =  0
+    itm_S0              =  0
+
+!## Writing switches
+    write_emb_d         =  0
+    write_rembo_m       =  0
+    write_rembo_d       =  0
+    write_rembo_r       =  0
+    
+!## Time options
+    year0               =  0.0
+    yearf               =  1000000.0
+    year_offset         =  0
+    dtime_emb           =  100
+    dtime_smb           =  1
+    dto_clim            =  1
+    dto_clim2d          =  10000 
+    dto_timer           =  100
+    n_equili            =  10
+    dte                 =  4.0e-2
+
+!## Boundary options
+    bnd_yr0             =  1958.01
+    bnd_start           =  1958.01
+    bnd_ave             =  200
+    bnd_trans           =  0
+    bnd_trans_delay     =  0
+    forcing_yr0         =  1980.0
+    forcing_yrf         =  2000.0 
+   
+!## EMB diffusion variables
+    kappaamp            =  0.0
+    kappalat            = -0.33
+    kappalon            =  0.0
+    kappazs             =  0.00125
+
+!## EMB diffusion variables, T
+    tce                 =  8.37e6
+    tkappa              =  1.0e12
+    tb                  =  1.94
+    ta                  =  224.58
+    trfac               = -1.0e3
+    tlfac               =  0.0065
+    s0                  =  1365.0
+    T_offset            =  0.0
+    T_warming           =  0.0
+    T_wintfac           =  2.0
+    T_noise             =  0.0
+    T_noise_period      =  100.0
+    clim_sens           =  3.0
+    firn_factor         =  0.0292
+    dT_factor           =  1.0
+    dT_min              = -2.0
+    dT_width            =  0.0
+    lat_grad            =  0.0  
+    f_eem               =  1.0 
+    f_hol               =  1.0
+    f_seas              =  1.0 
+    f_glac              =  1.0 
+    T_warming_delay     =  0
+    T_trans_max         =  100
+    T_diff              =  1.5
+    dT_rate             =  0.005
+
+!## REINHARD'S SECTION
+    tempamp             = 10.0
+
+!## EMB diffusion variables, P
+    pce                 =  1.0
+    prfac               = -1e-3
+    p_scaleT            =  0.0
+    pkappa              =  35e4
+    p_k                 =  50.0
+    p_k_eastfrac        =  1.0
+    p_k_lat             =  0.0
+    p_tau               =  5.0
+    p_he                =  2000.0
+    ppfac               = -0.03
+    
+!## Snow fraction
+    snow_Tmin           =  -7
+    snow_Tmax           =   7
+
+!## Surface albedo
+    as_snow0            =  0.8
+    as_snow1            =  0.6
+    as_snow2            =  0.4
+    as_snow_forest      =  0.4
+    as_ice              =  0.4
+    as_land             =  0.2
+    as_land_forest      =  0.1
+    as_ocean            =  0.1
+    hsnow_crit0         =  10.0
+    hsnow_crit1         =  100.0
+    melt_crit           =  1.0
+    
+!## Planetary albedo, parameterization 1
+    ap0_intercept       =  0.35
+    ap0_slope           =  0.39
+        
+!## Melt variables
+    Teff_sigma          =  5.0
+    mm_teff_snow        =  3.0
+    mm_teff_ice         =  8.0
+    pdd_factor          =  1.0
+    pdd_a               =  0.0
+    pdd_b               =  0.0
+    pdd_Tmax            =  4.0
+    pdd_Tmin            = -15.0
+    pdd_spread          =  1.3
+    pdd_amax            =  0.072
+    Pmaxfrac            =  0.6
+
+!## Oerleman's melt scheme
+    itm_c               = -55
+    itm_b               =  0.0
+    itm_t               =  10.0
+    at_intercept        =  0.46
+    at_slope            =  0.00006 
+
+!## Refreezing parameters (superimposed ice)
+    Cp                  =  2009.0               
+    T_melt              =  0.0    
+    h_snow_max          =  5.0e3
+  
+!## Smoothing radii and topography
+    prad                = 50e3
+    trad                = 50e3
+
+!# Physics
+    Lw                  =  2.50e6
+    Lm                  =  3.35e5
+    Ls                  =  2.84e6
+
+!## SPECIAL CASES
+
+!## cumco2 options (only parsed in job script)
+    cumco2name          =  "CMC2"
+    cumco2              =  2500
+
+!## RCP options (only parsed in job script)
+    rcpfldr             =  "in_rembo/scenarios"
+    rcpname             =  "3pd"
+    rcpquantile         =  50
+
+!## PPS options (only parsed in job script)
+    ppsname             =  "PPS41"
+
+!## Paleo forcing with fractions
+    paleo_frac_dT       =  0.0
+    
+!## SMB perturbations
+    smb_ppfac           =  0.0
+    smb_dT              =  0.0
+        
+!## Slow hysteresis
+    h_dVdt_max          =  20.0
+    h_dTdt_min          =  0.0
+    h_dTdt_max          =  20.0
+    h_dVdt_window       =  1000
+    h_fac               = -10.0
+/
+
+&emb_init_topo_default
+    init_topo_load    = True 
+    init_topo_path    = "ice_data/Greenland/GRL-16KM/GRL-16KM_TOPO-M17-v5.nc"
+    init_topo_names   = "H_ice" "z_bed"         ! Ice thickness, bedrock elevation
+/
+
+&emb_init_topo
+    init_topo_load    = False 
+    init_topo_path    = "/Users/robinson/GoogleDriveUCM/wrk/mypapers/TIPMIP/wrk/data_heiko/snaps/ISMIP6_grid16/snaps_geo_050_16km.nc"
+    init_topo_names   = "thk" "topg"            ! Ice thickness, bedrock elevation
+/
