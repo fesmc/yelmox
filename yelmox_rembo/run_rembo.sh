@@ -7,8 +7,8 @@
 # provides the surface mass balance; the shared multigrid couplers land it (and
 # isostasy / marine_shelf) on the Yelmo grid each step. See
 # yelmox_rembo/yelmox_rembo_Greenland.nml for the full configuration, and
-# yelmox_rembo/{options_rembo,rembo_Greenland.nml} for REMBO's own parameters
-# (both are staged into the run directory automatically via .runme/info.json).
+# yelmox_rembo/rembo_Greenland.nml for REMBO's own parameters (staged into the
+# run directory automatically via .runme/info.json).
 #
 # Usage (from anywhere):
 #     yelmox_rembo/run_rembo.sh [output_dir]

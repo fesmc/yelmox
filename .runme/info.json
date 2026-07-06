@@ -30,7 +30,7 @@
 
     "par_paths" :
         {
-            "rembo"        : ["yelmox_rembo/options_rembo", "yelmox_rembo/rembo_Greenland.nml"],
+            "rembo"        : "yelmox_rembo/rembo_Greenland.nml",
             "rembo-legacy" : "yelmox_rembo/legacy/rembo_Greenland.nml"
         },
 
