@@ -221,8 +221,11 @@ program yelmox_esm
         call bsl_update(bsl, ts%time_rel)
 
         ! Shared multigrid primitives (isostasy / ice sheet / hub / optimization).
+        ! The ESM-owned Yelmo input (Qd) is landed just before the ice sheet runs,
+        ! alongside the shared couplers invoked inside step_icesheet.
         call step_optimize(dom, ts)
         call step_isostasy(dom, ts, bsl)
+        call couple_esm_extras_to_yelmo(dom, esm)
         call step_icesheet(dom, ts)
         call refresh_htopo(dom)
 
@@ -289,7 +292,7 @@ contains
         type(bsl_class),      intent(inout) :: bsl
 
         real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
-        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:), z_bed_y(:,:), z_ss_y(:,:)
+        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         character(len=256) :: gi, gy
 
         gi = trim(dom%ctl%grid_isos)
@@ -302,15 +305,17 @@ contains
         call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
-        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
-        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
-        dom%yelmo%bnd%z_bed = z_bed_y
-        dom%yelmo%bnd%z_sl  = z_ss_y
+        call couple_isostasy_to_yelmo(dom)
 
         ! Hub mirror + first ESM forcing (init=.true. runs the smbpal ITM equil).
         call refresh_htopo(dom)
         call step_climate_esm(dom, esm, ec, ts, init=.true.)
         call step_marine_shelf_esm(dom, esm, ec, ts)
+
+        ! Assemble the Yelmo boundary state from the freshly produced outputs.
+        call couple_smb_to_yelmo(dom)
+        call couple_marine_to_yelmo(dom)
+        call couple_esm_extras_to_yelmo(dom, esm)
 
         ! Cold-start friction guess for the optimization.
         if (trim(dom%ctl%equil_method) == "opt") &
@@ -356,7 +361,6 @@ contains
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
         real(wp), allocatable :: smb_ann_s(:,:), dsmb_s(:,:), dsmbdz_s(:,:)
         real(wp), allocatable :: pd_zsrf_s(:,:), tsrf_s(:,:)
-        real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:), Qd_y(:,:)
         character(len=256) :: ge, gn, gy, gs
         logical :: is_init
 
@@ -434,15 +438,9 @@ contains
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if
 
-        ! Aggregate SMB / surface temperature -> Yelmo grid (conservative).
-        call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-        call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
-        dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
-        dom%yelmo%bnd%T_srf = tsrf_y
-
-        ! Subglacial discharge (Greenland frontal melt) -> Yelmo grid.
-        call remap(dom, esm%Qd_ann, ge, Qd_y, gy, "con")
-        dom%yelmo%bnd%Qd = Qd_y
+        ! smb / tsrf now live on grid_smb in dom%smb%ann; couple_smb_to_yelmo lands
+        ! them on the Yelmo grid. Subglacial discharge (esm%Qd_ann) is landed by
+        ! couple_esm_extras_to_yelmo. Both run in the ice-sheet coupling step.
 
     end subroutine step_climate_esm
 
@@ -464,15 +462,13 @@ contains
         real(wp), allocatable :: T_shlf_e(:,:), S_shlf_e(:,:), dT_shlf_e(:,:)
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
-        real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
-        character(len=256) :: ge, gm, gn, gy
+        character(len=256) :: ge, gm, gn
 
         if (.not. dom%ctl%with_marine_shelf) return
 
         ge = trim(dom%ctl%grid_clim)    ! esm grid (ocean fields live here)
         gm = trim(dom%ctl%grid_mshlf)   ! marine-shelf grid
         gn = trim(dom%ctl%grid_name)    ! hub grid
-        gy = trim(dom%ctl%grid_yelmo)
 
         ! --- Ocean forcing on the esm grid ---
         ! Geometry for the shelf-depth interpolation: hub -> esm grid.
@@ -512,12 +508,28 @@ contains
         call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
                              z_sl_m, dx=dom%ctl%dx_mshlf)
 
-        ! Aggregate outputs -> Yelmo grid (conservative).
-        call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
-        call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
-        dom%yelmo%bnd%bmb_shlf = bmb_y
-        dom%yelmo%bnd%T_shlf   = Tshlf_y
+        ! bmb_shlf / T_shlf now live on grid_mshlf in dom%mshlf%now;
+        ! couple_marine_to_yelmo lands them on the Yelmo grid in the ice-sheet step.
 
     end subroutine step_marine_shelf_esm
+
+    ! ---------------------------------------------------------------------------
+    subroutine couple_esm_extras_to_yelmo(dom, esm)
+        ! Land the ESM-owned Yelmo inputs that the shared couplers do not cover.
+        ! Currently just subglacial discharge (Qd, Greenland frontal melt), remapped
+        ! from the esm grid onto the Yelmo grid. Called before step_icesheet so Qd
+        ! is in place when Yelmo runs, matching the paradigm used by every module.
+        type(ice_domain),        intent(inout) :: dom
+        type(esm_forcing_class), intent(inout) :: esm
+
+        real(wp), allocatable :: Qd_y(:,:)
+        character(len=256) :: ge, gy
+
+        ge = trim(dom%ctl%grid_clim)    ! esm grid
+        gy = trim(dom%ctl%grid_yelmo)
+
+        call remap(dom, esm%Qd_ann, ge, Qd_y, gy, "con")
+        dom%yelmo%bnd%Qd = Qd_y
+    end subroutine couple_esm_extras_to_yelmo
 
 end program yelmox_esm
