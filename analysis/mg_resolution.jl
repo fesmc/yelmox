@@ -2,12 +2,18 @@
 #
 # Reads the six runs staged by yelmox/run_mg_resolution.sh and produces:
 #   (1) map of the shelf basal mass balance (yelmo%bnd%bmb_shlf) for the
-#       ANT-8KM-everywhere reference run;
-#   (2) core comparison -- rows = 8/16/32 km core runs, left column the actual
-#       bmb_shlf field, right column its difference vs. the ANT-8KM reference
-#       (coarser runs bilinearly remapped onto the 8KM reference grid);
+#       reference run;
+#   (2) comparison -- one row per completed run, left column the actual
+#       bmb_shlf field, right column its difference vs. the reference
+#       (bilinearly remapped onto the reference grid);
 #   (3) permutation timeseries -- ice volume and mean shelf bmb over time, one
 #       column per Yelmo grid, one line per marine_shelf resolution.
+#
+# Only runs that reached the 25 kyr end are used for the map/difference/scatter
+# figures (run_complete); incomplete or crashed runs are skipped so their early
+# slices are not mistaken for a spun-up state. The reference is the completed
+# run with the FINEST marine_shelf grid (refrun) rather than a hard-wired
+# ANT-8KM run, which may not have finished.
 #
 # All bmb_shlf comparisons use yelmo%bnd%bmb_shlf, i.e. the field aggregated
 # onto the Yelmo grid (whatever the marine_shelf grid was).
@@ -34,6 +40,32 @@ findrun(nm) = runs[findfirst(r -> r.name == nm, runs)]
 
 # res label like "8KM" from a grid name / run
 reslabel(grid) = replace(grid, "ANT-" => "")
+
+# integer km of a grid name, e.g. "ANT-8KM" -> 8
+gridkm(grid) = parse(Int, match(r"(\d+)KM", grid).captures[1])
+
+# A run "completed" if its 2D file exists and reached (near) the 25 kyr end.
+# Incomplete/crashed runs only wrote early slices; comparing their last slice
+# against a spun-up run would mix model times, so they are skipped.
+function run_complete(root, r; tmin = 24999.0)
+    p = yelmo2d(root, r)
+    isfile(p) || return false
+    NCDataset(p) do ds
+        haskey(ds, "time") || return false
+        t = ds["time"][:]
+        return length(t) > 0 && maximum(t) >= tmin
+    end
+end
+
+# Reference run for the bmb_shlf comparison: the completed run with the FINEST
+# marine_shelf grid. Was hard-wired to the ANT-8KM run, but that (like the other
+# fine-Yelmo runs) may not have finished; this degrades gracefully to whatever
+# finest-shelf run did complete. Returns nothing if no run completed.
+function refrun(root)
+    cand = filter(r -> run_complete(root, r), runs)
+    isempty(cand) && return nothing
+    return cand[argmin([gridkm(r.mgrid) for r in cand])]
+end
 
 # --- IO helpers ------------------------------------------------------------
 yelmo2d(root, r) = joinpath(root, r.name, "yelmo_$(r.ygrid).nc")
@@ -99,14 +131,15 @@ end
 
 # --- figure 1: reference bmb_shlf map --------------------------------------
 function fig_ref_map(root, out)
-    r = findrun("y8KM_m8KM")
+    r = refrun(root)
+    r === nothing && (@warn "no completed run, skipping fig 1"; return)
     m = read_map(yelmo2d(root, r), "bmb_shlf")
     m === nothing && (@warn "reference run missing, skipping fig 1"; return)
     x, y, f, flt, ice, grnd = m
     fm = copy(f); fm[.!flt] .= NaN                 # show floating shelf melt only
 
     fig = Figure(size = (620, 640))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = "bmb_shlf  (ANT-8KM reference)",
+    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = "bmb_shlf  ($(r.name) reference)",
               xlabel = "xc [km]", ylabel = "yc [km]")
     hm = heatmap!(ax, x, y, fm; colormap = Reverse(:dense), colorrange = (-20, 0))
     pd_outlines!(ax, x, y, ice, grnd)
@@ -118,17 +151,19 @@ end
 # zoom = ((xmin,xmax),(ymin,ymax)) in km restricts the view (e.g. WAIS); tag is
 # appended to the output filename.
 function fig_core_compare(root, out; zoom = nothing, tag = "")
-    ref = findrun("y8KM_m8KM")
+    ref = refrun(root)
+    ref === nothing && (@warn "no completed run, skipping fig 2"; return)
     rm = read_map(yelmo2d(root, ref), "bmb_shlf")
     rm === nothing && (@warn "reference run missing, skipping fig 2"; return)
     xr, yr, fr, fltr, icer, grndr = rm
     fr = copy(fr); fr[.!fltr] .= NaN               # reference: floating shelf only
 
-    cores = [findrun("y8KM_m8KM"), findrun("y16KM_m16KM"), findrun("y32KM_m32KM")]
+    # All completed runs (skip incomplete/crashed ones), compared vs reference.
+    cores = filter(r -> run_complete(root, r), runs)
 
     setzoom!(ax) = zoom !== nothing && (xlims!(ax, zoom[1]...); ylims!(ax, zoom[2]...))
 
-    fig = Figure(size = (860, 1120))
+    fig = Figure(size = (860, 380 * length(cores)))
     for (row, r) in enumerate(cores)
         m = read_map(yelmo2d(root, r), "bmb_shlf")
         m === nothing && continue
@@ -137,7 +172,7 @@ function fig_core_compare(root, out; zoom = nothing, tag = "")
 
         # left: actual field
         axl = Axis(fig[row, 1]; aspect = DataAspect(),
-                   title = "bmb_shlf  ($(reslabel(r.ygrid)) core)",
+                   title = "bmb_shlf  ($(r.name))",
                    ylabel = "yc [km]")
         hml = heatmap!(axl, x, y, f; colormap = Reverse(:dense), colorrange = (-20, 0))
         pd_outlines!(axl, x, y, ice, grnd)
@@ -149,7 +184,7 @@ function fig_core_compare(root, out; zoom = nothing, tag = "")
         fq = remap_bilin(x, y, f, xr, yr)
         d = fq .- fr
         axr = Axis(fig[row, 3]; aspect = DataAspect(),
-                   title = "difference vs ANT-8KM")
+                   title = "difference vs $(ref.name)")
         hmr = heatmap!(axr, xr, yr, d; colormap = :balance, colorrange = (-10, 10))
         pd_outlines!(axr, xr, yr, icer, grndr)     # reference geometry (diff is on ref grid)
         setzoom!(axr)
@@ -205,15 +240,17 @@ end
 
 # --- figure 4: scatter of coarse vs 8KM reference (floating shelf) ----------
 function fig_scatter(root, out)
-    ref = findrun("y8KM_m8KM")
+    ref = refrun(root)
+    ref === nothing && (@warn "no completed run, skipping scatter"; return)
     rm = read_map(yelmo2d(root, ref), "bmb_shlf")
     rm === nothing && (@warn "reference run missing, skipping scatter"; return)
     xr, yr, fr, fltr, _, _ = rm
-    refm = copy(fr); refm[.!fltr] .= NaN           # 8KM floating shelf field
+    refm = copy(fr); refm[.!fltr] .= NaN           # reference floating shelf field
 
-    others = [findrun("y16KM_m16KM"), findrun("y32KM_m32KM")]
+    others = filter(r -> run_complete(root, r) && r.name != ref.name, runs)
+    isempty(others) && (@warn "no other completed run, skipping scatter"; return)
     lo, hi = -30.0, 2.0
-    fig = Figure(size = (920, 480))
+    fig = Figure(size = (460 * length(others), 480))
     for (col, r) in enumerate(others)
         m = read_map(yelmo2d(root, r), "bmb_shlf")
         m === nothing && continue
@@ -225,9 +262,9 @@ function fig_scatter(root, out)
         bias = sum(ys .- xs) / length(xs)
         rmse = sqrt(sum((ys .- xs) .^ 2) / length(xs))
         ax = Axis(fig[1, col]; aspect = DataAspect(),
-                  title = "$(reslabel(r.ygrid)) vs 8KM   n=$(length(xs))  bias=$(round(bias, digits=2))  RMSE=$(round(rmse, digits=2))",
-                  xlabel = "bmb_shlf  8KM ref (aggregated) [m/yr]",
-                  ylabel = "bmb_shlf  $(reslabel(r.ygrid)) [m/yr]", titlesize = 10)
+                  title = "$(r.name) vs $(ref.name)   n=$(length(xs))  bias=$(round(bias, digits=2))  RMSE=$(round(rmse, digits=2))",
+                  xlabel = "bmb_shlf  $(ref.name) ref (aggregated) [m/yr]",
+                  ylabel = "bmb_shlf  $(r.name) [m/yr]", titlesize = 10)
         scatter!(ax, xs, ys; markersize = 4, color = (:steelblue, 0.4))
         lines!(ax, [lo, hi], [lo, hi]; color = :black, linestyle = :dash)
         xlims!(ax, lo, hi); ylims!(ax, lo, hi)
