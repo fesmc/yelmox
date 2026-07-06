@@ -68,6 +68,7 @@ module yelmox_domain
         ! Domain-specific startup / physics switches (mirrors yelmox.f90 internals).
         logical :: greenland_init_marine_H = .false.   ! impose LGM-like marine ice at start
         logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb (Greenland)
+        logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent (Greenland/rembo)
         logical :: use_negis               = .false.   ! NEGIS cb_ref modification (Greenland)
 
         ! Which components are active in this domain's coupling sequence.
@@ -134,6 +135,7 @@ module yelmox_domain
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
     public :: step_optimize, domain_update_smb
+    public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
     ! Exposed so flavor-specific drivers (e.g. the ESM driver) can remap between
     ! the hub/Yelmo grids and their own forcing grid via the domain's coupler.
     public :: remap
@@ -421,14 +423,12 @@ contains
 
         real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
-        real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        character(len=256) :: gi, gy, gc, gs, gn
+        character(len=256) :: gi, gy, gc, gn
 
         gi = trim(dom%ctl%grid_isos)
         gy = trim(dom%ctl%grid_yelmo)
         gc = trim(dom%ctl%grid_clim)
-        gs = trim(dom%ctl%grid_smb)
         gn = trim(dom%ctl%grid_name)
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
@@ -438,10 +438,7 @@ contains
         call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
-        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
-        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
-        dom%yelmo%bnd%z_bed = z_bed_y
-        dom%yelmo%bnd%z_sl  = z_ss_y
+        call couple_isostasy_to_yelmo(dom)
 
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call refresh_htopo(dom)
@@ -458,6 +455,11 @@ contains
 
         ! Marine shelf through the (already refreshed) hub.
         call step_marine_shelf(dom, ts)
+
+        ! Assemble the Yelmo boundary state from the freshly produced module
+        ! outputs (smb + marine_shelf; isostasy already coupled above).
+        call couple_smb_to_yelmo(dom)
+        call couple_marine_to_yelmo(dom)
 
         ! Initialize state variables (dyn, therm, mat) with a cold base
         call yelmo_print_bound(dom%yelmo%bnd)
@@ -580,9 +582,11 @@ contains
             dom%yelmo%bnd%H_ice_ref = dom%yelmo%tpo%now%H_ice
         end if
 
-        ! Refresh the hub and climate/smb to reflect the new geometry.
+        ! Refresh the hub and climate/smb to reflect the new geometry, then land
+        ! the smb on the Yelmo grid (used/adjusted just below).
         call refresh_htopo(dom)
         call step_climate(dom, ts)
+        call couple_smb_to_yelmo(dom)
 
         if (trim(method) == "const") then
             ! Ensure ice can grow on high-latitude land (mainly Cordilleran).
@@ -682,7 +686,7 @@ contains
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
 
-        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:), z_bed_y(:,:), z_ss_y(:,:)
+        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         character(len=256) :: gi, gy
 
         gi = trim(dom%ctl%grid_isos)
@@ -710,10 +714,7 @@ contains
         call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
-        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
-        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
-        dom%yelmo%bnd%z_bed = z_bed_y
-        dom%yelmo%bnd%z_sl  = z_ss_y
+        call couple_isostasy_to_yelmo(dom)
 
         ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
@@ -854,19 +855,19 @@ contains
     end subroutine step_optimize
 
     subroutine step_isostasy(dom, ts, bsl)
-        ! Run isostasy on its own grid: ice load from Yelmo (bilin), bedrock/sea
-        ! surface aggregated back to the Yelmo grid (conservative). Assumes
-        ! grid_isos is at least as fine as grid_yelmo (identity when equal).
-        ! bsl is the shared, driver-owned sea level (already updated for this step
-        ! by the driver); isos_update reads it and, under fastiso/mixed, writes
-        ! back the prognostic bsl_now -- so with several domains sharing one bsl the
-        ! sea level integrates every domain's ice load, as in yelmox_bipolar.
+        ! Run isostasy on its own grid: ice load from Yelmo (bilin). The bedrock /
+        ! sea-surface outputs stay on grid_isos (in dom%isos%out); they are landed
+        ! on the Yelmo grid by couple_isostasy_to_yelmo (in step_icesheet, before
+        ! yelmo_update). Assumes grid_isos is at least as fine as grid_yelmo
+        ! (identity when equal). bsl is the shared, driver-owned sea level (already
+        ! updated for this step by the driver); isos_update reads it and, under
+        ! fastiso/mixed, writes back the prognostic bsl_now -- so with several
+        ! domains sharing one bsl the sea level integrates every domain's ice load.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
 
         real(wp), allocatable :: H_ice_i(:,:), dwdt_i(:,:)
-        real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
         character(len=256) :: gi, gy
 
         if (.not. dom%ctl%with_isostasy) return
@@ -879,13 +880,96 @@ contains
         call remap(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, "bilin")
 
         call isos_update(dom%isos, H_ice_i, ts%time, bsl, dwdt_corr=dwdt_i)
+    end subroutine step_isostasy
 
-        ! aggregate outputs -> Yelmo grid (conservative)
+    ! --- Yelmo-input couplers -------------------------------------------------
+    ! Each coupler remaps one module's output onto the Yelmo grid and assigns it
+    ! into yelmo%bnd, i.e. "remap what Yelmo needs, before Yelmo runs". They are
+    ! called from step_icesheet (before yelmo_update) and from the init/restart
+    ! paths (before yelmo_init_state), so the Yelmo boundary assembly lives in one
+    ! place. Each is a no-op when its component is inactive. At identity grids the
+    ! remaps are copies, reproducing the pre-refactor behavior exactly.
+
+    subroutine couple_isostasy_to_yelmo(dom)
+        ! Bedrock + sea surface from isostasy (grid_isos -> Yelmo, conservative).
+        type(ice_domain), intent(inout) :: dom
+
+        real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
+        character(len=256) :: gi, gy
+
+        if (.not. dom%ctl%with_isostasy) return
+
+        gi = trim(dom%ctl%grid_isos)
+        gy = trim(dom%ctl%grid_yelmo)
+
         call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
         call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
         dom%yelmo%bnd%z_bed = z_bed_y
         dom%yelmo%bnd%z_sl  = z_ss_y
-    end subroutine step_isostasy
+    end subroutine couple_isostasy_to_yelmo
+
+    subroutine couple_smb_to_yelmo(dom)
+        ! Surface mass balance + surface temperature from the active SMB model
+        ! (grid_smb -> Yelmo, conservative), with the we->ie unit scaling and the
+        ! optional Greenland modifications. The producing step (domain_update_smb,
+        ! or a flavor climate step) leaves smb/tsrf on grid_smb in the SMB model's
+        ! own fields; this coupler is the single place that lands them on Yelmo.
+        type(ice_domain), intent(inout) :: dom
+
+        real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:), ta_y(:,:), ta_pd_y(:,:)
+        character(len=256) :: gs, gc, gy
+
+        if (.not. dom%ctl%with_climate) return
+
+        gs = trim(dom%ctl%grid_smb)
+        gc = trim(dom%ctl%grid_clim)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        if (trim(dom%ctl%smb_method) == "smb_simple") then
+            call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
+            call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
+        else
+            call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+            call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        end if
+
+        dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
+        dom%yelmo%bnd%T_srf = tsrf_y
+
+        ! Glacial-smb modification (Greenland): reduce large negative smb toward a
+        ! quasi glacial-interglacial index. Operates on the aggregated Yelmo-grid smb.
+        if (trim(dom%ctl%domain) == "Greenland" .and. dom%ctl%scale_glacial_smb) then
+            call remap(dom, dom%snp%now%ta_ann,   gc, ta_y,    gy, "bilin")
+            call remap(dom, dom%snp%clim0%ta_ann, gc, ta_pd_y, gy, "bilin")
+            call calc_glacial_smb(dom%yelmo%bnd%smb, real(dom%yelmo%grd%lat,wp), ta_y, ta_pd_y)
+        end if
+
+        ! Limit to present-day ice extent: impose extra melt (4 m ie/a) wherever
+        ! present-day data has no ice. Operates on the aggregated Yelmo-grid smb.
+        if (dom%ctl%lim_pd_ice) then
+            where(dom%yelmo%dta%pd%H_ice <= 0.0_wp) &
+                dom%yelmo%bnd%smb = dom%yelmo%bnd%smb - 4.0_wp
+        end if
+    end subroutine couple_smb_to_yelmo
+
+    subroutine couple_marine_to_yelmo(dom)
+        ! Basal mass balance + shelf temperature from marine_shelf (grid_mshlf ->
+        ! Yelmo, conservative).
+        type(ice_domain), intent(inout) :: dom
+
+        real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
+        character(len=256) :: gm, gy
+
+        if (.not. dom%ctl%with_marine_shelf) return
+
+        gm = trim(dom%ctl%grid_mshlf)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
+        call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
+        dom%yelmo%bnd%bmb_shlf = bmb_y
+        dom%yelmo%bnd%T_shlf   = Tshlf_y
+    end subroutine couple_marine_to_yelmo
 
     subroutine step_icesheet(dom, ts)
         type(ice_domain),  intent(inout) :: dom
@@ -894,6 +978,13 @@ contains
         ! Greenland NEGIS: update cb_ref from bed properties + NEGIS scaling.
         if (trim(dom%ctl%domain) == "Greenland" .and. dom%ngs%use_negis_par) &
             call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time)
+
+        ! Assemble the Yelmo boundary state: remap every coupled module's output
+        ! onto the Yelmo grid, before Yelmo runs. isostasy was produced this step;
+        ! smb / marine_shelf were produced last step (the one-step coupling lag).
+        call couple_isostasy_to_yelmo(dom)
+        call couple_smb_to_yelmo(dom)
+        call couple_marine_to_yelmo(dom)
 
         if (.not. dom%ctl%with_ice_sheet) return
         if (ts%n == 0 .and. dom%yelmo%par%use_restart) return
@@ -972,19 +1063,18 @@ contains
     end subroutine step_climate
 
     subroutine domain_update_smb(dom, ts, init)
-        ! Surface mass balance on grid_smb, aggregated (conservative) to the Yelmo
-        ! grid. Two methods: smbpal (default; monthly, needs tas/pr + geometry) or
-        ! smb_simple (needs z_srf + sea-level temperature). Geometry comes from the
-        ! hi-res hub, atmospheric forcing from snapclim (grid_clim). init=.true.
-        ! runs the smbpal ITM equilibration before the first update. Optionally
-        ! applies the Greenland glacial-smb reduction on the Yelmo grid.
+        ! Surface mass balance on grid_smb. Two methods: smbpal (default; monthly,
+        ! needs tas/pr + geometry) or smb_simple (needs z_srf + sea-level
+        ! temperature). Geometry comes from the hi-res hub, atmospheric forcing from
+        ! snapclim (grid_clim). init=.true. runs the smbpal ITM equilibration before
+        ! the first update. The result stays on grid_smb in the SMB model's fields
+        ! (dom%smb%ann or dom%smbs); couple_smb_to_yelmo lands it on the Yelmo grid.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         logical, intent(in), optional    :: init
 
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
-        real(wp), allocatable :: tsl_s(:,:), Href_s(:,:), smb_y(:,:), tsrf_y(:,:)
-        real(wp), allocatable :: ta_y(:,:), ta_pd_y(:,:)
+        real(wp), allocatable :: tsl_s(:,:), Href_s(:,:)
         character(len=256) :: gc, gs, gn, gy
         logical :: is_init
 
@@ -1004,8 +1094,6 @@ contains
             call remap(dom, dom%yelmo%bnd%H_ice_ref,  gy, Href_s,  gs, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
             call smb_simple_update(dom%smbs, z_srf_s, tsl_s)
-            call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
-            call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
         else
             ! smbpal (monthly)
             call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
@@ -1017,19 +1105,6 @@ contains
                         ts%time_rel, time_equil=100.0_wp)
             end if
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
-            call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-            call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
-        end if
-
-        dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
-        dom%yelmo%bnd%T_srf = tsrf_y
-
-        ! Glacial-smb modification (Greenland): reduce large negative smb toward a
-        ! quasi glacial-interglacial index. Operates on the aggregated Yelmo-grid smb.
-        if (trim(dom%ctl%domain) == "Greenland" .and. dom%ctl%scale_glacial_smb) then
-            call remap(dom, dom%snp%now%ta_ann,   gc, ta_y,    gy, "bilin")
-            call remap(dom, dom%snp%clim0%ta_ann, gc, ta_pd_y, gy, "bilin")
-            call calc_glacial_smb(dom%yelmo%bnd%smb, real(dom%yelmo%grd%lat,wp), ta_y, ta_pd_y)
         end if
     end subroutine domain_update_smb
 
@@ -1087,21 +1162,20 @@ contains
 
     subroutine step_marine_shelf(dom, ts)
         ! Run marine_shelf on its own grid: geometry/masks from the hub, ocean
-        ! forcing from snapclim, outputs aggregated back to the Yelmo grid.
+        ! forcing from snapclim. The outputs stay on grid_mshlf (in dom%mshlf%now);
+        ! couple_marine_to_yelmo lands bmb_shlf / T_shlf on the Yelmo grid.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
-        real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
-        character(len=256) :: gm, gn, gy, gc
+        character(len=256) :: gm, gn, gc
 
         if (.not. dom%ctl%with_marine_shelf) return
 
         gm = trim(dom%ctl%grid_mshlf)
         gn = trim(dom%ctl%grid_name)
-        gy = trim(dom%ctl%grid_yelmo)
         gc = trim(dom%ctl%grid_clim)
 
         ! geometry + masks: hub -> mshlf grid
@@ -1123,12 +1197,6 @@ contains
                 dom%ctl%dx_mshlf, dom%snp%now%depth, to_m, so_m, dto_ann=dto_m)
         call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
                 z_sl_m, dx=dom%ctl%dx_mshlf)
-
-        ! aggregate outputs -> Yelmo grid (conservative)
-        call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
-        call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
-        dom%yelmo%bnd%bmb_shlf = bmb_y
-        dom%yelmo%bnd%T_shlf   = Tshlf_y
     end subroutine step_marine_shelf
 
     ! ----- output (climber-x convention: one file per module, on its own grid,
