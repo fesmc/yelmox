@@ -181,15 +181,15 @@ program yelmox
     domain = yelmo1%par%domain 
 
     ! Ensure optimization fields are allocated and preassigned
-    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
-    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_min(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
+    allocate(opt%cf_max(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     
     opt%cf_min = yelmo1%dyn%par%till_cf_min
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define specific regions of interest =====================
 
-    allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(tmp_mask(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     
     select case(trim(domain))
 
@@ -218,9 +218,9 @@ program yelmox
             where(abs(yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
 
             yelmo1%bnd%mask_ice(1,:)             = MASK_ICE_NONE
-            yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = MASK_ICE_NONE
+            yelmo1%bnd%mask_ice(yelmo1%grd%G%nx,:) = MASK_ICE_NONE
             yelmo1%bnd%mask_ice(:,1)             = MASK_ICE_NONE
-            yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = MASK_ICE_NONE
+            yelmo1%bnd%mask_ice(:,yelmo1%grd%G%ny) = MASK_ICE_NONE
             
             ! Initialize regions
             call yelmo_regions_init(yelmo1,n=1)
@@ -290,9 +290,9 @@ end if
                 ! Evolve ice everywhere except the domain borders
                 yelmo1%bnd%mask_ice                  = MASK_ICE_DYNAMIC
                 yelmo1%bnd%mask_ice(1,:)             = MASK_ICE_FIXED
-                yelmo1%bnd%mask_ice(yelmo1%grd%nx,:) = MASK_ICE_FIXED
+                yelmo1%bnd%mask_ice(yelmo1%grd%G%nx,:) = MASK_ICE_FIXED
                 yelmo1%bnd%mask_ice(:,1)             = MASK_ICE_FIXED
-                yelmo1%bnd%mask_ice(:,yelmo1%grd%ny) = MASK_ICE_FIXED
+                yelmo1%bnd%mask_ice(:,yelmo1%grd%G%ny) = MASK_ICE_FIXED
 
                 where(abs(yelmo1%bnd%regions - 1.0) .lt. 1e-3)
                     yelmo1%bnd%tau_relax = -1.0      ! inside icefield: free evolution
@@ -310,30 +310,30 @@ end if
     call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%G%nx, yelmo1%grd%G%ny, real(yelmo1%grd%G%dx,wp), real(yelmo1%grd%G%dy,wp))
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%G%nx,yelmo1%grd%G%ny,yelmo1%bnd%basins)
     
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
-    call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
+    call smbpal_init(smbpal1,path_par,x=real(yelmo1%grd%G%x,wp),y=real(yelmo1%grd%G%y,wp),lats=real(yelmo1%grd%lat,wp))
 
     ! Initialize alternative surface mass balance method (smb_simple)
     if (trim(ctl%smb_method) .eq. "smb_simple") then
-        call smb_simple_init(smbs1,path_par,yelmo1%grd%x,yelmo1%grd%y,yelmo1%grd%lat, &
+        call smb_simple_init(smbs1,path_par,real(yelmo1%grd%x,wp),real(yelmo1%grd%y,wp),real(yelmo1%grd%lat,wp), &
                              group="smb_simple",units="m")
         ! Define the target ice mask (from file, or reference ice thickness)
         call smb_simple_set_mask(smbs1,yelmo1%bnd%H_ice_ref)
     end if
 
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
+    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
-    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    call sediments_init(sed1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%H_sed = sed1%now%H 
     
-    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    call geothermal_init(gthrm1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
     ! === Update initial boundary conditions for current time and yelmo state =====
@@ -352,7 +352,7 @@ end if
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins)
 
     if (trim(ctl%smb_method) .eq. "smb_simple") then
         ! Alternative surface mass balance method
@@ -376,22 +376,22 @@ end if
 
     ! Write out initial boundary conditions if desired
     if (ctl%write_clim_and_kill) then
-        call snapclim_write_init(snp1,"yelmox_climate.nc",yelmo1%grd%xc,yelmo1%grd%yc,time=ts%time,units="years")
+        call snapclim_write_init(snp1,"yelmox_climate.nc",real(yelmo1%grd%G%x,wp),real(yelmo1%grd%G%y,wp),time=ts%time,units="years")
         call snapclim_write_step(snp1,"yelmox_climate.nc",time=ts%time)
         stop
     end if
 
     if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then 
         ! Modify glacial smb
-        call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
+        call calc_glacial_smb(yelmo1%bnd%smb,real(yelmo1%grd%lat,wp),snp1%now%ta_ann,snp1%clim0%ta_ann)
     end if
 
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,real(yelmo1%grd%G%dx,wp),snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=real(yelmo1%grd%G%dx,wp))
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -622,7 +622,7 @@ end if
         
         if (mod(nint(ts%time_elapsed*100),nint(ctl%dt_clim*100))==0) then
                 ! Update snapclim
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins) 
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================
@@ -642,7 +642,7 @@ end if
 
         if (trim(yelmo1%par%domain) .eq. "Greenland" .and. scale_glacial_smb) then
             ! Modify glacial smb
-            call calc_glacial_smb(yelmo1%bnd%smb,yelmo1%grd%lat,snp1%now%ta_ann,snp1%clim0%ta_ann)
+            call calc_glacial_smb(yelmo1%bnd%smb,real(yelmo1%grd%lat,wp),snp1%now%ta_ann,snp1%clim0%ta_ann)
         end if
 
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
@@ -655,11 +655,11 @@ end if
                 yelmo1%bnd%T_shlf   = 0.0_wp
         else
                 call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                                yelmo1%bnd%basins,yelmo1%bnd%z_sl,real(yelmo1%grd%G%dx,wp),snp1%now%depth, &
                                 snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
                 call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                                     yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=real(yelmo1%grd%G%dx,wp))
 
                 yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf
                 yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
@@ -746,7 +746,7 @@ contains
             where (ylmo%bnd%regions .eq. 1.12) ylmo%tpo%now%H_ice = 1000.0 
 
             ! Apply Gaussian smoothing to keep things stable
-            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=3.0)
+            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=real(ylmo%grd%G%dx,wp),f_sigma=3.0)
 
             ! Make sure to update topographic info (without loading anything)
             call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
@@ -762,7 +762,7 @@ contains
             end where 
 
             ! Apply Gaussian smoothing to keep things stable
-            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
+            call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=real(ylmo%grd%G%dx,wp),f_sigma=2.0)
 
             ! Make sure to update topographic info (without loading anything)
             call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
@@ -787,7 +787,7 @@ contains
         end if 
 
         ! Update snapclim to reflect new topography 
-        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain=domain,dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
+        call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain=domain,dx=real(ylmo%grd%G%dx,wp),basins=ylmo%bnd%basins)
 
         if (trim(ctl%smb_method) .eq. "smb_simple") then
             ! Refresh the target mask from the (updated) reference geometry and
@@ -878,7 +878,7 @@ contains
         end where
 
         ! Smooth for stability and refresh topographic fields (z_srf from H_ice)
-        call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=ylmo%grd%dx,f_sigma=2.0)
+        call smooth_gauss_2D(ylmo%tpo%now%H_ice,dx=real(ylmo%grd%G%dx,wp),f_sigma=2.0)
         call yelmo_init_topo(ylmo,path_par,ylmo%par%nml_init_topo,ts%time,load_topo=.FALSE.)
         call yelmo_update_equil(ylmo,ts%time,time_tot=1.0_wp,dt=1.0,topo_fixed=.TRUE.)
 
@@ -887,7 +887,7 @@ contains
 
         ! Update climate to reflect the LGM surface
         call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=ts%time,domain="North", &
-                             dx=ylmo%grd%dx,basins=ylmo%bnd%basins)
+                             dx=real(ylmo%grd%G%dx,wp),basins=ylmo%bnd%basins)
 
         if (with_ice_sheet) then
             ! Stabilise dynamic fields with fixed boundaries (coupled runs only)
@@ -964,8 +964,8 @@ contains
         ! Local variables
         integer :: i, j, nx, ny 
 
-        nx = ylmo%grd%nx 
-        ny = ylmo%grd%ny 
+        nx = ylmo%grd%G%nx 
+        ny = ylmo%grd%G%ny 
 
         if (time .lt. -11e3) then 
             ngs%cf_x = ngs%cf_0

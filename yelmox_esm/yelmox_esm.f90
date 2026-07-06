@@ -167,7 +167,7 @@ program yelmox_esm
     write(*,*)
     write(*,*) "yelmox_esm: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
-    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
+    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
     write(*,*) "  esm  grid   : "//trim(dom%ctl%grid_clim)
     write(*,*) "  smb  grid   : "//trim(dom%ctl%grid_smb)
     write(*,*) "  mshlf grid  : "//trim(dom%ctl%grid_mshlf)

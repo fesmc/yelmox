@@ -143,14 +143,14 @@ program yelmox
     domain = yelmo1%par%domain 
 
     ! Ensure optimization fields are allocated and preassigned
-    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
-    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_min(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
+    allocate(opt%cf_max(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     
     opt%cf_min = yelmo1%dyn%par%till_cf_min 
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define no-ice mask from present-day data
-    allocate(mask_noice(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(mask_noice(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     mask_noice = .FALSE. 
     where(yelmo1%dta%pd%H_ice .le. 0.0) mask_noice = .TRUE. 
 
@@ -158,8 +158,8 @@ program yelmox
     call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
-        yelmo1%grd%dx, yelmo1%grd%dy)
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%G%nx, yelmo1%grd%G%ny, &
+        real(yelmo1%grd%G%dx,wp), real(yelmo1%grd%G%dy,wp))
 
     ! Initialize the climate model REMBO, including loading parameters from options_rembo 
     call rembo_init(real(ts%time,8))
@@ -169,18 +169,18 @@ program yelmox
     convert_km3_Gt = yelmo1%bnd%c%rho_ice *1e-3
 
     ! Initialize "climate" model (here for ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%G%nx,yelmo1%grd%G%ny,yelmo1%bnd%basins)
     
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny, &
+    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%G%nx,yelmo1%grd%G%ny, &
                         domain,yelmo1%par%grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
     ! Sediments
-    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    call sediments_init(sed1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%H_sed = sed1%now%H 
     
     ! Geothermal heat flow
-    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    call geothermal_init(gthrm1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
     
     ! === Update initial boundary conditions for current time and yelmo state =====
@@ -241,7 +241,7 @@ program yelmox
     end if 
     
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins)
 
     if (use_hyster .and. trim(snp1%par%ocn_type) .eq. "const") then 
         ! Apply oceanic anomaly from hyster method 
@@ -251,11 +251,11 @@ program yelmox
     end if 
 
     call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                        yelmo1%bnd%basins,yelmo1%bnd%z_sl,real(yelmo1%grd%G%dx,wp),snp1%now%depth, &
                         snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
     call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                         yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=real(yelmo1%grd%G%dx,wp))
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -473,7 +473,7 @@ program yelmox
             ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
             
             ! Update snapclim
-            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+            call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins) 
 
             if (use_hyster .and. trim(snp1%par%ocn_type) .eq. "const") then 
                 ! Apply oceanic anomaly from hyster method 
@@ -483,11 +483,11 @@ program yelmox
             end if
 
             call marshelf_update_shelf(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,yelmo1%grd%dx,snp1%now%depth, &
+                            yelmo1%bnd%basins,yelmo1%bnd%z_sl,real(yelmo1%grd%G%dx,wp),snp1%now%depth, &
                             snp1%now%to_ann,snp1%now%so_ann,dto_ann=snp1%now%to_ann-snp1%clim0%to_ann)
 
             call marshelf_update(mshlf1,yelmo1%tpo%now%H_ice,yelmo1%bnd%z_bed,yelmo1%tpo%now%f_grnd, &
-                                yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=yelmo1%grd%dx)
+                                yelmo1%bnd%regions,yelmo1%bnd%basins,yelmo1%bnd%z_sl,dx=real(yelmo1%grd%G%dx,wp))
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
@@ -1020,8 +1020,8 @@ contains
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
-        call nc_write_dim(filename,"xc",        x=dom%grd%xc*1e-3,      units="kilometers")
-        call nc_write_dim(filename,"yc",        x=dom%grd%yc*1e-3,      units="kilometers")
+        call nc_write_dim(filename,"xc",        x=real(dom%grd%G%x,wp)*1e-3,      units="kilometers")
+        call nc_write_dim(filename,"yc",        x=real(dom%grd%G%y,wp)*1e-3,      units="kilometers")
         call nc_write_dim(filename,"zeta",      x=dom%par%zeta_aa,      units="1")
         call nc_write_dim(filename,"time",      x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
         

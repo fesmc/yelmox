@@ -70,7 +70,7 @@ program yelmox
     write(*,*)
     write(*,*) "yelmox: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
-    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
+    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
     write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)

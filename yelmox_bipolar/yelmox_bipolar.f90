@@ -109,11 +109,11 @@ program yelmox_bipolar
     ! Hydrographic masks (Yelmo grid) restricting the freshwater flux per domain.
     if (ism2obm) then
         if (couple_fwf_north .and. active_north) then
-            allocate(hydro_mask_north(dom_north%yelmo%grd%nx, dom_north%yelmo%grd%ny))
+            allocate(hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
             call nc_read(hydro_mask_north_path, "mask", hydro_mask_north)
         end if
         if (couple_fwf_south .and. active_south) then
-            allocate(hydro_mask_south(dom_south%yelmo%grd%nx, dom_south%yelmo%grd%ny))
+            allocate(hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
             call nc_read(hydro_mask_south_path, "mask", hydro_mask_south)
         end if
     end if
@@ -279,7 +279,7 @@ contains
         write(*,*)
         write(*,*) "yelmox_bipolar: domain initialized ("//trim(adjustl(suffix))//")"
         write(*,*) "  domain      : "//trim(dom%ctl%domain)
-        write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%nx, dom%yelmo%grd%ny
+        write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
         write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
         write(*,*) "  coupler maps: ", dom%cpl%nmaps
         write(*,*) "  output dir  : "//trim(outfldr)

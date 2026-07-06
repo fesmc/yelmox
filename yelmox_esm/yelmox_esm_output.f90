@@ -551,12 +551,12 @@ contains
         logical, allocatable :: mask_grnd(:,:)
         logical, allocatable :: mask_flt(:,:)
     
-        dx = ylmo%grd%dx
-        dy = ylmo%grd%dy
+        dx = ylmo%grd%G%dx
+        dy = ylmo%grd%G%dy
     
-        allocate(mask_tot (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(mask_grnd(ylmo%grd%nx, ylmo%grd%ny))
-        allocate(mask_flt (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_tot (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(mask_grnd(ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(mask_flt (ylmo%grd%G%nx, ylmo%grd%G%ny))
     
         ! === Unit conversion factors =========================================
         rho_ice        = 917.0_wp           ! ice density kg m-3
@@ -723,22 +723,22 @@ contains
         real(wp), allocatable :: uz_s_masked(:,:), uz_b_masked(:,:)   
         
         ! ---- allocate -------------------------------------------------------
-        allocate(bmb_grnd_masked (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(bmb_shlf_masked (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(z_base          (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(T_top_ice       (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(T_base_grnd     (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(T_base_flt      (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(T_avg           (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(dTdz_base_grnd  (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(dTdz_base_flt   (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(flux_grl_2d     (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(flux_clv_2d     (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(tfbase          (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(ux_aa           (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(uy_aa           (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(uz_s_masked     (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(uz_b_masked     (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(bmb_grnd_masked (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(bmb_shlf_masked (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(z_base          (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(T_top_ice       (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(T_base_grnd     (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(T_base_flt      (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(T_avg           (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(dTdz_base_grnd  (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(dTdz_base_flt   (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(flux_grl_2d     (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(flux_clv_2d     (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(tfbase          (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(ux_aa           (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(uy_aa           (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(uz_s_masked     (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(uz_b_masked     (ylmo%grd%G%nx, ylmo%grd%G%ny))
         
         ! ---- initialise -----------------------------------------------------
         bmb_grnd_masked = 0.0_wp;  bmb_shlf_masked = 0.0_wp
@@ -818,8 +818,8 @@ contains
         end where
         
         ! Mean velocities interpolated onto aa-nodes (staggered → centred)
-        do j = 2, ylmo%grd%ny - 1
-        do i = 2, ylmo%grd%nx - 1
+        do j = 2, ylmo%grd%G%ny - 1
+        do i = 2, ylmo%grd%G%nx - 1
             ux_aa(i,j) = 0.5_wp * (ylmo%dyn%now%ux_bar(i,j) + ylmo%dyn%now%ux_bar(i-1,j))
             uy_aa(i,j) = 0.5_wp * (ylmo%dyn%now%uy_bar(i,j) + ylmo%dyn%now%uy_bar(i,j-1))
         end do
@@ -1033,11 +1033,11 @@ contains
         logical, allocatable :: mask_frnt(:,:)   ! ice-front cells
         
         ! ---- allocate -------------------------------------------------------
-        allocate(mask_tot  (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(mask_grnd (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(mask_flt  (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(mask_grl  (ylmo%grd%nx, ylmo%grd%ny))
-        allocate(mask_frnt (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(mask_tot  (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(mask_grnd (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(mask_flt  (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(mask_grl  (ylmo%grd%G%nx, ylmo%grd%G%ny))
+        allocate(mask_frnt (ylmo%grd%G%nx, ylmo%grd%G%ny))
         
         ! ---- unit conversions -----------------------------------------------
         rho_ice        = 917.0_wp
@@ -1046,8 +1046,8 @@ contains
         esm_correction = m3yr_to_kgs * density_corr
         yr_to_sec      = 31556952.0_wp
         
-        dx = ylmo%grd%dx
-        dy = ylmo%grd%dy
+        dx = ylmo%grd%G%dx
+        dy = ylmo%grd%G%dy
         
         ! ---- masks (updated to match yelmo_calving.f90) ---------------------
         mask_tot  = (ylmo%tpo%now%H_ice .gt. 0.0_wp)

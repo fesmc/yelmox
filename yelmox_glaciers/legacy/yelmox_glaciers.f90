@@ -163,8 +163,8 @@ program yelmox
     domain = yelmo1%par%domain 
 
     ! Ensure optimization fields are allocated and preassigned
-    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
-    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_min(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
+    allocate(opt%cf_max(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     
     opt%cf_min = yelmo1%dyn%par%till_cf_min
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
@@ -175,19 +175,19 @@ program yelmox
     call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%G%nx, yelmo1%grd%G%ny, real(yelmo1%grd%G%dx,wp), real(yelmo1%grd%G%dy,wp))
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%G%nx,yelmo1%grd%G%ny,yelmo1%bnd%basins)
     
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
-    call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
+    call smbpal_init(smbpal1,path_par,x=real(yelmo1%grd%G%x,wp),y=real(yelmo1%grd%G%y,wp),lats=real(yelmo1%grd%lat,wp))
 
     ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
-    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    call sediments_init(sed1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%H_sed = sed1%now%H 
     
-    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,yelmo1%par%grid_name)
+    call geothermal_init(gthrm1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,yelmo1%par%grid_name)
     yelmo1%bnd%Q_geo    = gthrm1%now%ghf 
     
     ! === Update initial boundary conditions for current time and yelmo state =====
@@ -206,7 +206,7 @@ program yelmox
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -361,7 +361,7 @@ program yelmox
         
         if (mod(nint(ts%time*100),nint(ctl%dt_clim*100))==0) then
                 ! Update snapclim
-                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins) 
+                call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins) 
         end if 
 
         ! == SURFACE MASS BALANCE ==============================================

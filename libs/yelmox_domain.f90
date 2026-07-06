@@ -202,16 +202,16 @@ contains
         nx_i = grid_i%G%nx
         ny_i = grid_i%G%ny
         ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
-        dom%ctl%dx_isos = dom%yelmo%grd%dx * (grid_i%G%dx / grid_y%G%dx)
-        dom%ctl%dy_isos = dom%yelmo%grd%dy * (grid_i%G%dy / grid_y%G%dy)
+        dom%ctl%dx_isos = dom%yelmo%grd%G%dx * (grid_i%G%dx / grid_y%G%dx)
+        dom%ctl%dy_isos = dom%yelmo%grd%G%dy * (grid_i%G%dy / grid_y%G%dy)
         call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
                        dom%ctl%dx_isos, dom%ctl%dy_isos)
 
-        call sediments_init(dom%sed, path_par, dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
+        call sediments_init(dom%sed, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
                             domain, dom%yelmo%par%grid_name, group="sed"//trim(sfx))
         dom%yelmo%bnd%H_sed = dom%sed%now%H
 
-        call geothermal_init(dom%gthrm, path_par, dom%yelmo%grd%nx, dom%yelmo%grd%ny, &
+        call geothermal_init(dom%gthrm, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
                              domain, dom%yelmo%par%grid_name, group="ghf"//trim(sfx))
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
 
@@ -232,7 +232,7 @@ contains
         call grid_cdo_read_desc(grid_c, trim(dom%ctl%grid_clim), MAP_FLDR)
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny
-        dom%ctl%dx_clim = dom%yelmo%grd%dx * (grid_c%G%dx / grid_y%G%dx)
+        dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
         if (do_climate) then
             call remap(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
             call snapclim_init(dom%snp, path_par, domain, trim(dom%ctl%grid_clim), &
@@ -268,7 +268,7 @@ contains
         nx_m = grid_m%G%nx
         ny_m = grid_m%G%ny
         ! Grid spacing in Yelmo dx units, scaled by the resolution ratio.
-        dom%ctl%dx_mshlf = dom%yelmo%grd%dx * (grid_m%G%dx / grid_y%G%dx)
+        dom%ctl%dx_mshlf = dom%yelmo%grd%G%dx * (grid_m%G%dx / grid_y%G%dx)
 
         ! Region/basin masks on the mshlf grid (from the hub).
         call remap(dom, dom%topo%regions, dom%ctl%grid_name, regions_m, dom%ctl%grid_mshlf, "nn")
@@ -301,8 +301,8 @@ contains
         dom%opt%tf_basins = 0
         call optimize_par_load(dom%opt, path_par, "opt"//trim(suffix))
 
-        nx = dom%yelmo%grd%nx
-        ny = dom%yelmo%grd%ny
+        nx = dom%yelmo%grd%G%nx
+        ny = dom%yelmo%grd%G%ny
         allocate(dom%opt%cf_min(nx, ny), dom%opt%cf_max(nx, ny))
         dom%opt%cf_min = dom%yelmo%dyn%par%till_cf_min
         dom%opt%cf_max = dom%yelmo%dyn%par%till_cf_ref
@@ -325,8 +325,8 @@ contains
 
         domain    = trim(dom%ctl%domain)
         grid_name = trim(dom%ctl%grid_yelmo)
-        nx = dom%yelmo%grd%nx
-        ny = dom%yelmo%grd%ny
+        nx = dom%yelmo%grd%G%nx
+        ny = dom%yelmo%grd%G%ny
         allocate(tmp_mask(nx, ny))
 
         select case(trim(domain))
@@ -552,7 +552,7 @@ contains
                 where (dom%yelmo%bnd%regions == 1.1_wp .and. dom%yelmo%bnd%z_bed > 0.0_wp) &
                     dom%yelmo%tpo%now%H_ice = 1000.0_wp
                 where (dom%yelmo%bnd%regions == 1.12_wp) dom%yelmo%tpo%now%H_ice = 1000.0_wp
-                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=dom%yelmo%grd%dx, f_sigma=3.0_wp)
+                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=real(dom%yelmo%grd%G%dx,wp), f_sigma=3.0_wp)
                 call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
                                      dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
             case("ref_lgm")
@@ -562,7 +562,7 @@ contains
                          dom%yelmo%bnd%regions == 1.12_wp) )
                     dom%yelmo%tpo%now%H_ice = dom%yelmo%bnd%H_ice_ref
                 end where
-                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=dom%yelmo%grd%dx, f_sigma=2.0_wp)
+                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=real(dom%yelmo%grd%G%dx,wp), f_sigma=2.0_wp)
                 call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
                                      dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
             case default
@@ -912,8 +912,8 @@ contains
 
         integer :: i, j, nx, ny
 
-        nx = ylmo%grd%nx
-        ny = ylmo%grd%ny
+        nx = ylmo%grd%G%nx
+        ny = ylmo%grd%G%ny
 
         if (time < -11e3_wp) then
             ngs%cf_x = ngs%cf_0
@@ -1029,7 +1029,7 @@ contains
         if (trim(dom%ctl%domain) == "Greenland" .and. dom%ctl%scale_glacial_smb) then
             call remap(dom, dom%snp%now%ta_ann,   gc, ta_y,    gy, "bilin")
             call remap(dom, dom%snp%clim0%ta_ann, gc, ta_pd_y, gy, "bilin")
-            call calc_glacial_smb(dom%yelmo%bnd%smb, dom%yelmo%grd%lat, ta_y, ta_pd_y)
+            call calc_glacial_smb(dom%yelmo%bnd%smb, real(dom%yelmo%grd%lat,wp), ta_y, ta_pd_y)
         end if
     end subroutine domain_update_smb
 

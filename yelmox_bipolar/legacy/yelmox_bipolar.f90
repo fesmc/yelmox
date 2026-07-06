@@ -281,7 +281,7 @@ program yelmox
         
         ! BIPOLAR: allocate and load hydrographic mask
         if (ctl%couple_fwf_north) then
-            allocate(yelmox_north%hydro_mask(yelmox_north%yelmo1%grd%nx,yelmox_north%yelmo1%grd%ny))
+            allocate(yelmox_north%hydro_mask(yelmox_north%yelmo1%grd%G%nx,yelmox_north%yelmo1%grd%G%ny))
             call nc_read(yelmox_north%path_hydro_mask,"mask",yelmox_north%hydro_mask)
         end if
 
@@ -298,7 +298,7 @@ program yelmox
         
         ! BIPOLAR: allocate and load hydrographic mask
         if (ctl%couple_fwf_south) then
-            allocate(yelmox_south%hydro_mask(yelmox_south%yelmo1%grd%nx,yelmox_south%yelmo1%grd%ny))
+            allocate(yelmox_south%hydro_mask(yelmox_south%yelmo1%grd%G%nx,yelmox_south%yelmo1%grd%G%ny))
             call nc_read(yelmox_south%path_hydro_mask,"mask",yelmox_south%hydro_mask)
         end if
         
@@ -402,10 +402,10 @@ program yelmox
                             ! Update snapclim
 
             if (ctl%active_north) then
-                call snapclim_update(yelmox_north%snp1,z_srf=yelmox_north%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox_north%domain,dx=yelmox_north%yelmo1%grd%dx,basins=yelmox_north%yelmo1%bnd%basins) 
+                call snapclim_update(yelmox_north%snp1,z_srf=yelmox_north%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox_north%domain,dx=real(yelmox_north%yelmo1%grd%G%dx,wp),basins=yelmox_north%yelmo1%bnd%basins) 
             end if
             if (ctl%active_south) then
-                call snapclim_update(yelmox_south%snp1,z_srf=yelmox_south%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox_south%domain,dx=yelmox_south%yelmo1%grd%dx,basins=yelmox_south%yelmo1%bnd%basins) 
+                call snapclim_update(yelmox_south%snp1,z_srf=yelmox_south%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox_south%domain,dx=real(yelmox_south%yelmo1%grd%G%dx,wp),basins=yelmox_south%yelmo1%bnd%basins) 
             end if
 
         end if
@@ -493,7 +493,7 @@ program yelmox
 
             if (trim(yelmox_north%yelmo1%par%domain) .eq. "Greenland" .and. yelmox_north%scale_glacial_smb) then 
                 ! Modify glacial smb
-                call calc_glacial_smb(yelmox_north%yelmo1%bnd%smb,yelmox_north%yelmo1%grd%lat,yelmox_north%snp1%now%ta_ann,yelmox_north%snp1%clim0%ta_ann)
+                call calc_glacial_smb(yelmox_north%yelmo1%bnd%smb,real(yelmox_north%yelmo1%grd%lat,wp),yelmox_north%snp1%now%ta_ann,yelmox_north%snp1%clim0%ta_ann)
             end if
         
             ! yelmox_north%yelmo1%bnd%smb   = yelmox_north%yelmo1%dta%pd%smb
@@ -515,7 +515,7 @@ program yelmox
 
             if (trim(yelmox_south%yelmo1%par%domain) .eq. "Greenland" .and. yelmox_south%scale_glacial_smb) then 
                 ! Modify glacial smb
-                call calc_glacial_smb(yelmox_south%yelmo1%bnd%smb,yelmox_south%yelmo1%grd%lat,yelmox_south%snp1%now%ta_ann,yelmox_south%snp1%clim0%ta_ann)
+                call calc_glacial_smb(yelmox_south%yelmo1%bnd%smb,real(yelmox_south%yelmo1%grd%lat,wp),yelmox_south%snp1%now%ta_ann,yelmox_south%snp1%clim0%ta_ann)
             end if
         
             ! yelmox_south%yelmo1%bnd%smb   = yelmox_south%yelmo1%dta%pd%smb
@@ -533,22 +533,22 @@ program yelmox
         ! == MARINE AND TOTAL BASAL MASS BALANCE ===============================
         if (ctl%active_north) then
             call marshelf_update_shelf(yelmox_north%mshlf1,yelmox_north%yelmo1%tpo%now%H_ice,yelmox_north%yelmo1%bnd%z_bed,yelmox_north%yelmo1%tpo%now%f_grnd, &
-                        yelmox_north%yelmo1%bnd%basins,yelmox_north%yelmo1%bnd%z_sl,yelmox_north%yelmo1%grd%dx,yelmox_north%snp1%now%depth, &
+                        yelmox_north%yelmo1%bnd%basins,yelmox_north%yelmo1%bnd%z_sl,real(yelmox_north%yelmo1%grd%G%dx,wp),yelmox_north%snp1%now%depth, &
                         yelmox_north%snp1%now%to_ann,yelmox_north%snp1%now%so_ann,dto_ann=yelmox_north%snp1%now%to_ann-yelmox_north%snp1%clim0%to_ann)
 
             call marshelf_update(yelmox_north%mshlf1,yelmox_north%yelmo1%tpo%now%H_ice,yelmox_north%yelmo1%bnd%z_bed,yelmox_north%yelmo1%tpo%now%f_grnd, &
-                                 yelmox_north%yelmo1%bnd%regions,yelmox_north%yelmo1%bnd%basins,yelmox_north%yelmo1%bnd%z_sl,dx=yelmox_north%yelmo1%grd%dx)
+                                 yelmox_north%yelmo1%bnd%regions,yelmox_north%yelmo1%bnd%basins,yelmox_north%yelmo1%bnd%z_sl,dx=real(yelmox_north%yelmo1%grd%G%dx,wp))
 
             yelmox_north%yelmo1%bnd%bmb_shlf = yelmox_north%mshlf1%now%bmb_shlf
             yelmox_north%yelmo1%bnd%T_shlf   = yelmox_north%mshlf1%now%T_shlf
         end if
         if (ctl%active_south) then
             call marshelf_update_shelf(yelmox_south%mshlf1,yelmox_south%yelmo1%tpo%now%H_ice,yelmox_south%yelmo1%bnd%z_bed,yelmox_south%yelmo1%tpo%now%f_grnd, &
-                        yelmox_south%yelmo1%bnd%basins,yelmox_south%yelmo1%bnd%z_sl,yelmox_south%yelmo1%grd%dx,yelmox_south%snp1%now%depth, &
+                        yelmox_south%yelmo1%bnd%basins,yelmox_south%yelmo1%bnd%z_sl,real(yelmox_south%yelmo1%grd%G%dx,wp),yelmox_south%snp1%now%depth, &
                         yelmox_south%snp1%now%to_ann,yelmox_south%snp1%now%so_ann,dto_ann=yelmox_south%snp1%now%to_ann-yelmox_south%snp1%clim0%to_ann)
 
             call marshelf_update(yelmox_south%mshlf1,yelmox_south%yelmo1%tpo%now%H_ice,yelmox_south%yelmo1%bnd%z_bed,yelmox_south%yelmo1%tpo%now%f_grnd, &
-                                 yelmox_south%yelmo1%bnd%regions,yelmox_south%yelmo1%bnd%basins,yelmox_south%yelmo1%bnd%z_sl,dx=yelmox_south%yelmo1%grd%dx)
+                                 yelmox_south%yelmo1%bnd%regions,yelmox_south%yelmo1%bnd%basins,yelmox_south%yelmo1%bnd%z_sl,dx=real(yelmox_south%yelmo1%grd%G%dx,wp))
 
             yelmox_south%yelmo1%bnd%bmb_shlf = yelmox_south%mshlf1%now%bmb_shlf
             yelmox_south%yelmo1%bnd%T_shlf   = yelmox_south%mshlf1%now%T_shlf
@@ -679,8 +679,8 @@ contains
         ! Local variables
         integer :: i, j, nx, ny 
 
-        nx = ylmo%grd%nx 
-        ny = ylmo%grd%ny 
+        nx = ylmo%grd%G%nx 
+        ny = ylmo%grd%G%ny 
 
         if (t .lt. -11e3) then 
             ngs%cf_x = ngs%cf_0
@@ -1283,8 +1283,8 @@ contains
         yelmox%domain = yelmox%yelmo1%par%domain  
 
         ! Ensure optimization fields are allocated and preassigned
-        allocate(yelmox%opt%cf_min(yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny))
-        allocate(yelmox%opt%cf_max(yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny))
+        allocate(yelmox%opt%cf_min(yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny))
+        allocate(yelmox%opt%cf_max(yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny))
         
         yelmox%opt%cf_min = yelmox%yelmo1%dyn%par%till_cf_min 
         yelmox%opt%cf_max = yelmox%yelmo1%dyn%par%till_cf_ref
@@ -1295,7 +1295,7 @@ contains
         yelmox%running_laurentide = .FALSE. 
         yelmox%running_greenland  = .FALSE. 
 
-        allocate(yelmox%tmp_mask(yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny))
+        allocate(yelmox%tmp_mask(yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny))
 
         select case(trim(yelmox%domain))
 
@@ -1344,9 +1344,9 @@ contains
                 where(abs(yelmox%yelmo1%bnd%regions - 1.30) .lt. 1e-3) yelmox%yelmo1%bnd%mask_ice = MASK_ICE_NONE
 
                 yelmox%yelmo1%bnd%mask_ice(1,:)                       = MASK_ICE_NONE
-                yelmox%yelmo1%bnd%mask_ice(yelmox%yelmo1%grd%nx,:)    = MASK_ICE_NONE
+                yelmox%yelmo1%bnd%mask_ice(yelmox%yelmo1%grd%G%nx,:)    = MASK_ICE_NONE
                 yelmox%yelmo1%bnd%mask_ice(:,1)                       = MASK_ICE_NONE
-                yelmox%yelmo1%bnd%mask_ice(:,yelmox%yelmo1%grd%ny)    = MASK_ICE_NONE
+                yelmox%yelmo1%bnd%mask_ice(:,yelmox%yelmo1%grd%G%ny)    = MASK_ICE_NONE
                 
                 ! Initialize regions
                 call yelmo_regions_init(yelmox%yelmo1,n=1)
@@ -1413,22 +1413,22 @@ contains
         ! === Initialize external models (forcing for ice sheet) ======
 
         ! Initialize fastisosaty
-        call isos_init(yelmox%isos1, path_par, isos_group, yelmox%yelmo1%grd%nx, yelmox%yelmo1%grd%ny, &
-            yelmox%yelmo1%grd%dx, yelmox%yelmo1%grd%dy)
+        call isos_init(yelmox%isos1, path_par, isos_group, yelmox%yelmo1%grd%G%nx, yelmox%yelmo1%grd%G%ny, &
+            real(yelmox%yelmo1%grd%G%dx,wp), real(yelmox%yelmo1%grd%G%dy,wp))
 
         ! Initialize "climate" model (climate and ocean forcing)
-        call snapclim_init(yelmox%snp1,path_par,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%yelmo1%bnd%basins,group=snapclim_group)
+        call snapclim_init(yelmox%snp1,path_par,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny,yelmox%yelmo1%bnd%basins,group=snapclim_group)
         ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
-        call smbpal_init(yelmox%smbpal1,path_par,x=yelmox%yelmo1%grd%xc,y=yelmox%yelmo1%grd%yc,lats=yelmox%yelmo1%grd%lat,group=smbpal_group,itm_group=itm_group)
+        call smbpal_init(yelmox%smbpal1,path_par,x=real(yelmox%yelmo1%grd%G%x,wp),y=real(yelmox%yelmo1%grd%G%y,wp),lats=real(yelmox%yelmo1%grd%lat,wp),group=smbpal_group,itm_group=itm_group)
         
         ! Initialize marine melt model (bnd%bmb_shlf)
-        call marshelf_init(yelmox%mshlf1,path_par,marshelf_group,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%bnd%regions,yelmox%yelmo1%bnd%basins)
+        call marshelf_init(yelmox%mshlf1,path_par,marshelf_group,yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,yelmox%yelmo1%bnd%regions,yelmox%yelmo1%bnd%basins)
 
         ! Load other constant boundary variables (bnd%H_sed, bnd%Q_geo)
-        call sediments_init(yelmox%sed1,path_par,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,group=sediments_group)
+        call sediments_init(yelmox%sed1,path_par,yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,group=sediments_group)
         yelmox%yelmo1%bnd%H_sed = yelmox%sed1%now%H 
         
-        call geothermal_init(yelmox%gthrm1,path_par,yelmox%yelmo1%grd%nx,yelmox%yelmo1%grd%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,group=geothermal_group)
+        call geothermal_init(yelmox%gthrm1,path_par,yelmox%yelmo1%grd%G%nx,yelmox%yelmo1%grd%G%ny,yelmox%domain,yelmox%yelmo1%par%grid_name,group=geothermal_group)
         yelmox%yelmo1%bnd%Q_geo    = yelmox%gthrm1%now%ghf 
 
         return
@@ -1457,7 +1457,7 @@ contains
         yelmox%yelmo1%bnd%z_sl  = yelmox%isos1%out%z_ss
 
         ! Update snapclim
-        call snapclim_update(yelmox%snp1,z_srf=yelmox%yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=yelmox%domain,dx=yelmox%yelmo1%grd%dx,basins=yelmox%yelmo1%bnd%basins)
+        call snapclim_update(yelmox%snp1,z_srf=yelmox%yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=yelmox%domain,dx=real(yelmox%yelmo1%grd%G%dx,wp),basins=yelmox%yelmo1%bnd%basins)
 
         ! Equilibrate snowpack for itm
         if (trim(yelmox%smbpal1%par%abl_method) .eq. "itm") then 
@@ -1472,15 +1472,15 @@ contains
 
         if (trim(yelmox%yelmo1%par%domain) .eq. "Greenland" .and. yelmox%scale_glacial_smb) then 
             ! Modify glacial smb
-            call calc_glacial_smb(yelmox%yelmo1%bnd%smb,yelmox%yelmo1%grd%lat,yelmox%snp1%now%ta_ann,yelmox%snp1%clim0%ta_ann)
+            call calc_glacial_smb(yelmox%yelmo1%bnd%smb,real(yelmox%yelmo1%grd%lat,wp),yelmox%snp1%now%ta_ann,yelmox%snp1%clim0%ta_ann)
         end if
 
         call marshelf_update_shelf(yelmox%mshlf1,yelmox%yelmo1%tpo%now%H_ice,yelmox%yelmo1%bnd%z_bed,yelmox%yelmo1%tpo%now%f_grnd, &
-                            yelmox%yelmo1%bnd%basins,yelmox%yelmo1%bnd%z_sl,yelmox%yelmo1%grd%dx,yelmox%snp1%now%depth, &
+                            yelmox%yelmo1%bnd%basins,yelmox%yelmo1%bnd%z_sl,real(yelmox%yelmo1%grd%G%dx,wp),yelmox%snp1%now%depth, &
                             yelmox%snp1%now%to_ann,yelmox%snp1%now%so_ann,dto_ann=yelmox%snp1%now%to_ann-yelmox%snp1%clim0%to_ann)
 
         call marshelf_update(yelmox%mshlf1,yelmox%yelmo1%tpo%now%H_ice,yelmox%yelmo1%bnd%z_bed,yelmox%yelmo1%tpo%now%f_grnd, &
-                            yelmox%yelmo1%bnd%regions,yelmox%yelmo1%bnd%basins,yelmox%yelmo1%bnd%z_sl,dx=yelmox%yelmo1%grd%dx)
+                            yelmox%yelmo1%bnd%regions,yelmox%yelmo1%bnd%basins,yelmox%yelmo1%bnd%z_sl,dx=real(yelmox%yelmo1%grd%G%dx,wp))
 
         yelmox%yelmo1%bnd%bmb_shlf = yelmox%mshlf1%now%bmb_shlf
         yelmox%yelmo1%bnd%T_shlf   = yelmox%mshlf1%now%T_shlf  
@@ -1543,7 +1543,7 @@ contains
                     end where 
 
                     ! Apply Gaussian smoothing to keep things stable
-                    call smooth_gauss_2D(yelmox%yelmo1%tpo%now%H_ice,dx=yelmox%yelmo1%grd%dx,f_sigma=2.0)
+                    call smooth_gauss_2D(yelmox%yelmo1%tpo%now%H_ice,dx=real(yelmox%yelmo1%grd%G%dx,wp),f_sigma=2.0)
                 
                 end if 
                 
@@ -1562,7 +1562,7 @@ contains
                 end if 
 
                 ! Update snapclim to reflect new topography 
-                call snapclim_update(yelmox%snp1,z_srf=yelmox%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox%domain,dx=yelmox%yelmo1%grd%dx,basins=yelmox%yelmo1%bnd%basins)
+                call snapclim_update(yelmox%snp1,z_srf=yelmox%yelmo1%tpo%now%z_srf,time=ts%time,domain=yelmox%domain,dx=real(yelmox%yelmo1%grd%G%dx,wp),basins=yelmox%yelmo1%bnd%basins)
 
                 ! Update smbpal
                 call smbpal_update_monthly(yelmox%smbpal1,yelmox%snp1%now%tas,yelmox%snp1%now%pr, &

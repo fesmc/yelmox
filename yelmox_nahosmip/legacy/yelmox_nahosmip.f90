@@ -186,15 +186,15 @@ program yelmox_ismip6
     grid_name = yelmo1%par%grid_name 
 
     ! Ensure optimization fields are allocated and preassigned
-    allocate(opt%cf_min(yelmo1%grd%nx,yelmo1%grd%ny))
-    allocate(opt%cf_max(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(opt%cf_min(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
+    allocate(opt%cf_max(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     
     opt%cf_min = yelmo1%dyn%par%till_cf_min
     opt%cf_max = yelmo1%dyn%par%till_cf_ref
 
     ! Define specific regions of interest =====================
 
-    allocate(tmp_mask(yelmo1%grd%nx,yelmo1%grd%ny))
+    allocate(tmp_mask(yelmo1%grd%G%nx,yelmo1%grd%G%ny))
     
     select case(trim(domain))
 
@@ -224,17 +224,17 @@ program yelmox_ismip6
     call bsl_init(bsl, path_par, ts%time_rel)
 
     ! Initialize fastisosaty
-    call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, &
-        yelmo1%grd%dx, yelmo1%grd%dy)
+    call isos_init(isos1, path_par, "isos", yelmo1%grd%G%nx, yelmo1%grd%G%ny, &
+        real(yelmo1%grd%G%dx,wp), real(yelmo1%grd%G%dy,wp))
 
     ! Initialize "climate" model (climate and ocean forcing)
-    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%nx,yelmo1%grd%ny,yelmo1%bnd%basins)
+    call snapclim_init(snp1,path_par,domain,yelmo1%par%grid_name,yelmo1%grd%G%nx,yelmo1%grd%G%ny,yelmo1%bnd%basins)
     
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
-    call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
+    call smbpal_init(smbpal1,path_par,x=real(yelmo1%grd%G%x,wp),y=real(yelmo1%grd%G%y,wp),lats=real(yelmo1%grd%lat,wp))
     
     ! Initialize marine melt model (bnd%bmb_shlf)
-    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
+    call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
     ! Initialize variables inside of ismip6 object 
     ismip6_path_par = trim(outfldr)//"/"//trim(ctl%ismip6_par_file)
@@ -257,11 +257,11 @@ program yelmox_ismip6
     ! === Update external modules and pass variables to yelmo boundaries =======
 
     ! Sediments
-    call sediments_init(sed1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
+    call sediments_init(sed1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,grid_name)
     yelmo1%bnd%H_sed = sed1%now%H 
 
     ! Geothermal heat flow
-    call geothermal_init(gthrm1,path_par,yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name)
+    call geothermal_init(gthrm1,path_par,yelmo1%grd%G%nx,yelmo1%grd%G%ny,domain,grid_name)
     yelmo1%bnd%Q_geo = gthrm1%now%ghf 
 
     ! Barystatic sea level
@@ -277,7 +277,7 @@ program yelmox_ismip6
     yelmo1%bnd%z_sl  = isos1%out%z_ss
 
     ! Update snapclim
-    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins)
+    call snapclim_update(snp1,z_srf=yelmo1%tpo%now%z_srf,time=ts%time_rel,domain=domain,dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins)
 
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm") then 
@@ -1056,9 +1056,9 @@ contains
         real(wp), allocatable :: dpr_now(:,:)
         real(wp), allocatable :: dsmb_now(:,:) 
 
-        allocate(dts_now(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(dpr_now(ylmo%grd%nx,ylmo%grd%ny))
-        allocate(dsmb_now(ylmo%grd%nx,ylmo%grd%ny))
+        allocate(dts_now(ylmo%grd%G%nx,ylmo%grd%G%ny))
+        allocate(dpr_now(ylmo%grd%G%nx,ylmo%grd%G%ny))
+        allocate(dsmb_now(ylmo%grd%G%nx,ylmo%grd%G%ny))
         
         ! Step 1: set climate to present day from input fields
         ! and calculate present-day smb based on this climate.
@@ -1068,7 +1068,7 @@ contains
 
         ! Set present-day climate with optional constant atmospheric anomaly
         call snapclim_update(snp,z_srf=ylmo%tpo%now%z_srf,time=0.0_wp, &
-                                        dx=yelmo1%grd%dx,basins=yelmo1%bnd%basins, &
+                                        dx=real(yelmo1%grd%G%dx,wp),basins=yelmo1%bnd%basins, &
                                         domain=ylmo%par%domain,dTa=dTa,dTo=0.0_wp)
 
         ! Calculate smb for present day 
@@ -1115,7 +1115,7 @@ contains
         ! robinson: dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1)
         ! jablasco: volvamos al ppio! dto_ann=ismp%to%var(:,:,:,1)*0.0
         call marshelf_update_shelf(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-                        ylmo%bnd%basins,ylmo%bnd%z_sl,ylmo%grd%dx,-ismp%to%z, &
+                        ylmo%bnd%basins,ylmo%bnd%z_sl,real(ylmo%grd%G%dx,wp),-ismp%to%z, &
                         ismp%to%var(:,:,:,1),ismp%so%var(:,:,:,1), &
                         dto_ann=ismp%to%var(:,:,:,1)-ismp%to_ref%var(:,:,:,1), &
                         tf_ann=ismp%tf%var(:,:,:,1))
@@ -1132,7 +1132,7 @@ contains
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
-                             ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=ylmo%grd%dx)
+                             ylmo%bnd%regions,ylmo%bnd%basins,ylmo%bnd%z_sl,dx=real(ylmo%grd%G%dx,wp))
 
         return
 
