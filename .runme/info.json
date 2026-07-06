@@ -17,7 +17,7 @@
             "ismip6-legacy"    : "libyelmox/bin/yelmox_ismip6-legacy.x",
             "nahosmip"         : "libyelmox/bin/yelmox_nahosmip-legacy.x",
             "nahosmip-legacy"  : "libyelmox/bin/yelmox_nahosmip-legacy.x",
-            "rembo"            : "libyelmox/bin/yelmox_rembo-legacy.x",
+            "rembo"            : "libyelmox/bin/yelmox_rembo.x",
             "rembo-legacy"     : "libyelmox/bin/yelmox_rembo-legacy.x",
             "rtip"             : "libyelmox/bin/yelmox_rtip-legacy.x",
             "rtip-legacy"      : "libyelmox/bin/yelmox_rtip-legacy.x"
@@ -30,7 +30,8 @@
 
     "par_paths" :
         {
-            "rembo"  : "yelmox_rembo/legacy/rembo_Greenland.nml"
+            "rembo"        : ["yelmox_rembo/options_rembo", "yelmox_rembo/rembo_Greenland.nml"],
+            "rembo-legacy" : "yelmox_rembo/legacy/rembo_Greenland.nml"
         },
 
     "files" : ["git_yelmo.txt"],
