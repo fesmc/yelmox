@@ -32,7 +32,7 @@ module yelmox_domain
                              marshelf_restart_read
     use fastisostasy, only : isos_class, isos_init, isos_update, isos_init_ref, &
                              isos_init_state, isos_restart_write, isos_restart_read, &
-                             bsl_class
+                             bsl_class, bsl_update, bsl_restart_read, bsl_restart_write
     use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
@@ -127,8 +127,9 @@ module yelmox_domain
     end type ice_domain
 
     public :: domain_ctl, ice_domain
-    public :: timeline_init
+    public :: timeline_init, tstep_due
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
+    public :: domain_startup, bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
@@ -183,6 +184,71 @@ contains
                             time_ref=tref, const_rel=tstep_const)
         end if
     end subroutine timeline_init
+
+    function tstep_due(time, dt) result(due)
+        ! Cadence predicate: true when `time` falls on the dt grid (0.01-yr
+        ! precision). dt <= 0 disables the cadence (never due).
+        real(wp), intent(in) :: time, dt
+        logical :: due
+        due = .false.
+        if (dt > 0.0_wp) due = (mod(nint(time*100), nint(dt*100)) == 0)
+    end function tstep_due
+
+    subroutine bsl_startup(bsl, ts, fldr)
+        ! Restore the shared, driver-owned barystatic sea level from a run-level
+        ! restart bundle (fldr/bsl_restart.nc) and refresh it for the current
+        ! time. No-op when fldr is "None" (bsl_init already set the cold state).
+        ! bsl is prognostic under method="fastiso"/"mixed" and cannot be
+        ! re-derived from time, hence the explicit restore.
+        type(bsl_class),   intent(inout) :: bsl
+        type(tstep_class), intent(in)    :: ts
+        character(len=*),  intent(in)    :: fldr
+
+        if (trim(fldr) == "None") return
+        call bsl_restart_read(bsl, trim(fldr)//"/bsl_restart.nc")
+        call bsl_update(bsl, ts%time_rel)
+    end subroutine bsl_startup
+
+    subroutine domain_startup(dom, ts, bsl, restore_bsl)
+        ! Establish the domain state after domain_init: cold start (ctl%restart
+        ! == "None") builds the initial boundary state; otherwise the restart
+        ! bundle is restored and the hi-res hub rebuilt from the restored models.
+        ! restore_bsl (default .true.) also restores the shared bsl from the same
+        ! bundle folder -- the single-domain convention, where the run-level
+        ! bsl_restart.nc lives in the domain's bundle. Multi-domain drivers
+        ! restore the bsl once themselves (bsl_startup) and pass .false..
+        ! Flavor drivers with their own cold start (esm, rembo) keep their own
+        ! cold branch and call this for the restart branch only.
+        type(ice_domain),  intent(inout) :: dom
+        type(tstep_class), intent(in)    :: ts
+        type(bsl_class),   intent(inout) :: bsl
+        logical, intent(in), optional    :: restore_bsl
+
+        logical :: do_bsl
+
+        do_bsl = .true.
+        if (present(restore_bsl)) do_bsl = restore_bsl
+
+        if (trim(dom%ctl%restart) == "None") then
+            call domain_init_state(dom, ts, bsl)
+        else
+            if (do_bsl) call bsl_startup(bsl, ts, trim(dom%ctl%restart))
+            call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
+            call refresh_htopo(dom)
+        end if
+    end subroutine domain_startup
+
+    subroutine run_restart_write(dom, bsl, time)
+        ! Single-domain restart: write the domain bundle and the run-level shared
+        ! bsl restart into the same auto-named per-time folder. Multi-domain
+        ! drivers write per-domain bundles + one run-root bsl bundle themselves.
+        type(ice_domain), intent(inout) :: dom
+        type(bsl_class),  intent(inout) :: bsl
+        real(wp),         intent(in)    :: time
+
+        call domain_restart_write(dom, time)
+        call bsl_restart_write(bsl, trim(restart_bundle_dir(time))//"/bsl_restart.nc", time)
+    end subroutine run_restart_write
 
     subroutine domain_init(dom, path_par, time, group_suffix, init_climate, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
@@ -1132,7 +1198,7 @@ contains
         gn = trim(dom%ctl%grid_name)
 
         ! snapclim snapshot on grid_clim, updated on the dt_clim cadence
-        if (mod(nint(ts%time_elapsed*100), nint(dom%ctl%dt_clim*100)) == 0) then
+        if (tstep_due(ts%time_elapsed, dom%ctl%dt_clim)) then
             call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
             call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &

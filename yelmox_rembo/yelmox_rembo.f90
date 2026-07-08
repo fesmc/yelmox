@@ -18,7 +18,6 @@ program yelmox_rembo
                       yelmo_init_state, yelmo_update_equil, yelmo_print_bound, &
                       yelmo_write_init, MASK_ICE_NONE
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
-                             bsl_restart_read, bsl_restart_write, &
                              isos_init_ref, isos_init_state
     use snapclim,     only : snapclim_update
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
@@ -85,10 +84,7 @@ program yelmox_rembo
     if (trim(dom%ctl%restart) == "None") then
         call rembo_cold_start()
     else
-        call bsl_restart_read(bsl, trim(dom%ctl%restart)//"/bsl_restart.nc")
-        call bsl_update(bsl, ts%time_rel)
-        call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
-        call refresh_htopo(dom)
+        call domain_startup(dom, ts, bsl)
         call step_rembo()
         call step_marine_shelf(dom, ts)
     end if
@@ -164,8 +160,7 @@ program yelmox_rembo
             call yelmox_rembo_write_step(dom%yelmo, rembo_ann, dom%isos, dom%mshlf, file2D, ts%time)
 
         ! === restart bundle ===
-        if (write_restart .and. dom%ctl%dt_restart > 0.0_wp .and. &
-            mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
+        if (write_restart .and. tstep_due(ts%time, dom%ctl%dt_restart)) then
             call write_rembo_restart()
         end if
 
@@ -311,11 +306,9 @@ contains
     end subroutine rembo_cold_start
 
     subroutine write_rembo_restart()
-        ! Restart bundle: the shared domain sub-models (yelmo/isos/mshlf/smbpal) plus
-        ! the driver-owned shared bsl and REMBO's own restart, all in one folder.
-        call domain_restart_write(dom, ts%time)
-        call restart_bundle_mkdir(ts%time)
-        call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
+        ! Restart bundle: the shared domain sub-models + shared bsl
+        ! (run_restart_write) plus REMBO's own restart, all in one folder.
+        call run_restart_write(dom, bsl, ts%time)
         call rembo_restart_write(trim(restart_bundle_dir(ts%time))//"/rembo_restart.nc", &
                 real(ts%time, dp), real(dom%yelmo%tpo%now%z_srf, dp), &
                 real(dom%yelmo%tpo%now%H_ice, dp), real(dom%yelmo%bnd%z_sl, dp))

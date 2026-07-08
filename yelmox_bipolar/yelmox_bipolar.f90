@@ -28,8 +28,7 @@ program yelmox_bipolar
     use timestepping
     use timeout
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
-    use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
-                             bsl_restart_read, bsl_restart_write
+    use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
     use yelmox_domain
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
@@ -88,12 +87,8 @@ program yelmox_bipolar
     !     bsl_restart.nc ([ctrl] restart_bsl) when restarting. ===
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
-    restart_bsl = "None"
     call nml_read(path_par, "ctrl", "restart_bsl", restart_bsl)
-    if (trim(restart_bsl) /= "None") then
-        call bsl_restart_read(bsl, trim(restart_bsl)//"/bsl_restart.nc")
-        call bsl_update(bsl, ts%time_rel)
-    end if
+    call bsl_startup(bsl, ts, restart_bsl)
 
     ! === Per-domain initialization ===
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
@@ -258,12 +253,9 @@ contains
 
         call domain_regions_init(dom, trim(outfldr))
 
-        if (trim(dom%ctl%restart) == "None") then
-            call domain_init_state(dom, ts, bsl)
-        else
-            call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
-            call refresh_htopo(dom)
-        end if
+        ! Cold start or per-domain restart; the shared bsl was already
+        ! initialized/restored once by the driver (bsl_startup above).
+        call domain_startup(dom, ts, bsl, restore_bsl=.false.)
 
         write(*,*)
         write(*,*) "yelmox_bipolar: domain initialized ("//trim(adjustl(suffix))//")"
@@ -324,8 +316,7 @@ contains
 
         if (do_force) then
             call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
-        else if (dom%ctl%dt_restart > 0.0_wp .and. &
-                 mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
+        else if (tstep_due(ts%time, dom%ctl%dt_restart)) then
             call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
             do_restart = .true.
         end if

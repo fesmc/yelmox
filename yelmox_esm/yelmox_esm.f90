@@ -176,10 +176,7 @@ program yelmox_esm
     if (trim(dom%ctl%restart) == "None") then
         call esm_cold_start(dom, esm, ec, ts, bsl)
     else
-        call bsl_restart_read(bsl, trim(dom%ctl%restart)//"/bsl_restart.nc")
-        call bsl_update(bsl, ts%time_rel)
-        call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
-        call refresh_htopo(dom)
+        call domain_startup(dom, ts, bsl)
         call step_climate_esm(dom, esm, ec, ts)
         call step_marine_shelf_esm(dom, esm, ec, ts)
     end if
@@ -239,18 +236,15 @@ program yelmox_esm
         end if
 
         if (ec%write_formatted) then
-            if (mod(nint(ts%time_elapsed*100), nint(ec%dt_formatted*100)) == 0) then
+            if (tstep_due(ts%time_elapsed, ec%dt_formatted)) then
                 call write_step_2D_cmip(dom%yelmo, dom%mshlf, file2D_cmip, ts%time)
                 call write_step_1D_cmip(dom%yelmo, dom%mshlf, file1D_cmip, ts%time)
             end if
         end if
 
-        ! === Restart bundle ===
-        if (dom%ctl%dt_restart > 0.0_wp .and. &
-            mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
-            call domain_restart_write(dom, ts%time)
-            call restart_bundle_mkdir(ts%time)
-            call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
+        ! === Restart bundle (domain + shared bsl) ===
+        if (tstep_due(ts%time, dom%ctl%dt_restart)) then
+            call run_restart_write(dom, bsl, ts%time)
         end if
 
     end do
@@ -259,9 +253,7 @@ program yelmox_esm
     call write_step_2D_combined(dom%yelmo, dom%isos, esm, dom%mshlf, dom%smb, &
                                 ec%use_smb, file2D, ts%time)
     call yelmo_regions_write(dom%yelmo, ts%time)
-    call domain_restart_write(dom, ts%time)
-    call restart_bundle_mkdir(ts%time)
-    call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
+    call run_restart_write(dom, bsl, ts%time)
 
     write(*,*)
     write(*,*) "yelmox_esm: run complete at time =", ts%time

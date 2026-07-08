@@ -11,8 +11,7 @@ program yelmox
     use timestepping
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
-    use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
-                             bsl_restart_read, bsl_restart_write
+    use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use yelmox_domain
 
     implicit none
@@ -48,14 +47,7 @@ program yelmox
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl) and rebuild the hi-res hub from the restored models.
-    if (trim(dom%ctl%restart) == "None") then
-        call domain_init_state(dom, ts, bsl)
-    else
-        call bsl_restart_read(bsl, trim(dom%ctl%restart)//"/bsl_restart.nc")
-        call bsl_update(bsl, ts%time_rel)
-        call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
-        call refresh_htopo(dom)
-    end if
+    call domain_startup(dom, ts, bsl)
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"
@@ -97,20 +89,15 @@ program yelmox
             call domain_write_1D(dom, trim(outfldr), ts%time)
         end if
 
-        if (dom%ctl%dt_restart > 0.0_wp .and. &
-            mod(nint(ts%time*100), nint(dom%ctl%dt_restart*100)) == 0) then
-            call domain_restart_write(dom, ts%time)
-            call restart_bundle_mkdir(ts%time)
-            call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
+        if (tstep_due(ts%time, dom%ctl%dt_restart)) then
+            call run_restart_write(dom, bsl, ts%time)
         end if
     end do
 
     ! Always capture the final state + a final restart bundle (incl. shared bsl).
     if (tm_2D%active) call domain_write_step(dom, trim(outfldr), ts%time)
     if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time)
-    call domain_restart_write(dom, ts%time)
-    call restart_bundle_mkdir(ts%time)
-    call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
+    call run_restart_write(dom, bsl, ts%time)
 
     write(*,*)
     write(*,*) "yelmox: run complete at time =", ts%time
