@@ -1,16 +1,57 @@
 &ctrl
+    ! Shared timeline (driver-owned). Domain component choices live in [coupling].
     tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
     tstep_const     = 1950.0            ! Assumed time for "const" method
-    time_init       = 0.0               ! [yr] Starting time 
+    time_init       = 0.0               ! [yr] Starting time
     time_end        = 200.0             ! [yr] Ending time
-    time_equil      = 0.0               ! [yr] Equilibration time 
-    dtt             = 5.0               ! [yr] Main loop timestep 
-    dt_restart      = 20e3              ! [yr] Frequency of writing restart files
-    with_ice_sheet  = True              ! Is the ice sheet active?
-    with_isostasy   = True              ! Is isostasy active?
-    equil_method    = "none"            ! "none", "relax", "opt"
-    smb_method      = "smbpal"          ! "smbpal" or "smb_simple"
-    write_clim_and_kill = False
+    dtt             = 5.0               ! [yr] Main loop timestep
+/
+
+&coupling
+    ! SRG is single-grid (SRG-250M): every component runs on the Yelmo grid.
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
+    with_climate      = True   ! Are climate + surface mass balance active?
+    with_marine_shelf = False  ! Ocean forcing off for now (imposed constant / none)
+    equil_method    = "none"   ! "none", "relax", "opt"
+    smb_method      = "smbpal" ! "smbpal" or "smb_simple"
+    dt_restart      = 20e3     ! [yr] Frequency of writing restart bundles
+    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    grid_mshlf = "SRG-250M"    ! marine-shelf grid (== grid_yelmo)
+    grid_isos  = "SRG-250M"    ! isostasy grid      (== grid_yelmo)
+    grid_clim  = "SRG-250M"    ! climate grid       (== grid_yelmo)
+    grid_smb   = "SRG-250M"    ! smb grid           (== grid_clim)
+    restart    = "None"        ! restart bundle folder, or "None" for a cold start
+
+    ! Domain-specific switches (Greenland only; keep False here).
+    scale_glacial_smb       = False
+    lim_pd_ice              = False
+    use_negis               = False
+    greenland_init_marine_H = False
+/
+
+&output
+    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos  = True
+    write_mshlf = False        ! marine shelf is off (with_marine_shelf=False)
+    write_smb   = True
+    write_snap  = True
+    write_htopo = True
+/
+
+&htopo
+    domain       = "SRG"
+    grid_name    = "SRG-250M"
+    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
+    name_z_bed   = "z_bed"
+    name_H_ice   = "H_ice"
+    name_z_srf   = "z_srf"
+    ! SRG has no basins field; point at REGIONS as an inert stand-in (basins are
+    ! consumed only by marine_shelf, which is off here).
+    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    name_basins  = "mask"
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    name_regions = "regions"
 /
 
 &tm_1D

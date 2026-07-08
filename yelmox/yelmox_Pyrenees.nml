@@ -1,16 +1,60 @@
 &ctrl
-    tstep_method    = "rel"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    ! Shared timeline (driver-owned). Domain component choices live in [coupling].
+    tstep_method    = "rel"             ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
     tstep_const     = 0e3               ! Assumed time for "const" method
-    time_init       = -120e3            ! [yr] Starting time 
+    time_init       = -120e3            ! [yr] Starting time
     time_end        = 0.0               ! [yr] Ending time
-    time_equil      = 0.0               ! [yr] Equilibration time 
-    dtt             = 10.0               ! [yr] Main loop timestep 
-    dt_restart      = 10e3              ! [yr] Frequency of writing restart files
-    with_ice_sheet  = True              ! Is the ice sheet active?
-    with_isostasy   = True              ! Is isostasy active?
-    equil_method    = "none"            ! "none", "relax", "opt"
-    smb_method      = "smbpal"          ! "smbpal" or "smb_simple"
-    write_clim_and_kill = False
+    dtt             = 10.0              ! [yr] Main loop timestep
+/
+
+&coupling
+    ! Pyrenees is single-grid (PYR-1KM): every component runs on the Yelmo grid.
+    ! NOTE: ported to the multigrid driver but UNTESTED -- the PYR-1KM data are
+    ! no longer available on this machine, so the htopo paths below are the
+    ! standard templates, not verified against real files.
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
+    with_climate      = True   ! Are climate + surface mass balance active?
+    with_marine_shelf = False  ! Ocean forcing off (mountain glacier: no ocean)
+    equil_method    = "none"   ! "none", "relax", "opt"
+    smb_method      = "smbpal" ! "smbpal" or "smb_simple"
+    dt_restart      = 10e3     ! [yr] Frequency of writing restart bundles
+    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    grid_mshlf = "PYR-1KM"     ! marine-shelf grid (== grid_yelmo)
+    grid_isos  = "PYR-1KM"     ! isostasy grid      (== grid_yelmo)
+    grid_clim  = "PYR-1KM"     ! climate grid       (== grid_yelmo)
+    grid_smb   = "PYR-1KM"     ! smb grid           (== grid_clim)
+    restart    = "None"        ! restart bundle folder, or "None" for a cold start
+
+    ! Domain-specific switches (Greenland only; keep False here).
+    scale_glacial_smb       = False
+    lim_pd_ice              = False
+    use_negis               = False
+    greenland_init_marine_H = False
+/
+
+&output
+    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos  = True
+    write_mshlf = False        ! marine shelf is off (with_marine_shelf=False)
+    write_smb   = True
+    write_snap  = True
+    write_htopo = True
+/
+
+&htopo
+    domain       = "Pyrenees"
+    grid_name    = "PYR-1KM"
+    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
+    name_z_bed   = "z_bed"
+    name_H_ice   = "H_ice"
+    name_z_srf   = "z_srf"
+    ! No basins field for this domain; point at REGIONS as an inert stand-in
+    ! (basins are consumed only by marine_shelf, which is off here).
+    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    name_basins  = "mask"
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    name_regions = "mask"
 /
 
 &tm_1D
@@ -525,6 +569,57 @@
     H_snow_crit_forest = 100.0
     melt_crit          =   0.5      ! Critical melt rate to reduce snow albedo [mm/day]
 
+/
+
+! marine_shelf is OFF for Pyrenees (with_marine_shelf=False), but the domain
+! still initializes it (marshelf_init), so a valid group must be present. Params
+! are inert here; use_obs / tf_correction are False so no data files are read.
+&marine_shelf
+    bmb_method      = "anom"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method       = 2             ! 0: tf external, 1: T_shlf-t_fp_shlf, 2: use dT_shlf
+    interp_depth    = "shlf"        ! "shlf", "bed", "const"
+    interp_method   = "interp"      ! "mean", "layer", "interp"
+    find_ocean      = True          ! Find points connected to open ocean
+    restart         = "none"        ! Load fields from a restart file?
+    extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
+    corr_method     = "tf-grl"      ! "tf", "bmb", "tf-grl" (reads [tf_corr_grl])
+    basin_number    = 1
+    basin_bmb_corr  = 0.0
+    basin_tf_corr   = 0.5
+    tf_correction   = False
+    tf_path         = "none"
+    tf_name         = "dT_nl"
+    bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value
+    c_deep          = -10.0         ! [m/yr] Melt rate in deep ocean
+    depth_deep      =  500.0        ! [m] Depth at which deep ocean is assumed
+    depth_const     =    0.0        ! [m] Constant shelf depth for interp_depth=const
+    depth_min       = 1100.0        ! [m] interp_method=mean, min depth
+    depth_max       = 1500.0        ! [m] interp_method=mean, max depth
+    lambda1         = -0.0575       ! [degC PSU-1] Liquidus slope
+    lambda2         = 0.0832        ! [degC] Liquidus intercept
+    lambda3         = 7.59e-4       ! [degC m-1] Liquidus pressure coefficient
+    gamma_lin       = 630.0         ! [m/yr] Linear heat exchange velocity
+    gamma_quad      = 11100.0       ! [m/yr] Quadratic heat exchange velocity
+    gamma_quad_nl   = 14500.0       ! [m/yr] Quadratic non-local heat exchange velocity
+    gamma_prime     = 100.0         ! [-] Scalar for '*-slope' method
+    kappa_grz       = 10.0          ! [m/yr K-1] Heat flux coefficient
+    c_grz           = 1.0           ! [-] bmb_ref scalar
+    f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
+    grz_length      = 32.0          ! [km] Length scale of grounding zone
+    use_obs         = False         ! Load obs for bmb_ref
+    obs_path        = "none"
+    obs_name        = "bm_eq_reese"
+    obs_scale       = 1.0
+    obs_lim         = 100.0
+    basin_name      = "none"
+    basin_bmb       = 0.0
+/
+
+&tf_corr_grl
+    ne      = 0.0                   ! [K] tf_corr for basin=2
+    e       = 1.0                   ! [K] tf_corr for basin=3
+    se      = 1.5                   ! [K] tf_corr for basin=4
+    w       = 0.0                   ! [K] tf_corr for basins=[6,7,8]
 /
 
 &sed
