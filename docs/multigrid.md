@@ -6,7 +6,7 @@ Design doc for a multigrid rewrite of the yelmox driver. Status: **implemented**
 domain-specific startups ported. The bipolar driver (`yelmox_bipolar.f90`) also
 carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level
 and a shared Ocean Box Model exchanging freshwater flux / ocean temperature
-between hemispheres (`yelmox_osm/obm_coupling.f90`). A third driver (`yelmox_esm.f90`)
+between hemispheres (`yelmox_bipolar/obm_coupling.f90`). A third driver (`yelmox_esm.f90`)
 swaps snapclim for ESM climatic forcing (`libs/esm.f90`), running esm as a
 first-class component on its own grid (`grid_clim`) and remapping its outputs to
 the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy
@@ -341,7 +341,7 @@ there, so the drivers only differ in config parsing + the loop over domains):
   `obm%fn/thetan/tn`, south ↔ `obm%fs/thetas/ts`). The driver owns the shared
   `bsl` and `obm`, breaks `yelmox_step` into its `step_*` primitives, and
   interleaves the OBM exactly as in `yelmox_bipolar` (below). The ocean exchanges
-  live in `yelmox_osm/obm_coupling.f90`; they and the OBM default off (`[ctrl]
+  live in `yelmox_bipolar/obm_coupling.f90`; they and the OBM default off (`[ctrl]
   active_obm=False`), so the config runs as two independent domains until enabled.
 
 ```fortran

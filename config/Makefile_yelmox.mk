@@ -61,9 +61,9 @@ $(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o 
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 # Bipolar ocean coupling: bridge over ice_domain (yelmox_domain) + the obm box
-# model. Kept alongside the bipolar driver in yelmox_osm/ for direct access; it
-# uses yelmo + yelmox_domain so it is built into the shared yelmox_libs.
-$(objdir)/obm_coupling.o: yelmox_osm/obm_coupling.f90 $(objdir)/yelmox_domain.o \
+# model. Lives alongside the bipolar driver in yelmox_bipolar/ -- it is only
+# pertinent to that flavor -- and is linked via obm_libs (bipolar targets only).
+$(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/yelmox_domain.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
@@ -176,8 +176,11 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/snapclim.o \
 						$(objdir)/htopo.o \
 						$(objdir)/yelmox_domain.o \
-						$(objdir)/ice_sub_regions.o\
-						$(objdir)/obm_defs.o\
+						$(objdir)/ice_sub_regions.o
+
+# Ocean box model stack + its ice_domain coupling bridge: bipolar-only, linked
+# on top of yelmox_libs by the yelmox_bipolar targets.
+obm_libs = 				$(objdir)/obm_defs.o\
 						$(objdir)/ice2ocean.o\
 						$(objdir)/ocean2ice.o\
 						$(objdir)/atm2ocean.o\
