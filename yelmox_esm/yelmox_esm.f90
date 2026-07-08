@@ -75,37 +75,11 @@ program yelmox_esm
 
     call yelmo_load_command_line_args(path_par)
 
-    ! Run step selects which timeline / esm-timing group is read.
-    call nml_read(path_par, "ctrl", "run_step", ec%run_step)
-
-    ! [esm] group: experiment identity + physics parameters (into the esm object).
-    call nml_read(path_par, "esm", "par_file",        ec%par_file)
-    call nml_read(path_par, "esm", "experiment",      ec%experiment)
-    call nml_read(path_par, "esm", "esm_name",        ec%esm_name)
-    call nml_read(path_par, "esm", "use_esm",         ec%use_esm)
-    call nml_read(path_par, "esm", "use_smb",         ec%use_smb)
-    call nml_read(path_par, "esm", "use_var",         ec%use_var)
-    call nml_read(path_par, "esm", "use_proj",        ec%use_proj)
-    call nml_read(path_par, "esm", "use_hist",        ec%use_hist)
-    call nml_read(path_par, "esm", "write_formatted", ec%write_formatted)
-    call nml_read(path_par, "esm", "dt_formatted",    ec%dt_formatted)
-    call nml_read(path_par, "esm", "lapse",           esm%lapse)
-    call nml_read(path_par, "esm", "f_p",             esm%beta_p)
-    call nml_read(path_par, "esm", "f_ocn",           esm%f_ocn)
-    call nml_read(path_par, "esm", "f_polar",         esm%f_polar)
-    call nml_read(path_par, "esm", "dT_threshold",    esm%dT_lim)
-    call nml_read(path_par, "esm", "grid_src",        esm%grid_src)
-
-    ! [run_step] group: esm reference/history/projection periods. The timeline
-    ! keys of the same group are read by timeline_init / domain_init below.
-    call nml_read(path_par, trim(ec%run_step), "time_equil",   ec%time_equil)
-    call nml_read(path_par, trim(ec%run_step), "time_ref",     ec%time_ref)
-    call nml_read(path_par, trim(ec%run_step), "time_hist",    ec%time_hist)
-    call nml_read(path_par, trim(ec%run_step), "time_proj",    ec%time_proj)
-    call nml_read(path_par, trim(ec%run_step), "time_esm_ref", ec%time_esm_ref)
-    call nml_read(path_par, trim(ec%run_step), "clim_var",     ec%clim_var)
-    call nml_read(path_par, trim(ec%run_step), "clim_seed",    ec%clim_seed)
-    call nml_read(path_par, trim(ec%run_step), "kill_shelves", ec%kill_shelves)
+    ! ESM run control: [ctrl] run_step selects the run phase, [esm] holds the
+    ! experiment identity + physics parameters, and the [run_step] group the
+    ! phase's esm timing (the timeline keys of the same group are read by
+    ! timeline_init / domain_init below).
+    call esm_ctl_load(ec, esm, path_par)
 
     ! Seed the RNG for climate-variability reproducibility.
     call random_seed(size=seed_size)
@@ -263,6 +237,46 @@ program yelmox_esm
     deallocate(seed)
 
 contains
+
+    ! ---------------------------------------------------------------------------
+    subroutine esm_ctl_load(ec, esm, path_par)
+        ! Load the ESM run control: [ctrl] run_step, the [esm] experiment
+        ! identity + physics parameters (the latter straight into the esm
+        ! object), and the selected [run_step] group's esm timing periods.
+        type(esm_ctl_params),    intent(inout) :: ec
+        type(esm_forcing_class), intent(inout) :: esm
+        character(len=*),        intent(in)    :: path_par
+
+        call nml_read(path_par, "ctrl", "run_step", ec%run_step)
+
+        ! [esm] group: experiment identity + physics parameters.
+        call nml_read(path_par, "esm", "par_file",        ec%par_file)
+        call nml_read(path_par, "esm", "experiment",      ec%experiment)
+        call nml_read(path_par, "esm", "esm_name",        ec%esm_name)
+        call nml_read(path_par, "esm", "use_esm",         ec%use_esm)
+        call nml_read(path_par, "esm", "use_smb",         ec%use_smb)
+        call nml_read(path_par, "esm", "use_var",         ec%use_var)
+        call nml_read(path_par, "esm", "use_proj",        ec%use_proj)
+        call nml_read(path_par, "esm", "use_hist",        ec%use_hist)
+        call nml_read(path_par, "esm", "write_formatted", ec%write_formatted)
+        call nml_read(path_par, "esm", "dt_formatted",    ec%dt_formatted)
+        call nml_read(path_par, "esm", "lapse",           esm%lapse)
+        call nml_read(path_par, "esm", "f_p",             esm%beta_p)
+        call nml_read(path_par, "esm", "f_ocn",           esm%f_ocn)
+        call nml_read(path_par, "esm", "f_polar",         esm%f_polar)
+        call nml_read(path_par, "esm", "dT_threshold",    esm%dT_lim)
+        call nml_read(path_par, "esm", "grid_src",        esm%grid_src)
+
+        ! [run_step] group: esm reference/history/projection periods + switches.
+        call nml_read(path_par, trim(ec%run_step), "time_equil",   ec%time_equil)
+        call nml_read(path_par, trim(ec%run_step), "time_ref",     ec%time_ref)
+        call nml_read(path_par, trim(ec%run_step), "time_hist",    ec%time_hist)
+        call nml_read(path_par, trim(ec%run_step), "time_proj",    ec%time_proj)
+        call nml_read(path_par, trim(ec%run_step), "time_esm_ref", ec%time_esm_ref)
+        call nml_read(path_par, trim(ec%run_step), "clim_var",     ec%clim_var)
+        call nml_read(path_par, trim(ec%run_step), "clim_seed",    ec%clim_seed)
+        call nml_read(path_par, trim(ec%run_step), "kill_shelves", ec%kill_shelves)
+    end subroutine esm_ctl_load
 
     ! ---------------------------------------------------------------------------
     subroutine esm_cold_start(dom, esm, ec, ts, bsl)
