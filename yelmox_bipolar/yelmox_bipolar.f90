@@ -24,7 +24,6 @@ program yelmox_bipolar
     ! yelmox_bipolar/obm_coupling.f90. See docs/multigrid.md.
 
     use nml
-    use ncio,         only : nc_read
     use timestepping
     use timeout
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
@@ -33,8 +32,7 @@ program yelmox_bipolar
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
-    use obm_coupling, only : coupling_atm2obm, coupling_ism2obm, coupling_obm2ism, &
-                             update_bipolar_hyster_forcing
+    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
 
     implicit none
 
@@ -48,20 +46,14 @@ program yelmox_bipolar
     character(len=512) :: outfldr_north, outfldr_south
     logical            :: active_north, active_south
 
-    ! Shared, driver-owned ocean box model + its coupling switches.
-    type(obm_class)    :: obm
-    logical            :: active_obm, ism2obm, obm2ism, atm2obm
-    character(len=512) :: obm_name, obm_file, obm_file_restart
-    logical            :: couple_fwf_north, couple_fwf_south
-    character(len=512) :: fwf_definition
-    character(len=512) :: hydro_mask_north_path, hydro_mask_south_path
-    real(wp), allocatable :: hydro_mask_north(:,:), hydro_mask_south(:,:)
-    logical            :: hyster_on
-    character(len=512) :: hyster_forcing, hyster_forcing_method
-    real(wp)           :: hyster_rate, hyster_positive_branch_time
+    ! Shared, driver-owned ocean box model + its coupling control (obm_coupling).
+    type(obm_class)        :: obm
+    type(obm_coupling_ctl) :: oc
+    character(len=512)     :: obm_file, obm_file_restart
 
     type(timeout_class) :: tm_2D, tm_1D
     logical             :: do_2D, do_1D, do_restart
+    logical             :: wrote_restart_north, wrote_restart_south
 
     real(wp) :: dtt
 
@@ -79,8 +71,8 @@ program yelmox_bipolar
         stop 1
     end if
 
-    ! Ocean coupling switches ([ctrl]).
-    call read_obm_control()
+    ! Ocean coupling control ([ctrl] switches + nautilus hysteresis parameters).
+    call obm_ctl_load(oc, path_par)
 
     ! === Shared, driver-owned barystatic sea level (one per run, common to both
     !     domains, exactly as in yelmox_bipolar). Restored once from a run-level
@@ -95,24 +87,15 @@ program yelmox_bipolar
     if (active_south) call setup_domain(dom_south, "_south", outfldr_south)
 
     ! Hydrographic masks (Yelmo grid) restricting the freshwater flux per domain.
-    if (ism2obm) then
-        if (couple_fwf_north .and. active_north) then
-            allocate(hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
-            call nc_read(hydro_mask_north_path, "mask", hydro_mask_north)
-        end if
-        if (couple_fwf_south .and. active_south) then
-            allocate(hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
-            call nc_read(hydro_mask_south_path, "mask", hydro_mask_south)
-        end if
-    end if
+    call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
 
     ! === Ocean box model init + first output record ===
-    if (active_obm) then
-        obm_file         = trim(obm_name)//".nc"
-        obm_file_restart = trim(obm_name)//"_restart.nc"
-        call obm_init(obm, path_par, obm_name)
+    if (oc%active_obm) then
+        obm_file         = trim(oc%obm_name)//".nc"
+        obm_file_restart = trim(oc%obm_name)//"_restart.nc"
+        call obm_init(obm, path_par, oc%obm_name)
         call write_obm_init(obm_file, ts%time, "years")
-        call write_obm_update(obm, obm_file, obm_name, ts%time)
+        call write_obm_update(obm, obm_file, oc%obm_name, ts%time)
     end if
 
     ! === Output setup (shared cadence, from [tm_1D]/[tm_2D]) ===
@@ -135,30 +118,16 @@ program yelmox_bipolar
         if (active_south) call advance_isostasy(dom_south)
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
-        if (active_obm) call obm_update(obm, dtt, obm_name)
+        if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
 
         ! Ice sheet + hi-res hub refresh + climate/smb (both domains).
         if (active_north) call advance_dynamics(dom_north)
         if (active_south) call advance_dynamics(dom_south)
 
-        ! === Inter-domain ocean coupling (shared obm) ===
-        if (atm2obm) then
-            if (active_north) call coupling_atm2obm(dom_north, obm, "north", ts%time)
-            if (active_south) call coupling_atm2obm(dom_south, obm, "south", ts%time)
-        end if
-        if (ism2obm) then
-            if (couple_fwf_north .and. active_north) &
-                call coupling_ism2obm(dom_north, obm, hydro_mask_north, "north", fwf_definition)
-            if (couple_fwf_south .and. active_south) &
-                call coupling_ism2obm(dom_south, obm, hydro_mask_south, "south", fwf_definition)
-        end if
-        if (trim(obm_name) == "nautilus" .and. hyster_on) &
-            call update_bipolar_hyster_forcing(ts%time, ts%time_init, obm, dtt, &
-                    hyster_positive_branch_time, hyster_rate, hyster_forcing, hyster_forcing_method)
-        if (obm2ism) then
-            if (active_north) call coupling_obm2ism(dom_north, obm, obm_name, "north")
-            if (active_south) call coupling_obm2ism(dom_south, obm, obm_name, "south")
-        end if
+        ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
+        ! flux, hysteresis forcing, obm->ism ocean temperature.
+        call obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
+                          ts%time, ts%time_init, dtt)
 
         ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.
         if (active_north) call step_marine_shelf(dom_north, ts)
@@ -168,25 +137,27 @@ program yelmox_bipolar
         do_2D = tm_2D%active .and. timeout_check(tm_2D, ts%time)
         do_1D = tm_1D%active .and. timeout_check(tm_1D, ts%time)
 
-        do_restart = .false.
-        if (active_north) call write_domain_step(dom_north, outfldr_north)
-        if (active_south) call write_domain_step(dom_south, outfldr_south)
-        if (active_obm .and. do_1D) call write_obm_update(obm, obm_file, obm_name, ts%time)
+        wrote_restart_north = .false.
+        wrote_restart_south = .false.
+        if (active_north) call write_domain_step(dom_north, outfldr_north, wrote_restart_north)
+        if (active_south) call write_domain_step(dom_south, outfldr_south, wrote_restart_south)
+        if (oc%active_obm .and. do_1D) call write_obm_update(obm, obm_file, oc%obm_name, ts%time)
 
         ! Shared bsl (+ obm) restart at the run root when either domain wrote one.
+        do_restart = wrote_restart_north .or. wrote_restart_south
         if (do_restart) then
             call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-            if (active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
+            if (oc%active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
         end if
     end do
 
     ! === Finalize: capture the final state + a final restart bundle per domain ===
-    if (active_north) call write_domain_step(dom_north, outfldr_north, force=.true.)
-    if (active_south) call write_domain_step(dom_south, outfldr_south, force=.true.)
+    if (active_north) call write_domain_step(dom_north, outfldr_north, wrote_restart_north, force=.true.)
+    if (active_south) call write_domain_step(dom_south, outfldr_south, wrote_restart_south, force=.true.)
     call restart_bundle_mkdir(ts%time)
     call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-    if (active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
+    if (oc%active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
 
     write(*,*)
     write(*,*) "yelmox_bipolar: run complete at time =", ts%time
@@ -199,43 +170,6 @@ program yelmox_bipolar
     if (active_south) call yelmo_end(dom_south%yelmo, time=ts%time)
 
 contains
-
-    subroutine read_obm_control()
-        ! Load the ocean-coupling switches ([ctrl]) and, when needed, the
-        ! freshwater-flux masks and nautilus hysteresis-forcing parameters.
-        active_obm = .false.
-        ism2obm    = .false.
-        obm2ism    = .false.
-        atm2obm    = .false.
-        obm_name   = "none"
-        call nml_read(path_par, "ctrl", "active_obm", active_obm)
-        call nml_read(path_par, "ctrl", "ism2obm",    ism2obm)
-        call nml_read(path_par, "ctrl", "obm2ism",    obm2ism)
-        call nml_read(path_par, "ctrl", "atm2obm",    atm2obm)
-        call nml_read(path_par, "ctrl", "obm_name",   obm_name)
-
-        couple_fwf_north = .false.
-        couple_fwf_south = .false.
-        fwf_definition   = "dVdt"
-        if (ism2obm) then
-            call nml_read(path_par, "ctrl", "couple_fwf_north", couple_fwf_north)
-            call nml_read(path_par, "ctrl", "couple_fwf_south", couple_fwf_south)
-            call nml_read(path_par, "ctrl", "fwf_definition",   fwf_definition)
-            if (couple_fwf_north) &
-                call nml_read(path_par, "ctrl", "hydro_mask_north", hydro_mask_north_path)
-            if (couple_fwf_south) &
-                call nml_read(path_par, "ctrl", "hydro_mask_south", hydro_mask_south_path)
-        end if
-
-        hyster_on = .false.
-        if (trim(obm_name) == "nautilus") then
-            call nml_read(path_par, obm_name, "hyster_on",                   hyster_on)
-            call nml_read(path_par, obm_name, "hyster_forcing",              hyster_forcing)
-            call nml_read(path_par, obm_name, "hyster_forcing_method",       hyster_forcing_method)
-            call nml_read(path_par, obm_name, "hyster_rate",                 hyster_rate)
-            call nml_read(path_par, obm_name, "hyster_positive_branch_time", hyster_positive_branch_time)
-        end if
-    end subroutine read_obm_control
 
     subroutine setup_domain(dom, suffix, outfldr)
         ! Initialize one hemisphere: sub-models + hi-res hub + coupler maps, its
@@ -296,13 +230,14 @@ contains
         if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
     end subroutine write_domain_init
 
-    subroutine write_domain_step(dom, outfldr, force)
+    subroutine write_domain_step(dom, outfldr, wrote_restart, force)
         ! Append 2D/1D records on the shared cadence (do_2D/do_1D), and write a
-        ! restart bundle on the domain's dt_restart cadence -- flagging do_restart
-        ! so the driver writes the single shared bsl (+ obm) restart. force=.true.
-        ! writes everything unconditionally (final step).
+        ! restart bundle on the domain's dt_restart cadence -- reporting it via
+        ! wrote_restart so the driver writes the single shared bsl (+ obm)
+        ! restart. force=.true. writes everything unconditionally (final step).
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
+        logical,          intent(out)   :: wrote_restart
         logical, intent(in), optional   :: force
 
         logical :: do_force
@@ -314,11 +249,12 @@ contains
         if (do_1D .or. (do_force .and. tm_1D%active)) &
             call domain_write_1D(dom, trim(outfldr), ts%time)
 
+        wrote_restart = .false.
         if (do_force) then
             call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
         else if (tstep_due(ts%time, dom%ctl%dt_restart)) then
             call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
-            do_restart = .true.
+            wrote_restart = .true.
         end if
     end subroutine write_domain_step
 

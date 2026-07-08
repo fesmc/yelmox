@@ -9,11 +9,18 @@ module obm_coupling
     ! matches Yelmo's wp (= sp), so obm and Yelmo/snapclim fields are exchanged
     ! without kind conversion.
     !
-    ! The three exchanges (per hemisphere, called from the bipolar driver):
+    ! The three exchanges (per hemisphere):
     !   atm2obm  : snapclim air-temperature anomaly -> obm box temperatures/vapor
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
     !   obm2ism  : obm box ocean temperature -> snapclim%now%to_ann (mshlf forcing)
+    !
+    ! The module owns its whole configuration (obm_coupling_ctl: exchange
+    ! switches, freshwater-flux masks, nautilus hysteresis forcing), loaded by
+    ! obm_ctl_load from [ctrl]. The driver calls obm_ctl_load + obm_masks_init
+    ! once, then obm_exchange once per step after the domains have advanced.
 
+    use nml,           only : nml_read
+    use ncio,          only : nc_read
     use yelmo,         only : wp
     use yelmox_domain, only : ice_domain
     use obm_defs,      only : obm_class
@@ -23,10 +30,121 @@ module obm_coupling
     implicit none
     private
 
+    type obm_coupling_ctl
+        ! Which exchanges are active ([ctrl]).
+        logical :: active_obm = .false.
+        logical :: ism2obm    = .false.
+        logical :: obm2ism    = .false.
+        logical :: atm2obm    = .false.
+        character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus"/"stommel")
+        ! ism2obm: freshwater-flux definition + per-hemisphere hydrographic masks.
+        logical            :: couple_fwf_north = .false.
+        logical            :: couple_fwf_south = .false.
+        character(len=512) :: fwf_definition   = "dVdt"
+        character(len=512) :: hydro_mask_north_path = ""
+        character(len=512) :: hydro_mask_south_path = ""
+        real(wp), allocatable :: hydro_mask_north(:,:), hydro_mask_south(:,:)
+        ! Hysteresis forcing (nautilus only, from the [nautilus] group).
+        logical            :: hyster_on = .false.
+        character(len=512) :: hyster_forcing = "", hyster_forcing_method = ""
+        real(wp)           :: hyster_rate = 0.0_wp
+        real(wp)           :: hyster_positive_branch_time = 0.0_wp
+    end type obm_coupling_ctl
+
+    public :: obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
     public :: coupling_atm2obm, coupling_ism2obm, coupling_obm2ism
     public :: update_bipolar_hyster_forcing
 
 contains
+
+    subroutine obm_ctl_load(oc, path_par)
+        ! Load the ocean-coupling switches ([ctrl]) and, when needed, the
+        ! freshwater-flux mask paths and nautilus hysteresis-forcing parameters.
+        ! The masks themselves are read by obm_masks_init (they need the
+        ! initialized domains for their grid shape).
+        type(obm_coupling_ctl), intent(inout) :: oc
+        character(len=*),       intent(in)    :: path_par
+
+        call nml_read(path_par, "ctrl", "active_obm", oc%active_obm)
+        call nml_read(path_par, "ctrl", "ism2obm",    oc%ism2obm)
+        call nml_read(path_par, "ctrl", "obm2ism",    oc%obm2ism)
+        call nml_read(path_par, "ctrl", "atm2obm",    oc%atm2obm)
+        call nml_read(path_par, "ctrl", "obm_name",   oc%obm_name)
+
+        if (oc%ism2obm) then
+            call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
+            call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
+            call nml_read(path_par, "ctrl", "fwf_definition",   oc%fwf_definition)
+            if (oc%couple_fwf_north) &
+                call nml_read(path_par, "ctrl", "hydro_mask_north", oc%hydro_mask_north_path)
+            if (oc%couple_fwf_south) &
+                call nml_read(path_par, "ctrl", "hydro_mask_south", oc%hydro_mask_south_path)
+        end if
+
+        if (trim(oc%obm_name) == "nautilus") then
+            call nml_read(path_par, oc%obm_name, "hyster_on",                   oc%hyster_on)
+            call nml_read(path_par, oc%obm_name, "hyster_forcing",              oc%hyster_forcing)
+            call nml_read(path_par, oc%obm_name, "hyster_forcing_method",       oc%hyster_forcing_method)
+            call nml_read(path_par, oc%obm_name, "hyster_rate",                 oc%hyster_rate)
+            call nml_read(path_par, oc%obm_name, "hyster_positive_branch_time", oc%hyster_positive_branch_time)
+        end if
+    end subroutine obm_ctl_load
+
+    subroutine obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
+        ! Load the hydrographic masks (Yelmo grid) restricting the freshwater
+        ! flux per hemisphere. Only touches a domain when it is active and its
+        ! fwf coupling is on, so an inactive domain may be uninitialized.
+        type(obm_coupling_ctl), intent(inout) :: oc
+        type(ice_domain),       intent(in)    :: dom_north, dom_south
+        logical,                intent(in)    :: active_north, active_south
+
+        if (.not. oc%ism2obm) return
+
+        if (oc%couple_fwf_north .and. active_north) then
+            allocate(oc%hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
+            call nc_read(oc%hydro_mask_north_path, "mask", oc%hydro_mask_north)
+        end if
+        if (oc%couple_fwf_south .and. active_south) then
+            allocate(oc%hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
+            call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
+        end if
+    end subroutine obm_masks_init
+
+    subroutine obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
+                            time, time_init, dtt)
+        ! One coupling pass, in the yelmox_bipolar order: atmosphere -> obm,
+        ! ice-sheet freshwater flux -> obm, hysteresis forcing (nautilus), then
+        ! obm ocean temperature -> ice sheets (read by the marine-shelf step).
+        ! Call after the domains' dynamics/climate have advanced and before
+        ! their marine-shelf steps.
+        type(obm_coupling_ctl), intent(inout) :: oc
+        type(obm_class),        intent(inout) :: obm
+        type(ice_domain),       intent(inout) :: dom_north, dom_south
+        logical,                intent(in)    :: active_north, active_south
+        real(wp),               intent(in)    :: time, time_init, dtt
+
+        if (oc%atm2obm) then
+            if (active_north) call coupling_atm2obm(dom_north, obm, "north", time)
+            if (active_south) call coupling_atm2obm(dom_south, obm, "south", time)
+        end if
+
+        if (oc%ism2obm) then
+            if (oc%couple_fwf_north .and. active_north) &
+                call coupling_ism2obm(dom_north, obm, oc%hydro_mask_north, "north", oc%fwf_definition)
+            if (oc%couple_fwf_south .and. active_south) &
+                call coupling_ism2obm(dom_south, obm, oc%hydro_mask_south, "south", oc%fwf_definition)
+        end if
+
+        if (trim(oc%obm_name) == "nautilus" .and. oc%hyster_on) &
+            call update_bipolar_hyster_forcing(time, time_init, obm, dtt, &
+                    oc%hyster_positive_branch_time, oc%hyster_rate, &
+                    oc%hyster_forcing, oc%hyster_forcing_method)
+
+        if (oc%obm2ism) then
+            if (active_north) call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
+            if (active_south) call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
+        end if
+    end subroutine obm_exchange
 
     subroutine coupling_atm2obm(dom, obm, hemisphere, time)
         ! Atmosphere -> OBM: drive the box-model atmospheric temperatures + vapor
