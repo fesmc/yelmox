@@ -320,7 +320,32 @@ reallocation cost is negligible against the physics.
 ## Drivers
 
 Three thin programs share `yelmox_domain` (all per-domain physics/coupling lives
-there, so the drivers only differ in config parsing + the loop over domains):
+there, so the drivers only differ in config parsing + the loop over domains).
+
+Common driver plumbing also lives in `yelmox_domain`, so every flavor uses the
+same handful of calls:
+
+- **`timeline_init(ts, dtt, path_par, group [, time_ref, cal])`** — reads the
+  run's timeline group (`[ctrl]`, or the esm `run_step` group) and initializes
+  the driver-owned timestepper. `domain_init` takes the same group name
+  (`timeline_group`, default `"ctrl"`) and reads the values the domain logic
+  needs (`tstep_method`, `dtt`) itself — nothing is injected after init.
+- **`domain_startup(dom, ts, bsl [, restore_bsl])`** — cold start
+  (`domain_init_state`) or restart-bundle restore + hub rebuild. Single-domain
+  drivers restore the shared bsl from the same bundle; multi-domain drivers
+  restore it once via **`bsl_startup(bsl, ts, fldr)`** and pass
+  `restore_bsl=.false.`. Flavors with their own cold start (esm, rembo) keep
+  their cold branch and call this on the restart branch only.
+- **`run_restart_write(dom, bsl, time)`** — the single-domain restart bundle
+  (domain sub-models + run-level `bsl_restart.nc`, one auto-named folder).
+- **`tstep_due(time, dt)`** — the shared cadence predicate (restart, `dt_clim`,
+  CMIP output); `dt <= 0` disables a cadence.
+
+The `[coupling<suffix>]` group is the single, complete description of a domain:
+every `domain_ctl` switch is a required key there (`with_ice_sheet`,
+`with_isostasy`, `with_climate`, `with_marine_shelf`, methods, cadences,
+per-component grids, restart, and the Greenland-specific startup switches --
+`use_negis=True` additionally loads a `[negis<suffix>]` group).
 
 - **`yelmox`** (single domain) — argument is one domain nml; one `ice_domain`,
   output to the run dir.
@@ -340,8 +365,11 @@ there, so the drivers only differ in config parsing + the loop over domains):
   variables, not an array — the ocean coupling is asymmetric (north ↔
   `obm%fn/thetan/tn`, south ↔ `obm%fs/thetas/ts`). The driver owns the shared
   `bsl` and `obm`, breaks `yelmox_step` into its `step_*` primitives, and
-  interleaves the OBM exactly as in `yelmox_bipolar` (below). The ocean exchanges
-  live in `yelmox_bipolar/obm_coupling.f90`; they and the OBM default off (`[ctrl]
+  interleaves the OBM exactly as in `yelmox_bipolar` (below). The ocean coupling
+  is fully contained in `yelmox_bipolar/obm_coupling.f90`: the module owns its
+  control (`obm_coupling_ctl`: exchange switches, freshwater-flux masks,
+  nautilus hysteresis forcing; `obm_ctl_load` + `obm_masks_init`) and exposes
+  one `obm_exchange` call per step. It and the OBM default off (`[ctrl]
   active_obm=False`), so the config runs as two independent domains until enabled.
 
 ```fortran
@@ -349,23 +377,25 @@ program yelmox_bipolar
     use yelmox_domain
     use obm, only : obm_update
     use obm_coupling
-    type(ice_domain) :: dom_north, dom_south
-    type(bsl_class)  :: bsl        ! shared, driver-owned
-    type(obm_class)  :: obm        ! shared, driver-owned
+    type(ice_domain)       :: dom_north, dom_south
+    type(bsl_class)        :: bsl      ! shared, driver-owned
+    type(obm_class)        :: obm      ! shared, driver-owned
+    type(obm_coupling_ctl) :: oc       ! obm_coupling's own control
 
-    ! read one file -> shared timeline + active_north/active_south
-    if (active_north) call domain_init(dom_north, path_par, ..., group_suffix="_north")
-    if (active_south) call domain_init(dom_south, path_par, ..., group_suffix="_south")
+    call timeline_init(ts, dtt, path_par, "ctrl")          ! shared timeline
+    call obm_ctl_load(oc, path_par)                        ! [ctrl] exchange switches
+    call bsl_startup(bsl, ts, restart_bsl)                 ! run-level bsl restore
+    ! per domain: domain_init(group_suffix) + domain_startup(restore_bsl=.false.)
+    call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
 
-    do while (time < time_end)
-        call bsl_update(bsl, ...)                          ! once, shared
+    do while (.not. ts%is_finished)
+        call bsl_update(bsl, ts%time_rel)                  ! once, shared
         call advance_isostasy(dom_north); call advance_isostasy(dom_south)
-        if (active_obm) call obm_update(obm, dtt, obm_name)
+        if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
         call advance_dynamics(dom_north); call advance_dynamics(dom_south)
-        ! ocean coupling (per hemisphere): atm2obm, ism2obm (fwf), hyster, obm2ism
+        call obm_exchange(oc, obm, dom_north, dom_south, ...)   ! atm2obm, fwf, hyster, obm2ism
         call step_marine_shelf(dom_north, ...); call step_marine_shelf(dom_south, ...)
         ! per-domain output/restart (subfolder each) + shared bsl/obm restart
-        time = time + dtt
     end do
 end program
 ```
@@ -403,8 +433,13 @@ program yelmox_esm
     type(bsl_class)         :: bsl    ! shared, driver-owned
     type(esm_forcing_class) :: esm    ! driver-owned climate (replaces snapclim)
 
-    call domain_init(dom, path_par, ts%time, init_climate=.false.)   ! skip snapclim
+    call esm_ctl_load(ec, esm, path_par)      ! [ctrl] run_step + [esm] + [run_step]
+    call timeline_init(ts, ec%dtt, path_par, trim(ec%run_step), &
+                       time_ref=2000.0_wp, cal=.true.)   ! per-phase timeline
+    call domain_init(dom, path_par, ts%time, init_climate=.false., &   ! skip snapclim
+                     timeline_group=trim(ec%run_step))
     call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_clim)      ! on esm's own grid
+    ! cold: esm_cold_start (contained); restart: domain_startup + re-forcing
 
     do while (.not. ts%is_finished)
         call bsl_update(bsl, ...)                       ! once, shared
@@ -412,7 +447,7 @@ program yelmox_esm
         call step_icesheet(dom, ts); call refresh_htopo(dom)
         call step_climate_esm(dom, esm, ec, ts)         ! esm + smbpal (contained)
         call step_marine_shelf_esm(dom, esm, ec, ts)    ! esm ocean BCs (contained)
-        ! output (yelmo2D / yelmo1D_esm / CMIP) + restart bundle + shared bsl
+        ! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on tstep_due
     end do
 end program
 ```
