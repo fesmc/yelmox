@@ -5,8 +5,8 @@
 #SBATCH -e pyr.err
 #SBATCH --mem=1800
 
-# Run the job
-./yelmox-legacy.x yelmo_Pyrenees.nml
+# Run the job (multigrid yelmox driver)
+./yelmox.x yelmo_Pyrenees.nml
 
 # Run ensemble
-# python2.7 yelmo_ensemble.py -l -f -a output/deglaciation_32km/ \&ydyn="cb_z0=-400 cb_z1=500 beta_u0=100"
+# python3 yelmox/yelmo_pyrenees.py -l -f -a output/deglaciation_32km/ ydyn="cb_z0=-400 cb_z1=500 beta_u0=100"

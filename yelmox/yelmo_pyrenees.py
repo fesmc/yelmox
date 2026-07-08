@@ -1,10 +1,14 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-Script to read and modify param namelist file.
+Script to read and modify a Yelmo namelist parameter file, stage a run
+directory, and (optionally) submit it. Pyrenees-specific helper; runs the
+multigrid yelmox driver (yelmox.x). Invoke from the repository root, e.g.:
+
+    python3 yelmox/yelmo_pyrenees.py -o output/pyr_test -f ydyn="cb_z0=-400"
 '''
 import subprocess as subp
-import sys, getopt, os, argparse, shutil, glob, datetime, json
+import sys, getopt, os, shutil
 
 # Define parameter classes
 class parameter:
@@ -88,7 +92,7 @@ class parameter:
     def __str__(self):
         '''Output a string suitable for a namelist parameter file'''
 
-        if type(self.value is str):
+        if isinstance(self.value, str):
             return "{} = {} {}".format(self.name,self.value,self.comment)
         else:
             return "{} = {:<9} {}".format(self.name,self.value,self.comment)
@@ -121,7 +125,7 @@ class parameters(parameter):
             try:
                 self.lines = open(self.file,'r').readlines()
             except:
-                print "File could not be opened: "+self.file+'\n'
+                print("File could not be opened: "+self.file+'\n')
                 raise
 
             # Loop to find parameters and load them into class
@@ -170,9 +174,9 @@ class parameters(parameter):
 
         for p in self.all:
             if not mod:
-                print p.__str__()
+                print(p.__str__())
             elif p.mod:
-                print p.__str__()
+                print(p.__str__())
 
         return
 
@@ -190,10 +194,10 @@ class parameters(parameter):
                 newfile.write("/\n\n")
 
             newfile.close()
-            print "Parameter file written: %s" % (file)
+            print("Parameter file written: %s" % (file))
 
         except:
-            print "Error::p.write: %s not written" % (file)
+            print("Error::p.write: %s not written" % (file))
             sys.exit(2)
 
         return
@@ -201,8 +205,8 @@ class parameters(parameter):
     def err(self,exit=2,message="unknown"):
         '''Print an error'''
 
-        print "Error in %s: %s" % (self.file,message)
-        print ""
+        print("Error in %s: %s" % (self.file,message))
+        print("")
         if exit >= 0: sys.exit(exit)
 
         return
@@ -243,7 +247,7 @@ class parameters(parameter):
         try:
             flines = open(file,'r').readlines()
         except:
-            print "Error: unable to open parameter exchange file: "+file+"\n"
+            print("Error: unable to open parameter exchange file: "+file+"\n")
             sys.exit(2)
 
         #Fill in lists for conversion
@@ -260,7 +264,7 @@ class parameters(parameter):
 
         # Loop over all exchanges to be made, exchange values!
         for k in range(len(p1)):
-            #print "%s : %s  %s" % (p1[k],p2[k],convert[k])
+            #print("%s : %s  %s" % (p1[k],p2[k],convert[k]))
 
             valnow = pset.get(p1[k]).value
 
@@ -272,9 +276,35 @@ class parameters(parameter):
 
             pnow = self.set(name=p2[k],value=valnow)
 
-            print pnow
+            print(pnow)
 
         return
+
+def usage():
+    '''Print command-line usage.'''
+
+    print('''
+Usage: python3 yelmox/yelmo_pyrenees.py [options] [param=value ...]
+
+Stage (and optionally submit) a Pyrenees yelmox run from the repo root.
+
+Options:
+  -h, --help        Show this help and exit
+  -p, --program P   Executable in libyelmox/bin/ to run (default: yelmox.x)
+  -o, --out DIR     Output/run directory
+  -a, --auto DIR    Auto-name the run folder from the modified params, under DIR
+  -l                Submit the job to the queue (sbatch submit_pyrenees.sh)
+  -f                Do not prompt for confirmation
+  -w, --wall H      Wall-clock time in hours (default: 24)
+  -s, --suffix S    Suffix appended to the default parameter filename
+  -t CASE           Special simulation case
+      --lhs FILE    Latin-Hypercube sampling table for parameter ranges
+
+Parameter edits are given as name=value, optionally grouped, e.g.:
+      ydyn="cb_z0=-400 cb_z1=500"   ytopo="calv_flt_method=vm-l19"
+''')
+
+    return
 
 def autofolder(params,outfldr0):
     '''Given a list of parameters,
@@ -301,10 +331,10 @@ def makedirs(dirname):
 
     try:
         os.makedirs(dirname)
-        print     'Directory created: ', dirname
+        print('Directory created:', dirname)
     except OSError:
         if os.path.isdir(dirname):
-            print 'Directory already exists: ', dirname
+            print('Directory already exists:', dirname)
             pass
         else:
             # There was an error on creation, so make sure we know about it
@@ -372,8 +402,8 @@ def parse_args(args=[],force=False,lhs=None):
                     params.append(p)
                     group.append(now)
             else:
-                print "\nArguments should be encapsulated by the group name,"
-                print 'eg, rembo="pname1=5" sico="pname2=10"\n'
+                print("\nArguments should be encapsulated by the group name,")
+                print('eg, rembo="pname1=5" sico="pname2=10"\n')
                 sys.exit(2)
 
     else: # only the default module parameters will be loaded
@@ -382,22 +412,22 @@ def parse_args(args=[],force=False,lhs=None):
             group.append("none")
 
     # Check values of arguments
-    print ""
+    print("")
     k = 0
     for p in params:
         m = group[k]; k = k + 1
-        print m + ":" + p
+        print(m + ":" + p)
 
     if not lhs is None:
-        print "**LHS sampling will be loaded from: "+lhs
-        print "  to produce the above parameter ranges."
+        print("**LHS sampling will be loaded from: "+lhs)
+        print("  to produce the above parameter ranges.")
 
     if not force:
         try:
-            response = raw_input("\n[Enter to proceed] or [ctl-c to exit]")
-            print "\n"
+            response = input("\n[Enter to proceed] or [ctl-c to exit]")
+            print("\n")
         except:
-            print "\n"
+            print("\n")
             sys.exit()
 
 
@@ -405,8 +435,8 @@ def parse_args(args=[],force=False,lhs=None):
 
     for p in params:
         if "=" not in p:
-            print 'Error::parse_args: parameter names and values must be separated by "="'
-            print ''
+            print('Error::parse_args: parameter names and values must be separated by "="')
+            print('')
             sys.exit(2)
 
         # Separate term into name and value(s)
@@ -431,8 +461,8 @@ def parse_args(args=[],force=False,lhs=None):
 
         # Make sure number of parameters == number of values loaded per combination
         if not len(names) == len(allvalues[0]):
-            print 'Error::parse_args: number of LHS parameters loaded does not match command line options.'
-            print ''
+            print('Error::parse_args: number of LHS parameters loaded does not match command line options.')
+            print('')
             sys.exit(2)
 
         # Multiply lhs values with parameter ranges
@@ -459,9 +489,9 @@ def parse_args(args=[],force=False,lhs=None):
 
     ## Check what has been created ##
 ##    for b in batch:
-##        print "Batch set ====="
+##        print("Batch set =====")
 ##        for p in b:
-##            print p
+##            print(p)
 
     return batch
 
@@ -469,7 +499,7 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     '''Given a set of parameters, generate output folder and
        set up a job, then submit it.
     '''
-    
+
     infldr = "./" # Path to original parameter files
 
     # Determine the base name of the parameter files (no folders)
@@ -481,7 +511,7 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
         outfldr = autofolder(params,out)
     else:
         outfldr = out
-        
+
     # First generate some empty data sets for each module
     p_yelmo   = parameters()
 
@@ -496,11 +526,11 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
         p_yelmo1.set(param=p)
 
     # Output a separator
-    print "============================================================"
+    print("============================================================")
 
     # Print info to screen
-    print "\nOutput directory: " + outfldr
-    print "\nModified parameters: Yelmo"
+    print("\nOutput directory: " + outfldr)
+    print("\nModified parameters: Yelmo")
     p_yelmo1.printer(mod=True)
 
     # Make output directory and subdirectory
@@ -511,18 +541,14 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
 
     ## Copy files of interest
 
-    # Generate the appropriate executable command to run job
-    # Assume executable is running from outlfdr
-    #executable = "./{}".format(exe_fname)
+    # Physical constants come from input/yelmo_phys_const.nml (group set by
+    # [yelmo] phys_const), reached through the `input` symlink created below --
+    # no separate constants file needs copying.
 
-    # Get path of constants parameter file and copy it 
-    const_path = "par/yelmo_const_Earth.nml"
-    shutil.copy(const_path,outfldr)
-
-    # Also copy exe file to rundir
+    # Copy the executable into the run dir
     shutil.copy("libyelmox/bin/"+executable,outfldr)
-        
-    ## Control parameter files 
+
+    ## Control parameter files
     # shutil.copy(os.path.join(infldr,o2),os.path.join(outfldr,o2))
 
     ## Generate symbolic links to input data folders
@@ -544,18 +570,6 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     else:
         print("Warning: path does not exist {}".format(srcname))
 
-    srcname = "ice_data_javi"
-    dstname = os.path.join(outfldr,srcname)
-    if os.path.islink(dstname): os.unlink(dstname)
-    if os.path.islink(srcname):
-        linkto = os.readlink(srcname)
-        os.symlink(linkto, dstname)
-    elif os.path.isdir(srcname):
-        srcpath = os.path.abspath(srcname)
-        os.symlink(srcpath,dstname)
-    else:
-        print("Warning: path does not exist {}".format(srcname))
-
     # Copy the submit.sh file (lives alongside this script in yelmox/)
     submit_file = "yelmox/submit_pyrenees.sh"
     shutil.copy(submit_file,outfldr)
@@ -566,11 +580,12 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     # Assume executable is running from rundir
     #executable = "./{}".format(exe_fname)
 
-    # Also copy exe file to rundir 
+    # Also copy exe file to rundir
     #shutil.copy(exe_path,outfldr)
 
-    # Submit job to queue 
-    pid = submitjob(outfldr,executable)
+    # Submit job to queue
+    if submit:
+        pid = submitjob(outfldr,executable)
 
     return outfldr
 
@@ -578,25 +593,12 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
 def submitjob(outfldr,executable):
     '''Submit a job to a HPC queue (qsub,sbatch)'''
 
-    # Get info about current system
-    # username  = os.environ.get('USER')
-    # hostname  = os.environ.get('HOSTNAME')
-
-    # Command to be called
-    #cmd = "{} {}".format(executable,par_path)
-
-    # Create the jobscript using current info
-    #nm_jobscript   = 'job.submit'
-    #path_jobscript = "{}/{}".format(rundir,nm_jobscript)
-
-    # Jobscript for qsub
-    #script = jobscript_qsub(cmd,rundir,username,usergroup,wtime,useremail)
-    #jobfile = open(path_jobscript,'w').write(script)
     cmd_job = "cd {} && sbatch submit_pyrenees.sh".format(outfldr)
 
     # Run the command (ie, change to output directory and submit job)
     # Note: the argument `shell=True` can be a security hazard, but should
-    # be ok in this context, see https://docs.python.org/2/library/subprocess.html#frequently-used-arguments
+    # be ok in this context, see
+    # https://docs.python.org/3/library/subprocess.html#security-considerations
     jobstatus = subp.check_call(cmd_job,shell=True)
 
     return jobstatus
@@ -604,8 +606,8 @@ def submitjob(outfldr,executable):
 def main():
 
     # Default values of options #
-    executable = 'yelmox-legacy.x'        # Exectutable program (default: Ant-40)
-    submit     = False           # Submit the job to loadleveler (default: no)
+    executable = 'yelmox.x'      # Executable program (multigrid yelmox driver)
+    submit     = False           # Submit the job to the queue (default: no)
     edit       = False           # Interactive editing of options
     outfldr    = 'output/test/'  # Default output folder is just the outbase
     auto       = False
@@ -619,10 +621,10 @@ def main():
     # Get a list of options and arguments
     try:
         opts, args = getopt.getopt(sys.argv[1:], "hlep:o:a:fw:t:s:", ["help", "program=","edit=","out=","auto=","wall=","lhs=","suffix="])
-    except getopt.GetoptError, err:
+    except getopt.GetoptError as err:
         # print help information and exit:
         usage()
-        print "\n    ",str(err) # will print something like "option -a not recognized"
+        print("\n    ", str(err)) # will print something like "option -a not recognized"
         sys.exit(2)
 
     # Cycle through options
@@ -633,7 +635,7 @@ def main():
         elif o in ("-p", "--program"):
             executable = a              # Executable program is input argument
         elif o in ("-l"):
-            submit = True               # Job will be submitted to loadleveler
+            submit = True               # Job will be submitted to the queue
         elif o in ("-e", "--edit"):
             edit   = True               # User will interactively edit options
         elif o in ("-f"):
@@ -661,7 +663,7 @@ def main():
     # Make sure that if generating multiple runs
     # that the --auto option has been used
     if len(batch) > 1 and not auto:
-        print "\nError: automatic folder generation must be used for batch processing!\n"
+        print("\nError: automatic folder generation must be used for batch processing!\n")
         sys.exit(2)
 
     # Loop over the parameter sets and make jobs
@@ -685,13 +687,14 @@ def main():
         else:
             open(outfldr+"batch","w").write(joblist1)
 
-        print "Output folder(s):\n"
-        print joblist
-        print "\n"
+        print("Output folder(s):\n")
+        print(joblist)
+        print("\n")
 
     except:
-        print "Unable to write batch list to " + outfldr
+        print("Unable to write batch list to " + outfldr)
 
     return
 
-main()
+if __name__ == "__main__":
+    main()

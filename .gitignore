@@ -23,3 +23,5 @@ git_yelmo.txt
 maps/*.nc
 .vscode
 .claude/worktrees
+__pycache__
+*.pyc
