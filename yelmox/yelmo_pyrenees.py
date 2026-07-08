@@ -556,8 +556,8 @@ def makejob(params,out,wtime,executable,suffix="",auto=False,force=False,edit=Fa
     else:
         print("Warning: path does not exist {}".format(srcname))
 
-    # Copy the submit.sh file
-    submit_file = "submit_pyrenees.sh"
+    # Copy the submit.sh file (lives alongside this script in yelmox/)
+    submit_file = "yelmox/submit_pyrenees.sh"
     shutil.copy(submit_file,outfldr)
 
     # 2. Run the job
