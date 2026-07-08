@@ -111,9 +111,9 @@ yelmox : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 	@echo "    yelmox.x is ready."
 	@echo " "
 
-yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(yelmox_libs) $(obm_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_bipolar.x yelmox_bipolar/yelmox_bipolar.f90 \
-		$(yelmox_libs) $(LFLAGS)
+		$(yelmox_libs) $(obm_libs) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox_bipolar.x is ready."
 	@echo " "
@@ -164,9 +164,9 @@ yelmox-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 	@echo "    yelmox-legacy.x is ready."
 	@echo " "
 
-yelmox_bipolar-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+yelmox_bipolar-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs) $(obm_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_bipolar-legacy.x yelmox_bipolar/legacy/yelmox_bipolar.f90 \
-		$(yelmox_libs) $(LFLAGS)
+		$(yelmox_libs) $(obm_libs) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox_bipolar-legacy.x is ready."
 	@echo " "
