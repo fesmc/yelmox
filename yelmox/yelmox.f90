@@ -24,20 +24,13 @@ program yelmox
     type(timeout_class) :: tm_2D, tm_1D
 
     character(len=512) :: outfldr
-    character(len=56)  :: tstep_method
-    real(wp)           :: tstep_const, time_init, time_end, dtt
+    real(wp)           :: dtt
 
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
 
     ! Timestepping (driver-owned; the [ctrl] group holds the shared timeline).
-    call nml_read(path_par, "ctrl", "tstep_method", tstep_method)
-    call nml_read(path_par, "ctrl", "tstep_const",  tstep_const)
-    call nml_read(path_par, "ctrl", "time_init",    time_init)
-    call nml_read(path_par, "ctrl", "time_end",     time_end)
-    call nml_read(path_par, "ctrl", "dtt",          dtt)
-    call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
-                    time_ref=1950.0_wp, const_rel=tstep_const)
+    call timeline_init(ts, dtt, path_par, "ctrl")
 
     ! Single-domain runs write to the run dir.
     outfldr = "./"
@@ -46,12 +39,9 @@ program yelmox
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
 
-    ! Initialize the domain: sub-models + hi-res hub + coupler maps.
+    ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
+    ! reads the timeline values it needs from the same [ctrl] group.
     call domain_init(dom, path_par, ts%time)
-
-    ! Inject the driver-owned timeline values the domain logic needs.
-    dom%ctl%tstep_method = tstep_method
-    dom%ctl%dtt          = dtt
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
@@ -76,14 +66,14 @@ program yelmox
     write(*,*)
 
     ! === output setup (2D; one file per module, on its own grid) ===
-    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
+    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ts%time_init, ts%time_end)
     if (tm_2D%active) then
         call domain_write_init(dom, trim(outfldr), ts%time)
         call domain_write_step(dom, trim(outfldr), ts%time)
     end if
 
     ! === output setup (1D timeseries) ===
-    call timeout_init(tm_1D, path_par, "tm_1D", "small", time_init, time_end)
+    call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
     if (tm_1D%active) then
         call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
     end if
@@ -91,7 +81,7 @@ program yelmox
     ! === main time loop ===
     call tstep_print_header(ts)
     do while (.not. ts%is_finished)
-        call tstep_update(ts, dom%ctl%dtt)
+        call tstep_update(ts, dtt)
         call tstep_print(ts)
 
         ! Shared sea level: update once per step, before the domain advances.

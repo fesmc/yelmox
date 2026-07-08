@@ -64,20 +64,13 @@ program yelmox_bipolar
     type(timeout_class) :: tm_2D, tm_1D
     logical             :: do_2D, do_1D, do_restart
 
-    character(len=56) :: tstep_method
-    real(wp)          :: tstep_const, time_init, time_end, dtt
+    real(wp) :: dtt
 
     ! Single parameter file from the command line (holds both domains + the obm).
     call yelmo_load_command_line_args(path_par)
 
     ! Shared timestepping (driver-owned) from the [ctrl] group.
-    call nml_read(path_par, "ctrl", "tstep_method", tstep_method)
-    call nml_read(path_par, "ctrl", "tstep_const",  tstep_const)
-    call nml_read(path_par, "ctrl", "time_init",    time_init)
-    call nml_read(path_par, "ctrl", "time_end",     time_end)
-    call nml_read(path_par, "ctrl", "dtt",          dtt)
-    call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
-                    time_ref=1950.0_wp, const_rel=tstep_const)
+    call timeline_init(ts, dtt, path_par, "ctrl")
 
     ! Which hemispheres are active ([ctrl]).
     call nml_read(path_par, "ctrl", "active_north", active_north)
@@ -128,8 +121,8 @@ program yelmox_bipolar
     end if
 
     ! === Output setup (shared cadence, from [tm_1D]/[tm_2D]) ===
-    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
-    call timeout_init(tm_1D, path_par, "tm_1D", "small", time_init, time_end)
+    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ts%time_init, ts%time_end)
+    call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
     if (active_north) call write_domain_init(dom_north, outfldr_north)
     if (active_south) call write_domain_init(dom_south, outfldr_south)
 
@@ -165,7 +158,7 @@ program yelmox_bipolar
                 call coupling_ism2obm(dom_south, obm, hydro_mask_south, "south", fwf_definition)
         end if
         if (trim(obm_name) == "nautilus" .and. hyster_on) &
-            call update_bipolar_hyster_forcing(ts%time, time_init, obm, dtt, &
+            call update_bipolar_hyster_forcing(ts%time, ts%time_init, obm, dtt, &
                     hyster_positive_branch_time, hyster_rate, hyster_forcing, hyster_forcing_method)
         if (obm2ism) then
             if (active_north) call coupling_obm2ism(dom_north, obm, obm_name, "north")
@@ -258,10 +251,6 @@ contains
         character(len=*), intent(out)   :: outfldr
 
         call domain_init(dom, path_par, ts%time, group_suffix=suffix)
-
-        ! Inject the driver-owned timeline values the domain logic needs.
-        dom%ctl%tstep_method = tstep_method
-        dom%ctl%dtt          = dtt
 
         ! Each domain writes to a subfolder named after its domain.
         outfldr = trim(dom%ctl%domain)//"/"

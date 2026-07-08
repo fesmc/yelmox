@@ -51,15 +51,14 @@ program yelmox_esm
     type(esm_forcing_class) :: esm      ! driver-owned climate forcing (replaces snapclim)
     type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm
 
-    ! ESM run control (esm-specific config; the shared domain_ctl carries the rest)
+    ! ESM run control (esm-specific config; the shared domain_ctl carries the
+    ! rest, and the timeline is driver-owned via timeline_init)
     type esm_ctl_params
         character(len=56) :: run_step
-        real(wp) :: time_init, time_end, dtt, time_equil
+        real(wp) :: dtt, time_equil
         real(wp) :: time_ref(2), time_hist(2), time_proj(2), time_esm_ref(2)
         character(len=56) :: clim_var
         integer  :: clim_seed
-        character(len=56) :: tstep_method
-        real(wp) :: tstep_const
         logical  :: kill_shelves
         logical  :: use_esm, use_smb, use_var, use_proj, use_hist
         logical  :: write_formatted
@@ -97,10 +96,8 @@ program yelmox_esm
     call nml_read(path_par, "esm", "dT_threshold",    esm%dT_lim)
     call nml_read(path_par, "esm", "grid_src",        esm%grid_src)
 
-    ! [run_step] group: timeline + esm reference/history/projection periods.
-    call nml_read(path_par, trim(ec%run_step), "time_init",    ec%time_init)
-    call nml_read(path_par, trim(ec%run_step), "time_end",     ec%time_end)
-    call nml_read(path_par, trim(ec%run_step), "dtt",          ec%dtt)
+    ! [run_step] group: esm reference/history/projection periods. The timeline
+    ! keys of the same group are read by timeline_init / domain_init below.
     call nml_read(path_par, trim(ec%run_step), "time_equil",   ec%time_equil)
     call nml_read(path_par, trim(ec%run_step), "time_ref",     ec%time_ref)
     call nml_read(path_par, trim(ec%run_step), "time_hist",    ec%time_hist)
@@ -108,8 +105,6 @@ program yelmox_esm
     call nml_read(path_par, trim(ec%run_step), "time_esm_ref", ec%time_esm_ref)
     call nml_read(path_par, trim(ec%run_step), "clim_var",     ec%clim_var)
     call nml_read(path_par, trim(ec%run_step), "clim_seed",    ec%clim_seed)
-    call nml_read(path_par, trim(ec%run_step), "tstep_method", ec%tstep_method)
-    call nml_read(path_par, trim(ec%run_step), "tstep_const",  ec%tstep_const)
     call nml_read(path_par, trim(ec%run_step), "kill_shelves", ec%kill_shelves)
 
     ! Seed the RNG for climate-variability reproducibility.
@@ -129,27 +124,26 @@ program yelmox_esm
     file_isos   = trim(outfldr)//"fastisostasy.nc"
     file_bsl    = trim(outfldr)//"bsl.nc"
 
+    ! Timestepping (driver-owned; the [run_step] group holds this run phase's
+    ! timeline, with tstep_const applied as a calendar constant).
+    call timeline_init(ts, ec%dtt, path_par, trim(ec%run_step), &
+                       time_ref=2000.0_wp, cal=.true.)
+
     write(*,*)
     write(*,*) "yelmox_esm: run_step = "//trim(ec%run_step)
-    write(*,*) "  time_init/end/dtt: ", ec%time_init, ec%time_end, ec%dtt
+    write(*,*) "  time_init/end/dtt: ", ts%time_init, ts%time_end, ec%dtt
     write(*,*) "  esm experiment:    "//trim(ec%experiment)//"  use_esm = ", ec%use_esm
     write(*,*)
-
-    ! Timestepping (driver-owned).
-    call tstep_init(ts, ec%time_init, ec%time_end, method=ec%tstep_method, units="year", &
-                    time_ref=2000.0_wp, const_rel=0.0_wp, const_cal=ec%tstep_const)
 
     ! Shared, driver-owned barystatic sea level.
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
 
     ! Initialize the domain (sub-models + hub + coupler maps), skipping snapclim:
-    ! this driver supplies its own climate via the esm object.
-    call domain_init(dom, path_par, ts%time, init_climate=.false.)
-
-    ! Inject the driver-owned timeline values the domain logic needs.
-    dom%ctl%tstep_method = ec%tstep_method
-    dom%ctl%dtt          = ec%dtt
+    ! this driver supplies its own climate via the esm object. The domain reads
+    ! the timeline values it needs from the [run_step] group.
+    call domain_init(dom, path_par, ts%time, init_climate=.false., &
+                     timeline_group=trim(ec%run_step))
 
     ! Regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
@@ -192,9 +186,9 @@ program yelmox_esm
 
     ! ================= OUTPUT SETUP ==========================================
 
-    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ec%time_init, ec%time_end)
-    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ec%time_init, ec%time_end)
-    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ec%time_init, ec%time_end)
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ts%time_init, ts%time_end)
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
 
     call yelmo_write_init(dom%yelmo, file2D,   time_init=ts%time, units="years")
     call yelmo_write_init(dom%yelmo, file2Dsm, time_init=ts%time, units="years")

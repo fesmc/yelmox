@@ -37,8 +37,7 @@ program yelmox_rembo
     type(timeout_class) :: tm_2D, tm_1D
 
     character(len=512)  :: outfldr, file2D, file_rembo
-    character(len=56)   :: tstep_method
-    real(wp) :: tstep_const, time_init, time_end, time_equil, dtt, dtt_now, deltat_tot
+    real(wp) :: time_equil, dtt, dtt_now, deltat_tot
     logical  :: use_hyster, write_restart, write_ocn_forcing
     real(wp) :: dT_summer, dT_ann, dT_ocn, hyst_f_to, hyst_f_ta
     real(wp) :: var, convert_km3_Gt
@@ -46,21 +45,14 @@ program yelmox_rembo
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
 
-    ! --- run control ([ctrl]) ---
-    call nml_read(path_par, "ctrl", "tstep_method", tstep_method)
-    call nml_read(path_par, "ctrl", "tstep_const",  tstep_const)
-    call nml_read(path_par, "ctrl", "time_init",    time_init)
-    call nml_read(path_par, "ctrl", "time_end",     time_end)
+    ! --- run control ([ctrl]: shared timeline + REMBO-flavor switches) ---
+    call timeline_init(ts, dtt, path_par, "ctrl")
     call nml_read(path_par, "ctrl", "time_equil",   time_equil)
-    call nml_read(path_par, "ctrl", "dtt",          dtt)
     call nml_read(path_par, "ctrl", "use_hyster",   use_hyster)
     call nml_read(path_par, "ctrl", "write_restart", write_restart)
     call nml_read(path_par, "ctrl", "write_ocn_forcing", write_ocn_forcing)
     call nml_read(path_par, "ctrl", "f_to",         hyst_f_to)
     call nml_read(path_par, "ctrl", "f_ta",         hyst_f_ta)
-
-    call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
-                    time_ref=1950.0_wp, const_rel=tstep_const)
 
     outfldr    = "./"
     file2D     = trim(outfldr)//"yelmo2D.nc"
@@ -71,12 +63,9 @@ program yelmox_rembo
     call bsl_update(bsl, ts%time_rel)
 
     ! Domain: ice sheet + isostasy + ocean (snapclim) + smbpal carrier + marine
-    ! shelf + sediments + geothermal + hi-res hub + coupler maps.
+    ! shelf + sediments + geothermal + hi-res hub + coupler maps. The domain
+    ! reads the timeline values it needs from the same [ctrl] group.
     call domain_init(dom, path_par, ts%time)
-
-    ! Inject the driver-owned timeline values the domain logic needs.
-    dom%ctl%tstep_method = tstep_method
-    dom%ctl%dtt          = dtt
 
     convert_km3_Gt = dom%yelmo%bnd%c%rho_ice * 1e-3
 
@@ -111,8 +100,8 @@ program yelmox_rembo
     write(*,*)
 
     ! === output setup ===
-    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", time_init, time_end)
-    call timeout_init(tm_1D, path_par, "tm_1D", "small", time_init, time_end)
+    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ts%time_init, ts%time_end)
+    call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
 
     if (tm_2D%active) then
         call yelmo_write_init(dom%yelmo, file2D, time_init=ts%time, units="years")

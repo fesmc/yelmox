@@ -14,7 +14,7 @@ module yelmox_domain
 
     use nml,          only : nml_read
     use ncio
-    use timestepping, only : tstep_class
+    use timestepping, only : tstep_class, tstep_init
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, yelmo_update_equil, &
                              yelmo_init_state, yelmo_init_topo, yelmo_print_bound, &
@@ -127,6 +127,7 @@ module yelmox_domain
     end type ice_domain
 
     public :: domain_ctl, ice_domain
+    public :: timeline_init
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
@@ -144,7 +145,46 @@ module yelmox_domain
 
 contains
 
-    subroutine domain_init(dom, path_par, time, group_suffix, init_climate)
+    subroutine timeline_init(ts, dtt, path_par, group, time_ref, cal)
+        ! Read the run's shared timeline ([<group>]: tstep_method, tstep_const,
+        ! time_init, time_end, dtt) and initialize the driver-owned timestepper.
+        ! The same group name is passed to domain_init (timeline_group), so the
+        ! domain reads the timeline values it needs itself -- drivers never
+        ! inject them. time_ref sets the calendar reference (default 1950.0);
+        ! cal=.true. applies tstep_const as a calendar constant (const_cal, the
+        ! ESM convention) instead of a relative one (const_rel).
+        type(tstep_class), intent(out) :: ts
+        real(wp),          intent(out) :: dtt
+        character(len=*),  intent(in)  :: path_par
+        character(len=*),  intent(in)  :: group
+        real(wp), optional, intent(in) :: time_ref
+        logical,  optional, intent(in) :: cal
+
+        character(len=56) :: tstep_method
+        real(wp) :: tstep_const, time_init, time_end, tref
+        logical  :: is_cal
+
+        tref = 1950.0_wp
+        if (present(time_ref)) tref = time_ref
+        is_cal = .false.
+        if (present(cal)) is_cal = cal
+
+        call nml_read(path_par, group, "tstep_method", tstep_method)
+        call nml_read(path_par, group, "tstep_const",  tstep_const)
+        call nml_read(path_par, group, "time_init",    time_init)
+        call nml_read(path_par, group, "time_end",     time_end)
+        call nml_read(path_par, group, "dtt",          dtt)
+
+        if (is_cal) then
+            call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
+                            time_ref=tref, const_rel=0.0_wp, const_cal=tstep_const)
+        else
+            call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
+                            time_ref=tref, const_rel=tstep_const)
+        end if
+    end subroutine timeline_init
+
+    subroutine domain_init(dom, path_par, time, group_suffix, init_climate, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
@@ -163,13 +203,18 @@ contains
         ! driver, which owns an esm_forcing_class in place of dom%snp) pass .FALSE.
         ! to skip snapclim_init; grid_clim is still resolved so grid_smb can default
         ! to it.
+        !
+        ! timeline_group (optional, default "ctrl") names the group holding the
+        ! run's shared timeline -- the same group the driver passes to
+        ! timeline_init -- from which the domain reads tstep_method/dtt itself.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
         character(len=*), intent(in), optional :: group_suffix
         logical,          intent(in), optional :: init_climate
+        character(len=*), intent(in), optional :: timeline_group
 
-        character(len=256)    :: domain
+        character(len=256)    :: domain, tgroup
         character(len=64)     :: sfx
         logical               :: do_climate
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
@@ -183,8 +228,11 @@ contains
         do_climate = .TRUE.
         if (present(init_climate)) do_climate = init_climate
 
+        tgroup = "ctrl"
+        if (present(timeline_group)) tgroup = trim(timeline_group)
+
         ! --- run control ---
-        call domain_ctl_load(dom%ctl, path_par, trim(sfx))
+        call domain_ctl_load(dom%ctl, path_par, trim(sfx), trim(tgroup))
 
         ! --- ice sheet (grid read from file) ---
         call yelmo_init(dom%yelmo, filename=path_par, grid_def="file", time=time, &
@@ -746,19 +794,26 @@ contains
         write(*,*) "domain_restart_read:: restored bundle "//trim(fldr)
     end subroutine domain_restart_read
 
-    subroutine domain_ctl_load(ctl, path_par, suffix)
+    subroutine domain_ctl_load(ctl, path_par, suffix, timeline_group)
         ! Load this domain's setup + coupling + output config. All groups carry an
         ! optional domain suffix (e.g. "_north"), so several domains can coexist in
         ! one parameter file without group.name collisions (matters for runme -p).
-        ! The shared timeline (tstep_method, dtt, ...) is NOT read here -- the
-        ! driver owns it and injects tstep_method/dtt into ctl.
+        ! The shared timeline is driver-owned (timeline_init); the values the
+        ! domain logic needs (tstep_method, dtt) are read from the same
+        ! timeline_group here, so nothing is injected after init.
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
         character(len=*), intent(in)    :: suffix
+        character(len=*), intent(in)    :: timeline_group
 
         character(len=256) :: gc, go
 
         ctl%path_par = trim(path_par)
+
+        ! Shared timeline values used by the domain logic (dt_clim cadence,
+        ! optimization dt, domain-specific startup).
+        call nml_read(path_par, timeline_group, "tstep_method", ctl%tstep_method)
+        call nml_read(path_par, timeline_group, "dtt",          ctl%dtt)
 
         ! Domain setup + coupling ([coupling<suffix>]): active components, methods,
         ! per-component grids, restart bundle, restart cadence.
