@@ -9,8 +9,6 @@
     dtt             = 10.0              ! [yr] Main loop timestep
     write_restart   = True              ! Write restart bundles
     use_hyster      = False             ! Use hysteresis module?
-    lim_pd_ice      = True              ! Extra melt outside present-day ice extent
-    greenland_init_marine_H = False     ! Initialize ice thickness to LGM-like state
     write_ocn_forcing = False           ! Write ocean-forcing fields to the small file
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
@@ -19,16 +17,25 @@
 &coupling
     ! Domain setup: active components + methods, per-component grids, restart.
     ! REMBO is single-grid (Greenland): every component runs on GRL-16KM.
-    with_ice_sheet  = True     ! Is the ice sheet active?
-    with_isostasy   = True     ! Is isostasy active?
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
+    with_climate      = True   ! Are climate + surface mass balance active?
+    with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (legacy optimize=False -> none)
     smb_method      = "smbpal" ! REMBO stages its smb into the smbpal carrier (dom%smb%ann)
     dt_restart      = 20e3     ! [yr] Frequency of writing restart bundles
+    dt_clim         = 10.0     ! [yr] Frequency of snapclim (ocean) snapshot updates
     grid_mshlf = "GRL-16KM"    ! marine-shelf grid (== grid_yelmo)
     grid_isos  = "GRL-16KM"    ! isostasy grid      (== grid_yelmo)
     grid_clim  = "GRL-16KM"    ! climate/REMBO grid (== grid_yelmo)
     grid_smb   = "GRL-16KM"    ! smb grid           (== grid_clim)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
+
+    ! Domain-specific switches (Greenland).
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (snapclim-based; unused with REMBO)
+    lim_pd_ice              = True    ! Extra melt outside PD ice extent
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
+    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
 &htopo

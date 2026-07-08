@@ -40,7 +40,6 @@ program yelmox_rembo
     character(len=56)   :: tstep_method
     real(wp) :: tstep_const, time_init, time_end, time_equil, dtt, dtt_now, deltat_tot
     logical  :: use_hyster, write_restart, write_ocn_forcing
-    logical  :: greenland_init_marine_H, lim_pd_ice
     real(wp) :: dT_summer, dT_ann, dT_ocn, hyst_f_to, hyst_f_ta
     real(wp) :: var, convert_km3_Gt
 
@@ -55,8 +54,6 @@ program yelmox_rembo
     call nml_read(path_par, "ctrl", "time_equil",   time_equil)
     call nml_read(path_par, "ctrl", "dtt",          dtt)
     call nml_read(path_par, "ctrl", "use_hyster",   use_hyster)
-    call nml_read(path_par, "ctrl", "lim_pd_ice",   lim_pd_ice)
-    call nml_read(path_par, "ctrl", "greenland_init_marine_H", greenland_init_marine_H)
     call nml_read(path_par, "ctrl", "write_restart", write_restart)
     call nml_read(path_par, "ctrl", "write_ocn_forcing", write_ocn_forcing)
     call nml_read(path_par, "ctrl", "f_to",         hyst_f_to)
@@ -77,11 +74,9 @@ program yelmox_rembo
     ! shelf + sediments + geothermal + hi-res hub + coupler maps.
     call domain_init(dom, path_par, ts%time)
 
-    ! Inject the driver-owned timeline + rembo switches into the domain control.
-    dom%ctl%tstep_method            = tstep_method
-    dom%ctl%dtt                     = dtt
-    dom%ctl%lim_pd_ice              = lim_pd_ice
-    dom%ctl%greenland_init_marine_H = greenland_init_marine_H
+    ! Inject the driver-owned timeline values the domain logic needs.
+    dom%ctl%tstep_method = tstep_method
+    dom%ctl%dtt          = dtt
 
     convert_km3_Gt = dom%yelmo%bnd%c%rho_ice * 1e-3
 

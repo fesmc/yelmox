@@ -17,7 +17,6 @@
     time_init       = 0.0
     time_end        = 40.0
     dtt             = 10.0
-    write_clim_and_kill = False
 
     active_north    = True              ! Run the Northern-Hemisphere domain?
     active_south    = True              ! Run the Southern-Hemisphere domain?
@@ -826,16 +825,25 @@
 
 &coupling_south
     ! Domain setup: active components + methods, per-component grids, restart.
-    with_ice_sheet  = True     ! Is the ice sheet active?
-    with_isostasy   = True     ! Is isostasy active?
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
+    with_climate      = True   ! Are climate + surface mass balance active?
+    with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "opt"    ! "none", "relax", "opt"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
     dt_restart      = 20e3     ! [yr] Frequency of writing restart files
+    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     grid_mshlf = "ANT-16KM"    ! hi-res hub grid; set "ANT-32KM" to keep mshlf on the Yelmo grid
     grid_isos  = "ANT-32KM"    ! isostasy grid; default = grid_yelmo (identity, exact parity)
     grid_clim  = "ANT-32KM"    ! climate grid; must have forcing data (default = grid_yelmo)
     grid_smb   = "ANT-32KM"    ! smb grid; default = grid_clim
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
+
+    ! Domain-specific switches (Greenland only; keep False elsewhere).
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (Greenland)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent (Greenland)
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
+    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
 &output_south
@@ -1306,16 +1314,25 @@
 /
 
 &coupling_north
-    with_ice_sheet  = True
-    with_isostasy   = True
+    with_ice_sheet    = True
+    with_isostasy     = True
+    with_climate      = True
+    with_marine_shelf = True
     equil_method    = "none"
     smb_method      = "smbpal"
     dt_restart      = 20e3
+    dt_clim         = 10.0
     grid_mshlf = "GRL-32KM"
     grid_isos  = "GRL-32KM"
     grid_clim  = "GRL-32KM"
     grid_smb   = "GRL-32KM"
     restart    = "None"
+
+    ! Domain-specific switches (Greenland).
+    scale_glacial_smb       = False   ! Reduce negative glacial smb
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
+    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
 &output_north

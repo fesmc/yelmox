@@ -150,7 +150,6 @@ program yelmox_esm
     ! Inject the driver-owned timeline values the domain logic needs.
     dom%ctl%tstep_method = ec%tstep_method
     dom%ctl%dtt          = ec%dtt
-    dom%ctl%time_equil   = ec%time_equil
 
     ! Regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))

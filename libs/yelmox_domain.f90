@@ -53,19 +53,16 @@ module yelmox_domain
     type domain_ctl
         ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
         character(len=512) :: path_par = ""
-        ! Run control (from the [ctrl] namelist group).
+        ! Shared timeline (read from the driver's timeline group, e.g. [ctrl]).
         character(len=56) :: tstep_method = "const"
-        real(wp) :: tstep_const = 0.0_wp
-        real(wp) :: time_init   = 0.0_wp
-        real(wp) :: time_end    = 0.0_wp
-        real(wp) :: time_equil  = 0.0_wp
         real(wp) :: dtt         = 10.0_wp
+        ! Cadences + methods ([coupling]).
         real(wp) :: dt_restart  = 0.0_wp
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"
 
-        ! Domain-specific startup / physics switches (mirrors yelmox.f90 internals).
+        ! Domain-specific startup / physics switches ([coupling]; Greenland only).
         logical :: greenland_init_marine_H = .false.   ! impose LGM-like marine ice at start
         logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb (Greenland)
         logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent (Greenland/rembo)
@@ -283,7 +280,26 @@ contains
         ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
         call domain_opt_init(dom, path_par, trim(sfx))
 
+        ! NEGIS cb_ref modification (Greenland): load its [negis] parameters when
+        ! enabled, so use_negis=True cannot silently run with default factors.
+        if (dom%ctl%use_negis) call negis_par_load(dom%ngs, path_par, trim(sfx))
+
     end subroutine domain_init
+
+    subroutine negis_par_load(ngs, path_par, suffix)
+        ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]). Ported from
+        ! yelmox.f90; only read when [coupling] use_negis is set.
+        type(negis_params), intent(inout) :: ngs
+        character(len=*),   intent(in)    :: path_par
+        character(len=*),   intent(in)    :: suffix
+
+        ngs%use_negis_par = .true.
+        call nml_read(path_par, "negis"//trim(suffix), "cf_0",      ngs%cf_0)
+        call nml_read(path_par, "negis"//trim(suffix), "cf_1",      ngs%cf_1)
+        call nml_read(path_par, "negis"//trim(suffix), "cf_centre", ngs%cf_centre)
+        call nml_read(path_par, "negis"//trim(suffix), "cf_north",  ngs%cf_north)
+        call nml_read(path_par, "negis"//trim(suffix), "cf_south",  ngs%cf_south)
+    end subroutine negis_par_load
 
     subroutine domain_opt_init(dom, path_par, suffix)
         ! Load optimization parameters and prepare Yelmo for external cb_ref:
@@ -368,10 +384,8 @@ contains
                 where(abs(dom%yelmo%bnd%regions - 1.23) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
                 where(abs(dom%yelmo%bnd%regions - 1.31) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
 
-                ! NEGIS cb_ref modification (off unless ctl%use_negis is set). The
-                ! reference intends this on for Greenland, but its cf_* parameters
-                ! are not present in the param files, so it is disabled by default.
-                dom%ngs%use_negis_par = dom%ctl%use_negis
+                ! NEGIS cb_ref modification: enabled via [coupling] use_negis, which
+                ! loads the [negis] parameters in domain_init.
 
                 ! With external cb_ref (till_method=-1) start from the reference value.
                 if (dom%yelmo%dyn%par%till_method == -1) &
@@ -443,15 +457,16 @@ contains
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call refresh_htopo(dom)
 
-        ! Climate on grid_clim (note: init uses time_rel for snapclim)
-        call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
-        call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
-        call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
-                             domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
-
-        ! Surface mass balance on grid_smb (smbpal or smb_simple; init=.true.
+        ! Climate on grid_clim (note: init uses time_rel for snapclim), then the
+        ! surface mass balance on grid_smb (smbpal or smb_simple; init=.true.
         ! runs the smbpal ITM equilibration before the first update).
-        call domain_update_smb(dom, ts, init=.true.)
+        if (dom%ctl%with_climate) then
+            call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
+            call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
+            call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
+                                 domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
+            call domain_update_smb(dom, ts, init=.true.)
+        end if
 
         ! Marine shelf through the (already refreshed) hub.
         call step_marine_shelf(dom, ts)
@@ -748,12 +763,23 @@ contains
         ! Domain setup + coupling ([coupling<suffix>]): active components, methods,
         ! per-component grids, restart bundle, restart cadence.
         gc = "coupling"//trim(suffix)
-        call nml_read(path_par, gc, "with_ice_sheet", ctl%with_ice_sheet)
-        call nml_read(path_par, gc, "with_isostasy",  ctl%with_isostasy)
+        call nml_read(path_par, gc, "with_ice_sheet",    ctl%with_ice_sheet)
+        call nml_read(path_par, gc, "with_isostasy",     ctl%with_isostasy)
+        call nml_read(path_par, gc, "with_climate",      ctl%with_climate)
+        call nml_read(path_par, gc, "with_marine_shelf", ctl%with_marine_shelf)
         call nml_read(path_par, gc, "equil_method",   ctl%equil_method)
         ctl%smb_method = "smbpal"
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
         call nml_read(path_par, gc, "dt_restart",     ctl%dt_restart)
+        call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
+
+        ! Domain-specific startup / physics switches (Greenland only; keep False
+        ! elsewhere). use_negis additionally requires a [negis<suffix>] group.
+        call nml_read(path_par, gc, "scale_glacial_smb",       ctl%scale_glacial_smb)
+        call nml_read(path_par, gc, "lim_pd_ice",              ctl%lim_pd_ice)
+        call nml_read(path_par, gc, "use_negis",               ctl%use_negis)
+        call nml_read(path_par, gc, "greenland_init_marine_H", ctl%greenland_init_marine_H)
+
         ctl%grid_mshlf = ""
         call nml_read(path_par, gc, "grid_mshlf",     ctl%grid_mshlf)
         ctl%grid_isos = ""
