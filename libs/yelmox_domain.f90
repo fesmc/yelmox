@@ -209,7 +209,7 @@ contains
         call bsl_update(bsl, ts%time_rel)
     end subroutine bsl_startup
 
-    subroutine domain_startup(dom, ts, bsl, restore_bsl)
+    subroutine domain_startup(dom, ts, bsl, restore_bsl, dTa, dTo, dSo)
         ! Establish the domain state after domain_init: cold start (ctl%restart
         ! == "None") builds the initial boundary state; otherwise the restart
         ! bundle is restored and the hi-res hub rebuilt from the restored models.
@@ -223,6 +223,9 @@ contains
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         logical, intent(in), optional    :: restore_bsl
+        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
+        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
+        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
 
         logical :: do_bsl
 
@@ -230,7 +233,7 @@ contains
         if (present(restore_bsl)) do_bsl = restore_bsl
 
         if (trim(dom%ctl%restart) == "None") then
-            call domain_init_state(dom, ts, bsl)
+            call domain_init_state(dom, ts, bsl, dTa=dTa, dTo=dTo, dSo=dSo)
         else
             if (do_bsl) call bsl_startup(bsl, ts, trim(dom%ctl%restart))
             call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
@@ -539,15 +542,20 @@ contains
 
     end subroutine domain_regions_init
 
-    subroutine domain_init_state(dom, ts, bsl)
+    subroutine domain_init_state(dom, ts, bsl, dTa, dTo, dSo)
         ! Build the initial boundary state and initialize the Yelmo state
         ! variables. Lifted from yelmox.f90's "update initial boundary conditions"
         ! block (minimal core: no smb_simple / domain-special / optimization).
         ! bsl is the shared, driver-owned sea level; the driver has already called
-        ! bsl_update for the initial time, so this routine only consumes it.
+        ! bsl_update for the initial time, so this routine only consumes it. The
+        ! optional dTa/dTo/dSo apply the initial transient-forcing anomalies to the
+        ! startup climate, keeping the cold-start state consistent with the loop.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
+        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
+        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
+        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
 
         real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
@@ -578,7 +586,8 @@ contains
             call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
             call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
-                                 domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
+                                 domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
+                                 dx=dom%ctl%dx_clim, basins=basins_c)
             call domain_update_smb(dom, ts, init=.true.)
         end if
 
@@ -922,21 +931,27 @@ contains
         call nml_read(path_par, go, "write_htopo", ctl%write_htopo)
     end subroutine domain_ctl_load
 
-    subroutine yelmox_step(dom, ts, bsl)
+    subroutine yelmox_step(dom, ts, bsl, dTa, dTo, dSo)
         ! Advance one domain by one coupling step. Component order is fixed here;
         ! each step_* is a no-op when its ctl flag is off. bsl is the shared,
         ! driver-owned sea level (the driver calls bsl_update once per step before
-        ! this call); step_isostasy consumes it. Used by the single-domain driver;
-        ! the multi-domain driver interleaves the step_* primitives itself.
+        ! this call); step_isostasy consumes it. The optional dTa/dTo/dSo are
+        ! driver-owned climate anomalies forwarded to step_climate (e.g. a transient
+        ! forcing series); when absent, snapclim uses its own index. Used by the
+        ! single-domain driver; the multi-domain driver interleaves the step_*
+        ! primitives itself.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
+        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
+        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
+        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
 
         call step_optimize(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
         call step_isostasy(dom, ts, bsl)
         call step_icesheet(dom, ts)
         call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
-        call step_climate(dom, ts)       ! climate/smb read geometry from the hub
+        call step_climate(dom, ts, dTa=dTa, dTo=dTo, dSo=dSo)  ! climate/smb read geometry from the hub
         call step_marine_shelf(dom, ts)
     end subroutine yelmox_step
 
@@ -1182,12 +1197,17 @@ contains
 
     end subroutine negis_update_cb_ref
 
-    subroutine step_climate(dom, ts)
+    subroutine step_climate(dom, ts, dTa, dTo, dSo)
         ! Run climate on grid_clim and smb on grid_smb: geometry (z_srf/H_ice) from
         ! the hub, ocean/atmosphere forcing produced by snapclim, smb aggregated
-        ! back to the Yelmo grid (conservative).
+        ! back to the Yelmo grid (conservative). The optional dTa/dTo/dSo are
+        ! spatially-homogeneous atmosphere/ocean anomalies (e.g. a transient forcing
+        ! series owned by the driver); when absent, snapclim uses its own index.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
+        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
+        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
 
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
         character(len=256) :: gc, gn
@@ -1202,7 +1222,8 @@ contains
             call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
             call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &
-                                 domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
+                                 domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
+                                 dx=dom%ctl%dx_clim, basins=basins_c)
         end if
 
         ! surface mass balance (smbpal or smb_simple), aggregated to the Yelmo grid

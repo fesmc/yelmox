@@ -396,6 +396,29 @@
 
 ! ===== EXTERNAL LIBRARIES =====
 
+&tsforcing
+    active = False    ! Apply transient tsgen forcing as snapclim anomalies?
+    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
+    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
+/
+
+&tsgen
+    method     = "const"    ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
+    with_kill  = False      ! stop the run once the response equilibrates at a bound
+    dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
+    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
+    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
+    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
+    df_sign    = 1          ! +1/-1 direction of forcing change
+    eps        = 1.0        ! response-rate tolerance (feedback/kill)
+    df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
+    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
+    f_min      = 0.0        ! [f]   lower forcing bound
+    f_max      = 5.0        ! [f]   upper forcing bound
+    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+/
+
 &snap
     atm_type           = "anom"
     ocn_type           = "anom"

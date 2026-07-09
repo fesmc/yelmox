@@ -12,6 +12,7 @@ program yelmox
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
+    use tsgen, only : tsgen_class, tsgen_init, tsgen_update
     use yelmox_domain
 
     implicit none
@@ -24,6 +25,14 @@ program yelmox
 
     character(len=512) :: outfldr
     real(wp)           :: dtt
+
+    ! Transient time-series forcing (tsgen), owned by the driver. The single
+    ! forcing value f_now is mapped onto the snapclim anomalies via per-channel
+    ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
+    type(tsgen_class) :: tsg
+    logical  :: tsf_active
+    real(wp) :: tsf_f_ta, tsf_f_to, tsf_f_so
+    real(wp) :: fvar
 
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
@@ -45,9 +54,28 @@ program yelmox
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
 
+    ! Transient time-series forcing (tsgen -> snapclim anomalies). Initialize
+    ! before startup so the initial (cold-start) climate carries the same
+    ! anomalies as the time loop. tsgen reads its own parameters from [tsgen];
+    ! tsgen_init sets f_now to the series value at the initial time.
+    call nml_read(path_par, "tsforcing", "active", tsf_active)
+    call nml_read(path_par, "tsforcing", "f_ta",   tsf_f_ta)
+    call nml_read(path_par, "tsforcing", "f_to",   tsf_f_to)
+    call nml_read(path_par, "tsforcing", "f_so",   tsf_f_so)
+    if (tsf_active) then
+        call tsgen_init(tsg, path_par, ts%time)
+        write(*,*) "yelmox: transient forcing active (tsgen), f_ta/f_to/f_so =", &
+                    tsf_f_ta, tsf_f_to, tsf_f_so
+    end if
+
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl) and rebuild the hi-res hub from the restored models.
-    call domain_startup(dom, ts, bsl)
+    if (tsf_active) then
+        call domain_startup(dom, ts, bsl, dTa=tsg%f_now*tsf_f_ta, &
+                            dTo=tsg%f_now*tsf_f_to, dSo=tsg%f_now*tsf_f_so)
+    else
+        call domain_startup(dom, ts, bsl)
+    end if
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"
@@ -79,7 +107,16 @@ program yelmox
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        call yelmox_step(dom, ts, bsl)
+        if (tsf_active) then
+            ! Advance the forcing series every step (feedback methods need the
+            ! response-derivative window); response variable = ice volume [Gt].
+            fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
+            call tsgen_update(tsg, ts%time, var=fvar)
+            call yelmox_step(dom, ts, bsl, dTa=tsg%f_now*tsf_f_ta, &
+                             dTo=tsg%f_now*tsf_f_to, dSo=tsg%f_now*tsf_f_so)
+        else
+            call yelmox_step(dom, ts, bsl)
+        end if
 
         if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
             call domain_write_step(dom, trim(outfldr), ts%time)
