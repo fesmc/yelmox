@@ -11,8 +11,6 @@
             "bipolar-legacy"   : "libyelmox/bin/yelmox_bipolar-legacy.x",
             "esm"              : "libyelmox/bin/yelmox_esm.x",
             "esm-legacy"       : "libyelmox/bin/yelmox_esm-legacy.x",
-            "glaciers"         : "libyelmox/bin/yelmox_glaciers.x",
-            "glaciers-legacy"  : "libyelmox/bin/yelmox_glaciers-legacy.x",
             "ismip6"           : "libyelmox/bin/yelmox_ismip6-legacy.x",
             "ismip6-legacy"    : "libyelmox/bin/yelmox_ismip6-legacy.x",
             "nahosmip"         : "libyelmox/bin/yelmox_nahosmip-legacy.x",
