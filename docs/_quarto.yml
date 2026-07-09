@@ -14,6 +14,23 @@ website:
   navbar:
     background: primary
     search: true
+    left:
+      - text: "Home"
+        href: index.md
+      - text: "Flavors"
+        menu:
+          - text: "Overview"
+            href: flavors.md
+          - text: "yelmox (single-domain)"
+            href: flavor-yelmox.md
+          - text: "yelmox_bipolar"
+            href: flavor-bipolar.md
+          - text: "yelmox_esm"
+            href: flavor-esm.md
+          - text: "yelmox_rembo"
+            href: flavor-rembo.md
+      - text: "Multigrid design"
+        href: multigrid.md
 
 format:
   html:
