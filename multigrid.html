@@ -120,9 +120,51 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <span class="navbar-title">YelmoX</span>
     </a>
   </div>
-        <div class="quarto-navbar-tools tools-end">
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Flavors</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+        <li>
+    <a class="dropdown-item" href="./flavors.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-yelmox.html">
+ <span class="dropdown-text">yelmox (single-domain)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-bipolar.html">
+ <span class="dropdown-text">yelmox_bipolar</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-esm.html">
+ <span class="dropdown-text">yelmox_esm</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-rembo.html">
+ <span class="dropdown-text">yelmox_rembo</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link active" href="./multigrid.html" aria-current="page"> 
+<span class="menu-text">Multigrid design</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
 </div>
-          <div id="quarto-search" class="" title="Search"></div>
       </div> <!-- /container-fluid -->
     </nav>
 </header>
@@ -162,7 +204,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="multigrid-coupling-yelmox" class="level1">
 <h1>Multigrid coupling (<code>yelmox</code>)</h1>
-<p>Design doc for a multigrid rewrite of the yelmox driver. Status: <strong>implemented</strong> (<code>yelmox.f90</code> + <code>libs/yelmox_domain.f90</code>); single-domain parity with <code>yelmox.f90</code> validated, multi-domain (bipolar) runs, optimization + smb_simple + domain-specific startups ported. The bipolar driver (<code>yelmox_bipolar.f90</code>) also carries the full <code>yelmox_bipolar</code> ocean coupling: a shared barystatic sea level and a shared Ocean Box Model exchanging freshwater flux / ocean temperature between hemispheres (<code>yelmox_osm/obm_coupling.f90</code>). A third driver (<code>yelmox_esm.f90</code>) swaps snapclim for ESM climatic forcing (<code>libs/esm.f90</code>), running esm as a first-class component on its own grid (<code>grid_clim</code>) and remapping its outputs to the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy hi-res output (below).</p>
+<p>Design doc for a multigrid rewrite of the yelmox driver. Status: <strong>implemented</strong> (<code>yelmox.f90</code> + <code>libs/yelmox_domain.f90</code>); single-domain parity with <code>yelmox.f90</code> validated, multi-domain (bipolar) runs, optimization + smb_simple + domain-specific startups ported. The bipolar driver (<code>yelmox_bipolar.f90</code>) also carries the full <code>yelmox_bipolar</code> ocean coupling: a shared barystatic sea level and a shared Ocean Box Model exchanging freshwater flux / ocean temperature between hemispheres (<code>yelmox_bipolar/obm_coupling.f90</code>). A third driver (<code>yelmox_esm.f90</code>) swaps snapclim for ESM climatic forcing (<code>libs/esm.f90</code>), running esm as a first-class component on its own grid (<code>grid_clim</code>) and remapping its outputs to the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy hi-res output (below).</p>
 <section id="motivation" class="level2">
 <h2 class="anchored" data-anchor-id="motivation">Motivation</h2>
 <p>Today every helper module (<code>marine_shelf</code>, <code>snapclim</code>, <code>smbpal</code>, FastIsostasy) is initialized on, and operates on, the Yelmo grid. Fields are passed between modules as bare <code>(nx,ny)</code> 2D arrays shaped to that single grid. There is no inter-module remapping in the main loop — remapping (<code>map_class</code> from the <code>coords</code> library in fesm-utils) is used only for restart I/O.</p>
@@ -393,35 +435,45 @@ yelmox/yelmox.f90                        thin driver: init → time loop → I/O
 </section>
 <section id="drivers" class="level2">
 <h2 class="anchored" data-anchor-id="drivers">Drivers</h2>
-<p>Three thin programs share <code>yelmox_domain</code> (all per-domain physics/coupling lives there, so the drivers only differ in config parsing + the loop over domains):</p>
+<p>Three thin programs share <code>yelmox_domain</code> (all per-domain physics/coupling lives there, so the drivers only differ in config parsing + the loop over domains).</p>
+<p>Common driver plumbing also lives in <code>yelmox_domain</code>, so every flavor uses the same handful of calls:</p>
+<ul>
+<li><strong><code>timeline_init(ts, dtt, path_par, group [, time_ref, cal])</code></strong> — reads the run’s timeline group (<code>[ctrl]</code>, or the esm <code>run_step</code> group) and initializes the driver-owned timestepper. <code>domain_init</code> takes the same group name (<code>timeline_group</code>, default <code>"ctrl"</code>) and reads the values the domain logic needs (<code>tstep_method</code>, <code>dtt</code>) itself — nothing is injected after init.</li>
+<li><strong><code>domain_startup(dom, ts, bsl [, restore_bsl])</code></strong> — cold start (<code>domain_init_state</code>) or restart-bundle restore + hub rebuild. Single-domain drivers restore the shared bsl from the same bundle; multi-domain drivers restore it once via <strong><code>bsl_startup(bsl, ts, fldr)</code></strong> and pass <code>restore_bsl=.false.</code>. Flavors with their own cold start (esm, rembo) keep their cold branch and call this on the restart branch only.</li>
+<li><strong><code>run_restart_write(dom, bsl, time)</code></strong> — the single-domain restart bundle (domain sub-models + run-level <code>bsl_restart.nc</code>, one auto-named folder).</li>
+<li><strong><code>tstep_due(time, dt)</code></strong> — the shared cadence predicate (restart, <code>dt_clim</code>, CMIP output); <code>dt &lt;= 0</code> disables a cadence.</li>
+</ul>
+<p>The <code>[coupling&lt;suffix&gt;]</code> group is the single, complete description of a domain: every <code>domain_ctl</code> switch is a required key there (<code>with_ice_sheet</code>, <code>with_isostasy</code>, <code>with_climate</code>, <code>with_marine_shelf</code>, methods, cadences, per-component grids, restart, and the Greenland-specific startup switches – <code>use_negis=True</code> additionally loads a <code>[negis&lt;suffix&gt;]</code> group).</p>
 <ul>
 <li><p><strong><code>yelmox</code></strong> (single domain) — argument is one domain nml; one <code>ice_domain</code>, output to the run dir.</p></li>
 <li><p><strong><code>yelmox_bipolar</code></strong> (bipolar, in <code>yelmox_bipolar/</code>) — argument is a single parameter file holding both hemispheres, in the original <code>yelmox_bipolar</code> convention: each domain’s instance groups carry a hemisphere suffix (<code>yelmo_south</code>, <code>coupling_north</code>, <code>snap_south</code>, …), while <code>[ctrl]</code>, <code>[barysealevel]</code>, the <code>[nautilus]</code>/<code>[stommel]</code> OBM block and the yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared. <code>[ctrl] active_north</code>/<code>active_south</code> select the hemispheres (hardcoded <code>_north</code>/<code>_south</code> suffixes threaded into every <code>group=</code> via <code>domain_init(..., group_suffix=…)</code>). Distinct group names also let <code>runme -p group.name=val</code> target one hemisphere unambiguously. Each domain writes to a subfolder named after its domain; invoke with <code>runme -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml</code>.</p>
-<p>A bipolar run is never more than north + south, so the two domains are explicit variables, not an array — the ocean coupling is asymmetric (north ↔︎ <code>obm%fn/thetan/tn</code>, south ↔︎ <code>obm%fs/thetas/ts</code>). The driver owns the shared <code>bsl</code> and <code>obm</code>, breaks <code>yelmox_step</code> into its <code>step_*</code> primitives, and interleaves the OBM exactly as in <code>yelmox_bipolar</code> (below). The ocean exchanges live in <code>yelmox_osm/obm_coupling.f90</code>; they and the OBM default off (<code>[ctrl] active_obm=False</code>), so the config runs as two independent domains until enabled.</p></li>
+<p>A bipolar run is never more than north + south, so the two domains are explicit variables, not an array — the ocean coupling is asymmetric (north ↔︎ <code>obm%fn/thetan/tn</code>, south ↔︎ <code>obm%fs/thetas/ts</code>). The driver owns the shared <code>bsl</code> and <code>obm</code>, breaks <code>yelmox_step</code> into its <code>step_*</code> primitives, and interleaves the OBM exactly as in <code>yelmox_bipolar</code> (below). The ocean coupling is fully contained in <code>yelmox_bipolar/obm_coupling.f90</code>: the module owns its control (<code>obm_coupling_ctl</code>: exchange switches, freshwater-flux masks, nautilus hysteresis forcing; <code>obm_ctl_load</code> + <code>obm_masks_init</code>) and exposes one <code>obm_exchange</code> call per step. It and the OBM default off (<code>[ctrl] active_obm=False</code>), so the config runs as two independent domains until enabled.</p></li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">program</span> yelmox_bipolar</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> yelmox_domain</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> obm, <span class="kw">only</span> : obm_update</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> obm_coupling</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(ice_domain)</span> <span class="dt">::</span> dom_north, dom_south</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(bsl_class)</span>  <span class="dt">::</span> bsl        <span class="co">! shared, driver-owned</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(obm_class)</span>  <span class="dt">::</span> obm        <span class="co">! shared, driver-owned</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">! read one file -&gt; shared timeline + active_north/active_south</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> (active_north) <span class="kw">call</span> domain_init(dom_north, path_par, ..., group_suffix<span class="kw">=</span><span class="st">"_north"</span>)</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> (active_south) <span class="kw">call</span> domain_init(dom_south, path_par, ..., group_suffix<span class="kw">=</span><span class="st">"_south"</span>)</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">do</span> <span class="kw">while</span> (time <span class="op">&lt;</span> time_<span class="kw">end</span>)</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> bsl_update(bsl, ...)                          <span class="co">! once, shared</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> advance_isostasy(dom_north); <span class="kw">call</span> advance_isostasy(dom_south)</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> (active_obm) <span class="kw">call</span> obm_update(obm, dtt, obm_name)</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> advance_dynamics(dom_north); <span class="kw">call</span> advance_dynamics(dom_south)</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>        <span class="co">! ocean coupling (per hemisphere): atm2obm, ism2obm (fwf), hyster, obm2ism</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf(dom_north, ...); <span class="kw">call</span> step_marine_shelf(dom_south, ...)</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>        <span class="co">! per-domain output/restart (subfolder each) + shared bsl/obm restart</span></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>        time <span class="kw">=</span> time <span class="kw">+</span> dtt</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end do</span></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="kw">end program</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(ice_domain)</span>       <span class="dt">::</span> dom_north, dom_south</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(bsl_class)</span>        <span class="dt">::</span> bsl      <span class="co">! shared, driver-owned</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(obm_class)</span>        <span class="dt">::</span> obm      <span class="co">! shared, driver-owned</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(obm_coupling_ctl)</span> <span class="dt">::</span> oc       <span class="co">! obm_coupling's own control</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> timeline_init(ts, dtt, path_par, <span class="st">"ctrl"</span>)          <span class="co">! shared timeline</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> obm_ctl_load(oc, path_par)                        <span class="co">! [ctrl] exchange switches</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> bsl_startup(bsl, ts, restart_bsl)                 <span class="co">! run-level bsl restore</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">! per domain: domain_init(group_suffix) + domain_startup(restore_bsl=.false.)</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> obm_masks_init(oc, dom_north, dom_south, active_north, active_south)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">do</span> <span class="kw">while</span> (<span class="op">.not.</span> ts<span class="op">%</span>is_finished)</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> bsl_update(bsl, ts<span class="op">%</span>time_rel)                  <span class="co">! once, shared</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> advance_isostasy(dom_north); <span class="kw">call</span> advance_isostasy(dom_south)</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> (oc<span class="op">%</span>active_obm) <span class="kw">call</span> obm_update(obm, dtt, oc<span class="op">%</span>obm_name)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> advance_dynamics(dom_north); <span class="kw">call</span> advance_dynamics(dom_south)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> obm_exchange(oc, obm, dom_north, dom_south, ...)   <span class="co">! atm2obm, fwf, hyster, obm2ism</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf(dom_north, ...); <span class="kw">call</span> step_marine_shelf(dom_south, ...)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        <span class="co">! per-domain output/restart (subfolder each) + shared bsl/obm restart</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end do</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="kw">end program</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li><strong><code>yelmox_esm</code></strong> (single domain, in <code>yelmox_esm/</code>) — ESM climatic forcing in place of snapclim. Reuses <code>domain_init</code> (with <code>init_climate=.false.</code>, so snapclim is skipped) plus the shared <code>step_optimize/step_isostasy/step_icesheet/ refresh_htopo</code> primitives and the restart bundle, but the driver owns an <code>esm_forcing_class</code> and calls its own <code>step_climate_esm</code> / <code>step_marine_shelf_esm</code> (contained in the program) instead of the snapclim-based steps. esm is a first-class multigrid component: it runs entirely on its own grid (<em>esm grid</em> = <code>grid_clim</code>, exactly like snapclim), and each output is remapped to the consumer module’s grid at coupling time — atmosphere to <code>grid_smb</code> (smbpal), the depth-interpolated ocean forcing to <code>grid_mshlf</code> (marine_shelf). This works because <code>marshelf_interp_shelf</code> reads only <code>mshlf%par</code> (grid-agnostic), so the ESM ocean interpolation runs on <code>grid_clim</code> and the resulting <code>T_shlf</code>/<code>S_shlf</code> are remapped to <code>grid_mshlf</code> before <code>marshelf_update</code>; <code>esm.f90</code> is untouched. Geometry comes from the hub, remapped to whichever grid a step needs; SMB / ocean BCs aggregate back to Yelmo. With <code>grid_clim == grid_smb == grid_mshlf == grid_name == grid_yelmo</code> every remap is an identity copy, reproducing <code>yelmox_esm.f90</code>; set <code>grid_clim</code> to a coarse ESM grid and it genuinely fans out. Config splits ESM-specific control ([esm] + the run_step group [spinup]/[transient]: <code>time_ref/hist/proj/esm_ref</code>, <code>use_*</code>, CMIP output) from the shared mg groups ([coupling]/[output]/[htopo]). Output (incl.&nbsp;the CMIP-formatted files) is kept identical to <code>yelmox_esm.f90</code> via the <code>yelmox_esm_output</code> module (in the same folder). Invoke with <code>runme -e esm -n yelmox_esm/yelmox_esm_Antarctica.nml</code>.</li>
 </ul>
@@ -433,18 +485,23 @@ yelmox/yelmox.f90                        thin driver: init → time loop → I/O
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(bsl_class)</span>         <span class="dt">::</span> bsl    <span class="co">! shared, driver-owned</span></span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(esm_forcing_class)</span> <span class="dt">::</span> esm    <span class="co">! driver-owned climate (replaces snapclim)</span></span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> domain_init(dom, path_par, ts<span class="op">%</span>time, init_climate<span class="kw">=</span><span class="cn">.false.</span>)   <span class="co">! skip snapclim</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> esm_forcing_init(esm, ..., grid_name<span class="kw">=</span>dom<span class="op">%</span>ctl<span class="op">%</span>grid_clim)      <span class="co">! on esm's own grid</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">do</span> <span class="kw">while</span> (<span class="op">.not.</span> ts<span class="op">%</span>is_finished)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> bsl_update(bsl, ...)                       <span class="co">! once, shared</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_optimize(dom, ts); <span class="kw">call</span> step_isostasy(dom, ts, bsl)</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_icesheet(dom, ts); <span class="kw">call</span> refresh_htopo(dom)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_climate_esm(dom, esm, ec, ts)         <span class="co">! esm + smbpal (contained)</span></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf_esm(dom, esm, ec, ts)    <span class="co">! esm ocean BCs (contained)</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        <span class="co">! output (yelmo2D / yelmo1D_esm / CMIP) + restart bundle + shared bsl</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end do</span></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="kw">end program</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> esm_ctl_load(ec, esm, path_par)      <span class="co">! [ctrl] run_step + [esm] + [run_step]</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> timeline_init(ts, ec<span class="op">%</span>dtt, path_par, <span class="fu">trim</span>(ec<span class="op">%</span>run_step), <span class="kw">&amp;</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>                       time_ref<span class="kw">=</span><span class="fl">2000.0_wp</span>, cal<span class="kw">=</span><span class="cn">.true.</span>)   <span class="co">! per-phase timeline</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> domain_init(dom, path_par, ts<span class="op">%</span>time, init_climate<span class="kw">=</span><span class="cn">.false.</span>, <span class="kw">&amp;</span>   <span class="co">! skip snapclim</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                     timeline_group<span class="kw">=</span><span class="fu">trim</span>(ec<span class="op">%</span>run_step))</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> esm_forcing_init(esm, ..., grid_name<span class="kw">=</span>dom<span class="op">%</span>ctl<span class="op">%</span>grid_clim)      <span class="co">! on esm's own grid</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">! cold: esm_cold_start (contained); restart: domain_startup + re-forcing</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">do</span> <span class="kw">while</span> (<span class="op">.not.</span> ts<span class="op">%</span>is_finished)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> bsl_update(bsl, ...)                       <span class="co">! once, shared</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_optimize(dom, ts); <span class="kw">call</span> step_isostasy(dom, ts, bsl)</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_icesheet(dom, ts); <span class="kw">call</span> refresh_htopo(dom)</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_climate_esm(dom, esm, ec, ts)         <span class="co">! esm + smbpal (contained)</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf_esm(dom, esm, ec, ts)    <span class="co">! esm ocean BCs (contained)</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        <span class="co">! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on tstep_due</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end do</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="kw">end program</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="integration-gaps-to-resolve-during-the-build" class="level2">
 <h2 class="anchored" data-anchor-id="integration-gaps-to-resolve-during-the-build">Integration gaps to resolve during the build</h2>

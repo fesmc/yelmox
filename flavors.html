@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>configme-install-details – YelmoX</title>
+<title>Program flavors – YelmoX</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -22,41 +22,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -177,67 +142,97 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#what-configme-install-yelmox-does" id="toc-what-configme-install-yelmox-does" class="nav-link active" data-scroll-target="#what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</a></li>
+  <li><a href="#the-flavors" id="toc-the-flavors" class="nav-link active" data-scroll-target="#the-flavors">The flavors</a></li>
+  <li><a href="#shared-coupling-primitives" id="toc-shared-coupling-primitives" class="nav-link" data-scroll-target="#shared-coupling-primitives">Shared coupling primitives</a></li>
+  <li><a href="#initialization-ordering-applies-to-all-flavors" id="toc-initialization-ordering-applies-to-all-flavors" class="nav-link" data-scroll-target="#initialization-ordering-applies-to-all-flavors">Initialization ordering (applies to all flavors)</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/configme-install-details.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/flavors.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Program flavors</h1>
+</div>
 
 
 
+<div class="quarto-title-meta">
 
-<section id="what-configme-install-yelmox-does" class="level1">
-<h1>What <code>configme install yelmox</code> does</h1>
-<p>This page is for context only. The recommended way to install YelmoX is to run <code>configme install yelmox</code> (see the <a href="./index.html#quick-start">Quick start</a>); you do <strong>not</strong> need to run any of the commands below by hand. They are reproduced here so you can see exactly what <code>configme</code> clones, configures, links, and builds on your behalf.</p>
-<p><code>configme install</code> performs the following phases:</p>
-<ol type="1">
-<li><strong>Clone</strong> the YelmoX checkout and each component repository it needs (<code>fesm-utils</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>).</li>
-<li><strong>Manifest</strong> — write <code>.configme/manifest.toml</code> so the checkout is self-describing regardless of its directory name.</li>
-<li><strong>Link</strong> each component into the directories where the build expects it.</li>
-<li><strong>Configure</strong> — generate a system-specific <code>Makefile</code> for every package from shared machine/compiler fragments, with the netCDF paths detected automatically.</li>
-<li><strong>Build</strong> <code>fesm-utils</code> (LIS + FFTW + utils). This is the slow step (~10-30 min), which is why it is folded into the install rather than run separately.</li>
-<li><strong>Extras</strong> — install <code>runme</code> if it is missing, create <code>.runme_config</code>, and link the external data paths (<code>ice_data</code>, <code>isostasy_data</code>).</li>
-</ol>
-<p>Each run also writes the exact commands it executed to a <code>.install.sh</code> script in the checkout, so any install is reproducible. The script below is the equivalent for the <code>dkrz_levante</code> machine with the <code>ifx</code> compiler; substitute your own machine and compiler, and note that the netCDF paths (<code>NC_FROOT</code> / <code>NC_CROOT</code>) and the install root are filled in automatically for your system.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/usr/bin/env bash</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Generated by `configme install` — reproduces this install.</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="at">-euo</span> pipefail</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># target=yelmox  machine=dkrz_levante  compiler=ifx</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># --- clone ---</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/yelmox.git <span class="va">$YELMOXROOT</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/fesm-utils.git <span class="va">$YELMOXROOT</span>/fesm-utils</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/yelmo.git <span class="va">$YELMOXROOT</span>/yelmo</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:palma-ice/FastIsostasy.git <span class="va">$YELMOXROOT</span>/FastIsostasy</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:alex-robinson/rembo1.git <span class="va">$YELMOXROOT</span>/rembo1</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># --- manifest ---</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> <span class="va">$YELMOXROOT</span>/.configme  <span class="co"># write .configme/manifest.toml</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- links ---</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">ln</span> <span class="at">-s</span> ../fesm-utils <span class="va">$YELMOXROOT</span>/yelmo/fesm-utils</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="fu">ln</span> <span class="at">-s</span> ../fesm-utils <span class="va">$YELMOXROOT</span>/FastIsostasy/fesm-utils</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="fu">ln</span> <span class="at">-s</span> ../fesm-utils <span class="va">$YELMOXROOT</span>/rembo1/fesm-utils</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co"># --- configure (per package) ---</span></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="co"># fesm-utils: build with autotools (slow, ~10-30 min):</span></span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/fesm-utils <span class="kw">&amp;&amp;</span> <span class="va">NC_FROOT</span><span class="op">=&lt;</span>auto-detected<span class="op">&gt;</span> NC_CROOT=<span class="op">&lt;</span>auto-detected<span class="op">&gt;</span> ./build.py <span class="ex">--variant</span> both <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx<span class="kw">)</span></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/fesm-utils/utils <span class="kw">&amp;&amp;</span> <span class="ex">configme</span> config fesm-utils/utils <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx<span class="kw">)</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co"># fesm-utils/utils: build (serial, omp):</span></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/fesm-utils/utils <span class="kw">&amp;&amp;</span> <span class="fu">make</span> openmp=0 fesmutils-static<span class="kw">)</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/fesm-utils/utils <span class="kw">&amp;&amp;</span> <span class="fu">make</span> openmp=1 fesmutils-static<span class="kw">)</span></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/yelmo <span class="kw">&amp;&amp;</span> <span class="ex">configme</span> config yelmo <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx<span class="kw">)</span></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/FastIsostasy <span class="kw">&amp;&amp;</span> <span class="ex">configme</span> config FastIsostasy <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx<span class="kw">)</span></span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span>/rembo1 <span class="kw">&amp;&amp;</span> <span class="ex">configme</span> config rembo1 <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx<span class="kw">)</span></span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="kw">(</span><span class="bu">cd</span> <span class="va">$YELMOXROOT</span> <span class="kw">&amp;&amp;</span> <span class="ex">configme</span> config yelmox <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx<span class="kw">)</span></span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="co"># --- extras ---</span></span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="bu">command</span> <span class="at">-v</span> runme <span class="op">&gt;</span>/dev/null <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">||</span> <span class="ex">pip</span> install git+https://github.com/fesmc/runme</span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="co"># runme_config: create .runme_config and set hpc/account</span></span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">--config</span>  <span class="co"># or: cp .runme/runme_config .runme_config</span></span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="co"># data_link ice_data: ln -s &lt;path&gt; ice_data</span></span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="co"># data_link isostasy_data: ln -s &lt;path&gt; isostasy_data</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>YelmoX ships several <strong>driver programs</strong> (“flavors”), each a <code>program</code> that wires Yelmo together with a different set of forcing/coupling components. All of the modern (multigrid) flavors are built on the shared <code>ice_domain</code> type and the <code>step_*</code> coupling primitives in <a href="https://github.com/fesmc/yelmox/blob/main/libs/yelmox_domain.f90"><code>libs/yelmox_domain.f90</code></a>; they differ in <strong>which components are active</strong> and in <strong>how the per-step coupling sequence is assembled</strong>.</p>
+<p>See <a href="./multigrid.html">Multigrid coupling</a> for the design of the shared <code>ice_domain</code> core that these drivers reuse.</p>
+<section id="the-flavors" class="level2">
+<h2 class="anchored" data-anchor-id="the-flavors">The flavors</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Flavor</th>
+<th>Build</th>
+<th>Climate / SMB</th>
+<th>Ocean</th>
+<th>Distinctive feature</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="./flavor-yelmox.html"><code>yelmox</code></a></td>
+<td><code>make yelmox</code></td>
+<td>snapclim + smbpal</td>
+<td>snapclim</td>
+<td>Single domain; canonical driver. Transient time-series forcing (<code>tsgen</code>).</td>
+</tr>
+<tr class="even">
+<td><a href="./flavor-bipolar.html"><code>yelmox_bipolar</code></a></td>
+<td><code>make yelmox_bipolar</code></td>
+<td>snapclim + smbpal (×2)</td>
+<td>snapclim + shared OBM</td>
+<td>Two hemispheres, shared sea level + Ocean Box Model.</td>
+</tr>
+<tr class="odd">
+<td><a href="./flavor-esm.html"><code>yelmox_esm</code></a></td>
+<td><code>make yelmox_esm</code></td>
+<td>ESM forcing (<code>libs/esm.f90</code>)</td>
+<td>ESM</td>
+<td>Earth-System-Model forcing replaces snapclim; calendar timeline.</td>
+</tr>
+<tr class="even">
+<td><a href="./flavor-rembo.html"><code>yelmox_rembo</code></a></td>
+<td><code>make yelmox_rembo</code></td>
+<td>REMBOv1</td>
+<td>snapclim</td>
+<td>REMBO energy/moisture-balance atmosphere + SMB.</td>
+</tr>
+</tbody>
+</table>
+<p>Legacy single-grid originals live under each flavor’s <code>legacy/</code> folder and build with <code>make &lt;flavor&gt;-legacy</code>. Flavors not yet ported to the multigrid driver (<code>yelmox_ismip6</code>, <code>yelmox_nahosmip</code>, <code>yelmox_rtip</code>) are legacy-only.</p>
+</section>
+<section id="shared-coupling-primitives" class="level2">
+<h2 class="anchored" data-anchor-id="shared-coupling-primitives">Shared coupling primitives</h2>
+<p>Every modern flavor advances the model by calling these primitives (from <code>yelmox_domain</code>), in a flavor-specific order:</p>
+<ul>
+<li><code>step_optimize</code> — spinup relaxation + basal-friction / thermal-forcing tuning.</li>
+<li><code>step_isostasy</code> — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (<code>bsl</code>).</li>
+<li><code>step_icesheet</code> — assemble the Yelmo boundary state (couplers) and run <code>yelmo_update</code>.</li>
+<li><code>refresh_htopo</code> — mirror the prognostic geometry into the hi-res reference hub.</li>
+<li><code>step_climate</code> — climate on <code>grid_clim</code> + SMB on <code>grid_smb</code> (snapclim/smbpal).</li>
+<li><code>step_marine_shelf</code> — sub-shelf melt on <code>grid_mshlf</code>.</li>
+</ul>
+<p>The single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a> wraps these in <code>yelmox_step</code>; the other drivers call the primitives directly so they can interleave extra steps (a second domain, an ocean box model, an ESM/REMBO climate step).</p>
+</section>
+<section id="initialization-ordering-applies-to-all-flavors" class="level2">
+<h2 class="anchored" data-anchor-id="initialization-ordering-applies-to-all-flavors">Initialization ordering (applies to all flavors)</h2>
+<p>On cold start, the Yelmo applied mass-balance diagnostics (<code>smb</code>, <code>bmb</code>, <code>fmb</code>) are populated at the initial time so the first output snapshot reflects the coupled boundary forcing rather than zeros. This is handled inside Yelmo: when the topography solver runs without advancing the ice (<code>pc_step="none"</code> at init, or any <code>topo_fixed</code> step), it diagnoses the applied mass balance from the current boundary forcing (<code>calc_ytopo_mb_diagnostic</code>). <code>mb_net</code> remains zero at <code>t=0</code> (nothing is applied), which is expected.</p>
 
 
 </section>
@@ -653,4 +648,4 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/configme-install-details.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/flavors.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
