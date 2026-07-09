@@ -21,7 +21,6 @@
 | 17 | cmb_grnd          | xc, yc      | m/yr        | Grounded calving rate                              |
 | 18 | z_srf             | xc, yc      | m           | Surface elevation                                  |
 | 19 | dzsdt             | xc, yc      | m/yr        | Surface elevation rate of change                   |
-| 20 | mask_adv          | xc, yc      |             | Advection mask                                     |
 | 21 | eps_eff           | xc, yc      | 1/yr        | Effective strain rate                              |
 | 22 | tau_eff           | xc, yc      | Pa          | Effective stress                                   |
 | 23 | z_base            | xc, yc      | m           | Ice-base elevation                                 |
@@ -48,7 +47,7 @@
 | 44 | mask_bed          | xc, yc      |             | Multi-valued bed mask                              |
 | 45 | mask_grz          | xc, yc      |             | Multi-valued grounding-line zone mask              |
 | 46 | mask_frnt         | xc, yc      |             | Multi-valued ice front mask                        |
-| 47 | dHidt_dyn_n       | xc, yc      | m/yr        | Ice thickness change due to advection (previous)   |
+| 47 | dHidt_dyn_raw_n   | xc, yc      | m/yr        | Ice thickness change due to advection (previous)   |
 | 48 | H_ice_n           | xc, yc      | m           | Ice thickness from previous timestep               |
 | 49 | z_srf_n           | xc, yc      | m           | Surface elevation from previous timestep           |
 | 50 | H_ice_dyn         | xc, yc      | m           | Dynamic ice thickness                              |
