@@ -373,6 +373,7 @@
     f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
     f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
     f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
+    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
 /
 
 &tsgen
