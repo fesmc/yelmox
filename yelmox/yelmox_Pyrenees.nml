@@ -49,10 +49,12 @@
     name_z_bed   = "z_bed"
     name_H_ice   = "H_ice"
     name_z_srf   = "z_srf"
-    ! No basins field for this domain; point at REGIONS as an inert stand-in
-    ! (basins are consumed only by marine_shelf, which is off here).
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_basins  = "mask"
+    ! No basins field for this domain (basins are consumed only by marine_shelf,
+    ! which is off here); skip the load and default basins to 1.0.
+    basins_load  = False
+    basins_path  = "none"
+    name_basins  = "basin"
+    regions_load = True
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     name_regions = "mask"
 /

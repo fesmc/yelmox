@@ -295,8 +295,10 @@ grid_name`):
     grid_name    = "ANT-16KM"
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     name_z_bed   = "z_bed"   name_H_ice = "H_ice"   name_z_srf = "z_srf"
+    basins_load  = True
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
     name_basins  = "basin"
+    regions_load = True
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     name_regions = "mask"
 /
@@ -304,7 +306,9 @@ grid_name`):
 
 `htopo_init` resolves the grid from `grid_<name>.txt` (the disk grid table) and
 reads the fields onto it — validated by `tests/test_htopo.f90` against the real
-ANT-16KM data.
+ANT-16KM data. Set `basins_load`/`regions_load = False` (mirroring Yelmo core's
+`[yelmo_masks]`) when a domain has no mask file — e.g. paleo domains; the field
+defaults to `1.0` (single region/basin) and the path is left unread.
 
 ### Buffers
 

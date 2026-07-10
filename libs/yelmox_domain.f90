@@ -50,6 +50,21 @@ module yelmox_domain
 
     character(len=*), parameter :: MAP_FLDR = "maps"
 
+    ! Default Yelmo 2D output variable sets. Public so a driver can reuse or
+    ! extend them per context without editing the write routines, e.g.
+    !   call domain_write_step(dom, outfldr, time, nms=[YELMO_VARS_2D, "my_var"])
+    ! Any name valid for yelmo_write_var may be added. The heavy set adds
+    ! bmb_shlf (coupled shelf melt) to the Yelmo default set.
+    character(len=56), parameter :: YELMO_VARS_2D(23) = [ character(len=56) :: &
+        "H_ice","z_srf","z_bed","mask_bed","uxy_b","uxy_s","uxy_bar", &
+        "ux_bar","uy_bar","cb_ref","N_eff","beta","taub","taud","visc_bar", &
+        "T_prime_b","hyd_W_til","mb_net","smb","bmb","cmb","z_sl","bmb_shlf" ]
+
+    ! Small set: the minimal fields for frequent monitoring (yelmo_sm.nc).
+    character(len=56), parameter :: YELMO_VARS_2D_SM(10) = [ character(len=56) :: &
+        "H_ice","z_srf","z_bed","mask_bed","uxy_s","smb","bmb","z_sl", &
+        "hyd_W_til","T_prime_b" ]
+
     type domain_ctl
         ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
         character(len=512) :: path_par = ""
@@ -132,6 +147,8 @@ module yelmox_domain
     public :: domain_startup, bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
+    public :: domain_write_init_sm, domain_write_step_sm
+    public :: YELMO_VARS_2D, YELMO_VARS_2D_SM
     public :: step_isostasy, step_icesheet, step_climate, refresh_htopo, step_marine_shelf
     public :: step_optimize, domain_update_smb
     public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
@@ -530,13 +547,13 @@ contains
 
         end select
 
-        ! Rename the regional 1D files to the climber-x timeseries convention:
-        !   global -> yelmo_<grid>_ts.nc, sub-region k -> yelmo_<grid>_ts_<name>.nc
-        dom%yelmo%reg%fnm = trim(outfldr)//"yelmo_"//trim(grid_name)//"_ts.nc"
+        ! Name the regional 1D files (no grid suffix; grid is recorded in-file):
+        !   global -> yelmo_ts.nc, sub-region k -> yelmo_ts_<name>.nc
+        dom%yelmo%reg%fnm = trim(outfldr)//"yelmo_ts.nc"
         if (dom%yelmo%par%n_reg > 0) then
             do i = 1, dom%yelmo%par%n_reg
-                dom%yelmo%regs(i)%fnm = trim(outfldr)//"yelmo_"//trim(grid_name)// &
-                                        "_ts_"//trim(dom%yelmo%regs(i)%name)//".nc"
+                dom%yelmo%regs(i)%fnm = trim(outfldr)//"yelmo_ts_"// &
+                                        trim(dom%yelmo%regs(i)%name)//".nc"
             end do
         end if
 
@@ -1367,13 +1384,14 @@ contains
                 z_sl_m, dx=dom%ctl%dx_mshlf)
     end subroutine step_marine_shelf
 
-    ! ----- output (climber-x convention: one file per module, on its own grid,
-    !        named <module>_<grid>.nc; 1D timeseries as <module>_<grid>_ts.nc) ---
+    ! ----- output (one file per module, each on its own grid; the grid is
+    !        recorded inside the file, so names carry no grid suffix: 2D as
+    !        <module>.nc, 1D timeseries as <module>_ts.nc) ---
 
-    function io_fname(outfldr, base, grid) result(fnm)
-        character(len=*), intent(in) :: outfldr, base, grid
+    function io_fname(outfldr, base) result(fnm)
+        character(len=*), intent(in) :: outfldr, base
         character(len=512) :: fnm
-        fnm = trim(outfldr)//trim(base)//"_"//trim(grid)//".nc"
+        fnm = trim(outfldr)//trim(base)//".nc"
     end function io_fname
 
     subroutine domain_write_init(dom, outfldr, time)
@@ -1383,47 +1401,87 @@ contains
         real(wp),         intent(in)    :: time
 
         if (dom%ctl%write_yelmo) &
-            call yelmo_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo",dom%ctl%grid_yelmo)), &
+            call yelmo_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo")), &
                                   time_init=time, units="years")
         if (dom%ctl%write_htopo) &
-            call htopo_write_init(dom%topo, trim(io_fname(outfldr,"htopo",dom%ctl%grid_name)), time_init=time)
+            call htopo_write_init(dom%topo, trim(io_fname(outfldr,"htopo")), time_init=time)
         if (dom%ctl%write_isos) &
-            call io_dims_init(trim(io_fname(outfldr,"isos",dom%ctl%grid_isos)),  dom%ctl%grid_isos,  time)
+            call io_dims_init(trim(io_fname(outfldr,"isos")),   dom%ctl%grid_isos,  time)
         if (dom%ctl%write_mshlf) &
-            call io_dims_init(trim(io_fname(outfldr,"mshlf",dom%ctl%grid_mshlf)), dom%ctl%grid_mshlf, time)
+            call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_mshlf, time)
         if (dom%ctl%write_smb) &
-            call io_dims_init(trim(io_fname(outfldr,"smbpal",dom%ctl%grid_smb)),  dom%ctl%grid_smb,   time)
+            call io_dims_init(trim(io_fname(outfldr,"smbpal")), dom%ctl%grid_smb,   time)
         if (dom%ctl%write_snap) &
-            call io_dims_init(trim(io_fname(outfldr,"snap",dom%ctl%grid_clim)),   dom%ctl%grid_clim,  time)
+            call io_dims_init(trim(io_fname(outfldr,"snap")),   dom%ctl%grid_clim,  time)
     end subroutine domain_write_init
 
-    subroutine domain_write_step(dom, outfldr, time)
-        ! Append one time record to each enabled per-module 2D output file.
+    subroutine domain_write_step(dom, outfldr, time, nms)
+        ! Append one time record to each enabled per-module 2D output file. The
+        ! Yelmo 2D variable set defaults to YELMO_VARS_2D; pass `nms` to override
+        ! or extend it for a specific context (see YELMO_VARS_2D above).
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: outfldr
+        real(wp),         intent(in)    :: time
+        character(len=*), intent(in), optional :: nms(:)
+
+        character(len=56), allocatable :: yvars(:)
+
+        if (present(nms)) then
+            yvars = nms
+        else
+            yvars = YELMO_VARS_2D
+        end if
+
+        if (dom%ctl%write_yelmo) &
+            call yelmo_write_step(dom%yelmo, trim(io_fname(outfldr,"yelmo")), &
+                                  time, nms=yvars, compare_pd=.FALSE.)
+        if (dom%ctl%write_htopo) &
+            call htopo_write_step(dom%topo, trim(io_fname(outfldr,"htopo")), time)
+        if (dom%ctl%write_isos) &
+            call isos_write_step(dom%isos, trim(io_fname(outfldr,"isos")), time)
+        if (dom%ctl%write_mshlf) &
+            call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf")), time)
+        if (dom%ctl%write_smb) &
+            call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
+        if (dom%ctl%write_snap) &
+            call snap_write_step(dom%snp, trim(io_fname(outfldr,"snap")), time)
+    end subroutine domain_write_step
+
+    subroutine domain_write_init_sm(dom, outfldr, time)
+        ! Create the small Yelmo 2D output file (yelmo_sm.nc): a reduced field set
+        ! for frequent monitoring, written on the sm cadence (tm_2Dsm). Same grid
+        ! and file conventions as the heavy yelmo.nc.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
 
-        ! Yelmo 2D fields: the yelmo_write_step default set + bmb_shlf, the
-        ! coupled shelf melt (yelmo%bnd%bmb_shlf) aggregated onto the Yelmo grid.
-        character(len=56), parameter :: yelmo_vars(23) = [ character(len=56) :: &
-            "H_ice","z_srf","z_bed","mask_bed","uxy_b","uxy_s","uxy_bar", &
-            "ux_bar","uy_bar","cb_ref","N_eff","beta","taub","taud","visc_bar", &
-            "T_prime_b","hyd_W_til","mb_net","smb","bmb","cmb","z_sl","bmb_shlf" ]
+        if (dom%ctl%write_yelmo) &
+            call yelmo_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo_sm")), &
+                                  time_init=time, units="years")
+    end subroutine domain_write_init_sm
+
+    subroutine domain_write_step_sm(dom, outfldr, time, nms)
+        ! Append one record to yelmo_sm.nc: the core geometry/velocity plus basal
+        ! hydrology and temperature -- the minimal set needed to watch a run at a
+        ! higher cadence than the heavy yelmo.nc. The variable set defaults to
+        ! YELMO_VARS_2D_SM; pass `nms` to override or extend it for a context.
+        type(ice_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: outfldr
+        real(wp),         intent(in)    :: time
+        character(len=*), intent(in), optional :: nms(:)
+
+        character(len=56), allocatable :: yvars(:)
+
+        if (present(nms)) then
+            yvars = nms
+        else
+            yvars = YELMO_VARS_2D_SM
+        end if
 
         if (dom%ctl%write_yelmo) &
-            call yelmo_write_step(dom%yelmo, trim(io_fname(outfldr,"yelmo",dom%ctl%grid_yelmo)), &
-                                  time, nms=yelmo_vars, compare_pd=.FALSE.)
-        if (dom%ctl%write_htopo) &
-            call htopo_write_step(dom%topo, trim(io_fname(outfldr,"htopo",dom%ctl%grid_name)), time)
-        if (dom%ctl%write_isos) &
-            call isos_write_step(dom%isos, trim(io_fname(outfldr,"isos",dom%ctl%grid_isos)), time)
-        if (dom%ctl%write_mshlf) &
-            call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf",dom%ctl%grid_mshlf)), time)
-        if (dom%ctl%write_smb) &
-            call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal",dom%ctl%grid_smb)), time)
-        if (dom%ctl%write_snap) &
-            call snap_write_step(dom%snp, trim(io_fname(outfldr,"snap",dom%ctl%grid_clim)), time)
-    end subroutine domain_write_step
+            call yelmo_write_step(dom%yelmo, trim(io_fname(outfldr,"yelmo_sm")), &
+                                  time, nms=yvars, compare_pd=.FALSE.)
+    end subroutine domain_write_step_sm
 
     subroutine domain_write_1D(dom, outfldr, time, init)
         ! Write 1D timeseries: Yelmo regional aggregates + isostasy diagnostics.
@@ -1447,7 +1505,7 @@ contains
         end if
 
         if (dom%ctl%write_isos) then
-            fnm_isos = trim(outfldr)//"isos_"//trim(dom%ctl%grid_isos)//"_ts.nc"
+            fnm_isos = trim(outfldr)//"isos_ts.nc"
             if (is_init) call isos_write_1D_init(trim(fnm_isos), time)
             call isos_write_1D_step(dom%isos, trim(fnm_isos), time)
         end if

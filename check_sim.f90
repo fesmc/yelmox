@@ -1,5 +1,11 @@
-program check_sim 
+program check_sim
     ! for D in tmp/yelmo991/ant-pd-ens1/* ; do ./check_sim.x $D ; done
+    !
+    ! NOTE: reads the LEGACY output file "yelmo2D.nc" and its PD/isochrone metrics
+    ! (rmse_H, rmse_uxy, rmse_uxy_log, H_ice_pd_err, rmse_iso), as written by the
+    ! legacy driver (yelmox-legacy.x, yelmo_write_step_pd_metrics). The multigrid
+    ! flavors write "yelmo.nc" without these metrics (compare_pd=.FALSE.), so this
+    ! tool is intentionally paired with legacy runs -- do NOT rename to yelmo.nc.
 
     use ncio 
 

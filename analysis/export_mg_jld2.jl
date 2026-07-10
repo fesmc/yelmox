@@ -41,8 +41,8 @@ MAP_VARS = ["H_ice", "z_srf", "z_bed", "uxy_s", "uxy_b", "uxy_bar",
 TS_VARS  = ["time", "V_ice", "V_sle", "V_ice_g", "V_ice_f", "A_ice", "A_ice_g",
             "A_ice_f", "z_srf", "uxy_s", "uxy_s_g", "bmb_shlf", "smb", "dVidt"]
 
-yelmo2d(root, r) = joinpath(root, r.name, "yelmo_$(r.ygrid).nc")
-yelmots(root, r) = joinpath(root, r.name, "yelmo_$(r.ygrid)_ts.nc")
+yelmo2d(root, r) = joinpath(root, r.name, "yelmo.nc")
+yelmots(root, r) = joinpath(root, r.name, "yelmo_ts.nc")
 
 # Locate the ice_data tree. Each run dir carries an `ice_data` symlink; fall back
 # to a cwd / repo-root copy. Returns "" if none found.

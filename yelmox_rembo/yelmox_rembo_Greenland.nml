@@ -9,7 +9,6 @@
     dtt             = 10.0              ! [yr] Main loop timestep
     write_restart   = True              ! Write restart bundles
     use_hyster      = False             ! Use hysteresis module?
-    write_ocn_forcing = False           ! Write ocean-forcing fields to the small file
     f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
     f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
 /
@@ -45,8 +44,10 @@
     name_z_bed   = "z_bed"
     name_H_ice   = "H_ice"
     name_z_srf   = "z_srf"
+    basins_load  = True
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
     name_basins  = "basin"
+    regions_load = True
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     name_regions = "mask"
 /
@@ -55,8 +56,8 @@
     write_yelmo = True         ! per-module 2D + 1D output switches
     write_isos  = True
     write_mshlf = True
-    write_smb   = True
-    write_snap  = True
+    write_smb   = False        ! REMBO provides the SMB (see rembo.nc); smbpal is only a carrier
+    write_snap  = False        ! REMBO provides the atmosphere; snapclim is used for ocean only
     write_htopo = True
 /
 
@@ -65,6 +66,13 @@
     dt              = 1.0
     file            = "input/timeout_ramp_100kyr.txt"
     times           = -10, -5, 0, 1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+/
+
+&tm_2Dsm
+    method          = "const"           ! "const", "file", "times"
+    dt              = 50.0
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
 /
 
 &tm_2D

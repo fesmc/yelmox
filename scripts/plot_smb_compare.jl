@@ -1,6 +1,6 @@
 #!/usr/bin/env julia
 # Compare smb_simple accumulation-modifier variants (baseline/dist/lat/both).
-# Expects four run directories under <base>/, each with a yelmo2D.nc, produced by
+# Expects four run directories under <base>/, each with a yelmo.nc, produced by
 # runme with smb_simple and (optionally) the smb_simple.k_acc_* / facc_*_min
 # overrides. Writes <base>/compare_smb.png.
 #
@@ -25,7 +25,7 @@ const TITLES = Dict(
 
 # Load last time slice. NCDatasets returns smb as (xc, yc, time).
 function load_run(v)
-    ds = NCDataset(joinpath(BASE, v, "yelmo2D.nc"))
+    ds = NCDataset(joinpath(BASE, v, "yelmo.nc"))
     smb = Float64.(ds["smb"][:, :, end])     # m ie/yr
     H   = Float64.(ds["H_ice"][:, :, end])
     xc  = Float64.(ds["xc"][:])

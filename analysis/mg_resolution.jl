@@ -68,8 +68,8 @@ function refrun(root)
 end
 
 # --- IO helpers ------------------------------------------------------------
-yelmo2d(root, r) = joinpath(root, r.name, "yelmo_$(r.ygrid).nc")
-yelmots(root, r) = joinpath(root, r.name, "yelmo_$(r.ygrid)_ts.nc")
+yelmo2d(root, r) = joinpath(root, r.name, "yelmo.nc")
+yelmots(root, r) = joinpath(root, r.name, "yelmo_ts.nc")
 
 "Read (xc, yc, field[last time]) from a 2D file, or nothing if absent."
 function read_map(path, var)

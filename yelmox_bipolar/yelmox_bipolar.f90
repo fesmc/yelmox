@@ -51,8 +51,8 @@ program yelmox_bipolar
     type(obm_coupling_ctl) :: oc
     character(len=512)     :: obm_file, obm_file_restart
 
-    type(timeout_class) :: tm_2D, tm_1D
-    logical             :: do_2D, do_1D, do_restart
+    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
+    logical             :: do_2D, do_2Dsm, do_1D, do_restart
     logical             :: wrote_restart_north, wrote_restart_south
 
     real(wp) :: dtt
@@ -98,9 +98,10 @@ program yelmox_bipolar
         call write_obm_update(obm, obm_file, oc%obm_name, ts%time)
     end if
 
-    ! === Output setup (shared cadence, from [tm_1D]/[tm_2D]) ===
-    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ts%time_init, ts%time_end)
-    call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
+    ! === Output setup (shared cadence, from [tm_2D]/[tm_2Dsm]/[tm_1D]) ===
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ts%time_init, ts%time_end)
     if (active_north) call write_domain_init(dom_north, outfldr_north)
     if (active_south) call write_domain_init(dom_south, outfldr_south)
 
@@ -134,8 +135,9 @@ program yelmox_bipolar
         if (active_south) call step_marine_shelf(dom_south, ts)
 
         ! === Output (shared cadence; timeout_check advances state, call once) ===
-        do_2D = tm_2D%active .and. timeout_check(tm_2D, ts%time)
-        do_1D = tm_1D%active .and. timeout_check(tm_1D, ts%time)
+        do_2D   = tm_2D%active   .and. timeout_check(tm_2D, ts%time)
+        do_2Dsm = tm_2Dsm%active .and. timeout_check(tm_2Dsm, ts%time)
+        do_1D   = tm_1D%active   .and. timeout_check(tm_1D, ts%time)
 
         wrote_restart_north = .false.
         wrote_restart_south = .false.
@@ -227,6 +229,10 @@ contains
             call domain_write_init(dom, trim(outfldr), ts%time)
             call domain_write_step(dom, trim(outfldr), ts%time)
         end if
+        if (tm_2Dsm%active) then
+            call domain_write_init_sm(dom, trim(outfldr), ts%time)
+            call domain_write_step_sm(dom, trim(outfldr), ts%time)
+        end if
         if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
     end subroutine write_domain_init
 
@@ -246,6 +252,8 @@ contains
 
         if (do_2D .or. (do_force .and. tm_2D%active)) &
             call domain_write_step(dom, trim(outfldr), ts%time)
+        if (do_2Dsm .or. (do_force .and. tm_2Dsm%active)) &
+            call domain_write_step_sm(dom, trim(outfldr), ts%time)
         if (do_1D .or. (do_force .and. tm_1D%active)) &
             call domain_write_1D(dom, trim(outfldr), ts%time)
 

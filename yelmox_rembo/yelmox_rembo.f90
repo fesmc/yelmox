@@ -15,8 +15,7 @@ program yelmox_rembo
     use timestepping
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, dp, yelmo_end, &
-                      yelmo_init_state, yelmo_update_equil, yelmo_print_bound, &
-                      yelmo_write_init, MASK_ICE_NONE
+                      yelmo_init_state, yelmo_update_equil, yelmo_print_bound
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
                              isos_init_ref, isos_init_state
     use snapclim,     only : snapclim_update
@@ -33,11 +32,11 @@ program yelmox_rembo
     type(ice_domain)    :: dom
     type(bsl_class)     :: bsl          ! shared, driver-owned barystatic sea level
     type(hyster_class)  :: hyst         ! driver-owned transient forcing
-    type(timeout_class) :: tm_2D, tm_1D
+    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
 
-    character(len=512)  :: outfldr, file2D, file_rembo
+    character(len=512)  :: outfldr, file_rembo2D, file_rembo1D
     real(wp) :: time_equil, dtt, dtt_now, deltat_tot
-    logical  :: use_hyster, write_restart, write_ocn_forcing
+    logical  :: use_hyster, write_restart
     real(wp) :: dT_summer, dT_ann, dT_ocn, hyst_f_to, hyst_f_ta
     real(wp) :: var, convert_km3_Gt
 
@@ -49,13 +48,12 @@ program yelmox_rembo
     call nml_read(path_par, "ctrl", "time_equil",   time_equil)
     call nml_read(path_par, "ctrl", "use_hyster",   use_hyster)
     call nml_read(path_par, "ctrl", "write_restart", write_restart)
-    call nml_read(path_par, "ctrl", "write_ocn_forcing", write_ocn_forcing)
     call nml_read(path_par, "ctrl", "f_to",         hyst_f_to)
     call nml_read(path_par, "ctrl", "f_ta",         hyst_f_ta)
 
-    outfldr    = "./"
-    file2D     = trim(outfldr)//"yelmo2D.nc"
-    file_rembo = trim(outfldr)//"yelmo-rembo.nc"
+    outfldr      = "./"
+    file_rembo2D = trim(outfldr)//"rembo.nc"
+    file_rembo1D = trim(outfldr)//"rembo_ts.nc"
 
     ! Shared, driver-owned barystatic sea level (one per run).
     call bsl_init(bsl, path_par, ts%time_rel)
@@ -96,19 +94,27 @@ program yelmox_rembo
     write(*,*)
 
     ! === output setup ===
-    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ts%time_init, ts%time_end)
-    call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
+    ! Standard per-module files (yelmo.nc / yelmo_sm.nc / yelmo_ts.nc / isos.nc /
+    ! mshlf.nc / htopo.nc) via the shared routines, exactly as the other flavors;
+    ! REMBO-specific fields go to rembo.nc (2D) and rembo_ts.nc (1D).
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ts%time_init, ts%time_end)
 
     if (tm_2D%active) then
-        call yelmo_write_init(dom%yelmo, file2D, time_init=ts%time, units="years")
-        call yelmox_rembo_write_step(dom%yelmo, rembo_ann, dom%isos, dom%mshlf, file2D, ts%time)
+        call domain_write_init(dom, trim(outfldr), ts%time)
+        call domain_write_step(dom, trim(outfldr), ts%time)
+        call rembo_write_2D_init(dom%yelmo, file_rembo2D, ts%time, "years")
+        call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
+    end if
+    if (tm_2Dsm%active) then
+        call domain_write_init_sm(dom, trim(outfldr), ts%time)
+        call domain_write_step_sm(dom, trim(outfldr), ts%time)
     end if
     if (tm_1D%active) then
-        call yelmox_rembo_write_init(dom%yelmo, file_rembo, time_init=ts%time, units="years", &
-                mask=(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE), &
-                dT_min=hyst%par%f_min, dT_max=hyst%par%f_max)
-        call yelmox_rembo_write_step_small(dom%yelmo, hyst, rembo_ann, dom%isos, dom%mshlf, &
-                file_rembo, ts%time, dT_summer, dT_ann, dT_ocn, write_ocn_forcing)
+        call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+        call rembo_write_1D_init(file_rembo1D, ts%time, "years", hyst)
+        call rembo_write_1D_step(dom%yelmo, hyst, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
     end if
 
     ! Initial restart bundle.
@@ -153,11 +159,16 @@ program yelmox_rembo
         call step_marine_shelf(dom, ts)
 
         ! === output ===
-        if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) &
-            call yelmox_rembo_write_step_small(dom%yelmo, hyst, rembo_ann, dom%isos, dom%mshlf, &
-                    file_rembo, ts%time, dT_summer, dT_ann, dT_ocn, write_ocn_forcing)
-        if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) &
-            call yelmox_rembo_write_step(dom%yelmo, rembo_ann, dom%isos, dom%mshlf, file2D, ts%time)
+        if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
+            call domain_write_step(dom, trim(outfldr), ts%time)
+            call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
+        end if
+        if (tm_2Dsm%active .and. timeout_check(tm_2Dsm, ts%time)) &
+            call domain_write_step_sm(dom, trim(outfldr), ts%time)
+        if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
+            call domain_write_1D(dom, trim(outfldr), ts%time)
+            call rembo_write_1D_step(dom%yelmo, hyst, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
+        end if
 
         ! === restart bundle ===
         if (write_restart .and. tstep_due(ts%time, dom%ctl%dt_restart)) then
@@ -173,9 +184,15 @@ program yelmox_rembo
     end do
 
     ! Final state + restart bundle.
-    if (tm_2D%active) call yelmox_rembo_write_step(dom%yelmo, rembo_ann, dom%isos, dom%mshlf, file2D, ts%time)
-    if (tm_1D%active) call yelmox_rembo_write_step_small(dom%yelmo, hyst, rembo_ann, dom%isos, dom%mshlf, &
-                    file_rembo, ts%time, dT_summer, dT_ann, dT_ocn, write_ocn_forcing)
+    if (tm_2D%active) then
+        call domain_write_step(dom, trim(outfldr), ts%time)
+        call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
+    end if
+    if (tm_2Dsm%active) call domain_write_step_sm(dom, trim(outfldr), ts%time)
+    if (tm_1D%active) then
+        call domain_write_1D(dom, trim(outfldr), ts%time)
+        call rembo_write_1D_step(dom%yelmo, hyst, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
+    end if
     if (write_restart) call write_rembo_restart()
 
     write(*,*)

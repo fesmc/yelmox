@@ -647,8 +647,10 @@
     name_z_bed   = "z_bed"
     name_H_ice   = "H_ice"
     name_z_srf   = "z_srf"
+    basins_load  = True
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
     name_basins  = "basin"
+    regions_load = True
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     name_regions = "mask"
 /

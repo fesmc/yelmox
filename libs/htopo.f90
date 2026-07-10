@@ -32,8 +32,10 @@ module htopo
         character(len=56)  :: name_z_bed
         character(len=56)  :: name_H_ice
         character(len=56)  :: name_z_srf
+        logical            :: basins_load    ! read basins from file? (else default 1.0)
         character(len=512) :: basins_path
         character(len=56)  :: name_basins
+        logical            :: regions_load   ! read regions from file? (else default 1.0)
         character(len=512) :: regions_path
         character(len=56)  :: name_regions
     end type
@@ -88,8 +90,16 @@ contains
         call nc_read(htopo%par%topo_path,    htopo%par%name_z_bed,   htopo%z_bed)
         call nc_read(htopo%par%topo_path,    htopo%par%name_H_ice,   htopo%H_ice)
         call nc_read(htopo%par%topo_path,    htopo%par%name_z_srf,   htopo%z_srf)
-        call nc_read(htopo%par%regions_path, htopo%par%name_regions, htopo%regions)
-        call nc_read(htopo%par%basins_path,  htopo%par%name_basins,  htopo%basins)
+
+        ! Static masks: load from file only when enabled, else default to a single
+        ! region/basin (1.0). Lets paleo domains without mask files run by setting
+        ! regions_load/basins_load = False (mirrors Yelmo core's yelmo_masks).
+        htopo%regions = 1.0_wp
+        htopo%basins  = 1.0_wp
+        if (htopo%par%regions_load) &
+            call nc_read(htopo%par%regions_path, htopo%par%name_regions, htopo%regions)
+        if (htopo%par%basins_load) &
+            call nc_read(htopo%par%basins_path,  htopo%par%name_basins,  htopo%basins)
 
     end subroutine htopo_init
 
@@ -103,8 +113,10 @@ contains
         call nml_read(filename, group, "name_z_bed",   par%name_z_bed)
         call nml_read(filename, group, "name_H_ice",   par%name_H_ice)
         call nml_read(filename, group, "name_z_srf",   par%name_z_srf)
+        call nml_read(filename, group, "basins_load",  par%basins_load)
         call nml_read(filename, group, "basins_path",  par%basins_path)
         call nml_read(filename, group, "name_basins",  par%name_basins)
+        call nml_read(filename, group, "regions_load", par%regions_load)
         call nml_read(filename, group, "regions_path", par%regions_path)
         call nml_read(filename, group, "name_regions", par%name_regions)
 

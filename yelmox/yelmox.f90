@@ -21,7 +21,7 @@ program yelmox
     type(tstep_class)  :: ts
     type(ice_domain)   :: dom
     type(bsl_class)    :: bsl        ! shared, driver-owned barystatic sea level
-    type(timeout_class) :: tm_2D, tm_1D
+    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
 
     character(len=512) :: outfldr
     real(wp)           :: dtt
@@ -92,6 +92,13 @@ program yelmox
         call domain_write_step(dom, trim(outfldr), ts%time)
     end if
 
+    ! === output setup (2D small; reduced field set, more frequent cadence) ===
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
+    if (tm_2Dsm%active) then
+        call domain_write_init_sm(dom, trim(outfldr), ts%time)
+        call domain_write_step_sm(dom, trim(outfldr), ts%time)
+    end if
+
     ! === output setup (1D timeseries) ===
     call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
     if (tm_1D%active) then
@@ -122,6 +129,10 @@ program yelmox
             call domain_write_step(dom, trim(outfldr), ts%time)
         end if
 
+        if (tm_2Dsm%active .and. timeout_check(tm_2Dsm, ts%time)) then
+            call domain_write_step_sm(dom, trim(outfldr), ts%time)
+        end if
+
         if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
             call domain_write_1D(dom, trim(outfldr), ts%time)
         end if
@@ -132,8 +143,9 @@ program yelmox
     end do
 
     ! Always capture the final state + a final restart bundle (incl. shared bsl).
-    if (tm_2D%active) call domain_write_step(dom, trim(outfldr), ts%time)
-    if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time)
+    if (tm_2D%active)   call domain_write_step(dom, trim(outfldr), ts%time)
+    if (tm_2Dsm%active) call domain_write_step_sm(dom, trim(outfldr), ts%time)
+    if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time)
     call run_restart_write(dom, bsl, ts%time)
 
     write(*,*)
