@@ -10,7 +10,7 @@ module yelmox_rembo_output
     use ncio
     use yelmo
     use rembo_sclimate, only : rembo_class
-    use hyster,         only : hyster_class
+    use tsgen,          only : tsgen_class
 
     implicit none
     private
@@ -60,12 +60,12 @@ contains
         call nc_close(ncid)
     end subroutine rembo_write_2D_step
 
-    subroutine rembo_write_1D_init(filename, time_init, units, hyst)
-        ! Create rembo_ts.nc (time + dT_axis) for the hysteresis diagnostics. The
+    subroutine rembo_write_1D_init(filename, time_init, units, tsg)
+        ! Create rembo_ts.nc (time + dT_axis) for the forcing diagnostics. The
         ! dT_axis dimension carries the ice volume as a function of forcing (V_dT).
         character(len=*),   intent(IN) :: filename, units
         real(wp),           intent(IN) :: time_init
-        type(hyster_class), intent(IN) :: hyst
+        type(tsgen_class),  intent(IN) :: tsg
 
         integer :: n
         real(wp), allocatable :: dT_axis(:)
@@ -75,7 +75,7 @@ contains
 
         allocate(dT_axis(1000))
         do n = 1, 1000
-            dT_axis(n) = hyst%par%f_min + (hyst%par%f_max-hyst%par%f_min)*(n-1)/real(1000-1,wp)
+            dT_axis(n) = tsg%par%f_min + (tsg%par%f_max-tsg%par%f_min)*(n-1)/real(1000-1,wp)
         end do
         call nc_write_dim(filename,"dT_axis",x=dT_axis,units="degC")
 
@@ -84,13 +84,13 @@ contains
         call nc_write(filename,"V_dT",dT_axis,dim1="dT_axis",missing_value=missing_value)
     end subroutine rembo_write_1D_init
 
-    subroutine rembo_write_1D_step(ylmo, hyst, rembo, filename, time, dT_ann, dT_ocn)
-        ! Append one record of the hysteresis/forcing scalars, the ice volume in
+    subroutine rembo_write_1D_step(ylmo, tsg, rembo, filename, time, dT_ann, dT_ocn)
+        ! Append one record of the tsgen forcing scalars, the ice volume in
         ! forcing phase space (V_dT), and the REMBO integrated metrics (smb_mean,
         ! aar) to rembo_ts.nc. Generic 1D aggregates (V_ice, A_ice, ...) live in
         ! the shared yelmo_ts.nc.
         type(yelmo_class),  intent(IN) :: ylmo
-        type(hyster_class), intent(IN) :: hyst
+        type(tsgen_class),  intent(IN) :: tsg
         type(rembo_class),  intent(IN) :: rembo
         character(len=*),   intent(IN) :: filename
         real(wp), intent(IN) :: time
@@ -105,17 +105,17 @@ contains
         n = nc_time_index(filename,"time",time,ncid)
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! ===== Hysteresis / forcing scalars =====
-        call nc_write(filename,"hyst_f_now",hyst%f_now,units="K",long_name="hyst: forcing value", &
+        ! ===== tsgen forcing scalars =====
+        call nc_write(filename,"tsgen_f_now",tsg%f_now,units="K",long_name="tsgen: forcing value", &
                       dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_df_dt",hyst%df_dt*1e6,units="K/(1e6 yr)", &
-                      long_name="hyst: forcing rate of change",dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"hyst_dv_dt",hyst%dv_dt_ave,units="m/yr", &
-                      long_name="hyst: rms thickness rate of change",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"tsgen_df_dt",tsg%df_dt*1e6,units="K/(1e6 yr)", &
+                      long_name="tsgen: forcing rate of change",dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"tsgen_dv_dt",tsg%dv_dt_ave,units="m/yr", &
+                      long_name="tsgen: rms thickness rate of change",dim1="time",start=[n],ncid=ncid)
 
         ! Ice volume in forcing (dT) phase space.
         call nc_read(filename,"dT_axis",dT_axis)
-        k = minloc(abs(dT_axis-hyst%f_now),dim=1)
+        k = minloc(abs(dT_axis-tsg%f_now),dim=1)
         call nc_write(filename,"V_dT",ylmo%reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
                       dim1="dT_axis",start=[k],ncid=ncid)
 
@@ -135,7 +135,7 @@ contains
             smb_tot = 0.0
         end if
 
-        call nc_write(filename,"dT_jja",hyst%f_now,units="K",long_name="Temp. anomaly, regional JJA mean", &
+        call nc_write(filename,"dT_jja",tsg%f_now,units="K",long_name="Temp. anomaly, regional JJA mean", &
                       dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"dT_ann",dT_ann,units="K",long_name="Temp. anomaly, regional annual mean", &
                       dim1="time",start=[n],ncid=ncid)

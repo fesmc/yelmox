@@ -8,9 +8,6 @@
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 10.0              ! [yr] Main loop timestep
     write_restart   = True              ! Write restart bundles
-    use_hyster      = False             ! Use hysteresis module?
-    f_to            = 0.25              ! Ratio of ocean warming to hyster forcing
-    f_ta            = 1.0               ! Ratio of atm warming to hyster forcing
 /
 
 &coupling
@@ -82,20 +79,28 @@
     times           = 0
 /
 
-&hyster
-    method          =  "PI42"           ! const, ramp-time, ramp-slope, exp, PI42, H312b, H312PID, H321PID, PID1
-    with_kill       = True              ! Should kill signal be activated at limits of forcing?
-    dt_init         = 200.0             ! [yr] Initialization time window: no transient methods applied.
-    dt_ramp         = 300.0             ! [yr] Duration of ramp-up time window in method='ramp-time'.
-    dt_conv         = -1.0              ! [yr] Duration of convergence (ramp-down) time window in method='ramp-time-step'
-    dt_ave          = 100.0             ! [yr] Number of years for averaging to diagnose system rate of change 
-    df_sign         =  1                ! [-1/1] Determines direction of forcing
-    eps             = 20.0              ! [Gt/yr] Target system rate of change (set point). Ice sheets: eg 20 Gt/a for 100yr averaging.
-    df_dt_max       = 1e-4              ! [f/yr] 4/1e-4 ~ 60 kyr, 4/1.333e-5 ~ 300 kyr.
-    sigma           = 0.0               ! [f] Noise signal 
-    f_min           =  0.0              ! [f] Forcing value minimum 
-    f_max           =  4.0              ! [f] Forcing value maximum
-    f_conv          =  0.0              ! [f] Convergence forcing value for triangle methods
+&tsforcing
+    active           = False    ! Apply transient tsgen forcing? (was ctrl.use_hyster)
+    f_ta             = 1.0      ! [K] dT_summer = f_now * f_ta  (atm warming ratio)
+    f_to             = 0.25     ! [K] dT_ocn = dT_ann * f_to    (ocean warming ratio)
+    f_so             = 0.0      ! [psu] unused by REMBO
+    restart_every_df = 0.0      ! [f] write a restart bundle each |Δf|; 0 = off
+/
+
+&tsgen
+    method     = "PI42"     ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
+    with_kill  = True       ! stop the run once the response equilibrates at a bound
+    dt_init    = 200.0      ! [yr]  hold forcing flat during this initial interval
+    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
+    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
+    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
+    df_sign    = 1          ! +1/-1 direction of forcing change
+    tol        = 20.0       ! [Gt/yr] target/tolerance response rate (feedback/kill; was hyster.eps)
+    df_dt_max  = 1e-4       ! [f/yr] maximum forcing rate (4/1e-4 ~ 60 kyr)
+    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
+    f_min      = 0.0        ! [f]   lower forcing bound
+    f_max      = 4.0        ! [f]   upper forcing bound
+    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
 /
 
 &opt

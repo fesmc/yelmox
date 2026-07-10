@@ -21,7 +21,7 @@ program yelmox_rembo
     use snapclim,     only : snapclim_update
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
                                rembo_ann, rembo_restart_write
-    use hyster
+    use tsgen, only : tsgen_class
     use yelmox_domain
     use yelmox_rembo_output
 
@@ -31,13 +31,13 @@ program yelmox_rembo
     type(tstep_class)   :: ts
     type(ice_domain)    :: dom
     type(bsl_class)     :: bsl          ! shared, driver-owned barystatic sea level
-    type(hyster_class)  :: hyst         ! driver-owned transient forcing
+    type(tsforcing_class) :: tsf        ! driver-owned transient forcing (tsgen)
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
 
     character(len=512)  :: outfldr, file_rembo2D, file_rembo1D
     real(wp) :: time_equil, dtt, dtt_now, deltat_tot
-    logical  :: use_hyster, write_restart
-    real(wp) :: dT_summer, dT_ann, dT_ocn, hyst_f_to, hyst_f_ta
+    logical  :: write_restart
+    real(wp) :: dT_summer, dT_ann, dT_ocn
     real(wp) :: var, convert_km3_Gt
 
     ! Parameter file path from the command line (runme passes it per run).
@@ -46,10 +46,7 @@ program yelmox_rembo
     ! --- run control ([ctrl]: shared timeline + REMBO-flavor switches) ---
     call timeline_init(ts, dtt, path_par, "ctrl")
     call nml_read(path_par, "ctrl", "time_equil",   time_equil)
-    call nml_read(path_par, "ctrl", "use_hyster",   use_hyster)
     call nml_read(path_par, "ctrl", "write_restart", write_restart)
-    call nml_read(path_par, "ctrl", "f_to",         hyst_f_to)
-    call nml_read(path_par, "ctrl", "f_ta",         hyst_f_ta)
 
     outfldr      = "./"
     file_rembo2D = trim(outfldr)//"rembo.nc"
@@ -69,13 +66,14 @@ program yelmox_rembo
     ! REMBO climate + hysteresis (driver-owned; not part of ice_domain). REMBO keeps
     ! its module-global state in rembo_ann and loads its own parameters (options_rembo).
     call rembo_init(real(ts%time, dp))
-    call hyster_init(hyst, path_par, ts%time)
+    call tsforcing_init(tsf, path_par, ts%time)
+    if (trim(dom%ctl%restart) /= "None") call tsforcing_restart_read(tsf, trim(dom%ctl%restart))
 
     ! Regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
 
     ! Initial transient forcing (dT_summer / dT_ann / dT_ocn).
-    call update_hyster_forcing()
+    call update_forcing()
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl) and re-establish the REMBO + ocean forcing.
@@ -113,8 +111,8 @@ program yelmox_rembo
     end if
     if (tm_1D%active) then
         call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
-        call rembo_write_1D_init(file_rembo1D, ts%time, "years", hyst)
-        call rembo_write_1D_step(dom%yelmo, hyst, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
+        call rembo_write_1D_init(file_rembo1D, ts%time, "years", tsf%tsg)
+        call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
     end if
 
     ! Initial restart bundle.
@@ -127,10 +125,10 @@ program yelmox_rembo
         ! Transient experiments: shrink dtt (and REMBO's emb cadence) during the
         ! hysteresis ramp, restore afterwards.
         dtt_now = dtt
-        if (use_hyster) then
-            select case(trim(hyst%par%method))
+        if (tsf%active) then
+            select case(trim(tsf%tsg%par%method))
                 case("ramp-time","ramp-time-step")
-                    deltat_tot = hyst%par%dt_init + hyst%par%dt_ramp + hyst%par%dt_conv + 100.0_wp
+                    deltat_tot = tsf%tsg%par%dt_init + tsf%tsg%par%dt_ramp + tsf%tsg%par%dt_conv + 100.0_wp
                     if (ts%time_elapsed < deltat_tot) then
                         dtt_now = min(5.0_wp, dtt)
                         rembo_ann%par%dtime_emb = real(dtt_now, dp)
@@ -144,8 +142,8 @@ program yelmox_rembo
         call tstep_update(ts, dtt_now)
         call tstep_print(ts)
 
-        ! Transient forcing for this step (from the hysteresis module).
-        call update_hyster_forcing()
+        ! Transient forcing for this step (from the tsgen series).
+        call update_forcing()
 
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
@@ -167,7 +165,7 @@ program yelmox_rembo
             call domain_write_step_sm(dom, trim(outfldr), ts%time)
         if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
             call domain_write_1D(dom, trim(outfldr), ts%time)
-            call rembo_write_1D_step(dom%yelmo, hyst, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
+            call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
         end if
 
         ! === restart bundle ===
@@ -175,10 +173,10 @@ program yelmox_rembo
             call write_rembo_restart()
         end if
 
-        ! Hysteresis kill switch.
-        if (use_hyster .and. hyst%kill) then
-            write(*,"(a,f12.3,a,f12.3)") "hyster:: kill switch activated. [time, f_now] = ", &
-                    ts%time, ", ", hyst%f_now
+        ! tsgen kill switch (response equilibrated at a forcing bound).
+        if (tsforcing_kill(tsf)) then
+            write(*,"(a,f12.3,a,f12.3)") "tsgen:: kill switch activated. [time, f_now] = ", &
+                    ts%time, ", ", tsf%tsg%f_now
             exit
         end if
     end do
@@ -191,7 +189,7 @@ program yelmox_rembo
     if (tm_2Dsm%active) call domain_write_step_sm(dom, trim(outfldr), ts%time)
     if (tm_1D%active) then
         call domain_write_1D(dom, trim(outfldr), ts%time)
-        call rembo_write_1D_step(dom%yelmo, hyst, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
+        call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
     end if
     if (write_restart) call write_rembo_restart()
 
@@ -203,22 +201,23 @@ program yelmox_rembo
 
 contains
 
-    subroutine update_hyster_forcing()
-        ! Update the transient temperature anomalies from the hysteresis module.
-        ! Regional dT_ann uses the REMBO winter factor (T_wintfac=1.6):
+    subroutine update_forcing()
+        ! Update the transient temperature anomalies from the tsgen forcing series.
+        ! REMBO uses its own channel mapping (not the snapclim dTa/dTo/dSo): f_now
+        ! drives dT_summer, and dT_ann uses the REMBO winter factor (T_wintfac=1.6):
         !   dT_ann = 0.5*((1.6)*dT_summer + (1.0)*dT_summer) = 1.3*dT_summer.
-        if (use_hyster) then
+        if (tsf%active) then
             var = dom%yelmo%reg%V_ice * convert_km3_Gt
-            call hyster_calc_forcing(hyst, ts%time, var)
-            dT_summer = hyst%f_now * hyst_f_ta
+            call tsforcing_update(tsf, ts%time, var=var)
+            dT_summer = tsf%tsg%f_now * tsf%f_ta
             dT_ann    = 1.3_wp * dT_summer
-            dT_ocn    = dT_ann * hyst_f_to
+            dT_ocn    = dT_ann * tsf%f_to
         else
             dT_summer = 0.0_wp
             dT_ann    = 0.0_wp
             dT_ocn    = 0.0_wp
         end if
-    end subroutine update_hyster_forcing
+    end subroutine update_forcing
 
     subroutine step_rembo(init)
         ! Advance REMBO one coupling step: geometry from the hub, REMBO atmosphere +
@@ -262,7 +261,7 @@ contains
         ! Ocean forcing via snapclim (grid_clim); optional hysteresis ocean anomaly.
         call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &
                              domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
-        if (use_hyster .and. trim(dom%snp%par%ocn_type) == "const") &
+        if (tsf%active .and. trim(dom%snp%par%ocn_type) == "const") &
             dom%snp%now%to_ann = dom%snp%now%to_ann + dT_ocn
     end subroutine step_rembo
 
@@ -325,7 +324,7 @@ contains
     subroutine write_rembo_restart()
         ! Restart bundle: the shared domain sub-models + shared bsl
         ! (run_restart_write) plus REMBO's own restart, all in one folder.
-        call run_restart_write(dom, bsl, ts%time)
+        call run_restart_write(dom, bsl, ts%time, tsf=tsf)
         call rembo_restart_write(trim(restart_bundle_dir(ts%time))//"/rembo_restart.nc", &
                 real(ts%time, dp), real(dom%yelmo%tpo%now%z_srf, dp), &
                 real(dom%yelmo%tpo%now%H_ice, dp), real(dom%yelmo%bnd%z_sl, dp))
