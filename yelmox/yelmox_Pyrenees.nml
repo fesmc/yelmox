@@ -411,7 +411,7 @@
     dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
     dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
     df_sign    = 1          ! +1/-1 direction of forcing change
-    eps        = 1.0        ! response-rate tolerance (feedback/kill)
+    tol        = 1.0        ! response-rate tolerance (feedback/kill)
     df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
     sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
     f_min      = 0.0        ! [f]   lower forcing bound
