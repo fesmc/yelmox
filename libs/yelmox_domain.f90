@@ -1705,9 +1705,11 @@ contains
     ! ===== transient forcing (tsgen -> snapclim anomalies) ===================
 
     subroutine tsforcing_init(tsf, path_par, time)
-        ! Read [tsforcing] and, when active, initialize the tsgen series and derive
-        ! the initial anomalies. On a restart run the caller then calls
-        ! tsforcing_restart_read to resume the series from the saved state.
+        ! Read [tsforcing] and initialize the tsgen series + derived anomalies. The
+        ! series is always initialized (even when inactive) so tsf%tsg is valid for
+        ! any diagnostics/output that reference it regardless of `active`; the
+        ! active flag only gates whether the forcing is actually applied. On a
+        ! restart run the caller then calls tsforcing_restart_read to resume.
         type(tsforcing_class), intent(inout) :: tsf
         character(len=*),      intent(in)    :: path_par
         real(wp),              intent(in)    :: time
@@ -1721,13 +1723,13 @@ contains
         tsf%dTa = 0.0_wp; tsf%dTo = 0.0_wp; tsf%dSo = 0.0_wp
         tsf%counter_restart = 0
 
-        if (tsf%active) then
-            call tsgen_init(tsf%tsg, path_par, time)
-            call tsforcing_set_anom(tsf)
-            tsf%f_last_restart = tsf%tsg%f_now
+        call tsgen_init(tsf%tsg, path_par, time)
+        call tsforcing_set_anom(tsf)
+        tsf%f_last_restart = tsf%tsg%f_now
+
+        if (tsf%active) &
             write(*,*) "tsforcing:: active (tsgen); f_ta/f_to/f_so =", &
                         tsf%f_ta, tsf%f_to, tsf%f_so
-        end if
     end subroutine tsforcing_init
 
     subroutine tsforcing_update(tsf, time, var)
