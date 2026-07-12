@@ -32,6 +32,16 @@ FASTHYDROROOT = ${YELMOROOT}/FastHydrology
 INC_FASTHYDRO = -I${FASTHYDROROOT}/include
 LIB_FASTHYDRO = -L${FASTHYDROROOT}/include -lfasthydro
 
+# elsa + tracer: dependencies of yelmo's ytrc (passive-tracer) subsystem, called
+# from yelmo_tracers. As with FastHydrology, yelmo's static archive does not pull
+# them in transitively, so reference them explicitly on the top-level link line.
+ELSAROOT   = ${YELMOROOT}/elsa
+INC_ELSA   = -I${ELSAROOT}/libelsa/include
+LIB_ELSA   = -L${ELSAROOT}/libelsa/include -lelsa
+TRACERROOT = ${YELMOROOT}/tracer
+INC_TRACER = -I${TRACERROOT}/libtracer/include
+LIB_TRACER = -L${TRACERROOT}/libtracer/include -ltracer
+
 REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
@@ -60,4 +70,4 @@ endif
 # macbook does this). ?= leaves any such earlier machine setting in force.
 LFLAGS_EXTRA ?= -Wl,-zmuldefs
 
-LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
+LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_ELSA) $(LIB_TRACER) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
