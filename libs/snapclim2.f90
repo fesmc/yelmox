@@ -54,20 +54,17 @@ module snapclim2
         real(wp)          :: idx_coord(2)   ! position on the 1-D / 2-D index manifold
     end type
 
-    ! One loaded snapshot: its spec + one varslice per enabled field (registry order).
-    type snapshot_class
-        type(snapshot_spec_class)         :: spec
-        type(varslice_class), allocatable :: fld(:)
-    end type
-
-    ! Output state. Option A: named members for the hot path, unallocated when a
+    ! A climate state. Option A: named members for the hot path, unallocated when a
     ! run does not use them (allocated() is the "in use" guard); `extra` for the tail.
+    ! Used both as a snapshot's reduced (sea-level) fields and as the blended output.
     type climate_state_class
-        ! atmosphere, monthly (nx,ny,12)
-        real(wp), allocatable :: tas(:,:,:), pr(:,:,:), sf(:,:,:), pr_stdev_frac(:,:,:)
+        ! atmosphere, monthly (nx,ny,12): tas at surface, tsl at sea level
+        real(wp), allocatable :: tas(:,:,:), tsl(:,:,:), pr(:,:,:), prcor(:,:,:)
+        real(wp), allocatable :: sf(:,:,:), pr_stdev_frac(:,:,:)
         ! atmosphere, annual / summer (nx,ny)
         real(wp), allocatable :: ta_ann(:,:), ta_sum(:,:), pr_ann(:,:)
         real(wp), allocatable :: tsl_ann(:,:), tsl_sum(:,:), prcor_ann(:,:)
+        real(wp), allocatable :: beta_p(:,:)          ! precip-temperature sensitivity
         ! ocean
         real(wp), allocatable :: to_ann(:,:,:), so_ann(:,:,:)
         real(wp), allocatable :: depth(:)
@@ -77,6 +74,14 @@ module snapclim2
         real(wp), allocatable :: smb(:,:), bmb_shlf(:,:,:)
         ! escape hatch for genuinely ad-hoc future fields (temp-copy access only)
         type(named_field_class), allocatable :: extra(:)
+    end type
+
+    ! One loaded snapshot: its spec, one varslice per enabled field (registry order),
+    ! and its reduced (sea-level) climate state used by the blend.
+    type snapshot_class
+        type(snapshot_spec_class)         :: spec
+        type(varslice_class), allocatable :: fld(:)
+        type(climate_state_class)         :: state
     end type
 
     ! Top-level parameters.
@@ -150,8 +155,8 @@ contains
                             group=trim(base_group)//"_idx_"//trim(sc%idx_name(k)))
         end do
 
-        ! Load the snapshot fields (varslice) and set the reference state.
-        call snapclim2_load_snapshots(sc, filename, basins)
+        ! Load the snapshot fields (varslice), reduce them, and set the reference state.
+        call snapclim2_load_snapshots(sc, filename, time, basins)
 
         return
     end subroutine snapclim2_init
@@ -167,15 +172,160 @@ contains
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
         real(wp),              intent(IN)    :: basins(:,:)
 
-        ! 1. TODO(indices):  tsgen_update(sc%idx(k), time, var) -> weights source
-        ! 2. TODO(loads):    varslice_update(sc%snap(s)%fld(f), time, method)
-        ! 3. TODO(combine):  now%f = ref%f + Sum w_s*(snap(s)%f - ref%f)   [or absolute]
-        ! 4. TODO(transform):lapse (tsl<->tas via source/target z_srf), precip scaling,
-        !                    seasonal synthesis, aggregates, ocean vertical interp
-        ! 5. TODO(derive):   optional rules, e.g. ocn anom = f_to * mean(atm anom)
+        real(wp), allocatable :: w(:)
+
+        ! 1. Advance the driving indices (tsgen) to `time`.
+        call snapclim2_advance_indices(sc, time)
+
+        ! 2. Refresh time-varying loads and re-reduce those snapshots.
+        call snapclim2_refresh_loads(sc, time)
+
+        ! 3. Combine snapshot states into `now`: now = ref + Sum w_s * snap(s)%state
+        !    (anomaly form; w_ref = 0). Weights encode the active method.
+        allocate(w(sc%par%n_snap))
+        call snapclim2_weights(sc, w)
+        call snapclim2_combine(sc, w)
+
+        ! 4. Transform: inflate sea-level fields to the current model elevation
+        !    (tsl -> tas), precip, annual/summer aggregates, ocean vertical interp.
+        call snapclim2_transform(sc, z_srf)
+
+        ! 5. Derive: optional coupled rules (e.g. ocean anomaly = f_to * atm anomaly).
+        call snapclim2_derive(sc, dTa, dTo, dSo)
 
         return
     end subroutine snapclim2_update
+
+    ! ---------------------------------------------------------------------
+    ! Update pipeline stages
+    ! ---------------------------------------------------------------------
+
+    subroutine snapclim2_advance_indices(sc, time)
+        ! Advance each tsgen index. Our indices are series/analytic (no feedback),
+        ! so the model-response argument is a dummy.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        real(wp),              intent(IN)    :: time
+        integer  :: k
+        real(wp) :: response
+        response = 0.0_wp
+        do k = 1, sc%par%n_idx
+            call tsgen_update(sc%idx(k), time, var=response)
+        end do
+        return
+    end subroutine snapclim2_advance_indices
+
+    subroutine snapclim2_refresh_loads(sc, time)
+        ! Re-slice only the time-varying fields (recon, transient orography, etc.);
+        ! static fields were primed once at load. A re-reduce of touched snapshots
+        ! follows once the reduction is implemented.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        real(wp),              intent(IN)    :: time
+        integer :: s, f
+        do s = 1, sc%par%n_snap
+            if (.not. allocated(sc%snap(s)%fld)) cycle
+            do f = 1, sc%par%n_field
+                if (.not. sc%registry(f)%enabled) cycle
+                if (sc%snap(s)%fld(f)%par%with_time) then
+                    call varslice_update(sc%snap(s)%fld(f), [time], method="extrap")
+                end if
+            end do
+            ! TODO(reduce): if any field was refreshed, call snapclim2_reduce_snapshot(sc, s).
+        end do
+        return
+    end subroutine snapclim2_refresh_loads
+
+    subroutine snapclim2_weights(sc, w)
+        ! Compute the per-snapshot anomaly weights from the indices and each
+        ! snapshot's idx_coord. now = ref + Sum w_s * snap(s)%state, with w_ref = 0.
+        !
+        ! Each method is a weight pattern, e.g. snap_1ind (snapclim.f90 calc_temp_1ind:
+        ! temp_now = temp0 + aa*(temp2 - temp1)) => w = [0, -aa, +aa] on [ref, s1, s2].
+        !
+        ! TODO(weights): port the per-method weight patterns (1ind/2ind/miocene/abs)
+        ! faithfully and reconcile with idx_coord/manifold. For now: `const` (w = 0,
+        ! now = ref), which is exact for the const method.
+        implicit none
+        type(snapclim2_class), intent(IN)  :: sc
+        real(wp),              intent(OUT) :: w(:)
+        w = 0.0_wp
+        return
+    end subroutine snapclim2_weights
+
+    subroutine snapclim2_combine(sc, w)
+        ! Generic weighted blend of the reduced snapshot states into `now`.
+        ! Blends the sea-level / annual fields; surface tas and aggregates are
+        ! derived afterwards in snapclim2_transform.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        real(wp),              intent(IN)    :: w(:)
+        integer :: s
+        logical :: first
+        do s = 1, sc%par%n_snap
+            first = (s == 1)
+            call accum3(sc%now%tsl,    sc%ref%tsl,    sc%snap(s)%state%tsl,    w(s), first)
+            call accum3(sc%now%prcor,  sc%ref%prcor,  sc%snap(s)%state%prcor,  w(s), first)
+            call accum3(sc%now%to_ann, sc%ref%to_ann, sc%snap(s)%state%to_ann, w(s), first)
+            call accum3(sc%now%so_ann, sc%ref%so_ann, sc%snap(s)%state%so_ann, w(s), first)
+            call accum2(sc%now%beta_p, sc%ref%beta_p, sc%snap(s)%state%beta_p, w(s), first)
+        end do
+        return
+    end subroutine snapclim2_combine
+
+    subroutine accum3(dst, ref, src, wgt, first)
+        ! dst = ref (on first) then dst += wgt*src  =>  dst = ref + Sum wgt*src.
+        ! No-op unless all three arrays are allocated (skips fields not in use).
+        implicit none
+        real(wp), allocatable, intent(INOUT) :: dst(:,:,:)
+        real(wp), allocatable, intent(IN)    :: ref(:,:,:), src(:,:,:)
+        real(wp),              intent(IN)    :: wgt
+        logical,               intent(IN)    :: first
+        if (.not. (allocated(dst) .and. allocated(ref) .and. allocated(src))) return
+        if (first) dst = ref
+        dst = dst + wgt*src
+        return
+    end subroutine accum3
+
+    subroutine accum2(dst, ref, src, wgt, first)
+        implicit none
+        real(wp), allocatable, intent(INOUT) :: dst(:,:)
+        real(wp), allocatable, intent(IN)    :: ref(:,:), src(:,:)
+        real(wp),              intent(IN)    :: wgt
+        logical,               intent(IN)    :: first
+        if (.not. (allocated(dst) .and. allocated(ref) .and. allocated(src))) return
+        if (first) dst = ref
+        dst = dst + wgt*src
+        return
+    end subroutine accum2
+
+    subroutine snapclim2_transform(sc, z_srf)
+        ! Inflate sea-level fields to the current model elevation and derive
+        ! aggregates. Faithful port target (snapclim.f90:779-812):
+        !   south = (domain=="Antarctica")
+        !   tas(m)  = tsl(m) - z_srf*(lapse(1) +/- (lapse(2)-lapse(1))*cos(2*pi*(m*30-15)/360))
+        !   pr(m)   = prcor(m) * exp(beta_p*(tas(m)-tsl(m)))
+        !   tsl_ann = mean(tsl); ta_ann = mean(tas); *_sum = mean over DJF/JJA;
+        !   pr_ann  = mean(pr)*365; prcor_ann = mean(prcor)*365
+        !
+        ! TODO(transform): implement once reduction populates now%tsl/prcor/beta_p.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        real(wp),              intent(IN)    :: z_srf(:,:)
+        if (allocated(sc%now%z_srf)) sc%now%z_srf = z_srf
+        return
+    end subroutine snapclim2_transform
+
+    subroutine snapclim2_derive(sc, dTa, dTo, dSo)
+        ! Optional coupled/derived rules applied after the blend, e.g. the old
+        ! `fraction` ocean rule (to anomaly = f_to * mean atm anomaly), and folding
+        ! the driver anomalies dTa/dTo/dSo into the fields.
+        ! TODO(derive): port `fraction` and dTa/dTo/dSo application.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        real(wp),              intent(IN), optional :: dTa, dTo, dSo
+        return
+    end subroutine snapclim2_derive
 
     subroutine snapclim2_end(sc)
         ! Teardown (snapclim never had one). Free varslice/tsgen and state arrays.
@@ -355,13 +505,16 @@ contains
         return
     end subroutine read_snapshot_spec
 
-    subroutine snapclim2_load_snapshots(sc, filename, basins)
+    subroutine snapclim2_load_snapshots(sc, filename, time, basins)
         ! Load each snapshot's enabled fields via varslice (option b): the varslice
         ! config lives on &<group>_field_<field> with a {snapshot} token in the path,
-        ! resolved per snapshot through varslice's `subs` substitution hook.
+        ! resolved per snapshot through varslice's `subs` substitution hook. Each field
+        ! is primed to `time`, the snapshot is reduced to sea-level fields, and finally
+        ! the reference state is set.
         implicit none
         type(snapclim2_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
+        real(wp),              intent(IN)    :: time
         real(wp),              intent(IN)    :: basins(:,:)
 
         integer            :: s, f
@@ -383,14 +536,62 @@ contains
                                        domain=trim(sc%par%domain), &
                                        grid_name=trim(sc%par%grid_name), &
                                        subs=subs)
+
+                ! Prime the load: static fields read once here, time-varying at `time`.
+                if (sc%snap(s)%fld(f)%par%with_time) then
+                    call varslice_update(sc%snap(s)%fld(f), [time], method="extrap")
+                else
+                    call varslice_update(sc%snap(s)%fld(f))
+                end if
             end do
+
+            ! Reduce raw loads -> sea-level state for this snapshot.
+            call snapclim2_reduce_snapshot(sc, s)
 
         end do
 
-        ! TODO(ref):      copy the reference snapshot's fields into sc%ref (anomaly baseline).
+        ! Set the reference state (anomaly baseline; clim0-equivalent for callers).
+        call snapclim2_set_ref(sc)
+
         ! TODO(override): honor a per-(snapshot,field) &<group>_snap_<snap>_<field> override.
 
         return
     end subroutine snapclim2_load_snapshots
+
+    subroutine snapclim2_reduce_snapshot(sc, s)
+        ! Extract raw fields from snapshot s's varslices into its reduced state and
+        ! compute the sea-level fields. Faithful port target
+        ! (snapclim.f90 read_climate_snapshot, ~1918-1948):
+        !   tsl_ann = ta_ann + lapse(1)*z_srf ; tsl_sum = ta_sum + lapse(2)*z_srf
+        !   pr      = pr*(1 + f_stdev*pr_stdev_frac)              [variability scaling]
+        !   prcor_ann = pr_ann / exp(beta_p*(ta_ann - tsl_ann))
+        !   tsl(m)  = tas(m) + z_srf*(lapse(1) +/- (lapse(2)-lapse(1))*cos(2*pi*(m*30-30)/360))
+        !   prcor(m)= pr(m) / exp(beta_p*(tas(m) - tsl(m)))
+        ! plus: seasonal synthesis for annual-only snapshots, ocean vertical interp to the
+        ! model depth axis, and the varslice %var -> state-array extraction (pending
+        ! confirmation of the monthly/3D %var layout). Allocates the state arrays it fills.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        integer,               intent(IN)    :: s
+        return
+    end subroutine snapclim2_reduce_snapshot
+
+    subroutine snapclim2_set_ref(sc)
+        ! Copy the designated reference snapshot's reduced state into sc%ref
+        ! (the anomaly baseline). Falls back to the first snapshot if none flagged.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        integer :: s, iref
+        iref = 0
+        do s = 1, sc%par%n_snap
+            if (sc%snap(s)%spec%is_ref) then
+                iref = s
+                exit
+            end if
+        end do
+        if (iref == 0 .and. sc%par%n_snap >= 1) iref = 1
+        if (iref >= 1) sc%ref = sc%snap(iref)%state
+        return
+    end subroutine snapclim2_set_ref
 
 end module snapclim2
