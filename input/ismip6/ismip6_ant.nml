@@ -1,12 +1,9 @@
 &var1
     filename    = "var_test.nc"
     name        = "var1"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1950, 1960, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1950, 1960, 1
 /
 
 ! ====== ISMIP6-2300 experiment definitions ======
@@ -96,111 +93,81 @@
 &gcm_ts_ref
     filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
     name        = "t2m"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1979, 2019, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1979, 2019, 1
 /
 
 &gcm_pr_ref
     filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
     name        = "precip"
-    units_in    = "kg m-2 yr-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 1.0         
-    unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1979, 2019, 1
+    units       = "kg m-2 yr-1" "mm yr-1"
+    scaling     = 1.0 0.0
+    time        = 1, 1979, 2019, 1
 /
 
 &gcm_sf_ref
     filename    = "ice_data/Antarctica/{domain}/{grid_name}/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2019.nc"
     name        = "snowfall"
-    units_in    = "kg m-2 yr-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 1.0         
-    unit_offset = 0.0 
-    with_time   = TRUE 
-    time_par    = 1979, 2019, 1
+    units       = "kg m-2 yr-1" "mm yr-1"
+    scaling     = 1.0 0.0
+    time        = 1, 1979, 2019, 1
 /
 
 &gcm_smb_ref
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/climatology_1995-2014/NorESM1-M_RCP26-repeat.nc"
     name        = "smb_clim"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3 
-    unit_offset = 0.0 
-    with_time   = FALSE 
-    time_par    = 1995, 2014, 1
+    units       = "kg m-2 s-1" "m i.e. yr-1"
+    scaling     = 34413.22 0.0     ! == 31556926.0*(1000/917)*1e-3
+    time        = 0, 1995, 2014, 1
 /
 
 &gcm_ts_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "ts_anomaly"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1950, 1994, 1
 /
 
 &gcm_pr_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "pr_anomaly"
-    units_in    = "kg m-2 s-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.0 0.0     ! ISMIP standard sec_to_year
+    time        = 1, 1950, 1994, 1
 /
 
 &gcm_smb_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/NorESM1-M_RCP26-repeat/1950-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "smb_anomaly"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1950, 1994, 1
+    units       = "kg m-2 s-1" "m i.e. yr-1"
+    scaling     = 34413.22 0.0     ! == 31556926.0*(1000/917)*1e-3
+    time        = 1, 1950, 1994, 1
 /
 
 &gcm_ts_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "ts_anomaly"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1995, 2300, 1
 /
 
 &gcm_pr_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "pr_anomaly"
-    units_in    = "kg m-2 s-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 31556926.0        ! ISMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.0 0.0     ! ISMIP standard sec_to_year
+    time        = 1, 1995, 2300, 1
 /
 
 &gcm_smb_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "smb_anomaly"
-    units_in    = "kg m-2 s-1"
-    units_out   = "m i.e. yr-1"
-    unit_scale  = 34413.22   ! == 31556926.0*(1000/917)*1e-3
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
+    units       = "kg m-2 s-1" "m i.e. yr-1"
+    scaling     = 34413.22 0.0     ! == 31556926.0*(1000/917)*1e-3
+    time        = 1, 1995, 2300, 1
 /
 
 ! ====== OCEAN ================
@@ -208,121 +175,88 @@
 &imbie_basins
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_IMBIE2_BASIN.nc"
     name        = "basinNumber"
-    units_in    = "1"
-    units_out   = "1"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 1995, 1
+    units       = "1" "1"
+    scaling     = 1.0 0.0
+    time        = 0, 1995, 1995, 1
 /
 
 &to_ref
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "to"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 273.15 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 0, 1995, 2017, 1
 /
 
 &so_ref
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 0, 1995, 2017, 1
 /
 
 &tf_ref
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "tf"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 0, 1995, 2017, 1
 /
 
 &tf_cor
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     name        = "dT_nl"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = False 
-    time_par    = 1995, 2017, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 0, 1995, 2017, 1
 /
 
 &gcm_to_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "temperature"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 273.15 
-    with_time   = True 
-    time_par    = 1850, 1994, 1
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 1850, 1994, 1
 /
 
 &gcm_so_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "salinity"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 1994, 1
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 1850, 1994, 1
 /
 
 &gcm_tf_hist
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/NorESM1-M_RCP26-repeat/1850-1994/NorESM1-M_RCP26-repeat.nc"
     name        = "thermal_forcing"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 1994, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1850, 1994, 1
 /
 
 &gcm_to_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "temperature"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 273.15 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 1995, 2300, 1
 /
 
 &gcm_so_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "salinity"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 1995, 2300, 1
 /
 &gcm_tf_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Ocean/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "thermal_forcing"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1995, 2300, 1
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1995, 2300, 1
 /
 
 ================== Ice shelf collapse mask =================
@@ -330,12 +264,9 @@
 &gcm_mask_shlf_proj
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/ShelfCollapse_forcing/{gcm}_{scenario}/1995-2300/{gcm}_{scenario}.nc"
     name        = "mask"
-    units_in    = "1"
-    units_out   = "1"
-    unit_scale  = 1.0
-    unit_offset = 0.0
-    with_time   = True
-    time_par    = 1995, 2300, 1
+    units       = "1" "1"
+    scaling     = 1.0 0.0
+    time        = 1, 1995, 2300, 1
 /
 
 ! =====================================================
