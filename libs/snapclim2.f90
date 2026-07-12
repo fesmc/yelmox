@@ -22,6 +22,9 @@ module snapclim2
 
     private
 
+    integer, parameter :: SNP2_MAX = 32   ! max entries in a snapshots/fields/indices list
+    integer, parameter :: NMONTH   = 12
+
     ! =====================================================================
     ! Types
     ! =====================================================================
@@ -80,6 +83,7 @@ module snapclim2
     type snapclim2_param_class
         character(len=256) :: domain
         character(len=256) :: grid_name
+        character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
         character(len=16)  :: combine       ! default combine mode
         integer            :: manifold      ! index-manifold dimension (0/1/2)
@@ -96,6 +100,7 @@ module snapclim2
         type(field_spec_class),  allocatable :: registry(:)  ! field definitions
         type(snapshot_class),    allocatable :: snap(:)      ! was clim0..clim3
         type(tsgen_class),       allocatable :: idx(:)       ! was at..bs (each may be nc-channel)
+        character(len=64),       allocatable :: idx_name(:)  ! index names (for labels/accessors)
         type(climate_state_class)            :: now          ! current output
         type(climate_state_class)            :: ref          ! distinguished reference (was clim0)
     end type
@@ -115,22 +120,38 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapclim2_init(sc, filename, domain, grid_name, nx, ny, basins, group)
-        ! Mirrors snapclim_init so yelmox_domain call sites are unchanged.
+    subroutine snapclim2_init(sc, filename, domain, grid_name, nx, ny, time, basins, group)
+        ! Mirrors snapclim_init, plus `time` (required to initialize the tsgen indices,
+        ! which anchor ramp-type series to their start time).
         implicit none
         type(snapclim2_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         character(len=*),      intent(IN)    :: domain
         character(len=*),      intent(IN)    :: grid_name
         integer,               intent(IN)    :: nx, ny
+        real(wp),              intent(IN)    :: time
         real(wp),              intent(IN)    :: basins(:,:)
         character(len=*),      intent(IN), optional :: group
 
-        ! TODO(par_load): read top-level group, the field registry
-        !   (&<group>_field_<name>), the snapshot specs (&<group>_snap_<name>),
-        !   and the index groups (&<group>_idx_<name>).
-        ! TODO(load): for each snapshot x enabled field, varslice_init_nml_snapclim2;
-        !   for each index, tsgen_init. Identify and copy out the reference state.
+        character(len=64) :: base_group
+        integer           :: k
+
+        base_group = "snp2"
+        if (present(group)) base_group = trim(group)
+
+        ! Read all configuration: top-level, field registry, snapshot specs, index names.
+        call snapclim2_par_load(sc, filename, trim(base_group), domain, grid_name)
+        sc%par%nx = nx
+        sc%par%ny = ny
+
+        ! Initialize the driving indices (tsgen). Group is &tsgen_<base_group>_<idxname>.
+        do k = 1, sc%par%n_idx
+            call tsgen_init(sc%idx(k), filename, time, &
+                            label=trim(base_group)//"_"//trim(sc%idx_name(k)))
+        end do
+
+        ! Load the snapshot fields (varslice) and set the reference state.
+        call snapclim2_load_snapshots(sc, filename, basins)
 
         return
     end subroutine snapclim2_init
@@ -218,5 +239,136 @@ contains
 
         return
     end subroutine snapclim2_restart_read
+
+    ! =====================================================================
+    ! Parameter loading & setup
+    ! =====================================================================
+
+    subroutine snapclim2_par_load(sc, filename, group, domain, grid_name)
+        ! Read the full configuration: top-level knobs, the field registry
+        ! (&<group>_field_<name>), the snapshot specs (&<group>_snap_<name>), and
+        ! the index names (each an &tsgen_<group>_<name> group, read by tsgen_init).
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        character(len=*),      intent(IN)    :: filename
+        character(len=*),      intent(IN)    :: group      ! base group (already domain-suffixed)
+        character(len=*),      intent(IN)    :: domain
+        character(len=*),      intent(IN)    :: grid_name
+
+        character(len=64) :: names(SNP2_MAX)
+        integer           :: i
+
+        sc%par%group     = group
+        sc%par%domain    = domain
+        sc%par%grid_name = grid_name
+
+        ! --- top-level --------------------------------------------------------
+        sc%par%combine   = "anomaly"
+        sc%par%manifold  = 1
+        sc%par%ref_name  = ""
+        sc%par%lapse     = 0.0_wp
+        sc%par%dTa_const = 0.0_wp
+        sc%par%dTo_const = 0.0_wp
+        sc%par%dSo_const = 0.0_wp
+        call nml_read(filename, group, "combine",   sc%par%combine)
+        call nml_read(filename, group, "manifold",  sc%par%manifold)
+        call nml_read(filename, group, "ref_name",  sc%par%ref_name)
+        call nml_read(filename, group, "lapse",     sc%par%lapse)
+        call nml_read(filename, group, "dTa_const", sc%par%dTa_const)
+        call nml_read(filename, group, "dTo_const", sc%par%dTo_const)
+        call nml_read(filename, group, "dSo_const", sc%par%dSo_const)
+
+        ! --- field registry ---------------------------------------------------
+        names = ""
+        call nml_read(filename, group, "fields", names, init=.TRUE.)
+        sc%par%n_field = count(len_trim(names) > 0)
+        if (allocated(sc%registry)) deallocate(sc%registry)
+        allocate(sc%registry(sc%par%n_field))
+        do i = 1, sc%par%n_field
+            call read_field_spec(sc%registry(i), filename, &
+                                 trim(group)//"_field_"//trim(names(i)), &
+                                 trim(names(i)), sc%par%combine)
+        end do
+
+        ! --- snapshots --------------------------------------------------------
+        names = ""
+        call nml_read(filename, group, "snapshots", names, init=.TRUE.)
+        sc%par%n_snap = count(len_trim(names) > 0)
+        if (allocated(sc%snap)) deallocate(sc%snap)
+        allocate(sc%snap(sc%par%n_snap))
+        do i = 1, sc%par%n_snap
+            call read_snapshot_spec(sc%snap(i)%spec, filename, &
+                                    trim(group)//"_snap_"//trim(names(i)), &
+                                    trim(names(i)), sc%par%ref_name)
+        end do
+
+        ! --- indices (names only; tsgen_init reads the &tsgen_* groups) --------
+        names = ""
+        call nml_read(filename, group, "indices", names, init=.TRUE.)
+        sc%par%n_idx = count(len_trim(names) > 0)
+        if (allocated(sc%idx))      deallocate(sc%idx)
+        if (allocated(sc%idx_name)) deallocate(sc%idx_name)
+        allocate(sc%idx(sc%par%n_idx))
+        allocate(sc%idx_name(sc%par%n_idx))
+        do i = 1, sc%par%n_idx
+            sc%idx_name(i) = trim(names(i))
+        end do
+
+        return
+    end subroutine snapclim2_par_load
+
+    subroutine read_field_spec(fs, filename, group, name, combine_default)
+        implicit none
+        type(field_spec_class), intent(OUT) :: fs
+        character(len=*),       intent(IN)  :: filename, group, name, combine_default
+
+        fs%name           = name
+        fs%kind           = "atm_monthly"
+        fs%combine        = combine_default
+        fs%enabled        = .TRUE.
+        fs%apply_lapse    = .FALSE.
+        fs%precip_scaling = .FALSE.
+        fs%seasonal_synth = .FALSE.
+        call nml_read(filename, group, "kind",           fs%kind)
+        call nml_read(filename, group, "combine",        fs%combine)
+        call nml_read(filename, group, "enabled",        fs%enabled)
+        call nml_read(filename, group, "apply_lapse",    fs%apply_lapse)
+        call nml_read(filename, group, "precip_scaling", fs%precip_scaling)
+        call nml_read(filename, group, "seasonal_synth", fs%seasonal_synth)
+
+        return
+    end subroutine read_field_spec
+
+    subroutine read_snapshot_spec(ss, filename, group, name, ref_name)
+        implicit none
+        type(snapshot_spec_class), intent(OUT) :: ss
+        character(len=*),          intent(IN)  :: filename, group, name, ref_name
+
+        ss%name      = name
+        ss%is_ref    = .FALSE.
+        ss%idx_coord = 0.0_wp
+        call nml_read(filename, group, "is_ref",    ss%is_ref)
+        call nml_read(filename, group, "idx_coord", ss%idx_coord)
+        ! The top-level ref_name also designates the reference snapshot.
+        if (trim(name) == trim(ref_name)) ss%is_ref = .TRUE.
+
+        return
+    end subroutine read_snapshot_spec
+
+    subroutine snapclim2_load_snapshots(sc, filename, basins)
+        ! Load each snapshot's enabled fields via varslice and set the reference state.
+        !
+        ! PENDING (varslice {snapshot} binding, option b): each field's varslice config
+        ! lives on &<group>_field_<field> with a {snapshot} token in the path, resolved
+        ! per snapshot (with an optional &<group>_snap_<snap>_<field> override). This needs
+        ! a {snapshot}-style substitution hook in varslice (see docs/snapclim2-design.md);
+        ! stubbed until that mechanism is settled.
+        implicit none
+        type(snapclim2_class), intent(INOUT) :: sc
+        character(len=*),      intent(IN)    :: filename
+        real(wp),              intent(IN)    :: basins(:,:)
+
+        return
+    end subroutine snapclim2_load_snapshots
 
 end module snapclim2
