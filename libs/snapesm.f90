@@ -18,11 +18,15 @@ module snapesm
     use precision, only : wp, sp, dp
     use ncio
     use nml
+    use interp1D, only : interp_linear
+    use series,   only : series_interp1
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use tsgen,    only : tsgen_class, tsgen_init, tsgen_update, &
                          tsgen_restart_write, tsgen_restart_read
 
     implicit none
+
+    real(wp), parameter :: pi = 3.14159265358979323846_wp
 
     private
 
@@ -43,8 +47,10 @@ module snapesm
     ! One physical field in the registry (immutable after load).
     type field_spec_class
         character(len=32) :: name           ! "tas","pr","to","so","zs","smb","bmb_shlf",...
-        character(len=16) :: kind           ! "atm_monthly" | "ocn_3d" | "scalar_2d"
+        character(len=16) :: kind           ! "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
+        character(len=16) :: blend          ! "linear" | "ratio" | "fraction" | "const"
+        character(len=16) :: index          ! name of the driving index (idx) for this field, or ""
         logical           :: enabled        ! off by default for exotic fields
         logical           :: apply_lapse
         logical           :: precip_scaling
@@ -55,6 +61,8 @@ module snapesm
     type snapshot_spec_class
         character(len=64) :: name
         logical           :: is_ref         ! the distinguished reference state
+        logical           :: monthly        ! raw atm fields are monthly (else annual+summer -> synthesized)
+        real(wp)          :: time           ! reference time [yr] of this snapshot (index normalization)
         real(wp)          :: idx_coord(2)   ! position on the 1-D / 2-D index manifold
     end type
 
@@ -105,7 +113,13 @@ module snapesm
         character(len=16)  :: combine       ! default combine mode
         integer            :: manifold      ! index-manifold dimension (0/1/2)
         character(len=64)  :: ref_name      ! which snapshot is the reference
-        real(wp)           :: lapse(2)
+        real(wp)           :: lapse(2)      ! [annual, summer] lapse rate [K/m]
+        ! precip / ocean sensitivity parameters (snapclim &snap)
+        real(wp)           :: f_p           ! precip-temperature Clausius factor -> beta_p [1/K]
+        real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (snapclim hardcodes 1.0)
+        real(wp)           :: f_stdev       ! precip-variability multiplier
+        real(wp)           :: f_to          ! ocean/atm anomaly ratio (fraction ocean rule)
+        real(wp)           :: f_hol         ! Holocene index scaling (snap_1ind_new)
         ! bipolar/obm compatibility (obm_coupling reads par%dTa_const today)
         real(wp)           :: dTa_const, dTo_const, dSo_const
         integer            :: n_snap, n_field, n_idx
@@ -184,7 +198,7 @@ contains
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
         real(wp),              intent(IN)    :: basins(:,:)
 
-        real(wp), allocatable :: w(:)
+        real(wp), allocatable :: ta_ann_lag(:,:)
 
         ! 1. Advance the driving indices (tsgen) to `time`.
         call snapesm_advance_indices(sc, time)
@@ -192,18 +206,19 @@ contains
         ! 2. Refresh time-varying loads and re-reduce those snapshots.
         call snapesm_refresh_loads(sc, time)
 
-        ! 3. Combine snapshot states into `now`: now = ref + Sum w_s * snap(s)%state
-        !    (anomaly form; w_ref = 0). Weights encode the active method.
-        allocate(w(sc%par%n_snap))
-        call snapesm_weights(sc, w)
-        call snapesm_combine(sc, w)
+        ! 3. Combine the reduced snapshot states into `now`, per field.
+        call snapesm_combine(sc, time)
+
+        ! Capture ta_ann as it stands BEFORE the transform overwrites it: the
+        ! fraction ocean rule (derive) reads the previous step's value (see there).
+        if (allocated(sc%now%ta_ann)) ta_ann_lag = sc%now%ta_ann
 
         ! 4. Transform: inflate sea-level fields to the current model elevation
-        !    (tsl -> tas), precip, annual/summer aggregates, ocean vertical interp.
+        !    (tsl -> tas), precip, annual/summer aggregates.
         call snapesm_transform(sc, z_srf)
 
-        ! 5. Derive: optional coupled rules (e.g. ocean anomaly = f_to * atm anomaly).
-        call snapesm_derive(sc, dTa, dTo, dSo)
+        ! 5. Derive: coupled rules (e.g. fraction ocean = f_to * atm anomaly).
+        call snapesm_derive(sc, ta_ann_lag, dTa, dTo, dSo)
 
         return
     end subroutine snapesm_update
@@ -254,94 +269,226 @@ contains
         return
     end subroutine snapesm_refresh_loads
 
-    subroutine snapesm_weights(sc, w)
-        ! Compute the per-snapshot anomaly weights from the indices and each
-        ! snapshot's idx_coord. now = ref + Sum w_s * snap(s)%state, with w_ref = 0.
-        !
-        ! Each method is a weight pattern, e.g. snap_1ind (snapclim.f90 calc_temp_1ind:
-        ! temp_now = temp0 + aa*(temp2 - temp1)) => w = [0, -aa, +aa] on [ref, s1, s2].
-        !
-        ! TODO(weights): port the per-method weight patterns (1ind/2ind/miocene/abs)
-        ! faithfully and reconcile with idx_coord/manifold. For now: `const` (w = 0,
-        ! now = ref), which is exact for the const method.
-        implicit none
-        type(snapesm_class), intent(IN)  :: sc
-        real(wp),              intent(OUT) :: w(:)
-        w = 0.0_wp
-        return
-    end subroutine snapesm_weights
-
-    subroutine snapesm_combine(sc, w)
-        ! Generic weighted blend of the reduced snapshot states into `now`.
-        ! Blends the sea-level / annual fields; surface tas and aggregates are
-        ! derived afterwards in snapesm_transform.
+    subroutine snapesm_combine(sc, time)
+        ! Blend the reduced snapshot states into `now`, per field, from the reference
+        ! baseline (was clim0). Each field uses its blend rule and driving index:
+        !   linear (temp/salinity): now = ref + aa*(s1 - s0)        [calc_temp_1ind]
+        !   ratio  (precip):        now = ref*(aa*(s1/s0 - 1) + 1)  [calc_precip_1ind]
+        !   fraction / const:       now = ref  (fraction ocean is finished in derive)
+        ! s0,s1 are the manifold-endpoint snapshots (idx_coord min/max among non-ref);
+        ! aa is the field's index normalized to those snapshots' times.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        real(wp),              intent(IN)    :: w(:)
-        integer :: s
-        logical :: first
-        do s = 1, sc%par%n_snap
-            first = (s == 1)
-            call accum3(sc%now%tsl,    sc%ref%tsl,    sc%snap(s)%state%tsl,    w(s), first)
-            call accum3(sc%now%prcor,  sc%ref%prcor,  sc%snap(s)%state%prcor,  w(s), first)
-            call accum3(sc%now%to_ann, sc%ref%to_ann, sc%snap(s)%state%to_ann, w(s), first)
-            call accum3(sc%now%so_ann, sc%ref%so_ann, sc%snap(s)%state%so_ann, w(s), first)
-            call accum2(sc%now%beta_p, sc%ref%beta_p, sc%snap(s)%state%beta_p, w(s), first)
+        real(wp),              intent(IN)    :: time
+        integer  :: f, iref, is0, is1
+        real(wp) :: aa
+
+        call find_endpoints(sc, iref, is0, is1)
+
+        do f = 1, sc%par%n_field
+            if (.not. sc%registry(f)%enabled) cycle
+            aa = 0.0_wp
+            if (len_trim(sc%registry(f)%index) > 0) &
+                aa = norm_index(sc, trim(sc%registry(f)%index), time, is0, is1)
+
+            select case(trim(sc%registry(f)%kind))
+                case("atm_temp")
+                    call blend_field(sc%registry(f)%blend, sc%now%tsl, sc%ref%tsl, &
+                         sc%snap(is0)%state%tsl, sc%snap(is1)%state%tsl, aa)
+                case("atm_precip")
+                    call blend_field(sc%registry(f)%blend, sc%now%prcor, sc%ref%prcor, &
+                         sc%snap(is0)%state%prcor, sc%snap(is1)%state%prcor, aa)
+                case("ocn")
+                    call blend_field(sc%registry(f)%blend, sc%now%to_ann, sc%ref%to_ann, &
+                         sc%snap(is0)%state%to_ann, sc%snap(is1)%state%to_ann, aa)
+                case("ocn_salt")
+                    call blend_field(sc%registry(f)%blend, sc%now%so_ann, sc%ref%so_ann, &
+                         sc%snap(is0)%state%so_ann, sc%snap(is1)%state%so_ann, aa)
+                case default
+                    ! "elev" and other non-blended fields: nothing to combine.
+            end select
         end do
+
         return
     end subroutine snapesm_combine
 
-    subroutine accum3(dst, ref, src, wgt, first)
-        ! dst = ref (on first) then dst += wgt*src  =>  dst = ref + Sum wgt*src.
-        ! No-op unless all three arrays are allocated (skips fields not in use).
+    subroutine blend_field(mode, dst, ref, x0, x1, aa)
+        ! Combine a single reduced field. `linear`/`ratio` need the endpoint states
+        ! (x0,x1) allocated; `fraction`/`const` only copy the reference. No-op unless
+        ! the required arrays are allocated (skips fields a snapshot does not supply).
         implicit none
+        character(len=*),      intent(IN)    :: mode
         real(wp), allocatable, intent(INOUT) :: dst(:,:,:)
-        real(wp), allocatable, intent(IN)    :: ref(:,:,:), src(:,:,:)
-        real(wp),              intent(IN)    :: wgt
-        logical,               intent(IN)    :: first
-        if (.not. (allocated(dst) .and. allocated(ref) .and. allocated(src))) return
-        if (first) dst = ref
-        dst = dst + wgt*src
-        return
-    end subroutine accum3
+        real(wp), allocatable, intent(IN)    :: ref(:,:,:), x0(:,:,:), x1(:,:,:)
+        real(wp),              intent(IN)    :: aa
 
-    subroutine accum2(dst, ref, src, wgt, first)
-        implicit none
-        real(wp), allocatable, intent(INOUT) :: dst(:,:)
-        real(wp), allocatable, intent(IN)    :: ref(:,:), src(:,:)
-        real(wp),              intent(IN)    :: wgt
-        logical,               intent(IN)    :: first
-        if (.not. (allocated(dst) .and. allocated(ref) .and. allocated(src))) return
-        if (first) dst = ref
-        dst = dst + wgt*src
+        if (.not. (allocated(dst) .and. allocated(ref))) return
+
+        select case(trim(mode))
+            case("fraction","const")
+                dst = ref
+            case("ratio")
+                if (.not. (allocated(x0) .and. allocated(x1))) then
+                    dst = ref; return
+                end if
+                where (x0 /= 0.0_wp)
+                    dst = ref*(aa*(x1/x0 - 1.0_wp) + 1.0_wp)
+                elsewhere
+                    dst = ref
+                end where
+            case default   ! "linear"
+                if (.not. (allocated(x0) .and. allocated(x1))) then
+                    dst = ref; return
+                end if
+                dst = ref + aa*(x1 - x0)
+        end select
+
         return
-    end subroutine accum2
+    end subroutine blend_field
+
+    subroutine find_endpoints(sc, iref, is0, is1)
+        ! Identify the reference snapshot and the 1-D manifold endpoints (the non-ref
+        ! snapshots with the smallest and largest idx_coord). Falls back to the
+        ! reference when there are no non-ref snapshots (e.g. the `const` method).
+        implicit none
+        type(snapesm_class), intent(IN)  :: sc
+        integer,              intent(OUT) :: iref, is0, is1
+        integer  :: s
+        real(wp) :: cmin, cmax
+        iref = 0; is0 = 0; is1 = 0
+        cmin =  huge(1.0_wp); cmax = -huge(1.0_wp)
+        do s = 1, sc%par%n_snap
+            if (sc%snap(s)%spec%is_ref) then
+                if (iref == 0) iref = s
+                cycle
+            end if
+            if (sc%snap(s)%spec%idx_coord(1) < cmin) then
+                cmin = sc%snap(s)%spec%idx_coord(1); is0 = s
+            end if
+            if (sc%snap(s)%spec%idx_coord(1) > cmax) then
+                cmax = sc%snap(s)%spec%idx_coord(1); is1 = s
+            end if
+        end do
+        if (iref == 0) iref = 1
+        if (is0  == 0) is0  = iref
+        if (is1  == 0) is1  = iref
+        return
+    end subroutine find_endpoints
+
+    function norm_index(sc, idx_name, time, is0, is1) result(aa)
+        ! Normalize a driving index to the manifold endpoints' snapshot times:
+        !   aa = (S(time) - S(t0)) / (S(t1) - S(t0))   (snapclim 439-445)
+        ! so aa=0 at snapshot is0's time and aa=1 at is1's time. Optional Holocene
+        ! scaling (snap_1ind_new): aa *= f_hol when aa>1 within (-12 ka, -1 ka).
+        implicit none
+        type(snapesm_class), intent(IN) :: sc
+        character(len=*),      intent(IN) :: idx_name
+        real(wp),              intent(IN) :: time
+        integer,               intent(IN) :: is0, is1
+        real(wp) :: aa
+        integer  :: k, i
+        real(wp) :: t0, t1, snow, s0v, s1v
+
+        k = 0
+        do i = 1, sc%par%n_idx
+            if (trim(sc%idx_name(i)) == trim(idx_name)) then
+                k = i; exit
+            end if
+        end do
+
+        aa = 0.0_wp
+        if (k == 0) return
+
+        t0 = sc%snap(is0)%spec%time
+        t1 = sc%snap(is1)%spec%time
+        snow = series_interp1(sc%idx(k)%ser, time)
+        s0v  = series_interp1(sc%idx(k)%ser, t0)
+        s1v  = series_interp1(sc%idx(k)%ser, t1)
+        if (s1v /= s0v) aa = (snow - s0v) / (s1v - s0v)
+
+        if (aa > 1.0_wp .and. time > -12.0e3_wp .and. time < -1.0e3_wp) aa = aa*sc%par%f_hol
+
+        return
+    end function norm_index
 
     subroutine snapesm_transform(sc, z_srf)
-        ! Inflate sea-level fields to the current model elevation and derive
-        ! aggregates. Faithful port target (snapclim.f90:779-812):
-        !   south = (domain=="Antarctica")
-        !   tas(m)  = tsl(m) - z_srf*(lapse(1) +/- (lapse(2)-lapse(1))*cos(2*pi*(m*30-15)/360))
-        !   pr(m)   = prcor(m) * exp(beta_p*(tas(m)-tsl(m)))
-        !   tsl_ann = mean(tsl); ta_ann = mean(tas); *_sum = mean over DJF/JJA;
-        !   pr_ann  = mean(pr)*365; prcor_ann = mean(prcor)*365
-        !
-        ! TODO(transform): implement once reduction populates now%tsl/prcor/beta_p.
+        ! Inflate the blended sea-level fields to the current model elevation and
+        ! compute the annual/summer aggregates (snapclim 779-811). Note the cosine
+        ! phase here is m*30-15 (vs m*30-30 in the sea-level reduction).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
+        integer  :: m
+        logical  :: south
+        real(wp) :: l1, l2
+
+        south = (trim(sc%par%domain) == "Antarctica")
+        l1 = sc%par%lapse(1)
+        l2 = sc%par%lapse(2)
+
         if (allocated(sc%now%z_srf)) sc%now%z_srf = z_srf
+        if (allocated(sc%now%mask)) then
+            sc%now%mask = 0.0_wp
+            where (z_srf > 1.0_wp) sc%now%mask = 1.0_wp
+        end if
+
+        ! 3a: monthly tas from tsl via seasonal lapse rate to the current elevation.
+        do m = 1, NMONTH
+            if (south) then
+                sc%now%tas(:,:,m) = sc%now%tsl(:,:,m) - &
+                    z_srf*(l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp))
+            else
+                sc%now%tas(:,:,m) = sc%now%tsl(:,:,m) - &
+                    z_srf*(l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp))
+            end if
+        end do
+
+        ! 3b: monthly precip re-sensitized to the current elevation.
+        do m = 1, NMONTH
+            sc%now%pr(:,:,m) = sc%now%prcor(:,:,m) * &
+                exp(sc%now%beta_p*(sc%now%tas(:,:,m) - sc%now%tsl(:,:,m)))
+        end do
+
+        ! Step 4: annual and summer aggregates.
+        sc%now%tsl_ann = sum(sc%now%tsl, dim=3) / 12.0_wp
+        sc%now%ta_ann  = sum(sc%now%tas, dim=3) / 12.0_wp
+        if (south) then
+            sc%now%tsl_sum = sum(sc%now%tsl(:,:,[12,1,2]), dim=3) / 3.0_wp
+            sc%now%ta_sum  = sum(sc%now%tas(:,:,[12,1,2]), dim=3) / 3.0_wp
+        else
+            sc%now%tsl_sum = sum(sc%now%tsl(:,:,[6,7,8]),  dim=3) / 3.0_wp
+            sc%now%ta_sum  = sum(sc%now%tas(:,:,[6,7,8]),  dim=3) / 3.0_wp
+        end if
+        sc%now%prcor_ann = sum(sc%now%prcor, dim=3) / 12.0_wp * 365.0_wp
+        sc%now%pr_ann    = sum(sc%now%pr,    dim=3) / 12.0_wp * 365.0_wp
+
         return
     end subroutine snapesm_transform
 
-    subroutine snapesm_derive(sc, dTa, dTo, dSo)
-        ! Optional coupled/derived rules applied after the blend, e.g. the old
-        ! `fraction` ocean rule (to anomaly = f_to * mean atm anomaly), and folding
-        ! the driver anomalies dTa/dTo/dSo into the fields.
-        ! TODO(derive): port `fraction` and dTa/dTo/dSo application.
+    subroutine snapesm_derive(sc, ta_ann_lag, dTa, dTo, dSo)
+        ! Coupled/derived rules applied after the blend. The `fraction` ocean rule
+        ! (snapclim 663-675) sets the ocean anomaly to f_to times the domain-mean
+        ! atmospheric annual anomaly. snapclim evaluates this BEFORE now%ta_ann is
+        ! recomputed, so it reads the previous step's ta_ann -> we pass ta_ann_lag
+        ! (now%ta_ann as of the start of this update) to reproduce that lag exactly.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
+        real(wp),              intent(IN)    :: ta_ann_lag(:,:)
         real(wp),              intent(IN), optional :: dTa, dTo, dSo
+        integer  :: f
+        real(wp) :: dTo_now
+
+        do f = 1, sc%par%n_field
+            if (.not. sc%registry(f)%enabled) cycle
+            if (trim(sc%registry(f)%blend) == "fraction" .and. &
+                trim(sc%registry(f)%kind)  == "ocn") then
+                dTo_now = sc%par%f_to * sum(ta_ann_lag - sc%ref%ta_ann) &
+                          / real(sc%par%nx*sc%par%ny, wp)
+                if (allocated(sc%now%to_ann) .and. allocated(sc%ref%to_ann)) &
+                    sc%now%to_ann = sc%ref%to_ann + dTo_now
+            end if
+        end do
+
         return
     end subroutine snapesm_derive
 
@@ -436,17 +583,27 @@ contains
         sc%par%manifold  = 1
         sc%par%ref_name  = ""
         sc%par%lapse     = 0.0_wp
+        sc%par%f_p       = 0.0_wp
+        sc%par%f_p_ne    = 1.0_wp
+        sc%par%f_stdev   = 0.0_wp
+        sc%par%f_to      = 0.0_wp
+        sc%par%f_hol     = 1.0_wp
         sc%par%dTa_const = 0.0_wp
         sc%par%dTo_const = 0.0_wp
         sc%par%dSo_const = 0.0_wp
-        call nml_read(filename, group, "var_defs",  sc%par%var_defs)
-        call nml_read(filename, group, "combine",   sc%par%combine)
-        call nml_read(filename, group, "manifold",  sc%par%manifold)
-        call nml_read(filename, group, "ref_name",  sc%par%ref_name)
-        call nml_read(filename, group, "lapse",     sc%par%lapse)
-        call nml_read(filename, group, "dTa_const", sc%par%dTa_const)
-        call nml_read(filename, group, "dTo_const", sc%par%dTo_const)
-        call nml_read(filename, group, "dSo_const", sc%par%dSo_const)
+        call nml_read(filename, group, "var_defs",  sc%par%var_defs,  init=.TRUE.)
+        call nml_read(filename, group, "combine",   sc%par%combine,   init=.TRUE.)
+        call nml_read(filename, group, "manifold",  sc%par%manifold,  init=.TRUE.)
+        call nml_read(filename, group, "ref_name",  sc%par%ref_name,  init=.TRUE.)
+        call nml_read(filename, group, "lapse",     sc%par%lapse,     init=.TRUE.)
+        call nml_read(filename, group, "f_p",       sc%par%f_p,       init=.TRUE.)
+        call nml_read(filename, group, "f_p_ne",    sc%par%f_p_ne,    init=.TRUE.)
+        call nml_read(filename, group, "f_stdev",   sc%par%f_stdev,   init=.TRUE.)
+        call nml_read(filename, group, "f_to",      sc%par%f_to,      init=.TRUE.)
+        call nml_read(filename, group, "f_hol",     sc%par%f_hol,     init=.TRUE.)
+        call nml_read(filename, group, "dTa_const", sc%par%dTa_const, init=.TRUE.)
+        call nml_read(filename, group, "dTo_const", sc%par%dTo_const, init=.TRUE.)
+        call nml_read(filename, group, "dSo_const", sc%par%dSo_const, init=.TRUE.)
 
         ! --- field registry ---------------------------------------------------
         names = ""
@@ -493,18 +650,21 @@ contains
         character(len=*),       intent(IN)  :: filename, group, name, combine_default
 
         fs%name           = name
-        fs%kind           = "atm_monthly"
+        fs%kind           = "atm_temp"
         fs%combine        = combine_default
+        fs%blend          = "linear"
+        fs%index          = ""
         fs%enabled        = .TRUE.
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
         fs%seasonal_synth = .FALSE.
-        call nml_read(filename, group, "kind",           fs%kind)
-        call nml_read(filename, group, "combine",        fs%combine)
-        call nml_read(filename, group, "enabled",        fs%enabled)
-        call nml_read(filename, group, "apply_lapse",    fs%apply_lapse)
-        call nml_read(filename, group, "precip_scaling", fs%precip_scaling)
-        call nml_read(filename, group, "seasonal_synth", fs%seasonal_synth)
+        ! Only the keys the current model uses are read (kind/blend/index). The
+        ! remaining knobs (combine/enabled/*_flags) keep their struct defaults; they
+        ! cannot be made optional in the namelist until nml gains an ignore-missing
+        ! mode (it errors on any absent key), so they are not read here yet.
+        call nml_read(filename, group, "kind",  fs%kind,  init=.TRUE.)
+        call nml_read(filename, group, "blend", fs%blend, init=.TRUE.)
+        call nml_read(filename, group, "index", fs%index, init=.TRUE.)
 
         return
     end subroutine read_field_spec
@@ -516,10 +676,15 @@ contains
 
         ss%name      = name
         ss%is_ref    = .FALSE.
+        ss%monthly   = .FALSE.
+        ss%time      = 0.0_wp
         ss%idx_coord = 0.0_wp
-        call nml_read(filename, group, "is_ref",    ss%is_ref)
-        call nml_read(filename, group, "idx_coord", ss%idx_coord)
-        ! The top-level ref_name also designates the reference snapshot.
+        call nml_read(filename, group, "monthly",   ss%monthly,   init=.TRUE.)
+        call nml_read(filename, group, "time",      ss%time,      init=.TRUE.)
+        call nml_read(filename, group, "idx_coord", ss%idx_coord, init=.TRUE.)
+        ! The reference snapshot is designated solely by the top-level ref_name
+        ! (an is_ref namelist key would have to be present in every snapshot group,
+        ! given nml's error-on-missing behavior).
         if (trim(name) == trim(ref_name)) ss%is_ref = .TRUE.
 
         return
@@ -579,26 +744,231 @@ contains
         ! Set the reference state (anomaly baseline; clim0-equivalent for callers).
         call snapesm_set_ref(sc)
 
+        ! Seed the output state from the reference (allocates now; mirrors snapclim's
+        ! `now = clim0`). This also primes now%ta_ann for the first fraction-ocean lag.
+        sc%now = sc%ref
+
         return
     end subroutine snapesm_load_snapshots
 
     subroutine snapesm_reduce_snapshot(sc, s)
-        ! Extract raw fields from snapshot s's varslices into its reduced state and
-        ! compute the sea-level fields. Faithful port target
-        ! (snapclim.f90 read_climate_snapshot, ~1918-1948):
-        !   tsl_ann = ta_ann + lapse(1)*z_srf ; tsl_sum = ta_sum + lapse(2)*z_srf
-        !   pr      = pr*(1 + f_stdev*pr_stdev_frac)              [variability scaling]
-        !   prcor_ann = pr_ann / exp(beta_p*(ta_ann - tsl_ann))
-        !   tsl(m)  = tas(m) + z_srf*(lapse(1) +/- (lapse(2)-lapse(1))*cos(2*pi*(m*30-30)/360))
-        !   prcor(m)= pr(m) / exp(beta_p*(tas(m) - tsl(m)))
-        ! plus: seasonal synthesis for annual-only snapshots, ocean vertical interp to the
-        ! model depth axis, and the varslice %var -> state-array extraction (pending
-        ! confirmation of the monthly/3D %var layout). Allocates the state arrays it fills.
+        ! Extract snapshot s's varslice fields into its reduced (sea-level) state.
+        ! Faithful port of snapclim read_climate_snapshot (1685-1969) + read_ocean_snapshot.
+        ! Monthly snapshots (spec%monthly): raw tas/pr are monthly (pr = sum of sources, sf+rf).
+        ! Annual snapshots: tas = cosine-synthesized from [ta_ann, ta_sum]; pr from pr_ann.
+        ! Then (both): sea-level lapse reduction, prcor, and ocean vertical interp.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         integer,               intent(IN)    :: s
+
+        integer  :: nx, ny, m, k, nsrc
+        integer  :: f_tas, f_pr, f_zs, f_to, f_so
+        logical  :: south
+        real(wp) :: zmean, l1, l2
+
+        nx = sc%par%nx
+        ny = sc%par%ny
+        south = (trim(sc%par%domain) == "Antarctica")
+        l1 = sc%par%lapse(1)
+        l2 = sc%par%lapse(2)
+
+        f_zs  = field_bind_index(sc, "zs")
+        f_tas = field_bind_index(sc, "tas")
+        f_pr  = field_bind_index(sc, "pr")
+        f_to  = field_bind_index(sc, "to")
+        f_so  = field_bind_index(sc, "so")
+
+        associate(spec => sc%snap(s)%spec, st => sc%snap(s)%state, bind => sc%snap(s)%bind)
+
+        ! --- elevation, mask, beta_p (snapclim 1746-1755) -------------------------
+        if (allocated(st%z_srf))  deallocate(st%z_srf)
+        if (allocated(st%mask))   deallocate(st%mask)
+        if (allocated(st%beta_p)) deallocate(st%beta_p)
+        allocate(st%z_srf(nx,ny), st%mask(nx,ny), st%beta_p(nx,ny))
+        st%z_srf = bind(f_zs)%src(1)%var(:,:,1,1)
+        ! Missing-value fill -> domain mean (GRL inputs are complete; guard on the
+        ! -9999 fill sentinel, safe since surface elevation is >= 0).
+        if (any(st%z_srf <= -9000.0_wp)) then
+            zmean = sum(st%z_srf, mask=st%z_srf > -9000.0_wp) &
+                    / real(max(count(st%z_srf > -9000.0_wp),1), wp)
+            where (st%z_srf <= -9000.0_wp) st%z_srf = zmean
+        end if
+        st%mask = 0.0_wp
+        where (st%z_srf > 0.0_wp) st%mask = 1.0_wp
+        ! beta_p = f_p everywhere (snapclim hardcodes f_p_ne=1.0, so the NE-basin
+        ! branch is dormant); f_p_ne is retained in par for future basin dependence.
+        st%beta_p = sc%par%f_p * 1.0_wp
+        if (sc%par%f_p_ne /= 1.0_wp) st%beta_p = sc%par%f_p  ! (kept uniform; see note)
+
+        ! --- atmosphere: raw monthly tas/pr -------------------------------------
+        if (allocated(st%tas))    deallocate(st%tas)
+        if (allocated(st%pr))     deallocate(st%pr)
+        if (allocated(st%ta_ann)) deallocate(st%ta_ann)
+        if (allocated(st%ta_sum)) deallocate(st%ta_sum)
+        if (allocated(st%pr_ann)) deallocate(st%pr_ann)
+        allocate(st%tas(nx,ny,NMONTH), st%pr(nx,ny,NMONTH))
+        allocate(st%ta_ann(nx,ny), st%ta_sum(nx,ny), st%pr_ann(nx,ny))
+
+        if (spec%monthly) then
+            ! Monthly climatology (snapclim clim_monthly=True, 1757-1840).
+            do m = 1, NMONTH
+                st%tas(:,:,m) = bind(f_tas)%src(1)%var(:,:,m,1)
+            end do
+            ! pr = sum of monthly sources (name3=="sf" -> pr = sf + rf).
+            nsrc = size(bind(f_pr)%src)
+            st%pr = bind(f_pr)%src(1)%var(:,:,1:NMONTH,1)
+            do k = 2, nsrc
+                st%pr = st%pr + bind(f_pr)%src(k)%var(:,:,1:NMONTH,1)
+            end do
+            where (st%pr < 0.0_wp) st%pr = 0.0_wp
+            st%ta_ann = sum(st%tas, dim=3) / 12.0_wp
+            if (south) then
+                st%ta_sum = sum(st%tas(:,:,[12,1,2]), dim=3) / 3.0_wp
+            else
+                st%ta_sum = sum(st%tas(:,:,[6,7,8]),  dim=3) / 3.0_wp
+            end if
+            st%pr_ann = sum(st%pr, dim=3) / 12.0_wp * 365.0_wp
+        else
+            ! Annual+summer inputs, cosine-synthesized to monthly (snapclim 1842-1910).
+            st%ta_ann = bind(f_tas)%src(1)%var(:,:,1,1)
+            st%ta_sum = bind(f_tas)%src(2)%var(:,:,1,1)
+            do m = 1, NMONTH
+                if (south) then
+                    st%tas(:,:,m) = st%ta_ann + (st%ta_sum-st%ta_ann)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp)
+                else
+                    st%tas(:,:,m) = st%ta_ann - (st%ta_sum-st%ta_ann)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp)
+                end if
+            end do
+            ! pr_ann raw is [mm/d]; monthly pr = raw (flat), object pr_ann = raw*365 [mm/a].
+            st%pr_ann = bind(f_pr)%src(1)%var(:,:,1,1)
+            do m = 1, NMONTH
+                st%pr(:,:,m) = st%pr_ann
+            end do
+            st%pr_ann = st%pr_ann * 365.0_wp
+        end if
+
+        ! Precip variability scaling (snapclim 1926-1927); f_stdev=0 -> no-op here.
+        ! (pr_stdev_frac == 0 for this config, so the monthly scaling is identity.)
+
+        ! --- sea-level temperatures and elevation-desensitized precip -----------
+        if (allocated(st%tsl))       deallocate(st%tsl)
+        if (allocated(st%prcor))     deallocate(st%prcor)
+        if (allocated(st%tsl_ann))   deallocate(st%tsl_ann)
+        if (allocated(st%tsl_sum))   deallocate(st%tsl_sum)
+        if (allocated(st%prcor_ann)) deallocate(st%prcor_ann)
+        allocate(st%tsl(nx,ny,NMONTH), st%prcor(nx,ny,NMONTH))
+        allocate(st%tsl_ann(nx,ny), st%tsl_sum(nx,ny), st%prcor_ann(nx,ny))
+
+        st%tsl_ann   = st%ta_ann + l1*st%z_srf
+        st%tsl_sum   = st%ta_sum + l2*st%z_srf
+        st%prcor_ann = st%pr_ann / exp(st%beta_p*(st%ta_ann - st%tsl_ann))
+        do m = 1, NMONTH
+            if (south) then
+                st%tsl(:,:,m) = st%tas(:,:,m) + st%z_srf*(l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp))
+            else
+                st%tsl(:,:,m) = st%tas(:,:,m) + st%z_srf*(l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp))
+            end if
+            st%prcor(:,:,m) = st%pr(:,:,m) / exp(st%beta_p*(st%tas(:,:,m) - st%tsl(:,:,m)))
+        end do
+
+        ! --- ocean (only if this snapshot supplies 3-D to/so) -------------------
+        if (f_to > 0 .and. f_so > 0) then
+            if (allocated(bind(f_to)%src) .and. allocated(bind(f_so)%src)) then
+                call reduce_ocean(sc, s, f_to, f_so)
+            end if
+        end if
+
+        end associate
+
         return
     end subroutine snapesm_reduce_snapshot
+
+    subroutine reduce_ocean(sc, s, f_to, f_so)
+        ! Monthly-average to/so over the 12-month axis, then vertically interpolate
+        ! the input depth profiles to the model depth axis (snapclim read_ocean_snapshot
+        ! 2078-2150; 42 -> 23 levels, depth0 = abs(file depth)).
+        implicit none
+        type(snapesm_class), intent(INOUT) :: sc
+        integer,               intent(IN)    :: s, f_to, f_so
+
+        integer  :: nx, ny, nz0, nzo, i, j, k, nt
+        real(wp) :: tlo, thi
+        real(wp), allocatable :: depth0(:), depthm(:), to0(:,:,:), so0(:,:,:)
+
+        nx = sc%par%nx
+        ny = sc%par%ny
+
+        associate(st => sc%snap(s)%state, vt => sc%snap(s)%bind(f_to)%src(1), &
+                                          vs => sc%snap(s)%bind(f_so)%src(1))
+
+        ! Read all 12 months then average to the annual mean (snapclim sum(dim=4)/12).
+        ! rep=12 selects the sub-annual axis via whole-year matching (get_indices uses
+        ! floor(month)==year), which is robust to the sp/dp rounding of the fractional
+        ! month positions that a direct fractional range would trip on.
+        tlo = real(floor(minval(vt%time)), wp)   ! the (single) whole year of the axis
+        call varslice_update(vt, [tlo,tlo], method="range", rep=12)
+        call varslice_update(vs, [tlo,tlo], method="range", rep=12)
+
+        nz0 = size(vt%var,3)
+        nt  = size(vt%var,4)
+        allocate(depth0(nz0)); depth0 = abs(vt%z(1:nz0))
+        allocate(to0(nx,ny,nz0), so0(nx,ny,nz0))
+        to0 = sum(vt%var, dim=4) / real(nt,wp)
+        so0 = sum(vs%var, dim=4) / real(size(vs%var,4),wp)
+
+        call model_depth(depthm)
+        nzo = size(depthm)
+        if (allocated(st%depth))  deallocate(st%depth)
+        if (allocated(st%to_ann)) deallocate(st%to_ann)
+        if (allocated(st%so_ann)) deallocate(st%so_ann)
+        allocate(st%depth(nzo)); st%depth = depthm
+        allocate(st%to_ann(nx,ny,nzo), st%so_ann(nx,ny,nzo))
+
+        do k = 1, nzo
+        do j = 1, ny
+        do i = 1, nx
+            st%to_ann(i,j,k) = interp_linear(depth0, to0(i,j,:), xout=depthm(k))
+            st%so_ann(i,j,k) = interp_linear(depth0, so0(i,j,:), xout=depthm(k))
+        end do
+        end do
+        end do
+
+        end associate
+
+        return
+    end subroutine reduce_ocean
+
+    subroutine model_depth(depth)
+        ! Model ocean depth axis: nzo=23, 0..2000 m in 21 steps + [2500, 3000]
+        ! (snapclim snapclim_init 300-307).
+        implicit none
+        real(wp), allocatable, intent(OUT) :: depth(:)
+        integer, parameter :: nzo = 23
+        integer :: k
+        if (allocated(depth)) deallocate(depth)
+        allocate(depth(nzo))
+        do k = 1, nzo-2
+            depth(k) = (k-1)*2000.0_wp/real(nzo-3,wp)
+        end do
+        depth(nzo-1:nzo) = [2500.0_wp, 3000.0_wp]
+        return
+    end subroutine model_depth
+
+    function field_bind_index(sc, name) result(f)
+        ! Registry index of the field named `name` (case-sensitive), or 0 if absent.
+        implicit none
+        type(snapesm_class), intent(IN) :: sc
+        character(len=*),      intent(IN) :: name
+        integer :: f, i
+        f = 0
+        do i = 1, sc%par%n_field
+            if (trim(sc%registry(i)%name) == trim(name)) then
+                f = i
+                return
+            end if
+        end do
+        return
+    end function field_bind_index
 
     subroutine snapesm_set_ref(sc)
         ! Copy the designated reference snapshot's reduced state into sc%ref
