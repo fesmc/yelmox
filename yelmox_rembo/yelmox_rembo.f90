@@ -18,7 +18,7 @@ program yelmox_rembo
                       yelmo_init_state, yelmo_update_equil, yelmo_print_bound
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
                              isos_init_ref, isos_init_state
-    use snapclim,     only : snapclim_update
+    use yelmox_climate, only : climate_update
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
                                rembo_ann, rembo_restart_write
     use tsgen, only : tsgen_class
@@ -258,11 +258,11 @@ contains
         dom%smb%ann%smb  = real(rembo_ann%smb,   wp)
         dom%smb%ann%tsrf = real(rembo_ann%T_srf, wp)
 
-        ! Ocean forcing via snapclim (grid_clim); optional hysteresis ocean anomaly.
-        call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &
-                             domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
-        if (tsf%active .and. trim(dom%snp%par%ocn_type) == "const") &
-            dom%snp%now%to_ann = dom%snp%now%to_ann + dT_ocn
+        ! Ocean forcing via the climate backend (grid_clim); optional hysteresis anomaly.
+        call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time, &
+                            domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
+        if (tsf%active .and. trim(dom%cl%snp%par%ocn_type) == "const") &
+            dom%clim%now%to_ann = dom%clim%now%to_ann + dT_ocn
     end subroutine step_rembo
 
     subroutine rembo_cold_start()

@@ -48,13 +48,37 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
+$(objdir)/snapesm.o: $(libdir)/snapesm.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+# ---- Climate backend selection: snapclim (default) or snapesm ----------------
+# The backend-agnostic domain (yelmox_domain) reads dom%clim, filled by the
+# yelmox_climate adapter. Both adapter variants share the module name yelmox_climate;
+# CLIMATE selects which source (and backend object) is compiled. Build with e.g.
+#   make yelmox CLIMATE=snapesm
+CLIMATE ?= snapclim
+ifeq ($(CLIMATE),snapesm)
+    climate_backend_obj = $(objdir)/snapesm.o
+    yelmox_climate_src  = $(libdir)/yelmox_climate_snapesm.f90
+else
+    climate_backend_obj = $(objdir)/snapclim.o
+    yelmox_climate_src  = $(libdir)/yelmox_climate_snapclim.f90
+endif
+
+$(objdir)/climate_out.o: $(libdir)/climate_out.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+$(objdir)/yelmox_climate.o: $(yelmox_climate_src) $(objdir)/climate_out.o $(climate_backend_obj)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
 # Hi-res topography reference hub for multigrid yelmox
 $(objdir)/htopo.o: $(libdir)/htopo.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # Multigrid coupling driver support (ice_domain + step_* primitives)
 $(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o \
-						$(objdir)/snapclim.o $(objdir)/smbpal.o $(objdir)/smb_simple.o \
+						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o \
+						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
 						$(objdir)/htopo.o \
 						$(objdir)/sediments.o $(objdir)/geothermal.o \
 						$(objdir)/ice_sub_regions.o
@@ -173,7 +197,9 @@ yelmox_libs = 			$(objdir)/basal_hydrology.o \
 					    $(objdir)/smb_pdd.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/smb_simple.o \
-					    $(objdir)/snapclim.o \
+					    $(objdir)/climate_out.o \
+					    $(objdir)/yelmox_climate.o \
+					    $(climate_backend_obj) \
 						$(objdir)/htopo.o \
 						$(objdir)/yelmox_domain.o \
 						$(objdir)/ice_sub_regions.o

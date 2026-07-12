@@ -1,0 +1,134 @@
+! =====================================================================
+! greenland_clim.nml — var_defs database for snapesm (Greenland climate)
+!
+! Each group is one varslice binding (permanent per-file variable metadata).
+! Referenced by name from the &snp_<snapshot> groups of an assembly config.
+! Compact fesm-utils format: units = "in" "out"; scaling = scale offset
+! (var*scale+offset, so degC->K uses offset 273.15); time = active x0 x1 dx nsub
+! (active>=0.5 => time axis; nsub>1 => sub-annual/monthly axis).
+!
+! Sources mirror snapclim &snap_clim0..2 for atm_type=snap_1ind_new:
+!   pd        = MARv3.11-ERA (monthly)          [clim0, reference]
+!   picontrol = PMIP3 piControl (annual+summer) [clim1]
+!   lgm       = PMIP3 LGM      (annual+summer)  [clim2]
+! Only pd supplies the 3-D ocean (to/so); the fraction ocean rule derives the
+! rest from the atmospheric anomaly, so picontrol/lgm need no ocean here.
+! =====================================================================
+
+! ---- pd (present day, MARv3.11-ERA, monthly) --------------------------------
+
+&clim_pd_tas
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    name     = "tas"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_pd_pr_sf
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    name     = "sf"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&clim_pd_pr_rf
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    name     = "rf"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&clim_pd_zs
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&clim_pd_to
+    filename = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    name     = "to"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 1 1 1 1 12
+/
+
+&clim_pd_so
+    filename = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    name     = "so"
+    units    = "psu" "psu"
+    scaling  = 1.0 0.0
+    time     = 1 1 1 1 12
+/
+
+! ---- picontrol (PMIP3 piControl, annual + summer) ---------------------------
+
+&clim_picontrol_tas_ann
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    name     = "t2m_ann"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_picontrol_tas_sum
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_picontrol_pr_ann
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    name     = "pr_ann"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&clim_picontrol_zs
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+! ---- lgm (PMIP3 LGM, annual + summer) ---------------------------------------
+
+&clim_lgm_tas_ann
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    name     = "t2m_ann"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_lgm_tas_sum
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_lgm_pr_ann
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    name     = "pr_ann"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&clim_lgm_zs
+    filename = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
