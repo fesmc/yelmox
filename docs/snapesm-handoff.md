@@ -65,8 +65,12 @@ structure · `9efdfe1` load via subs · `99260a1` par_load · `c48cbd9` skeleton
 
 ## What REMAINS — in-model integration
 
-**Integration is CODE-COMPLETE but UNVERIFIED** (no yelmox build here — a full build needs
-Yelmo+LIS+isostasy+fesm-utils and there is no built objdir). Done on branch `snapclim2`:
+**Integration BUILDS end-to-end for BOTH backends.** All merged to `dev` (yelmox + fesm-utils);
+`include-serial` rebuilt; Yelmo/FastIsostasy/yelmox libs rebuilt against current fesm-utils.
+Verified: `make yelmox openmp=0` (snapclim, default) and `make yelmox CLIMATE=snapesm openmp=0`
+both compile + link to `yelmox.x` (EXIT=0). **Remaining = run the model both ways and diff outputs.**
+
+Done on branch `snapclim2` (now merged to `dev`):
 
 - **fesm-utils fixes** (branch `snp-forcing-fixes`, off dev): tsgen/series plain-header skip;
   varslice `ndim=4` missing branch. Committed, not merged to dev.
@@ -81,17 +85,23 @@ Yelmo+LIS+isostasy+fesm-utils and there is no built objdir). Done on branch `sna
     internals; snapclim only) + `dom%clim%now%to_ann` (ocean writes).
   - `config/Makefile_yelmox.mk` — `CLIMATE ?= snapclim` selects adapter source + backend obj.
 
-**Next session — build & validate in-model:**
-1. Merge `snp-forcing-fixes` → fesm-utils `dev`; rebuild `include-serial`
-   (`make -C fesm-utils fesmutils-static`). ⚠ Only when no yelmox experiments run.
-2. `make yelmox` (snapclim, default) — must still build & run unchanged (regression check).
-3. `make yelmox CLIMATE=snapesm` — fix any compile errors (watch: `dom%cl%snp` type visibility
-   in rembo/obm — those build only with `CLIMATE=snapclim`; a `CLIMATE=snapesm` build of the
-   bipolar/rembo targets is expected to fail until they are migrated off backend internals).
-4. Run the same config under both backends, diff `dom%clim` outputs (snap.nc / mshlf / smb) — the
-   physics already matches offline (see above), so any divergence is an integration bug.
-5. Flip the default to snapesm, keep snapclim selectable a cycle, then retire `libs/snapclim.f90`
+**Next session — run in-model & diff:**
+1. Run a short yelmox simulation with the default (snapclim) `yelmox.x`, then rebuild with
+   `make yelmox CLIMATE=snapesm` and run the SAME config. Author a `snp`/var_defs config for the
+   in-model run (the offline `input/greenland_snp.nml` + `greenland_clim.nml` are the template;
+   the in-model `&snap` group is `snap`+domain-suffix — the adapter passes `group="snap"//sfx`).
+2. Diff the two runs' `snap.nc` / marine-shelf / smb outputs. Physics matches offline (atmosphere
+   bit-exact; ocean matches at real cells), so any divergence is an integration bug.
+3. Flip the default to snapesm, keep snapclim selectable a cycle, then retire `libs/snapclim.f90`
    + `yelmox_climate_snapclim.f90`.
+
+Notes / caveats:
+- The bipolar (`obm_coupling`) + `rembo` drivers reach into `dom%cl%snp` (snapclim internals), so
+  they build only with `CLIMATE=snapclim`. `make yelmox_bipolar` / `yelmox_rembo` under
+  `CLIMATE=snapesm` will fail until those are migrated off backend internals.
+- Rebuilding `include-serial` to current fesm-utils `dev` (removed `ncio` `actual_range`) required a
+  clean rebuild of Yelmo + FastIsostasy + the yelmox libs (their cached mods were stale). Already
+  done this session; future fesm-utils bumps need the same.
 
 ---
 
