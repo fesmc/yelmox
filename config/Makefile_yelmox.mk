@@ -48,7 +48,7 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/snapclim2.o: $(libdir)/snapclim2.f90
+$(objdir)/snapesm.o: $(libdir)/snapesm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # Hi-res topography reference hub for multigrid yelmox
