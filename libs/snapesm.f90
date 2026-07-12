@@ -208,6 +208,14 @@ contains
         ! 3. Combine the reduced snapshot states into `now`, per field.
         call snapesm_combine(sc, time)
 
+        ! 3b. Driver transient forcing: a spatially-homogeneous atmospheric anomaly
+        !     (dTa = [tsforcing] f_now*f_ta) added on top of the blended base
+        !     climate. Absent (or 0) when [tsforcing] is inactive -> base climate
+        !     unchanged. Unlike snapclim (which honors dTa in atm_type='anom' only),
+        !     applied for any atm_type, so scenario forcing composes with e.g.
+        !     snap_1ind_new. tsl feeds the transform, so tas/ta_ann/ta_sum inherit it.
+        if (present(dTa)) call snapesm_apply_atm_anom(sc, dTa)
+
         ! Capture ta_ann as it stands BEFORE the transform overwrites it: the
         ! fraction ocean rule (derive) reads the previous step's value (see there).
         if (allocated(sc%now%ta_ann)) ta_ann_lag = sc%now%ta_ann
@@ -488,8 +496,39 @@ contains
             end if
         end do
 
+        ! Driver transient forcing: homogeneous ocean anomalies (dTo/dSo =
+        ! [tsforcing] f_now*{f_to,f_so}) on top of the blended/derived ocean state.
+        ! Absent (or 0) when [tsforcing] is inactive. As with dTa, applied for any
+        ! ocn_type (snapclim honors these in ocn_type='anom' only).
+        if (present(dTo)) then
+            if (allocated(sc%now%to_ann)) sc%now%to_ann = sc%now%to_ann + dTo
+        end if
+        if (present(dSo)) then
+            if (allocated(sc%now%so_ann)) sc%now%so_ann = sc%now%so_ann + dSo
+        end if
+
         return
     end subroutine snapesm_derive
+
+    subroutine snapesm_apply_atm_anom(sc, dTa)
+        ! Apply a spatially-homogeneous atmospheric temperature anomaly on top of
+        ! the blended base climate: warm the sea-level temperature uniformly and
+        ! scale precip by exp(beta_p*dTa). Mirrors snapclim's anom-mode kernels
+        ! (calc_temp_anom + calc_precip_anom, snapclim 504-505) but composes with
+        ! any atm_type. tsl feeds snapesm_transform, so tas/ta_ann/ta_sum inherit
+        ! the shift; prcor feeds the precip re-sensitization there.
+        implicit none
+        type(snapesm_class), intent(INOUT) :: sc
+        real(wp),              intent(IN)    :: dTa
+        integer :: m
+        if (allocated(sc%now%tsl)) sc%now%tsl = sc%now%tsl + dTa
+        if (allocated(sc%now%prcor)) then
+            do m = 1, NMONTH
+                sc%now%prcor(:,:,m) = sc%now%prcor(:,:,m) * exp(sc%now%beta_p*dTa)
+            end do
+        end if
+        return
+    end subroutine snapesm_apply_atm_anom
 
     subroutine snapesm_end(sc)
         ! Teardown (snapclim never had one). Free varslice/tsgen and state arrays.
