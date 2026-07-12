@@ -18,7 +18,6 @@ module snapesm
     use precision, only : wp, sp, dp
     use ncio
     use nml
-    use interp1D, only : interp_linear
     use series,   only : series_interp1
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use tsgen,    only : tsgen_class, tsgen_init, tsgen_update, &
@@ -987,5 +986,37 @@ contains
         if (iref >= 1) sc%ref = sc%snap(iref)%state
         return
     end subroutine snapesm_set_ref
+
+    function interp_linear(x, y, xout) result(yout)
+        ! Simple linear point interpolation, clamped to the endpoints. Private copy
+        ! (identical to snapclim's) so the ocean vinterp does not depend on which
+        ! interp1D module wins the include path in a full yelmox build, and matches
+        ! snapclim's ocean interpolation exactly.
+        implicit none
+        real(wp), dimension(:), intent(IN) :: x, y
+        real(wp),               intent(IN) :: xout
+        real(wp) :: yout
+        integer  :: j, n
+        real(wp) :: alph
+        n = size(x)
+        if (xout .lt. x(1)) then
+            yout = y(1)
+        else if (xout .gt. x(n)) then
+            yout = y(n)
+        else
+            do j = 1, n
+                if (x(j) .ge. xout) exit
+            end do
+            if (j .eq. 1) then
+                yout = y(1)
+            else if (j .eq. n+1) then
+                yout = y(n)
+            else
+                alph = (xout - x(j-1)) / (x(j) - x(j-1))
+                yout = y(j-1) + alph*(y(j) - y(j-1))
+            end if
+        end if
+        return
+    end function interp_linear
 
 end module snapesm
