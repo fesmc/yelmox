@@ -144,10 +144,10 @@ contains
         sc%par%nx = nx
         sc%par%ny = ny
 
-        ! Initialize the driving indices (tsgen). Group is &tsgen_<base_group>_<idxname>.
+        ! Initialize the driving indices (tsgen). Group is &<base_group>_idx_<idxname>.
         do k = 1, sc%par%n_idx
             call tsgen_init(sc%idx(k), filename, time, &
-                            label=trim(base_group)//"_"//trim(sc%idx_name(k)))
+                            group=trim(base_group)//"_idx_"//trim(sc%idx_name(k)))
         end do
 
         ! Load the snapshot fields (varslice) and set the reference state.
@@ -356,17 +356,39 @@ contains
     end subroutine read_snapshot_spec
 
     subroutine snapclim2_load_snapshots(sc, filename, basins)
-        ! Load each snapshot's enabled fields via varslice and set the reference state.
-        !
-        ! PENDING (varslice {snapshot} binding, option b): each field's varslice config
-        ! lives on &<group>_field_<field> with a {snapshot} token in the path, resolved
-        ! per snapshot (with an optional &<group>_snap_<snap>_<field> override). This needs
-        ! a {snapshot}-style substitution hook in varslice (see docs/snapclim2-design.md);
-        ! stubbed until that mechanism is settled.
+        ! Load each snapshot's enabled fields via varslice (option b): the varslice
+        ! config lives on &<group>_field_<field> with a {snapshot} token in the path,
+        ! resolved per snapshot through varslice's `subs` substitution hook.
         implicit none
         type(snapclim2_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         real(wp),              intent(IN)    :: basins(:,:)
+
+        integer            :: s, f
+        character(len=64)  :: subs(1,2)
+        character(len=256) :: fgroup
+
+        do s = 1, sc%par%n_snap
+
+            if (allocated(sc%snap(s)%fld)) deallocate(sc%snap(s)%fld)
+            allocate(sc%snap(s)%fld(sc%par%n_field))
+
+            subs(1,1) = "snapshot"
+            subs(1,2) = trim(sc%snap(s)%spec%name)
+
+            do f = 1, sc%par%n_field
+                if (.not. sc%registry(f)%enabled) cycle
+                fgroup = trim(sc%par%group)//"_field_"//trim(sc%registry(f)%name)
+                call varslice_init_nml(sc%snap(s)%fld(f), filename, trim(fgroup), &
+                                       domain=trim(sc%par%domain), &
+                                       grid_name=trim(sc%par%grid_name), &
+                                       subs=subs)
+            end do
+
+        end do
+
+        ! TODO(ref):      copy the reference snapshot's fields into sc%ref (anomaly baseline).
+        ! TODO(override): honor a per-(snapshot,field) &<group>_snap_<snap>_<field> override.
 
         return
     end subroutine snapclim2_load_snapshots

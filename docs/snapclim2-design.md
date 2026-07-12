@@ -170,73 +170,74 @@ Notes:
 
 ## Namelist design
 
-Base group name is passed via `group=` (default `snapclim2`, or `snapclim2_1`/`_2` for
-multi-domain), mirroring snapclim's `group=`.
+Base group name is passed via `group=` (default `snp2`, or `snp2_1`/`_2` for multi-domain),
+mirroring snapclim's `group=`. All sub-groups are `&<group>_...`.
 
 ```
-&snapclim2                     ! top-level
+&snp2                          ! top-level
     combine     = "anomaly"    ! default combine mode
     manifold    = 1            ! index-manifold dimension (0/1/2)
     ref_name    = "pd"         ! which snapshot is the reference
     lapse       = ...
     ! precip/ocean scaling factors, f_stdev, etc.
-    snapshots   = "pd" "lgm"          ! ordered list -> &snapclim2_snap_<name>
-    fields      = "tas" "pr" "to" "so" "zs"   ! registry -> &snapclim2_field_<name>
-    indices     = "at" "ap"           ! -> &snapclim2_idx_<name> (tsgen groups)
+    snapshots   = "pd" "lgm"          ! ordered list -> &snp2_snap_<name>
+    fields      = "tas" "pr" "to" "so" "zs"   ! registry -> &snp2_field_<name>
+    indices     = "at" "ap"           ! -> &snp2_idx_<name>
 /
 
-&snapclim2_field_tas
+&snp2_field_tas                ! field spec + varslice binding (option b) on one group
     kind        = "atm_monthly"
     combine     = "anomaly"    ! override top-level
     apply_lapse = True
+    ! --- varslice keys (condensed convention); {snapshot} resolved per snapshot ---
+    filename = "ice_data/{domain}/{grid_name}/{snapshot}/{grid_name}_..._monthly.nc"
+    name     = "t2m"
+    units    = "K" "K"                        ! units_in units_out
+    scaling  = 1.0 0.0                         ! unit_scale unit_offset
+    time     = 1.0, 1979.0, 2022.0, 1.0, 12.0 ! [active?, t0, t1, dt, n_sub]
 /
 
-&snapclim2_field_smb           ! exotic forcing, off unless enabled
+&snp2_field_smb                ! exotic forcing, off unless enabled
     kind        = "scalar_2d"
     enabled     = False
 /
 
-&snapclim2_snap_pd             ! reference snapshot
+&snp2_snap_pd                  ! reference snapshot
     is_ref      = True
     idx_coord   = 0.0
-    ! per-field file bindings (see below)
 /
 
-&snapclim2_snap_lgm
+&snp2_snap_lgm
     idx_coord   = 1.0
 /
 
-&snapclim2_idx_at              ! a driving index == a tsgen group
+&snp2_idx_at                   ! a driving index == a tsgen group (verbatim name)
     method      = "series"
     series_file = "..."
     series_var  = "..."
 /
 ```
 
-**Per-snapshot × per-field file binding.** Each snapshot needs a varslice config per enabled
-field. To avoid snapclim's `clim_names(4)` positional array and esm's ~40 named members, bind
-them as a small sub-group per (snapshot, field), e.g. `&snapclim2_snap_pd_tas`, reusing the
-stock varslice namelist keys via a `varslice_init_nml_snapclim2` wrapper (adds any extra
-`{...}` placeholders on top of `{domain}`/`{grid_name}`).
+**Field-templated file binding (option b), implemented.** The varslice config lives on the
+field group `&<group>_field_<field>` (alongside the snapclim2 field-spec keys — different key
+names, same group). A `{snapshot}` token in `filename` is resolved per snapshot at load. This
+uses two small fesm-utils API additions (both non-breaking, landed on branch
+`snp2-forcing-api`):
 
-**varslice namelist convention (condensed form).** snapclim2 consumes whatever `varslice_init_nml`
-accepts; the current condensed convention is:
+- **varslice** — `varslice_init_nml`/`parse_path` gain an optional `subs(:,2)` argument of
+  `{key}`→value pairs (`subs(k,1)`=key, `subs(k,2)`=value), applied after `{domain}`/`{grid_name}`.
+  snapclim2 passes `subs = ["snapshot", snap%name]`. Generic, so esm/ismip6 can later drop their
+  bespoke `parse_path_esm`/`_ismip6` and use `{gcm}`/`{experiment}` subs instead.
+- **tsgen** — `tsgen_init`'s `label` argument becomes `group` and is used **verbatim** (default
+  `"tsgen"`, no forced `tsgen_` prefix), so indices sit in `&<group>_idx_<name>`.
 
-```
-&snapclim2_snap_pd_tas
-    filename = "ice_data/{domain}/{grid_name}/.../..._monthly.nc"
-    name     = "t2m"
-    units    = "K" "K"                        ! units_in units_out
-    scaling  = 1.0 0.0                         ! unit_scale unit_offset
-    time     = 1.0, 1979.0, 2022.0, 1.0, 12.0 ! [active?, t0, t1, dt, n_sub]
-/
-```
+The **condensed varslice convention**: `time`'s first value flags whether the time axis is
+active (replaces `with_time`); the remaining four are `[t0, t1, dt, n_sub]`. A time-varying
+snapshot elevation just sets the `_zs` field's `time` active flag to 1 — no code path change.
+`units`/`scaling` collapse the former in/out and scale/offset pairs onto one line each.
 
-The **first `time` value flags whether the time axis is active** (replaces the separate
-`with_time` key); the remaining four are the old `time_par` `[t0, t1, dt, n_sub]`. A snapshot
-with time-varying elevation just sets its `_zs` sub-group's `time` active flag to 1 — no code
-path change. `units`/`scaling` collapse the former `units_in`/`units_out` and
-`unit_scale`/`unit_offset` pairs onto one line each.
+A per-(snapshot, field) override group `&<group>_snap_<snap>_<field>` (for a snapshot that
+deviates from the field template) is planned but not yet wired.
 
 ---
 
@@ -370,10 +371,16 @@ Compatibility shims for the two special callers:
 
 ## Status / next steps
 
-- **Done:** design agreed; worktree `snapclim2` created; compiling module skeleton
-  (`libs/snapclim2.f90`) with the type layout and stub public API; Makefile rule.
-- **Next:** implement `snapclim2_par_load` (top-level + registry + snapshot + index groups),
-  then the load→combine→transform pipeline, then the validation harness against snapclim.
+- **Done (yelmox worktree `snapclim2`):** compiling module skeleton (`libs/snapclim2.f90`) with
+  the full type layout and public API; Makefile rule; `snapclim2_par_load` (top-level, field
+  registry, snapshot specs, index names); `snapclim2_init` wiring tsgen index init +
+  `snapclim2_load_snapshots` (varslice load via the `{snapshot}` subs hook).
+- **Done (fesm-utils worktree `snp2-forcing-api`):** the two non-breaking API additions above
+  (varslice `subs`, tsgen `group`), compile-verified; snapclim2 compiles against them.
+- **Pending merge:** `snp2-forcing-api` must land on fesm-utils `dev` and the shared
+  `include-serial` be rebuilt before yelmox can build snapclim2 in-tree.
+- **Next:** the `update` pipeline (combine → transform → derive) + `sc%ref` population; then the
+  validation harness against snapclim; then wire the `climate_backend` switch in `yelmox_domain`.
 
 ## Open items
 
