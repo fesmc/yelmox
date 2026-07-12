@@ -33,7 +33,8 @@ module yelmox_domain
     use fastisostasy, only : isos_class, isos_init, isos_update, isos_init_ref, &
                              isos_init_state, isos_restart_write, isos_restart_read, &
                              bsl_class, bsl_update, bsl_restart_read, bsl_restart_write
-    use snapclim,     only : snapclim_class, snapclim_init, snapclim_update
+    use climate_out,    only : climate_out_class
+    use yelmox_climate, only : yelmox_climate_class, climate_init, climate_update
     use smbpal,       only : smbpal_class, smbpal_init, smbpal_update_monthly, &
                              smbpal_update_monthly_equil, smbpal_restart_write, smbpal_restart_read
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask, &
@@ -131,7 +132,8 @@ module yelmox_domain
         type(yelmo_class)      :: yelmo
         type(marshelf_class)   :: mshlf
         type(isos_class)       :: isos
-        type(snapclim_class)   :: snp
+        type(yelmox_climate_class) :: cl    ! climate backend (snapclim | snapesm)
+        type(climate_out_class)    :: clim  ! backend-agnostic climate output (now/ref)
         type(smbpal_class)     :: smb
         type(smb_simple_class) :: smbs    ! alternative SMB (smb_method="smb_simple")
         type(sediments_class)  :: sed
@@ -408,8 +410,8 @@ contains
         dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
         if (do_climate) then
             call remap(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
-            call snapclim_init(dom%snp, path_par, domain, trim(dom%ctl%grid_clim), &
-                               nx_c, ny_c, basins_c, group="snap"//trim(sfx))
+            call climate_init(dom%cl, path_par, domain, trim(dom%ctl%grid_clim), &
+                              nx_c, ny_c, time, basins_c, group="snap"//trim(sfx))
         end if
 
         ! --- smb on its configured grid ([coupling] grid_smb; default = grid_clim) ---
@@ -642,7 +644,7 @@ contains
         if (dom%ctl%with_climate) then
             call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
-            call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time_rel, &
+            call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time_rel, &
                                  domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
                                  dx=dom%ctl%dx_clim, basins=basins_c)
             call domain_update_smb(dom, ts, init=.true.)
@@ -1158,8 +1160,8 @@ contains
         ! Glacial-smb modification (Greenland): reduce large negative smb toward a
         ! quasi glacial-interglacial index. Operates on the aggregated Yelmo-grid smb.
         if (trim(dom%ctl%domain) == "Greenland" .and. dom%ctl%scale_glacial_smb) then
-            call remap(dom, dom%snp%now%ta_ann,   gc, ta_y,    gy, "bilin")
-            call remap(dom, dom%snp%clim0%ta_ann, gc, ta_pd_y, gy, "bilin")
+            call remap(dom, dom%clim%now%ta_ann, gc, ta_y,    gy, "bilin")
+            call remap(dom, dom%clim%ref%ta_ann, gc, ta_pd_y, gy, "bilin")
             call calc_glacial_smb(dom%yelmo%bnd%smb, real(dom%yelmo%grd%lat,wp), ta_y, ta_pd_y)
         end if
 
@@ -1278,7 +1280,7 @@ contains
         if (tstep_due(ts%time_elapsed, dom%ctl%dt_clim)) then
             call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
-            call snapclim_update(dom%snp, z_srf=z_srf_c, time=ts%time, &
+            call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time, &
                                  domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
                                  dx=dom%ctl%dx_clim, basins=basins_c)
         end if
@@ -1315,14 +1317,14 @@ contains
             ! smb_simple: surface elevation + sea-level temperature, masked to the
             ! reference ice extent (refreshed each call in case H_ice_ref changed).
             call remap(dom, dom%topo%z_srf,          gn, z_srf_s, gs, "bilin")
-            call remap(dom, dom%snp%now%tsl_ann,      gc, tsl_s,   gs, "bilin")
+            call remap(dom, dom%clim%now%tsl_ann,     gc, tsl_s,   gs, "bilin")
             call remap(dom, dom%yelmo%bnd%H_ice_ref,  gy, Href_s,  gs, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
             call smb_simple_update(dom%smbs, z_srf_s, tsl_s)
         else
             ! smbpal (monthly)
-            call remap(dom, dom%snp%now%tas, gc, tas_s, gs, "bilin")
-            call remap(dom, dom%snp%now%pr,  gc, pr_s,  gs, "bilin")
+            call remap(dom, dom%clim%now%tas, gc, tas_s, gs, "bilin")
+            call remap(dom, dom%clim%now%pr,  gc, pr_s,  gs, "bilin")
             call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
             call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
@@ -1412,14 +1414,14 @@ contains
         call remap(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
 
         ! ocean forcing (3D): snapclim (grid_clim) -> mshlf grid
-        call remap(dom, dom%snp%now%to_ann, gc, to_m, gm, "bilin")
-        call remap(dom, dom%snp%now%so_ann, gc, so_m, gm, "bilin")
-        dto_y = dom%snp%now%to_ann - dom%snp%clim0%to_ann
+        call remap(dom, dom%clim%now%to_ann, gc, to_m, gm, "bilin")
+        call remap(dom, dom%clim%now%so_ann, gc, so_m, gm, "bilin")
+        dto_y = dom%clim%now%to_ann - dom%clim%ref%to_ann
         call remap(dom, dto_y, gc, dto_m, gm, "bilin")
 
         ! run marine_shelf on grid_mshlf
         call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
-                dom%ctl%dx_mshlf, dom%snp%now%depth, to_m, so_m, dto_ann=dto_m)
+                dom%ctl%dx_mshlf, dom%clim%now%depth, to_m, so_m, dto_ann=dto_m)
         call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
                 z_sl_m, dx=dom%ctl%dx_mshlf)
     end subroutine step_marine_shelf
@@ -1484,7 +1486,7 @@ contains
         if (dom%ctl%write_smb) &
             call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
         if (dom%ctl%write_snap) &
-            call snap_write_step(dom%snp, trim(io_fname(outfldr,"snap")), time)
+            call snap_write_step(dom%clim, trim(io_fname(outfldr,"snap")), time)
     end subroutine domain_write_step
 
     subroutine domain_write_init_sm(dom, outfldr, time)
@@ -1624,16 +1626,16 @@ contains
         call nc_close(ncid)
     end subroutine smb_write_step
 
-    subroutine snap_write_step(snp, filename, time)
-        type(snapclim_class), intent(in) :: snp
-        character(len=*),     intent(in) :: filename
-        real(wp),             intent(in) :: time
+    subroutine snap_write_step(clim, filename, time)
+        type(climate_out_class), intent(in) :: clim
+        character(len=*),        intent(in) :: filename
+        real(wp),                intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "t2m_ann", snp%now%ta_ann, n, ncid, "K", "Annual mean air temperature")
-        call io_var2D(filename, "pr_ann",  snp%now%pr_ann, n, ncid, "mm/a", "Annual mean precipitation")
+        call io_var2D(filename, "t2m_ann", clim%now%ta_ann, n, ncid, "K", "Annual mean air temperature")
+        call io_var2D(filename, "pr_ann",  clim%now%pr_ann, n, ncid, "mm/a", "Annual mean precipitation")
         call nc_close(ncid)
     end subroutine snap_write_step
 

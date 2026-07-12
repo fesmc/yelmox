@@ -161,8 +161,9 @@ contains
         real(wp) :: at, dTa
 
         ! Air-temperature anomaly (snapclim series), scaled to a temperature change.
-        at  = series_interp(dom%snp%at%time, dom%snp%at%var, time)
-        dTa = at * dom%snp%par%dTa_const
+        ! (Reaches into the snapclim backend; the bipolar driver builds with CLIMATE=snapclim.)
+        at  = series_interp(dom%cl%snp%at%time, dom%cl%snp%at%var, time)
+        dTa = at * dom%cl%snp%par%dTa_const
 
         select case(trim(hemisphere))
             case("north")
@@ -226,9 +227,9 @@ contains
         name_loc = obm_name
         select case(trim(hemisphere))
             case("north")
-                call calc_ocean_temperature_field(dom%snp%now%to_ann, obm%tn, name_loc)
+                call calc_ocean_temperature_field(dom%clim%now%to_ann, obm%tn, name_loc)
             case("south")
-                call calc_ocean_temperature_field(dom%snp%now%to_ann, obm%ts, name_loc)
+                call calc_ocean_temperature_field(dom%clim%now%to_ann, obm%ts, name_loc)
         end select
     end subroutine coupling_obm2ism
 
