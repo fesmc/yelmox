@@ -1,0 +1,109 @@
+! =====================================================================
+! greenland_snp.nml — snapesm assembly config (Greenland, snap_1ind_new + fraction)
+!
+! Wires each climate state to the var_defs groups that supply each field, and
+! sets the blend method per field. Reproduces snapclim &snap for
+! atm_type=snap_1ind_new, ocn_type=fraction (yelmox/yelmox_Greenland.nml).
+! Parameters (lapse, f_p, f_to, f_hol, dT*_const) copied from that &snap block.
+! =====================================================================
+
+&snp
+    var_defs   = ".claude/worktrees/snapclim2/input/greenland_clim.nml"
+    combine    = "anomaly"
+    manifold   = 1
+    ref_name   = "pd"
+    lapse      = 0.0080 0.0065
+    f_p        = 0.06
+    f_p_ne     = 1.0
+    f_stdev    = 0.0
+    f_to       = 0.25
+    f_hol      = 0.5
+    dTa_const  = 2.0
+    dTo_const  = 0.5
+    dSo_const  = 3.0
+    snapshots  = "pd" "picontrol" "lgm"
+    fields     = "tas" "pr" "to" "so" "zs"
+    indices    = "at" "ap"
+/
+
+! ---- field registry (semantics + blend rule; no file bindings here) ---------
+
+&snp_field_tas
+    kind  = "atm_temp"
+    blend = "linear"
+    index = "at"
+/
+
+&snp_field_pr
+    kind  = "atm_precip"
+    blend = "ratio"
+    index = "ap"
+/
+
+&snp_field_to
+    kind  = "ocn"
+    blend = "fraction"
+    index = ""
+/
+
+&snp_field_so
+    kind  = "ocn_salt"
+    blend = "const"
+    index = ""
+/
+
+&snp_field_zs
+    kind  = "elev"
+    blend = "const"
+    index = ""
+/
+
+! ---- snapshots (state -> var_defs group refs per field) ---------------------
+
+&snp_pd
+    is_ref    = True
+    monthly   = True
+    time      = 0.0
+    idx_coord = 0.0 0.0
+    tas = "clim_pd_tas"
+    pr  = "clim_pd_pr_sf" "clim_pd_pr_rf"
+    zs  = "clim_pd_zs"
+    to  = "clim_pd_to"
+    so  = "clim_pd_so"
+/
+
+&snp_picontrol
+    monthly   = False
+    time      = 0.0
+    idx_coord = 0.0 0.0
+    tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
+    pr  = "clim_picontrol_pr_ann"
+    zs  = "clim_picontrol_zs"
+    to  = ""
+    so  = ""
+/
+
+&snp_lgm
+    monthly   = False
+    time      = -21000.0
+    idx_coord = 1.0 0.0
+    tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
+    pr  = "clim_lgm_pr_ann"
+    zs  = "clim_lgm_zs"
+    to  = ""
+    so  = ""
+/
+
+! ---- driving indices (tsgen series; groups named &snp_idx_<name>) ------------
+
+&snp_idx_at
+    method      = "series"
+    sigma       = 0.0
+    series_file = ".claude/worktrees/snapclim2/tests/alpha_orbital_r2020.dat"
+/
+
+&snp_idx_ap
+    method      = "series"
+    sigma       = 0.0
+    series_file = ".claude/worktrees/snapclim2/tests/alpha_orbital_r2020.dat"
+/
