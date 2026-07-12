@@ -99,11 +99,11 @@
 &snp_idx_at
     method      = "series"
     sigma       = 0.0
-    series_file = ".claude/worktrees/snapclim2/tests/alpha_orbital_r2020.dat"
+    series_file = "input/alpha_orbital_r2020.dat"
 /
 
 &snp_idx_ap
     method      = "series"
     sigma       = 0.0
-    series_file = ".claude/worktrees/snapclim2/tests/alpha_orbital_r2020.dat"
+    series_file = "input/alpha_orbital_r2020.dat"
 /
