@@ -65,19 +65,33 @@ structure · `9efdfe1` load via subs · `99260a1` par_load · `c48cbd9` skeleton
 
 ## What REMAINS — in-model integration
 
-1. **fesm-utils fixes** (in progress / as needed):
-   - tsgen `series_load_ascii`: add a plain-header skip (follow-up #2) so production `.dat` files
-     load without the `tests/` fixture.
-   - varslice: allocate the `ndim=4` missing-values branch in `varslice_update` (follow-up #3).
-2. **Rebuild `include-serial`** from fesm-utils `dev` (its `varslice.mod` is current but `tsgen.mod`
-   is **stale** — no `group` arg). ⚠ Do NOT rebuild while yelmox experiments run (project rule).
-3. **Wire `climate_backend`** in `libs/yelmox_domain.f90` (mirror how `yelmox_esm` substitutes
-   `esm_forcing_class`); add `snapesm.o` to the driver object lists in `config/Makefile_yelmox.mk`.
-4. Validate in-model against snapclim, flip the default, retire `libs/snapclim.f90`.
+**Integration is CODE-COMPLETE but UNVERIFIED** (no yelmox build here — a full build needs
+Yelmo+LIS+isostasy+fesm-utils and there is no built objdir). Done on branch `snapclim2`:
 
-Caller touch-points (from the design note): `yelmox_rembo` mutates `now%to_ann` and runs ocean-only;
-`yelmox_bipolar/obm_coupling.f90` reaches into snapclim internals (`snp%at%time/%var`,
-`par%dTa_const`) — needs index accessors + a `dTa_const` carrier (already in `par`).
+- **fesm-utils fixes** (branch `snp-forcing-fixes`, off dev): tsgen/series plain-header skip;
+  varslice `ndim=4` missing branch. Committed, not merged to dev.
+- **Backend-agnostic climate** (`e412632`..`9febf81`):
+  - `libs/climate_out.f90` — `climate_out_class {now, ref}`, each a `clim_state_class`
+    {tas, pr, tsl_ann, ta_ann, pr_ann, to_ann, so_ann, depth}. Anomalies = now − ref.
+  - `libs/yelmox_climate_snapclim.f90` / `_snapesm.f90` — same `module yelmox_climate` + API
+    (`climate_init`/`climate_update`, fills `climate_out`); compile-verified vs each backend.
+  - `libs/yelmox_domain.f90` — `ice_domain%snp` → `%cl` (adapter) + `%clim` (agnostic output);
+    init/update via the adapter; all reads go through `dom%clim%now`/`%ref`.
+  - `yelmox_rembo.f90`, `yelmox_bipolar/obm_coupling.f90` — updated to `dom%cl%snp` (backend
+    internals; snapclim only) + `dom%clim%now%to_ann` (ocean writes).
+  - `config/Makefile_yelmox.mk` — `CLIMATE ?= snapclim` selects adapter source + backend obj.
+
+**Next session — build & validate in-model:**
+1. Merge `snp-forcing-fixes` → fesm-utils `dev`; rebuild `include-serial`
+   (`make -C fesm-utils fesmutils-static`). ⚠ Only when no yelmox experiments run.
+2. `make yelmox` (snapclim, default) — must still build & run unchanged (regression check).
+3. `make yelmox CLIMATE=snapesm` — fix any compile errors (watch: `dom%cl%snp` type visibility
+   in rembo/obm — those build only with `CLIMATE=snapclim`; a `CLIMATE=snapesm` build of the
+   bipolar/rembo targets is expected to fail until they are migrated off backend internals).
+4. Run the same config under both backends, diff `dom%clim` outputs (snap.nc / mshlf / smb) — the
+   physics already matches offline (see above), so any divergence is an integration bug.
+5. Flip the default to snapesm, keep snapclim selectable a cycle, then retire `libs/snapclim.f90`
+   + `yelmox_climate_snapclim.f90`.
 
 ---
 
