@@ -397,32 +397,33 @@ Compatibility shims for the two special callers:
 - Dead code: commented `snapclim_end`, the inline commented temperature-correction block, the
   empty "write static fields" stub, the commented type-dump TODO.
 
+## Model revision made during the port
+
+The port confirmed the design but refined the blend model: **not every field is a linear weight
+vector.** `snap_1ind_new` blends temperature linearly (`ref + aa·(s1−s0)`) but **precip as a
+ratio** (`ref·(aa·(s1/s0−1)+1)`), and each field is driven by its own index (`at`/`ap`), each
+normalized to its snapshots' *times*. So `field_spec` gained `blend` (`linear`/`ratio`/`fraction`/
+`const`) and `index`; `snapshot_spec` gained `monthly` (raw-monthly vs annual+summer synthesis,
+mirroring snapclim's `clim_monthly`) and `time` (for index normalization). `combine` dispatches
+per field on `blend`; `derive` handles the `fraction` ocean.
+
 ## Status / next steps
 
-- **Done (yelmox worktree `snapclim2` / branch `snapclim2`):** module `snapesm`
-  (`libs/snapesm.f90`) compiles — full type layout + public API; Makefile rule;
-  `snapesm_par_load` (top-level incl. `var_defs`, field registry, snapshot specs, index names);
-  `snapesm_init` wiring tsgen index init; `snapesm_load_snapshots` loading each state's field
-  group ref(s) from the `var_defs` database; the `update` pipeline **structure** (advance →
-  refresh → combine → transform → derive) with a working generic combine primitive and
-  `sc%ref` population.
-- **Done (fesm-utils worktree, branch `snp2-forcing-api`):** the two non-breaking API additions
-  (varslice `subs`, tsgen `group`), compile-verified; snapesm compiles against them.
-- **Done:** validation reference — `logs/snapclim_ref.nc` from snapclim on GRL-16KM
-  `snap_1ind_new` (`tests/build_snapclim_ref.sh`).
-- **Stubbed (next):** the numeric physics — `reduce_snapshot` (varslice `%var` extraction +
-  sea-level reduction + annual→monthly synthesis + ocean vinterp), `weights` (per-method, from
-  the `calc_*` kernels), `transform` (inflate + aggregates), `derive` (`fraction` + `dTa/dTo/dSo`).
-- **Then:** write `input/greenland_clim.nml` + the `snp` assembly config; build the snapesm
-  harness mirroring the reference; diff field-by-field to tight tolerance; iterate.
-- **Pending merge:** `snp2-forcing-api` must land on fesm-utils `dev` and `include-serial` be
-  rebuilt before yelmox builds snapesm in-tree (validation runs against the scratch mods until then).
-- **Finally:** wire the `climate_backend` switch in `yelmox_domain`; retire snapclim.
+- **Done + validated (branch `snapclim2`):** full physics — `reduce_snapshot`/`reduce_ocean`
+  (climate + ocean snapshot reduction, 42→23 vinterp), `combine`/`blend_field`/`norm_index`
+  (per-field linear/ratio blend), `transform`, `derive` (fraction with the faithful one-step lag).
+  var_defs + assembly configs (`input/greenland_clim.nml`, `input/greenland_snp.nml`), both
+  validation harnesses + `diff_nc.py`. Diff vs snapclim on GRL-16KM `snap_1ind_new`: atmosphere
+  bit-exact, ocean matches at all real cells. See `snapesm-handoff.md`.
+- **fesm-utils forcing API is merged to `dev`** (varslice `subs`, tsgen `group`).
+- **Remaining = integration:** small fesm-utils fixes (tsgen header-skip, varslice ndim-4 branch),
+  rebuild `include-serial`, wire the `climate_backend` switch in `yelmox_domain`, validate in-model,
+  retire snapclim.
 
 ## Open items
 
-- Final module/type name.
 - Exact registry field set to name explicitly vs leave to `extra(:)`.
 - Whether `dTa/dTo/dSo` (driver tsforcing) and snapesm's own `idx(:)` should compose or be
   mutually exclusive per field (today snapclim uses the arg when present, else its own index).
 - Provenance record format (reuse ncio; decide whether derived-field snapshot is default-on).
+- Whether to fix the fraction-ocean lag (a snapclim quirk, faithfully replicated for now).
