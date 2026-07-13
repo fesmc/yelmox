@@ -323,8 +323,6 @@
     enh_shlf                = 0.5
     enh_umin                = 50.0          ! [m/yr] Minimum transition velocity to enh_stream (enh_method="paleo-shear")
     enh_umax                = 500.0         ! [m/yr] Maximum transition velocity to enh_stream (enh_method="paleo-shear")
-    calc_age                = False         ! Calculate age tracer field?
-    age_iso                 = 0.0
     tracer_method           = "expl"        ! "expl", "impl": used for age and 'paleo-shear' enh fields
     tracer_impl_kappa       = 1.5           ! [m2 a-1] Artificial diffusion term for implicit tracer solving 
     
