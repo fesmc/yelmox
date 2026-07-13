@@ -249,7 +249,7 @@
 
     ! Eulerian backend
     calc_age                = False         ! Calculate the Eulerian age tracer field?
-    age_iso                 = 11.7, 29.0, 57.0, 115.0
+    time_iso                = -11.7, -29.0, -57.0, -115.0    ! [ka] isochrone deposition times
     tracer_method           = "expl"        ! "expl", "impl": Eulerian age solver
     tracer_impl_kappa       = 1.5           ! [m2 a-1] Artificial diffusion term for implicit age solving
 
@@ -326,6 +326,7 @@
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones
+    pd_age_to_time    = True                         ! Convert loaded obs isochrone ages [ka] to deposition times [ka] (t_dep = -age)
 
 /
