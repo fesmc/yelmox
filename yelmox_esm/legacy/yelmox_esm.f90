@@ -12,7 +12,7 @@ program yelmox_esm
     
     ! External libraries
     use geothermal
-    use esm
+    use esm_forcing
     use fastisostasy    ! also reexports barysealevel
     use marine_shelf
     use sediments

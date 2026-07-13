@@ -30,7 +30,7 @@ program yelmox_esm
     use yelmo
     use ice_optimization
 
-    use esm
+    use esm_forcing
     use fastisostasy    ! also reexports barysealevel (bsl_*)
     use marine_shelf, only : marshelf_update, marshelf_interp_shelf, ocn_variable_extrapolation
     use smbpal,       only : smbpal_update_monthly, smbpal_update_monthly_equil

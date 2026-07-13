@@ -15,7 +15,7 @@ module yelmox_esm_output
     use nml
     use ncio
     use yelmo
-    use esm
+    use esm_forcing
     use fastisostasy    ! isos_class (reexports barysealevel)
     use marine_shelf
     use smbpal

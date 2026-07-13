@@ -1,4 +1,4 @@
-module esm
+module esm_forcing
     ! This module contains routines that help with performing the esm suite
     ! of experiments. 
     
@@ -1262,5 +1262,5 @@ contains
             str = trim(str)
         end function
     
-end module esm
+end module esm_forcing
 
