@@ -1,3 +1,25 @@
+! ============================================================================
+! 1pctCO2 Antarctica ESM forcing -- SCAFFOLD (UNTESTED / DATA-PENDING).
+!
+! Idealized CMIP experiment: atmospheric CO2 rises +1%/yr (compounding), reaching
+! 4xCO2 at ~yr 140. Consumes ABSOLUTE CMIP fields (tas/pr/thetao/so), NOT precomputed
+! anomalies -- the anomaly is formed internally by SELF-REFERENCE: gcm_*_esm_ref and
+! gcm_*_proj point at the SAME 1pctCO2 file, so with the run's time_esm_ref set to the
+! first years (~1xCO2 baseline) dts = proj(t) - mean(esm_ref) recovers warming relative
+! to the 1pctCO2 start. (Mirrors esm_ant_ismip7.nml's pattern, not the anomaly-file
+! style of the TIPMIP configs.)
+!
+! Reference climatology: RACMO2.3 (t2m/precip/z_srf) + meltMIP OI (thetao/so) -- both
+! Antarctic products that DO exist on this machine.
+!
+! *** DATA-PENDING: the 1pctCO2 forcing itself is NOT on this machine (2026-07). ***
+! The whole ice_data/1pctCO2/ tree is absent. Expected layout (realization r1i1p4f1):
+!   ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_{tas,pr,thetao,so}.nc
+!   ice_data/1pctCO2/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_{thetao,so}_extrap.nc
+! Window is 2020-2160 (140 yr). Verify these paths/vars/time axes once the data is
+! staged, then smoke-test via run_1pctco2_antarctica.sh (spinup -> scenarios).
+! ============================================================================
+
 ! =========== ATMOSPHERE ===========
 
 ! ======== Reference period ========
