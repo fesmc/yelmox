@@ -160,8 +160,7 @@ module esm_forcing
     public :: esm_clim_update
     
     public :: esm_write_init
-    public :: esm_write_step
-    
+
 contains
     
     subroutine esm_forcing_init(esm,filename,domain,grid_name,run_type,gcm,experiment, &
