@@ -626,13 +626,14 @@ contains
         logical,  intent(IN) :: use_smb  
         logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
     
-        ! Local variables 
-        integer  :: k, m 
+        ! Local variables
+        integer  :: k, m
         real(wp) :: tmp, anomaly
-        character(len=56) :: slice_method 
-    
+        character(len=56) :: slice_method
+        real(wp), allocatable :: to_ann(:,:,:), so_ann(:,:,:)
+
         ! Get slices for current time
-        slice_method = "extrap" 
+        slice_method = "extrap"
         anomaly = 0.0_wp
             
         ! Initialize anomalies
@@ -691,25 +692,32 @@ contains
                             end if
                         end do
                         ! ===   Oceanic fields   ===
-                        call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
-                        call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
+                        ! rep is sourced from each field's declared sub-annual period
+                        ! (varslice_nsub): 12 for monthly ocean (e.g. Greenland), 1 for
+                        ! annual ocean (e.g. Antarctica). The monthly cycle is then
+                        ! collapsed to an annual mean so the shelf physics receives one
+                        ! (x,y,depth) field in either case (a no-op for annual data).
+                        call varslice_update(esm%to_hist,[time],method="extrap",rep=varslice_nsub(esm%to_hist))
+                        call varslice_update(esm%so_hist,[time],method="extrap",rep=varslice_nsub(esm%so_hist))
+                        to_ann = sum(esm%to_hist%var,dim=4) / real(size(esm%to_hist%var,4),wp)
+                        so_ann = sum(esm%so_hist%var,dim=4) / real(size(esm%so_hist%var,4),wp)
                         if (trim(domain).eq."Greenland") then
                             call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_hist%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_hist%var(:,:,6,1)+esm%Qd_hist%var(:,:,7,1)+esm%Qd_hist%var(:,:,8,1)) / 3.0
                         end if
-                                         
+
                         if (mshlf%par%extrap_shlf) then
                             ! Extrapolate ocean data to the interior of ice shelves
-                            call ocn_variable_extrapolation(esm%to_hist%var(:,:,:,1),H_ice,basins,-esm%to_hist%z,z_bed)
-                            call ocn_variable_extrapolation(esm%so_hist%var(:,:,:,1),H_ice,basins,-esm%so_hist%z,z_bed)
+                            call ocn_variable_extrapolation(to_ann,H_ice,basins,-esm%to_hist%z,z_bed)
+                            call ocn_variable_extrapolation(so_ann,H_ice,basins,-esm%so_hist%z,z_bed)
                         end if
 
                         ! Compute the anomaly at the desired depth level
-                        call marshelf_interp_shelf(esm%dto,mshlf,esm%to_hist%var(:,:,:,1)-esm%to_esm_ref%var(:,:,:,1),H_ice, &
+                        call marshelf_interp_shelf(esm%dto,mshlf,to_ann-esm%to_esm_ref%var(:,:,:,1),H_ice, &
                                                     z_bed,f_grnd,z_sl,-esm%to_esm_ref%z)
-                        call marshelf_interp_shelf(esm%dso,mshlf,esm%so_hist%var(:,:,:,1)-esm%so_esm_ref%var(:,:,:,1),H_ice, &
-                                                    z_bed,f_grnd,z_sl,-esm%so_esm_ref%z) 
+                        call marshelf_interp_shelf(esm%dso,mshlf,so_ann-esm%so_esm_ref%var(:,:,:,1),H_ice, &
+                                                    z_bed,f_grnd,z_sl,-esm%so_esm_ref%z)
                         
                     ! === Projection period ===
                     else if (time .ge. time_proj(1)) then
@@ -734,27 +742,31 @@ contains
                         end do    
                         
                         ! ===   Oceanic fields   ===
-                        call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
-                        call varslice_update(esm%so_proj,[time],method="extrap",rep=1)  
+                        ! rep sourced from the field's declared sub-annual period, then
+                        ! collapsed to an annual mean (see historical block above).
+                        call varslice_update(esm%to_proj,[time],method="extrap",rep=varslice_nsub(esm%to_proj))
+                        call varslice_update(esm%so_proj,[time],method="extrap",rep=varslice_nsub(esm%so_proj))
+                        to_ann = sum(esm%to_proj%var,dim=4) / real(size(esm%to_proj%var,4),wp)
+                        so_ann = sum(esm%so_proj%var,dim=4) / real(size(esm%so_proj%var,4),wp)
                         if (trim(domain).eq."Greenland") then
                             call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_proj%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_proj%var(:,:,6,1)+esm%Qd_proj%var(:,:,7,1)+esm%Qd_proj%var(:,:,8,1)) / 3.0
                         end if
-                            
+
                         if (mshlf%par%extrap_shlf) then
                             ! Interpolate ocean data to the interior
-                            call ocn_variable_extrapolation(esm%to_proj%var(:,:,:,1),H_ice,basins,-esm%to_proj%z,z_bed)
-                            call ocn_variable_extrapolation(esm%so_proj%var(:,:,:,1),H_ice,basins,-esm%so_proj%z,z_bed)
+                            call ocn_variable_extrapolation(to_ann,H_ice,basins,-esm%to_proj%z,z_bed)
+                            call ocn_variable_extrapolation(so_ann,H_ice,basins,-esm%so_proj%z,z_bed)
                         end if
 
                         ! Compute the anomaly at the desired depth level
                         esm%dto = 0.0_wp
                         esm%dso = 0.0_wp
-                        call marshelf_interp_shelf(esm%dto,mshlf,esm%to_proj%var(:,:,:,1)-esm%to_esm_ref%var(:,:,:,1),H_ice, &
+                        call marshelf_interp_shelf(esm%dto,mshlf,to_ann-esm%to_esm_ref%var(:,:,:,1),H_ice, &
                                                     z_bed,f_grnd,z_sl,-esm%to_esm_ref%z)
-                        call marshelf_interp_shelf(esm%dso,mshlf,esm%so_proj%var(:,:,:,1)-esm%so_esm_ref%var(:,:,:,1),H_ice, &
-                                                    z_bed,f_grnd,z_sl,-esm%so_esm_ref%z)            
+                        call marshelf_interp_shelf(esm%dso,mshlf,so_ann-esm%so_esm_ref%var(:,:,:,1),H_ice, &
+                                                    z_bed,f_grnd,z_sl,-esm%so_esm_ref%z)
 
                     ! === Reference period ===
                     ! Only used if there is a gap between the historical and projection period

@@ -51,6 +51,13 @@
     time        = 0, 2000, 2000, 0, 1
 /
 
+! WARNING: the transient atmosphere fields below (esm_ref/hist/proj for ts,pr)
+! declare a sub-annual period of 1 (annual) in their `time` entry, but the
+! transient code path drives the atmosphere monthly (rep=12, see esm_forcing).
+! This mismatch makes any *transient* run with this config abort at the varslice
+! rep/period guard (rep must be 1 or equal the declared period). ctrl/opt/spinup
+! runs are unaffected (they use the period-12 reference climatology above). To
+! run transient here, these fields need monthly data with period 12.
 ! ======== ESM Reference period ========
 &gcm_ts_esm_ref
     filename    = "ice_data/ISMIP6-2300/{domain}/{grid_name}/Atmosphere/{gcm}_{scenario}/climatology_1995-2014/{gcm}_{scenario}.nc"
