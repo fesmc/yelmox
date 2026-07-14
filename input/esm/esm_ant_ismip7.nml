@@ -95,7 +95,7 @@
 
 ! ======== ESM Reference period ========
 &gcm_ts_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/{grid_name}_{gcm}_historical_1850-2014_tas.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
     name        = "tas"
     units       = "K" "K"
     scaling     = 1.0 0.0
@@ -103,7 +103,7 @@
 /
 
 &gcm_pr_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/{grid_name}_{gcm}_historical_1850-2014_pr.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
     name        = "pr"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -111,7 +111,7 @@
 /
 
 &gcm_smb_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/{grid_name}_{gcm}_historical_1850-2014_acabf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_acabf.nc"
     name        = "acabf"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -128,7 +128,7 @@
 
 ! ======= Historical period =======
 &gcm_ts_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/{grid_name}_{gcm}_historical_1850-2014_tas.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
     name        = "tas"
     units       = "K" "K"
     scaling     = 1.0 0.0
@@ -136,7 +136,7 @@
 /
 
 &gcm_pr_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/{grid_name}_{gcm}_historical_1850-2014_pr.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
     name        = "pr"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -144,7 +144,7 @@
 /
 
 &gcm_smb_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/{grid_name}_{gcm}_historical_1850-2014_acabf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_acabf.nc"
     name        = "acabf"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -152,7 +152,7 @@
 /
 
 &gcm_dsmbdz_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/{grid_name}_{gcm}_historical_1850-2014_dacabfdz.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_historical_v2_1850-2014_dacabfdz.nc"
     name        = "dacabfdz"
     units       = "kg m-2 s-1 m-1" "mm yr-1 m-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -161,7 +161,7 @@
 
 ! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/tas/{grid_name}_{gcm}_{experiment}_2015-2300_tas.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/tas/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_tas.nc"
     name        = "tas"
     units       = "K" "K"
     scaling     = 1.0 0.0
@@ -169,7 +169,7 @@
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/pr/{grid_name}_{gcm}_{experiment}_2015-2300_pr.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/pr/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_pr.nc"
     name        = "pr"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -177,7 +177,7 @@
 /
 
 &gcm_smb_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/acabf/{grid_name}_{gcm}_{experiment}_2015-2300_acabf.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/acabf/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_acabf.nc"
     name        = "acabf"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
@@ -185,11 +185,11 @@
 /
 
 &gcm_dsmbdz_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/dacabfdz/{grid_name}_{gcm}_{experiment}_2016-2300_dacabfdz.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2299_dacabfdz.nc"
     name        = "dacabfdz"
     units       = "kg m-2 s-1 m-1" "mm yr-1 m-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
-    time        = 1, 2016, 2300, 1, 1
+    time        = 1, 2015, 2299, 1, 1
 /
 
 ! ========      OCEAN      =========
@@ -230,7 +230,7 @@
 
 ! ======== ESM Reference period ========
 &gcm_to_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/thetao/{grid_name}_{gcm}_historical_1850-2014_thetao.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/thetao/v3/{grid_name}_{gcm}_historical_v3_1850-2014_thetao.nc"
     name        = "thetao"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
@@ -238,7 +238,7 @@
 /
 
 &gcm_so_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/{grid_name}_{gcm}_historical_1850-2014_so.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v3/{grid_name}_{gcm}_historical_v3_1850-2014_so.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
@@ -247,7 +247,7 @@
 
 ! ======== Historical period ========
 &gcm_to_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/thetao/{grid_name}_{gcm}_historical_1850-2014_thetao.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/thetao/v3/{grid_name}_{gcm}_historical_v3_1850-2014_thetao.nc"
     name        = "thetao"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
@@ -255,7 +255,7 @@
 /
 
 &gcm_so_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/{grid_name}_{gcm}_historical_1850-2014_so.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v3/{grid_name}_{gcm}_historical_v3_1850-2014_so.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
@@ -264,17 +264,17 @@
 
 ! ======== Projection period ========
 &gcm_to_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/thetao/{grid_name}_{gcm}_{experiment}_2016-2300_thetao.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/thetao/v3/{grid_name}_{gcm}_{experiment}_v3_2015-2299_thetao.nc"
     name        = "thetao"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
-    time        = 1, 2016, 2300, 1, 1
+    time        = 1, 2015, 2299, 1, 1
 /
 
 &gcm_so_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/so/{grid_name}_{gcm}_{experiment}_2016-2300_so.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/so/v3/{grid_name}_{gcm}_{experiment}_v3_2015-2299_so.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 1, 2016, 2300, 1, 1
+    time        = 1, 2015, 2299, 1, 1
 /
