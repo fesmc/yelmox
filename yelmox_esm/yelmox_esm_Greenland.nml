@@ -668,8 +668,8 @@
     ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
-    with_ice_sheet    = False  ! Is the ice sheet active? (OFF: forcing-only test)
-    with_isostasy     = False  ! Is isostasy active? (OFF: forcing-only test)
+    with_ice_sheet    = True   ! Is the ice sheet active? (OFF: forcing-only test)
+    with_isostasy     = True   ! Is isostasy active? (OFF: forcing-only test)
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)

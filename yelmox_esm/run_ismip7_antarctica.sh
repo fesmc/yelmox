@@ -51,7 +51,7 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup esm.experiment=ctrl esm.esm_name="$GCM" \
+      -p ctrl.run_step=spinup coupling.equil_method="opt" \
          yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;

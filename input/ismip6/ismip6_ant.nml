@@ -1,11 +1,3 @@
-&var1
-    filename    = "var_test.nc"
-    name        = "var1"
-    units       = "K" "K"
-    scaling     = 1.0 0.0
-    time        = 1, 1950, 1960, 1
-/
-
 ! ====== ISMIP6-2300 experiment definitions ======
 
 &ctrlAE0

@@ -148,16 +148,10 @@ module esm_forcing
         character(len=256)  :: experiment
         character(len=256)  :: file_suffix
     end type
-        
-    ! Class for holding ice output for writing to standard formats...
-    type esm_ice_class
-        type(esm_ice_var_class), allocatable :: vars(:)
-    end type 
-
+    
     private
     public :: esm_forcing_class
     public :: esm_experiment_class
-    public :: esm_ice_class
 
     ! General routines
     public :: esm_forcing_init
@@ -672,7 +666,7 @@ contains
                     call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                         
                     ! Interpolate ocean data to the interior of ice shelves
-                    if (.TRUE.) then
+                    if (mshlf%par%extrap_shlf) then
                         call ocn_variable_extrapolation(esm%to_esm_ref%var(:,:,:,1),H_ice,basins,-esm%to_esm_ref%z,z_bed)
                         call ocn_variable_extrapolation(esm%so_esm_ref%var(:,:,:,1),H_ice,basins,-esm%so_esm_ref%z,z_bed)
                     end if
@@ -918,148 +912,6 @@ contains
         return
 
     end subroutine esm_write_init
-
-    subroutine esm_write_step(filename,file_nml,time)
-
-        implicit none 
-
-        character(len=*),   intent(IN) :: filename
-        character(len=*),   intent(IN) :: file_nml 
-        real(wp),           intent(IN) :: time 
-
-        ! Local variables 
-        integer    :: ncid, n
-        real(wp) :: time_prev 
-        type(esm_ice_class) :: esm 
-
-        if (.FALSE.) then    
-            ! Open the file for writing
-            call nc_open(filename,ncid,writable=.TRUE.)
-
-            ! Determine current writing time step 
-            n = nc_size(filename,"time",ncid)
-            call nc_read(filename,"time",time_prev,start=[n],count=[1],ncid=ncid) 
-            if (abs(time-time_prev).gt.1e-5) n = n+1 
-
-        end if 
-        ! Load up output variable meta information 
-        call esm_load_ice_var_info(esm,file_nml,verbose=.TRUE.)
- 
-        return
-
-    end subroutine esm_write_step
-
-    subroutine esm_load_ice_var_info(esmi,filename,verbose)
-
-        implicit none 
-
-        type(esm_ice_class), intent(OUT) :: esmi 
-        character(len=*),    intent(IN)  :: filename 
-        logical,             intent(IN)  :: verbose 
-
-        ! Local variables
-        integer :: n  
-        integer, parameter :: n_variables = 38
-
-        type(esm_ice_var_class) :: v 
-
-        ! First initialize esm object to hold variable meta data 
-        if (allocated(esmi%vars)) deallocate(esmi%vars)
-        allocate(esmi%vars(n_variables))
-
-        ! Load individual variables by namelist group 
-        call ice_var_par_load(esmi%vars(1), filename,var_name="lithk")
-        call ice_var_par_load(esmi%vars(2), filename,var_name="orog")
-        call ice_var_par_load(esmi%vars(3), filename,var_name="base")
-        call ice_var_par_load(esmi%vars(4), filename,var_name="topg")
-        call ice_var_par_load(esmi%vars(5), filename,var_name="hfgeoubed")
-        call ice_var_par_load(esmi%vars(6), filename,var_name="acabf")
-        call ice_var_par_load(esmi%vars(7), filename,var_name="libmassbfgr")
-        call ice_var_par_load(esmi%vars(8), filename,var_name="libmassbffl")
-        call ice_var_par_load(esmi%vars(9), filename,var_name="dlithkdt")
-        call ice_var_par_load(esmi%vars(10),filename,var_name="xvelsurf")
-        call ice_var_par_load(esmi%vars(11),filename,var_name="yvelsurf")
-        call ice_var_par_load(esmi%vars(12),filename,var_name="zvelsurf")
-        call ice_var_par_load(esmi%vars(13),filename,var_name="xvelbase")
-        call ice_var_par_load(esmi%vars(14),filename,var_name="yvelbase")
-        call ice_var_par_load(esmi%vars(15),filename,var_name="zvelbase")
-        call ice_var_par_load(esmi%vars(16),filename,var_name="xvelmean")
-        call ice_var_par_load(esmi%vars(17),filename,var_name="yvelmean")
-        call ice_var_par_load(esmi%vars(18),filename,var_name="litemptop")
-        call ice_var_par_load(esmi%vars(19),filename,var_name="litempbotgr")
-        call ice_var_par_load(esmi%vars(20),filename,var_name="litempbotfl")
-        call ice_var_par_load(esmi%vars(21),filename,var_name="strbasemag")
-        call ice_var_par_load(esmi%vars(22),filename,var_name="licalvf")
-        call ice_var_par_load(esmi%vars(23),filename,var_name="lifmassbf")
-        call ice_var_par_load(esmi%vars(24),filename,var_name="lifmassbf")
-        call ice_var_par_load(esmi%vars(25),filename,var_name="ligroundf")
-        call ice_var_par_load(esmi%vars(26),filename,var_name="sftgif")
-        call ice_var_par_load(esmi%vars(27),filename,var_name="sftgrf")
-        call ice_var_par_load(esmi%vars(28),filename,var_name="sftflf")
-
-        call ice_var_par_load(esmi%vars(29),filename,var_name="lim")
-        call ice_var_par_load(esmi%vars(30),filename,var_name="limnsw")
-        call ice_var_par_load(esmi%vars(31),filename,var_name="iareagr")
-        call ice_var_par_load(esmi%vars(32),filename,var_name="iareafl")
-        call ice_var_par_load(esmi%vars(33),filename,var_name="tendacabf")
-        call ice_var_par_load(esmi%vars(34),filename,var_name="tendlibmassbf")
-        call ice_var_par_load(esmi%vars(35),filename,var_name="tendlibmassbffl")
-        call ice_var_par_load(esmi%vars(36),filename,var_name="tendlicalvf")
-        call ice_var_par_load(esmi%vars(37),filename,var_name="tendlifmassbf")
-        call ice_var_par_load(esmi%vars(38),filename,var_name="tendligroundf")
-
-        if (verbose) then 
-
-            ! === Print summary =========
-
-            write(*,"(a40,a8,a65,a15)") &
-                                    "Variable name",    &
-                                    "Type",             &
-                                    "Standard name",    &
-                                    "Unit"
-            
-            do n = 1, n_variables 
-                v = esmi%vars(n)
-                write(*,"(a40,a8,a65,a15)") &
-                                    trim(v%long_name),      &
-                                    trim(v%var_type),       &
-                                    trim(v%standard_name),  &
-                                    trim(v%units_out) 
-            end do 
-
-
-        end if 
-
-        return 
-
-    end subroutine esm_load_ice_var_info
-
-    subroutine ice_var_par_load(esmv,filename,var_name)
-        ! Load parmaeters associated with a given ice variable
-
-        implicit none 
-
-        type(esm_ice_var_class),    intent(OUT) :: esmv 
-        character(len=*),           intent(IN)  :: filename 
-        character(len=*),           intent(IN)  :: var_name
-
-        ! Local variables 
-        character(len=56) :: group 
-
-        group = "esm_out_"//trim(var_name)
-
-        call nml_read(filename,group,"name",            esmv%name)
-        call nml_read(filename,group,"long_name",       esmv%long_name)
-        call nml_read(filename,group,"var_type",        esmv%var_type)
-        call nml_read(filename,group,"standard_name",   esmv%standard_name)
-        call nml_read(filename,group,"units_in",        esmv%units_in)
-        call nml_read(filename,group,"units_out",       esmv%units_out)
-        call nml_read(filename,group,"unit_scale",      esmv%unit_scale)
-        call nml_read(filename,group,"unit_offset",     esmv%unit_offset)
-
-        return 
-
-    end subroutine ice_var_par_load
 
     ! Initlialize allocatable objects
     subroutine esm_allocate(esm,nx,ny)
