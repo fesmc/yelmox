@@ -29,6 +29,8 @@ website:
             href: flavor-esm.md
           - text: "yelmox_rembo"
             href: flavor-rembo.md
+      - text: "Database namelists"
+        href: database-namelists.md
       - text: "Multigrid design"
         href: multigrid.md
 
