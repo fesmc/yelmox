@@ -858,7 +858,12 @@ contains
         call execute_command_line('mkdir -p "'//trim(bundle)//'"')
 
         call isos_restart_write(dom%isos,    trim(bundle)//"/isos_restart.nc",  time)
-        call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
+        ! Only checkpoint the ice-sheet state when the ice sheet is active. With
+        ! with_ice_sheet=False the Yelmo dynamics never run, so there is no
+        ! meaningful ice state to write (and the restart writer is not exercised
+        ! in that mode).
+        if (dom%ctl%with_ice_sheet) &
+            call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
         call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
         call smbpal_restart_write(dom%smb,   trim(bundle)//"/smbpal_restart.nc", time)
 
