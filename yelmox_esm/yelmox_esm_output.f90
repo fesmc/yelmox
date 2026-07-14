@@ -546,7 +546,16 @@ contains
         real(wp) :: tf_1d
         real(wp) :: dto_1d, dto_var_1d
         real(wp) :: dso_1d, dso_var_1d
-    
+
+        ! Missing-value (N/A) sentinel for the ocean shelf-draft diagnostics.
+        ! The marine-shelf module leaves a large out-of-range fill value in cells
+        ! where no ocean data is available (e.g. a minority of Greenland floating
+        ! cells, whose tf forcing carries a NaN _FillValue). ocn_mean below drops
+        ! those PER FIELD (fill is not identical across T_shlf/S_shlf/tf_shlf) via
+        ! a physical bound, returning this sentinel only if a field has no valid
+        ! floating-ice cell.
+        real(wp), parameter :: mv_ocn = -9999.0_wp
+
         logical, allocatable :: mask_tot(:,:)
         logical, allocatable :: mask_grnd(:,:)
         logical, allocatable :: mask_flt(:,:)
@@ -600,19 +609,21 @@ contains
             dt_var_1d = 0.0_wp; dpr_var_1d = 0.0_wp
         end if
 
-        ! Ocean (averaged over floating ice only)
-        if (npts_flt .gt. 0.0) then
-            to_1d      = sum(mshlf%now%T_shlf,  mask=mask_flt) / npts_flt
-            so_1d      = sum(mshlf%now%S_shlf,  mask=mask_flt) / npts_flt
-            tf_1d      = sum(mshlf%now%tf_shlf, mask=mask_flt) / npts_flt
-            dto_1d     = sum(esm%dto,           mask=mask_flt) / npts_flt
-            dso_1d     = sum(esm%dso,           mask=mask_flt) / npts_flt
-            dto_var_1d = sum(esm%dto_var,       mask=mask_flt) / npts_flt
-            dso_var_1d = sum(esm%dso_var,       mask=mask_flt) / npts_flt
-        else
-            to_1d = 0.0_wp; so_1d = 0.0_wp; tf_1d = 0.0_wp
-            dto_1d = 0.0_wp; dso_1d = 0.0_wp; dto_var_1d = 0.0_wp; dso_var_1d = 0.0_wp
-        end if
+        ! Ocean (averaged over floating ice, per field, excluding fill cells).
+        ! Each shelf field is averaged only over floating cells whose value is
+        ! finite and inside a physical bound, so marine-shelf fill cells (large
+        ! out-of-range sentinel) no longer contaminate the mean. A field returns
+        ! mv_ocn (N/A) if it has no valid floating cell -- e.g. Greenland tf_1d,
+        ! whose tf_shlf (~273 K here, an artifact of feeding tf-as-temperature)
+        ! falls outside the plausible thermal-forcing range; the Greenland shelf
+        ! temperature/salinity (to_1d/so_1d) remain valid.
+        to_1d      = ocn_mean(mshlf%now%T_shlf,  mask_flt,  240.0_wp, 320.0_wp, mv_ocn)
+        so_1d      = ocn_mean(mshlf%now%S_shlf,  mask_flt,    0.0_wp,  60.0_wp, mv_ocn)
+        tf_1d      = ocn_mean(mshlf%now%tf_shlf, mask_flt, -100.0_wp, 100.0_wp, mv_ocn)
+        dto_1d     = ocn_mean(esm%dto,           mask_flt, -100.0_wp, 100.0_wp, mv_ocn)
+        dso_1d     = ocn_mean(esm%dso,           mask_flt, -100.0_wp, 100.0_wp, mv_ocn)
+        dto_var_1d = ocn_mean(esm%dto_var,       mask_flt, -100.0_wp, 100.0_wp, mv_ocn)
+        dso_var_1d = ocn_mean(esm%dso_var,       mask_flt, -100.0_wp, 100.0_wp, mv_ocn)
 
         ! === Write to file ===================================================
         call nc_open(filename, ncid, writable=.TRUE.)
@@ -692,6 +703,34 @@ contains
         return
     
     end subroutine write_1D_esm
+
+    function ocn_mean(field, base_mask, lo, hi, mv) result(val)
+        ! Mean of `field` over the `base_mask` cells whose value is finite and
+        ! inside the physical range (lo,hi); returns `mv` (missing value / N/A)
+        ! if no cell qualifies. NaN/Inf fail the comparisons and so are dropped.
+        ! Keeps marine-shelf fill cells (large out-of-range sentinel) out of the
+        ! floating-ice ocean-forcing diagnostics, per field.
+        implicit none
+        real(wp), intent(IN) :: field(:,:)
+        logical,  intent(IN) :: base_mask(:,:)
+        real(wp), intent(IN) :: lo, hi, mv
+        real(wp) :: val
+        ! Local variables
+        logical, allocatable :: m(:,:)
+        integer :: npts
+
+        allocate(m(size(field,1), size(field,2)))
+        m = base_mask .and. field .gt. lo .and. field .lt. hi
+        npts = count(m)
+        if (npts .gt. 0) then
+            val = sum(field, mask=m) / real(npts, wp)
+        else
+            val = mv
+        end if
+
+        return
+    end function ocn_mean
+
     subroutine write_step_2D_cmip(ylmo, mshlf, filename, time)
         ! Writes all mandatory (and key optional) 2-D ISMIP7 variables.
         ! ST = snapshot (end-of-year); FL = yearly-average flux.
