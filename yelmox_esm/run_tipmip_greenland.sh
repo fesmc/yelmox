@@ -19,13 +19,15 @@
 #
 #   STAGE=1 yelmox_esm/run_tipmip_greenland.sh spinup
 #
-# SCAFFOLD STATUS: only the RAMP (esm-up2p0) is wired end-to-end -- its 0..232 yr
-# clock and start-referenced anomaly match the run config. The stabilisations
-# (esm-up2p0-gwl2p0 / -gwl4p0) are listed but commented: they span different
-# piControl years (109..159 / 232..282) and start already warm, so they need the
-# &transient time_* and a proper zero reference set before enabling (see the
-# esm_grl_tipmip.nml header). Second forcing model EC-Earth3-ESM-1 exists only at
-# GRL-4KM (set GCM + GRID accordingly).
+# SCAFFOLD STATUS: the RAMP (esm-up2p0, 232 yr) and BOTH STABILISATIONS
+# (esm-up2p0-gwl2p0 / -gwl4p0, 50 yr) are wired end-to-end for IPSL-CM6-ESMCO2 @
+# GRL-8KM. The stabilisations start already warm, so they use a separate par_file
+# (esm_grl_tipmip_gwl.nml) that pins esm_ref to the ramp's piControl branch point
+# (zero reference) and uses a 50-yr projection clock; the scenarios step below
+# overrides esm.par_file + transient.time_end per experiment (see the RUNS table).
+# NOTE: the second forcing model EC-Earth3-ESM-1 (GRL-4KM only) is NOT wired here --
+# GRL-4KM currently lacks the ORAS4 ocean reference (empty dir) and a combined-pr
+# MAR climatology on this machine, so it cannot run the forcing setup as-is.
 #
 set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1                  # repo root
@@ -36,9 +38,16 @@ NML="yelmox_esm/yelmox_esm_Greenland_tipmip.nml"
 OUTROOT="output/tipmip_grl"
 GCM="IPSL-CM6-ESMCO2"
 GRID="GRL-8KM"
-SCENARIOS=(esm-up2p0)                              # ramp; add stabilisations once tuned:
-                                                   #   esm-up2p0-gwl2p0 esm-up2p0-gwl4p0
 SPINUP_YEARS=10                                    # forcing-only: short suffices
+
+# Scenario table:  experiment | par_file (-> esm.par_file) | transient.time_end
+# Ramp uses the base par nml (232 yr); stabilisations use the gwl par nml (50 yr,
+# ramp-referenced zero baseline). See the esm_grl_tipmip*.nml headers.
+RUNS=(
+  "esm-up2p0         input/esm/esm_grl_tipmip.nml      232"
+  "esm-up2p0-gwl2p0  input/esm/esm_grl_tipmip_gwl.nml   50"
+  "esm-up2p0-gwl4p0  input/esm/esm_grl_tipmip_gwl.nml   50"
+)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
@@ -57,11 +66,14 @@ case "${1:-}" in
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
-    for exp in "${SCENARIOS[@]}"; do
+    # Ramp then both stabilisations, each restart-branched off the spin-up bundle.
+    for row in "${RUNS[@]}"; do
+      read -r exp par tend <<<"$row"
       runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
-           esm.use_esm=True esm.use_hist=False esm.use_proj=True \
+           esm.par_file="$par" esm.use_esm=True esm.use_hist=False esm.use_proj=True \
            yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+           transient.time_end="$tend" \
            coupling.restart="$BUNDLE"
     done
     ;;
