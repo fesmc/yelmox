@@ -901,12 +901,20 @@ contains
         !   - yelmo_restart_read loads [dyn,therm,mat] + mask_bed.
         ! use_restart/pc_active are flags the native path sets; the topo
         ! diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
-        call yelmo_restart_read_topo_bnd(dom%yelmo%tpo, dom%yelmo%bnd, dom%yelmo%time, &
-                dom%yelmo%par%restart_interpolated, dom%yelmo%grd, dom%yelmo%par%domain, &
-                dom%yelmo%par%grid_name, trim(fldr)//"/yelmo_restart.nc", ts%time)
-        call yelmo_restart_read(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
-        dom%yelmo%par%use_restart = .true.
-        dom%yelmo%time%pc_active  = .true.
+        !
+        ! Only when the ice sheet is active. With with_ice_sheet=False the spin-up
+        ! wrote no yelmo_restart.nc (see the matching guard in domain_restart_write),
+        ! and the Yelmo dynamics never run; the geometry already loaded by
+        ! domain_init (observed topography) is what the forcing-only run uses and
+        ! what the isostasy/marine-shelf restore below consume.
+        if (dom%ctl%with_ice_sheet) then
+            call yelmo_restart_read_topo_bnd(dom%yelmo%tpo, dom%yelmo%bnd, dom%yelmo%time, &
+                    dom%yelmo%par%restart_interpolated, dom%yelmo%grd, dom%yelmo%par%domain, &
+                    dom%yelmo%par%grid_name, trim(fldr)//"/yelmo_restart.nc", ts%time)
+            call yelmo_restart_read(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
+            dom%yelmo%par%use_restart = .true.
+            dom%yelmo%time%pc_active  = .true.
+        end if
 
         ! Restore isostasy via isos_init_state (reads state + reference from the
         ! bundle and runs the full post-read setup), on the isos grid. The shared
