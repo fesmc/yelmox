@@ -1,0 +1,316 @@
+! ============================================================================
+! TIPMIP Greenland ESM forcing (SCAFFOLD) -- derived from esm_grl_ismip7.nml.
+!
+! TIPMIP provides forcing as monthly gridded ANOMALIES/RATIOS relative to the
+! model's piControl baseline, not absolute fields:
+!   tas_anomaly [K], pr_ratio [1], TF_anomaly [K]   (one file per experiment)
+! layout: ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/
+!         {grid_name}_{gcm}_{experiment}_<Nyrs>_<var>.nc   (Nyrs matched by *yrs)
+!
+! esm_forcing forms dts = ts_proj - ts_esm_ref and dpr = pr_proj / pr_esm_ref,
+! so ts_esm_ref/ts_proj (and pr, to) point at the SAME anomaly file: with the
+! run's time_esm_ref set to the start of the ramp (anomaly ~ 0, ratio ~ 1) this
+! recovers dts ~ tas_anomaly, dpr ~ pr_ratio directly.
+!
+! SCAFFOLD CAVEATS -- verify before scientific use:
+!  - Reference-at-start is clean for the RAMP (esm-up2p0, starts near 0). The
+!    STABILISATIONS (esm-up2p0-gwl2p0/gwl4p0) start already warm (+3.7/+6.3 K),
+!    so a start reference mis-references them; they need a true zero baseline
+!    (a zeros/ones esm_ref field, or an anomaly-direct code path).
+!  - Salinity (so_*) and subglacial discharge (sgd/Qd) have no TIPMIP field, so
+!    those groups still point at the ISMIP7 GRL data below (approximation).
+!  - TF_anomaly carries NaN fill in some ocean cells (as ISMIP7 tf does); the
+!    2D ocean forcing tolerates it and the 1D diagnostic masks it (ocn_mean).
+!  - time = 1,0,231,1,12 matches the 232-yr ramp; the 50-yr stabilisations need
+!    their own step count/range.
+! ============================================================================
+
+! =========== ATMOSPHERE ===========
+
+! ======== Reference period ========
+
+&gcm_ts_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "tas"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 0, 1961, 1990, 0, 12.0
+/
+
+&gcm_pr_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "pr"
+    units       = "mm d-1" "mm d-1"
+    scaling     = 1 0.0
+    time        = 0, 1961, 1990, 0, 12.0
+/
+
+&gcm_smb_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "smb"
+    units       = "mm d-1" "mm yr-1"
+    scaling     = 365.25 0.0
+    time        = 0, 1961, 1990, 0, 12.0
+/
+
+&gcm_zs_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "z_srf"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 1990, 1990, 1, 1
+/
+
+! ======== ESM Reference period ========
+&gcm_ts_esm_ref
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_*yrs_tas_anomaly.nc"
+    name        = "tas_anomaly"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 0, 231, 1, 12
+/
+
+&gcm_pr_esm_ref
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_*yrs_pr_ratio.nc"
+    name        = "pr_ratio"
+    units       = "1" "1"
+    scaling     = 1.0 0.0              ! dimensionless ratio; dpr = pr_proj/pr_esm_ref
+    time        = 1, 0, 231, 1, 12
+/
+
+&gcm_smb_esm_ref
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/{grid_name}_{gcm}_historical_1850-2014_acabf.nc"
+    name        = "acabf"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_zs_esm_ref
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
+    name        = "surface_gimp"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 1960, 1989, 0, 1
+/
+
+! ======= Historical period =======
+&gcm_ts_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/{grid_name}_{gcm}_historical_1850-2014_tas.nc"
+    name        = "tas"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_pr_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/{grid_name}_{gcm}_historical_1850-2014_pr.nc"
+    name        = "pr"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_smb_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/{grid_name}_{gcm}_historical_1850-2014_acabf.nc"
+    name        = "acabf"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_dsmbdz_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/{grid_name}_{gcm}_historical_1850-2014_dacabfdz.nc"
+    name        = "dacabfdz"
+    units       = "kg m-2 s-1 m-1" "mm yr-1 m-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 1850, 2014, 1, 1
+/
+
+! ======== Projection period ========
+&gcm_ts_proj
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_*yrs_tas_anomaly.nc"
+    name        = "tas_anomaly"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 0, 231, 1, 12
+/
+
+&gcm_pr_proj
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_*yrs_pr_ratio.nc"
+    name        = "pr_ratio"
+    units       = "1" "1"
+    scaling     = 1.0 0.0              ! dimensionless ratio; dpr = pr_proj/pr_esm_ref
+    time        = 1, 0, 231, 1, 12
+/
+
+&gcm_smb_proj
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/acabf/{grid_name}_{gcm}_{experiment}_2015-2300_acabf.nc"
+    name        = "acabf"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 2015, 2300, 1, 12
+/
+
+&gcm_dsmbdz_proj
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/dacabfdz/{grid_name}_{gcm}_{experiment}_2015-2300_dacabfdz.nc"
+    name        = "dacabfdz"
+    units       = "kg m-2 s-1 m-1" "mm yr-1 m-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 2015, 2300, 1, 1
+/
+
+! ========      OCEAN      =========
+
+! ======== Reference period ========
+&gcm_to_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    name        = "to"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 0, 1981, 2010, 0, 1
+/
+
+&gcm_so_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 0, 1981, 2010, 0, 1
+/
+
+! ======== ESM Reference period ========
+&gcm_to_esm_ref
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_*yrs_TF_anomaly.nc"
+    name        = "TF_anomaly"
+    units       = "K" "K"
+    scaling     = 1.0 0.0              ! thermal-forcing ANOMALY (delta), no +273.15 offset
+    time        = 1, 0, 231, 1, 12
+/
+
+! loaded but not used so far
+&gcm_so_esm_ref
+    ! TIPMIP has no salinity field. Point esm_ref AND proj at the same (gcm-free)
+    ! ORAS4 reference so the salinity anomaly dso = so_proj - so_esm_ref = 0.
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 0, 1981, 2010, 0, 1
+/
+
+! ======== Historical period ========
+&gcm_to_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/{grid_name}_{gcm}_historical_1850-2014_tf.nc"
+    name        = "tf"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_sgd_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/{grid_name}_{gcm}_historical_1850-2014_sgd.nc"
+    name        = "sgd"
+    units       = "m3 s-1" "K"
+    scaling     = 1.0 1
+    time        = 1, 1850, 2014, 1, 12
+/
+
+! loaded but not used so far
+&gcm_so_hist
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/{grid_name}_{gcm}_historical_1850-2014_so.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 1850, 2014, 1, 12
+/
+
+! ======== Projection period ========
+
+&gcm_to_proj
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_*yrs_TF_anomaly.nc"
+    name        = "TF_anomaly"
+    units       = "K" "K"
+    scaling     = 1.0 0.0              ! thermal-forcing ANOMALY (delta), no +273.15 offset
+    time        = 1, 0, 231, 1, 12
+/
+
+&gcm_sgd_proj
+    ! SCAFFOLD placeholder: TIPMIP has no subglacial-discharge field, so point at
+    ! a LITERAL existing ISMIP7 sgd file (CESM2-WACCM ssp585). Its 2015-2300 axis
+    ! sits entirely above the TIPMIP 0..232 run clock, so the "extrap" slice used
+    ! for Qd_proj clamps to the 2015 boundary slice (a constant). Qd is diagnostic
+    ! only here (forcing-only, with_ice_sheet=False); replace for scientific use.
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/CESM2-WACCM/ssp585/SDBN1/sgd/{grid_name}_CESM2-WACCM_ssp585_2015-2300_sgd.nc"
+    name        = "sgd"
+    units       = "m3 s-1" "K"
+    scaling     = 1.0 1
+    time        = 1, 2015, 2300, 1, 12
+/
+
+! Loaded but not used
+&gcm_so_proj
+    ! No TIPMIP salinity: reuse the ORAS4 reference so dso = 0 (see so_esm_ref).
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 0, 1981, 2010, 0, 1
+/
+
+! ==================================
+!        
+!  Non used routines for Greenland
+!
+! ==================================
+
+! ======== Variability =============
+
+&gcm_ts_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
+    name        = "t2m_dt"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1990.0, 2019.0, 1.0, 12.0
+/
+
+&gcm_pr_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
+    name        = "precip_dt"
+    units       = "kg m-2 month-1" "mm d-1"
+    scaling     = 0.0329 0.0
+    time        = 1, 1990.0, 2019.0, 1.0, 12.0
+/
+
+&gcm_smb_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "smb"
+    units       = "kg m-2 month-1" "mm yr-1"
+    scaling     = 12.0 0.0
+    time        = 1, 1979.0, 2022.0, 1.0, 12.0
+/
+
+&gcm_zs_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "z_srf"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 2000, 2000, 0, 1
+/
+
+! ======== Variability period ========
+&gcm_to_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1990-2019_DETRENDED.nc"
+    name        = "thetao_dt"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 1990, 2019, 1, 1
+/
+
+&gcm_so_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1990-2019_DETRENDED.nc"
+    name        = "so_dt"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 1990, 2019, 1, 1
+/
