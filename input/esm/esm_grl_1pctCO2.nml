@@ -1,0 +1,253 @@
+! ============================================================================
+! 1pctCO2 Greenland ESM forcing -- SCAFFOLD (UNTESTED / DATA-PENDING).
+! Greenland counterpart of esm_ant_1pctCO2.nml: same 1pctCO2 experiment structure,
+! but with Greenland reference conventions (MAR atmosphere + ORAS4 ocean) and the
+! Greenland-required subglacial-discharge group (sgd_proj -> Qd).
+!
+! Idealized CMIP experiment: atmospheric CO2 rises +1%/yr (compounding), reaching
+! 4xCO2 at ~yr 140. Consumes ABSOLUTE CMIP fields (tas/pr/thetao/so), NOT precomputed
+! anomalies -- the anomaly is formed internally by SELF-REFERENCE: gcm_*_esm_ref and
+! gcm_*_proj point at the SAME 1pctCO2 file, so with the run's time_esm_ref set to the
+! first years (~1xCO2 baseline) dts = proj(t) - mean(esm_ref) recovers warming relative
+! to the 1pctCO2 start. (Mirrors the esm_grl_tipmip.nml GRL structure, absolute-field.)
+!
+! Reference climatology: MAR (tas/pr/z_srf) + ERA-INT-ORAS4 (to/so) -- both GRL products
+! that DO exist on this machine (so the SPIN-UP can already run; only the scenario needs
+! the pending 1pctCO2 forcing). Salinity/sgd handled as in esm_grl_tipmip.nml.
+!
+! *** DATA-PENDING: the 1pctCO2 forcing itself is NOT on this machine (2026-07). ***
+! The whole ice_data/1pctCO2/ tree is absent. Expected layout (realization r1i1p4f1):
+!   ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_{tas,pr,thetao,so}.nc
+!   ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_orog.nc  (zs_esm_ref)
+! Window is 2020-2160 (140 yr). Verify these paths/vars/time axes once the data is
+! staged, then smoke-test via run_1pctco2_greenland.sh (spinup -> scenarios).
+! ============================================================================
+
+! =========== ATMOSPHERE ===========
+
+! ======== Reference period ========
+&gcm_ts_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "tas"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 0, 1961, 1990, 0, 12.0
+/
+
+&gcm_pr_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "pr"
+    units       = "mm d-1" "mm d-1"
+    scaling     = 1 0.0
+    time        = 0, 1961, 1990, 0, 12.0
+/
+
+&gcm_zs_ref
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    name        = "z_srf"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 1990, 1990, 1, 1
+/
+
+! ======== ESM Reference period ========
+&gcm_ts_esm_ref
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_tas.nc"
+    name        = "tas"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 2020, 2160, 1, 12
+/
+
+&gcm_pr_esm_ref
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_pr.nc"
+    name        = "pr"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 2020, 2160, 1, 12
+/
+
+&gcm_zs_esm_ref
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_orog.nc"
+    name        = "orog"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 2000, 2000, 0, 1
+/
+
+! ======== Projection period ========
+&gcm_ts_proj
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_tas.nc"
+    name        = "tas"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 2020, 2160, 1, 12
+/
+
+&gcm_pr_proj
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_pr.nc"
+    name        = "pr"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 2020, 2160, 1, 12
+/
+
+! ========      OCEAN      =========
+
+! ======== Reference period ========
+&gcm_to_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    name        = "to"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 0, 1981, 2010, 0, 1
+/
+
+&gcm_so_ref
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 0, 1981, 2010, 0, 1
+/
+
+! ======== ESM Reference period ========
+&gcm_to_esm_ref
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_thetao.nc"
+    name        = "thetao"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 2020, 2160, 1, 1
+/
+
+&gcm_so_esm_ref
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_so.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 2020, 2160, 1, 1
+/
+
+! ======== Projection period ========
+&gcm_to_proj
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_thetao.nc"
+    name        = "thetao"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 2020, 2160, 1, 1
+/
+
+&gcm_so_proj
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_so.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 2020, 2160, 1, 1
+/
+
+! Greenland requires a subglacial-discharge field (Qd_proj is loaded from group
+! "sgd_proj" unconditionally in the projection branch). 1pctCO2 has no sgd, so use
+! the same LITERAL ISMIP7 placeholder as the TIPMIP GRL config: its 2015-2300 axis
+! sits above the 2020-2160 run window and Qd_proj uses "extrap", so it clamps to a
+! constant boundary slice. Qd is diagnostic in forcing-only mode; replace for real use.
+&gcm_sgd_proj
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/CESM2-WACCM/ssp585/SDBN1/sgd/{grid_name}_CESM2-WACCM_ssp585_2015-2300_sgd.nc"
+    name        = "sgd"
+    units       = "m3 s-1" "K"
+    scaling     = 1.0 1
+    time        = 1, 2015, 2300, 1, 12
+/
+
+
+
+
+
+
+
+! =====================================================
+!
+! Non-used nmls
+!
+! =====================================================
+
+
+
+
+
+
+
+
+! ======= Historical period =======
+&gcm_ts_hist
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
+    name        = "tas"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_pr_hist
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
+    name        = "pr"
+    units       = "kg m-2 s-1" "mm yr-1"
+    scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
+    time        = 1, 1850, 2014, 1, 12
+/
+
+&gcm_to_hist
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{gcm}/historical/ocean/thetao/v3/{grid_name}_{gcm}_historical_v3_1850-2014_thetao.nc"
+    name        = "thetao"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 1850, 2014, 1, 1
+/
+
+&gcm_so_hist
+    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{gcm}/historical/ocean/so/v3/{grid_name}_{gcm}_historical_v3_1850-2014_so.nc"
+    name        = "so"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 1850, 2014, 1, 1
+/
+
+! ======== Variability period ========
+
+&gcm_ts_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
+    name        = "t2m_dt"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
+    time        = 1, 1990.0, 2019.0, 1.0, 12.0
+/
+
+&gcm_pr_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1990-2019_monthly_DETRENDED.nc"
+    name        = "precip_dt"
+    units       = "kg m-2 month-1" "mm d-1"
+    scaling     = 0.0329 0.0
+    time        = 1, 1990.0, 2019.0, 1.0, 12.0
+/
+
+&gcm_zs_var
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    name        = "z_srf"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 2000, 2000, 0, 1
+/
+
+&gcm_to_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1990-2019_DETRENDED.nc"
+    name        = "thetao_dt"
+    units       = "degrees C" "K"
+    scaling     = 1.0 273.15
+    time        = 1, 1990, 2019, 1, 1
+/
+
+&gcm_so_var
+    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS5/{grid_name}_ORAS5_1990-2019_DETRENDED.nc"
+    name        = "so_dt"
+    units       = "PSU" "PSU"
+    scaling     = 1.0 0.0
+    time        = 1, 1990, 2019, 1, 1
+/
