@@ -136,13 +136,37 @@ yelmox_rembo : fesmutils-static yelmo-static rembo-static isostasy-static $(yelm
 	@echo "    yelmox_rembo.x is ready."
 	@echo " "
 
-# --- flavors not yet ported to the multigrid driver: stub default targets ---
-.PHONY : yelmox_ismip6 yelmox_nahosmip yelmox_rtip
-yelmox_ismip6 yelmox_nahosmip yelmox_rtip :
-	@echo ""
-	@echo "    *** $@ is not ported to the new (multigrid) driver yet."
-	@echo "    Build the legacy program instead:  make $@-legacy"
-	@echo ""
+# ---------------------------------------------------------------------------
+# Retired flavors (single-grid originals under retired/<flavor>/).
+# Still compilable, but no longer maintained -- prefer yelmox or yelmox_esm.
+# ---------------------------------------------------------------------------
+
+yelmox_ismip6 : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_ismip6.x retired/yelmox_ismip6/yelmox_ismip6.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    *** yelmox_ismip6 is RETIRED and no longer maintained."
+	@echo "        Prefer 'make yelmox' or 'make yelmox_esm' for new work."
+	@echo "    yelmox_ismip6.x is ready."
+	@echo " "
+
+yelmox_nahosmip : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_nahosmip.x retired/yelmox_nahosmip/yelmox_nahosmip.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    *** yelmox_nahosmip is RETIRED and no longer maintained."
+	@echo "        Prefer 'make yelmox' or 'make yelmox_esm' for new work."
+	@echo "    yelmox_nahosmip.x is ready."
+	@echo " "
+
+yelmox_rtip : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip.x retired/yelmox_rtip/yelmox_rtip.f90 \
+		$(yelmox_libs) $(LFLAGS)
+	@echo " "
+	@echo "    *** yelmox_rtip is RETIRED and no longer maintained."
+	@echo "        Prefer 'make yelmox' or 'make yelmox_esm' for new work."
+	@echo "    yelmox_rtip.x is ready."
+	@echo " "
 
 # ---------------------------------------------------------------------------
 # Legacy programs (single-grid originals under <flavor>/legacy/).
@@ -167,27 +191,6 @@ yelmox_esm-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 		$(yelmox_libs) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox_esm-legacy.x is ready."
-	@echo " "
-
-yelmox_ismip6-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_ismip6-legacy.x yelmox_ismip6/legacy/yelmox_ismip6.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_ismip6-legacy.x is ready."
-	@echo " "
-
-yelmox_nahosmip-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_nahosmip-legacy.x yelmox_nahosmip/legacy/yelmox_nahosmip.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_nahosmip-legacy.x is ready."
-	@echo " "
-
-yelmox_rtip-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip-legacy.x yelmox_rtip/legacy/yelmox_rtip.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_rtip-legacy.x is ready."
 	@echo " "
 
 yelmox_rembo-legacy : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
@@ -220,7 +223,7 @@ usage:
 	@echo ""
 	@echo " Default (multigrid) drivers, one per flavor folder:"
 	@echo "   make yelmox | yelmox_bipolar | yelmox_esm | yelmox_rembo"
-	@echo " Flavors not yet ported (print a stub, build legacy instead):"
+	@echo " Retired flavors (single-grid, unmaintained; in retired/<flavor>/):"
 	@echo "   make yelmox_ismip6 | yelmox_nahosmip | yelmox_rtip"
 	@echo " Legacy single-grid originals (in <flavor>/legacy/):"
 	@echo "   make <name>-legacy   e.g. make yelmox-legacy, make yelmox_rembo-legacy"

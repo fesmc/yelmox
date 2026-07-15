@@ -11,14 +11,11 @@
             "bipolar-legacy"   : "libyelmox/bin/yelmox_bipolar-legacy.x",
             "esm"              : "libyelmox/bin/yelmox_esm.x",
             "esm-legacy"       : "libyelmox/bin/yelmox_esm-legacy.x",
-            "ismip6"           : "libyelmox/bin/yelmox_ismip6-legacy.x",
-            "ismip6-legacy"    : "libyelmox/bin/yelmox_ismip6-legacy.x",
-            "nahosmip"         : "libyelmox/bin/yelmox_nahosmip-legacy.x",
-            "nahosmip-legacy"  : "libyelmox/bin/yelmox_nahosmip-legacy.x",
+            "ismip6"           : "libyelmox/bin/yelmox_ismip6.x",
+            "nahosmip"         : "libyelmox/bin/yelmox_nahosmip.x",
             "rembo"            : "libyelmox/bin/yelmox_rembo.x",
             "rembo-legacy"     : "libyelmox/bin/yelmox_rembo-legacy.x",
-            "rtip"             : "libyelmox/bin/yelmox_rtip-legacy.x",
-            "rtip-legacy"      : "libyelmox/bin/yelmox_rtip-legacy.x"
+            "rtip"             : "libyelmox/bin/yelmox_rtip.x"
         },
 
     "grp_aliases" :

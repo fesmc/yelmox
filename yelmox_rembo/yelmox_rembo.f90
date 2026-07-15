@@ -38,7 +38,6 @@ program yelmox_rembo
     real(wp) :: time_equil, dtt, dtt_now, deltat_tot
     logical  :: write_restart
     real(wp) :: dT_summer, dT_ann, dT_ocn
-    real(wp) :: var, convert_km3_Gt
 
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
@@ -61,8 +60,6 @@ program yelmox_rembo
     ! reads the timeline values it needs from the same [ctrl] group.
     call domain_init(dom, path_par, ts%time)
 
-    convert_km3_Gt = dom%yelmo%bnd%c%rho_ice * 1e-3
-
     ! REMBO climate + hysteresis (driver-owned; not part of ice_domain). REMBO keeps
     ! its module-global state in rembo_ann and loads its own parameters (options_rembo).
     call rembo_init(real(ts%time, dp))
@@ -73,15 +70,15 @@ program yelmox_rembo
     call domain_regions_init(dom, trim(outfldr))
 
     ! Initial transient forcing (dT_summer / dT_ann / dT_ocn).
-    call update_forcing()
+    call update_forcing(tsf, dom, ts, dT_summer, dT_ann, dT_ocn)
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl) and re-establish the REMBO + ocean forcing.
     if (trim(dom%ctl%restart) == "None") then
-        call rembo_cold_start()
+        call rembo_cold_start(dom, ts, bsl, tsf, dT_summer, dT_ocn, time_equil, dtt)
     else
         call domain_startup(dom, ts, bsl)
-        call step_rembo()
+        call step_rembo(dom, ts, tsf, dT_summer, dT_ocn)
         call step_marine_shelf(dom, ts)
     end if
 
@@ -116,7 +113,7 @@ program yelmox_rembo
     end if
 
     ! Initial restart bundle.
-    if (write_restart) call write_rembo_restart()
+    if (write_restart) call write_rembo_restart(dom, bsl, ts, tsf)
 
     ! === main time loop ===
     call tstep_print_header(ts)
@@ -143,7 +140,7 @@ program yelmox_rembo
         call tstep_print(ts)
 
         ! Transient forcing for this step (from the tsgen series).
-        call update_forcing()
+        call update_forcing(tsf, dom, ts, dT_summer, dT_ann, dT_ocn)
 
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
@@ -153,7 +150,7 @@ program yelmox_rembo
         call step_isostasy(dom, ts, bsl)
         call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
         call refresh_htopo(dom)
-        call step_rembo()                ! REMBO atmosphere/smb + snapclim ocean
+        call step_rembo(dom, ts, tsf, dT_summer, dT_ocn)  ! REMBO atmosphere/smb + snapclim ocean
         call step_marine_shelf(dom, ts)
 
         ! === output ===
@@ -170,7 +167,7 @@ program yelmox_rembo
 
         ! === restart bundle ===
         if (write_restart .and. tstep_due(ts%time, dom%ctl%dt_restart)) then
-            call write_rembo_restart()
+            call write_rembo_restart(dom, bsl, ts, tsf)
         end if
 
         ! tsgen kill switch (response equilibrated at a forcing bound).
@@ -191,7 +188,7 @@ program yelmox_rembo
         call domain_write_1D(dom, trim(outfldr), ts%time)
         call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
     end if
-    if (write_restart) call write_rembo_restart()
+    if (write_restart) call write_rembo_restart(dom, bsl, ts, tsf)
 
     write(*,*)
     write(*,*) "yelmox_rembo: run complete at time =", ts%time
@@ -201,13 +198,20 @@ program yelmox_rembo
 
 contains
 
-    subroutine update_forcing()
+    subroutine update_forcing(tsf, dom, ts, dT_summer, dT_ann, dT_ocn)
         ! Update the transient temperature anomalies from the tsgen forcing series.
         ! REMBO uses its own channel mapping (not the snapclim dTa/dTo/dSo): f_now
         ! drives dT_summer, and dT_ann uses the REMBO winter factor (T_wintfac=1.6):
         !   dT_ann = 0.5*((1.6)*dT_summer + (1.0)*dT_summer) = 1.3*dT_summer.
+        type(tsforcing_class), intent(inout) :: tsf
+        type(ice_domain),      intent(in)    :: dom
+        type(tstep_class),     intent(in)    :: ts
+        real(wp),              intent(out)   :: dT_summer, dT_ann, dT_ocn
+
+        real(wp) :: var
+
         if (tsf%active) then
-            var = dom%yelmo%reg%V_ice * convert_km3_Gt
+            var = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
             call tsforcing_update(tsf, ts%time, var=var)
             dT_summer = tsf%tsg%f_now * tsf%f_ta
             dT_ann    = 1.3_wp * dT_summer
@@ -219,7 +223,7 @@ contains
         end if
     end subroutine update_forcing
 
-    subroutine step_rembo(init)
+    subroutine step_rembo(dom, ts, tsf, dT_summer, dT_ocn, init)
         ! Advance REMBO one coupling step: geometry from the hub, REMBO atmosphere +
         ! surface mass balance staged into the SMB carrier (dom%smb%ann), and ocean
         ! forcing from snapclim (with the optional hysteresis ocean anomaly). REMBO
@@ -227,6 +231,10 @@ contains
         ! couple_smb_to_yelmo applies the we->ie scaling + lim_pd_ice, on the Yelmo
         ! grid, inside step_icesheet. init=.true. equilibrates REMBO before the first
         ! update (cold start only).
+        type(ice_domain),      intent(inout) :: dom
+        type(tstep_class),     intent(in)    :: ts
+        type(tsforcing_class), intent(in)    :: tsf
+        real(wp),              intent(in)    :: dT_summer, dT_ocn
         logical, intent(in), optional :: init
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_sl_c(:,:), basins_c(:,:)
@@ -265,10 +273,17 @@ contains
             dom%clim%now%to_ann = dom%clim%now%to_ann + dT_ocn
     end subroutine step_rembo
 
-    subroutine rembo_cold_start()
+    subroutine rembo_cold_start(dom, ts, bsl, tsf, dT_summer, dT_ocn, time_equil, dtt)
         ! Build the initial boundary state for a cold start (no restart bundle):
         ! isostasy reference/state, the first REMBO + ocean + marine forcing, the
         ! Yelmo state init, and the thermodynamic/dynamic equilibration passes.
+        type(ice_domain),      intent(inout) :: dom
+        type(tstep_class),     intent(in)    :: ts
+        type(bsl_class),       intent(inout) :: bsl
+        type(tsforcing_class), intent(in)    :: tsf
+        real(wp),              intent(in)    :: dT_summer, dT_ocn
+        real(wp),              intent(in)    :: time_equil, dtt
+
         real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         character(len=256) :: gi, gy
@@ -287,7 +302,7 @@ contains
 
         ! Hub mirror + first REMBO / ocean / marine forcing.
         call refresh_htopo(dom)
-        call step_rembo(init=.true.)
+        call step_rembo(dom, ts, tsf, dT_summer, dT_ocn, init=.true.)
         call step_marine_shelf(dom, ts)
 
         ! Assemble the Yelmo boundary state from the freshly produced outputs.
@@ -321,9 +336,14 @@ contains
         end if
     end subroutine rembo_cold_start
 
-    subroutine write_rembo_restart()
+    subroutine write_rembo_restart(dom, bsl, ts, tsf)
         ! Restart bundle: the shared domain sub-models + shared bsl
         ! (run_restart_write) plus REMBO's own restart, all in one folder.
+        type(ice_domain),      intent(inout) :: dom
+        type(bsl_class),       intent(inout) :: bsl
+        type(tstep_class),     intent(in)    :: ts
+        type(tsforcing_class), intent(inout) :: tsf
+
         call run_restart_write(dom, bsl, ts%time, tsf=tsf)
         call rembo_restart_write(trim(restart_bundle_dir(ts%time))//"/rembo_restart.nc", &
                 real(ts%time, dp), real(dom%yelmo%tpo%now%z_srf, dp), &
