@@ -12,10 +12,10 @@
 |  8 | pd_uxy_s          | xc, yc              | m/yr        | PD surface velocity magnitude                 |
 |  9 | pd_T_srf          | xc, yc              | K           | PD surface temperature                        |
 | 10 | pd_smb_ref        | xc, yc              | m/yr        | PD surface mass balance                       |
-| 11 | pd_depth_iso      | xc, yc, pd_age_iso  | m           | PD depth of specific isochrones               |
+| 11 | pd_depth_iso      | xc, yc, pd_time_iso | m           | PD depth of specific isochrones               |
 | 12 | pd_err_H_ice      | xc, yc              | m           | PD error in ice thickness                     |
 | 13 | pd_err_z_srf      | xc, yc              | m           | PD error in surface elevation                 |
 | 14 | pd_err_z_bed      | xc, yc              | m           | PD error in bedrock elevation                 |
 | 15 | pd_err_smb_ref    | xc, yc              | m/yr        | PD error in surface mass balance              |
 | 16 | pd_err_uxy_s      | xc, yc              | m/yr        | PD error in surface velocity magnitude        |
-| 17 | pd_err_depth_iso  | xc, yc, pd_age_iso  | m           | PD error in isochrone depth                   |
+| 17 | pd_err_depth_iso  | xc, yc, pd_time_iso | m           | PD error in isochrone depth                   |

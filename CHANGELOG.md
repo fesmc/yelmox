@@ -38,6 +38,12 @@ annotated git tag. Dates are release (tag) dates.
   `yelmox_esm` for new work.
 - Dropped pre-configme / pre-runme tooling.
 
+### Fixed
+- `var_io` tables (`input/yelmo-variables-{ydata,ytrc}.md`) synced to the
+  yelmo:dev isochrone dimension rename (`age_iso`→`time_iso`,
+  `pd_age_iso`→`pd_time_iso`). The stale copies crashed restart writing
+  (`nf90_inq_dimid`), which affected every run.
+
 ## [v2.2.2] - 2026-06-24
 - yelmox: added bsl ts writing.
 
