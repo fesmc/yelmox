@@ -170,10 +170,10 @@ module esm
     
 contains
     
-    subroutine esm_forcing_init(esm,filename,domain,grid_name,run_type,gcm,experiment, &
+    subroutine esm_forcing_init(esm,filename,domain,grid_name,run_type,gcm,scenario,experiment, &
                                 use_esm,use_smb,use_var,&
                                 use_hist,time_hist,&
-                                use_proj,time_proj)
+                                use_proj,time_proj,fmb_method)
 
         implicit none 
     
@@ -181,12 +181,15 @@ contains
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain 
         character(len=*), intent(IN) :: grid_name 
-        character(len=*), intent(IN), optional :: run_type, gcm, experiment
+        character(len=*), intent(IN), optional :: run_type, gcm, scenario, experiment
         logical,          intent(IN), optional :: use_esm, use_smb, use_var
         logical,          intent(IN), optional :: use_hist, use_proj
         real(wp),         intent(IN), optional :: time_hist(2), time_proj(2)
     
         ! Local variables 
+        character(len=256) :: gcm_now
+        character(len=256) :: experiment_now
+        character(len=256) :: scenario_now
         character(len=256) :: group_prefix 
     
         ! Reference climatology
@@ -227,15 +230,61 @@ contains
         character(len=256) :: grp_to_proj 
         character(len=256) :: grp_so_proj
         character(len=256) :: grp_Qd_proj   ! used for Greenland
+        integer, intent(IN), optional :: fmb_method
 
         integer  :: iloc, k 
         real(wp) :: tmp
         real(wp) :: time_par_ref(4),time_par_hist(4),time_par_proj(4),time_par_var(4)
+
+        ! First determine whether gcm+scenario provided or experiment
+        ! obtain valid values for gcm and scenario to start.
+        if (present(experiment)) then 
+            ! Experiment provided, obtain gcm+scenario from it 
+    
+            if (trim(experiment) .eq. "ctrl" .or. trim(experiment) .eq. "ctrl0") then 
+                gcm_now        = trim(experiment)
+                scenario_now   = trim(experiment)
+                experiment_now = "ctrl"
+            ! jablasco: change this?
+            elseif (trim(experiment) .eq. "1pctCO2") then
+                gcm_now      = trim(experiment)
+                scenario_now = "transient"
+                experiment_now = "transient" 
+            elseif (trim(experiment) .eq. "ssp126" .or. trim(experiment) .eq. "ssp585") then
+                gcm_now      = trim(experiment)
+                scenario_now = "transient"
+            else 
+                iloc = index(experiment,"_")
+                if (iloc == 0) then
+                    write(error_unit,*) "esm_ant_forcing_init:: Error: experiment &
+                    &argument must be defined as gcm_scenario."
+                    write(error_unit,*) "experiment = ", trim(experiment)
+                    stop
+                end if
+    
+                gcm_now = experiment(1:iloc-1)
+                scenario_now = experiment(iloc+1:len_trim(experiment))
+    
+            end if 
+    
+        else if (present(gcm) .and. present(scenario)) then 
+            ! gcm and scenario provided go forward as usual 
+    
+            gcm_now        = trim(gcm)
+            scenario_now   = trim(scenario)
+            experiment_now = "transient"
+    
+        else
+            ! Arguments not provided 
+            write(error_unit,*) "esm_forcing_init:: Error: gcm+scenario or experiment must be provided &
+            &as arguments."
+            stop
+        end if
     
         ! Define the current experiment characteristics
-        esm%ctrl_run_type = trim(run_type)
+        esm%ctrl_run_type = trim(experiment_now) 
         esm%gcm           = trim(gcm)
-        esm%experiment    = trim(experiment) 
+        esm%experiment    = trim(scenario) 
     
         write(*,*)
         write(*,*) "esm_forcing_init:: summary"
@@ -349,7 +398,7 @@ contains
                     end if
                     call varslice_init_nml_esm(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, esm%gcm, esm%experiment)
                     call varslice_init_nml_esm(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, esm%gcm, esm%experiment)
-                    if (trim(domain).eq."Greenland") then
+                    if (trim(domain).eq."Greenland" .and. fmb_method.eq.3) then
                         call varslice_init_nml_esm(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,esm%gcm,esm%experiment)
                     end if
                 end if
@@ -367,7 +416,7 @@ contains
                     ! ocean
                     call varslice_init_nml_esm(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,esm%gcm,esm%experiment)
                     call varslice_init_nml_esm(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,esm%gcm,esm%experiment)
-                    if (trim(domain).eq."Greenland") then
+                    if (trim(domain).eq."Greenland" .and. fmb_method.eq.3) then
                         call varslice_init_nml_esm(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,esm%gcm,esm%experiment)
                     end if
                 end if
@@ -432,7 +481,7 @@ contains
         !    call varslice_map_to_grid(esm%to_ref,esm%to_ref_src,mps)
         !end if
 
-        call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
+        call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1) !ep=1 is annual
         call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)  
 
         ! Convert atmospheric fields to model elevation
@@ -605,7 +654,8 @@ contains
     end subroutine esm_variability_update
 
     subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,&
-                                  domain,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
+                                  domain,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn,&
+                                  fmb_method)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -620,7 +670,7 @@ contains
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
         logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
-    
+        integer,  intent(IN), optional :: fmb_method
         ! Local variables 
         integer  :: k, m 
         real(wp) :: tmp, anomaly
@@ -639,7 +689,6 @@ contains
         esm%dso    = 0.0_wp 
         esm%Qd_ann = 0.0_wp
         esm%Qd_sum = 0.0_wp
-
         select case(trim(esm%ctrl_run_type))
             
             case("ctrl","opt")
@@ -658,7 +707,6 @@ contains
                     ! === Oceanic fields ===
                     call varslice_update(esm%to_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                     call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
-                        
                     ! Interpolate ocean data to the interior of ice shelves
                     if (.TRUE.) then
                         call ocn_variable_extrapolation(esm%to_esm_ref%var(:,:,:,1),H_ice,basins,-esm%to_esm_ref%z,z_bed)
@@ -688,12 +736,13 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_hist,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_hist,[time],method="extrap",rep=1)
-                        if (trim(domain).eq."Greenland") then
+
+                        if (trim(domain).eq."Greenland" .and. fmb_method.eq.3) then
                             call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_hist%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_hist%var(:,:,6,1)+esm%Qd_hist%var(:,:,7,1)+esm%Qd_hist%var(:,:,8,1)) / 3.0
                         end if
-                                         
+
                         if (mshlf%par%extrap_shlf) then
                             ! Extrapolate ocean data to the interior of ice shelves
                             call ocn_variable_extrapolation(esm%to_hist%var(:,:,:,1),H_ice,basins,-esm%to_hist%z,z_bed)
@@ -731,7 +780,7 @@ contains
                         ! ===   Oceanic fields   ===
                         call varslice_update(esm%to_proj,[time],method="extrap",rep=1)
                         call varslice_update(esm%so_proj,[time],method="extrap",rep=1)  
-                        if (trim(domain).eq."Greenland") then
+                        if (trim(domain).eq."Greenland" .and. fmb_method.eq.3) then
                             call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_proj%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_proj%var(:,:,6,1)+esm%Qd_proj%var(:,:,7,1)+esm%Qd_proj%var(:,:,8,1)) / 3.0
@@ -1116,22 +1165,20 @@ contains
         call ice_var_par_load(esmi%vars(21),filename,var_name="strbasemag")
         call ice_var_par_load(esmi%vars(22),filename,var_name="licalvf")
         call ice_var_par_load(esmi%vars(23),filename,var_name="lifmassbf")
-        call ice_var_par_load(esmi%vars(24),filename,var_name="lifmassbf")
-        call ice_var_par_load(esmi%vars(25),filename,var_name="ligroundf")
-        call ice_var_par_load(esmi%vars(26),filename,var_name="sftgif")
-        call ice_var_par_load(esmi%vars(27),filename,var_name="sftgrf")
-        call ice_var_par_load(esmi%vars(28),filename,var_name="sftflf")
-
-        call ice_var_par_load(esmi%vars(29),filename,var_name="lim")
-        call ice_var_par_load(esmi%vars(30),filename,var_name="limnsw")
-        call ice_var_par_load(esmi%vars(31),filename,var_name="iareagr")
-        call ice_var_par_load(esmi%vars(32),filename,var_name="iareafl")
-        call ice_var_par_load(esmi%vars(33),filename,var_name="tendacabf")
-        call ice_var_par_load(esmi%vars(34),filename,var_name="tendlibmassbf")
-        call ice_var_par_load(esmi%vars(35),filename,var_name="tendlibmassbffl")
-        call ice_var_par_load(esmi%vars(36),filename,var_name="tendlicalvf")
-        call ice_var_par_load(esmi%vars(37),filename,var_name="tendlifmassbf")
-        call ice_var_par_load(esmi%vars(38),filename,var_name="tendligroundf")
+        call ice_var_par_load(esmi%vars(24),filename,var_name="ligroundf")
+        call ice_var_par_load(esmi%vars(25),filename,var_name="sftgif")
+        call ice_var_par_load(esmi%vars(26),filename,var_name="sftgrf")
+        call ice_var_par_load(esmi%vars(27),filename,var_name="sftflf")
+        call ice_var_par_load(esmi%vars(28),filename,var_name="lim")
+        call ice_var_par_load(esmi%vars(29),filename,var_name="limnsw")
+        call ice_var_par_load(esmi%vars(30),filename,var_name="iareagr")
+        call ice_var_par_load(esmi%vars(31),filename,var_name="iareafl")
+        call ice_var_par_load(esmi%vars(32),filename,var_name="tendacabf")
+        call ice_var_par_load(esmi%vars(33),filename,var_name="tendlibmassbf")
+        call ice_var_par_load(esmi%vars(34),filename,var_name="tendlibmassbffl")
+        call ice_var_par_load(esmi%vars(35),filename,var_name="tendlicalvf")
+        call ice_var_par_load(esmi%vars(36),filename,var_name="tendlifmassbf")
+        call ice_var_par_load(esmi%vars(37),filename,var_name="tendligroundf")
 
         if (verbose) then 
 

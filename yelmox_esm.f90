@@ -271,6 +271,11 @@ program yelmox_esm
             call get_ice_sub_region(tmp_mask,"EAIS",yelmo1%par%domain,yelmo1%par%grid_name)
             call yelmo_region_init(yelmo1%regs(3),"EAIS",mask=tmp_mask,write_to_file=.TRUE.,outfldr=outfldr)
     
+        case("Greenland")
+            where(abs(yelmo1%bnd%regions - 1.20) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
+            where(abs(yelmo1%bnd%regions - 1.23) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
+            where(abs(yelmo1%bnd%regions - 1.31) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
+            where(abs(yelmo1%bnd%regions - 1.11) .lt. 1e-3) yelmo1%bnd%mask_ice = MASK_ICE_NONE
     end select
 
 
@@ -283,9 +288,11 @@ program yelmox_esm
     call isos_init(isos1, path_par, "isos", yelmo1%grd%nx, yelmo1%grd%ny, yelmo1%grd%dx, yelmo1%grd%dy)
     
     ! Initialize ESM atmospheric and oceanic objects 
-    esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
-    call esm_forcing_init(esm1,esm_path_par,domain,grid_name,run_type=ctl%run_step,gcm=ctl%esm_name,experiment=ctl%esm_experiment,&
-                          use_esm=ctl%esm_use_esm,use_smb=ctl%esm_use_smb,use_var=ctl%esm_use_var,use_hist=ctl%esm_use_hist,use_proj=ctl%esm_use_proj)
+    ! esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
+    !esm_path_par = trim(outfldr)//"/yelmo_Greenland_esm_ismip7.nml"
+    call esm_forcing_init(esm1,path_par,domain,grid_name,run_type=ctl%run_step,gcm=ctl%esm_name,scenario=ctl%esm_experiment,&
+                          use_esm=ctl%esm_use_esm,use_smb=ctl%esm_use_smb,use_var=ctl%esm_use_var,use_hist=ctl%esm_use_hist,&
+                          use_proj=ctl%esm_use_proj,fmb_method=yelmo1%tpo%par%fmb_method)
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
@@ -318,8 +325,9 @@ program yelmox_esm
     ! Update forcing to present-day reference using esm forcing
     call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                           time=ts%time,time_bp=ts%time_rel, &
-                          domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name)
-    
+                          domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name, &
+                          fmb_method=yelmo1%tpo%par%fmb_method)
+
     ! Equilibrate snowpack for itm
     if (trim(smbpal1%par%abl_method) .eq. "itm" .and. (.not. ctl%esm_use_smb)) then 
         call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
@@ -331,9 +339,10 @@ program yelmox_esm
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
 
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
-    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf 
-    yelmo1%bnd%Qd       = esm1%Qd_ann           ! subglacial dscharge needed for frontal melt
-    ! yelmo1%bnd%Qd       = esm1%Qd_sum
+    yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
+    yelmo1%bnd%tf_shlf  = mshlf1%now%tf_shlf 
+    yelmo1%bnd%Qd       = esm1%Qd_ann           ! subglacial dscharge needed for frontal melt lucgut check
+    ! yelmo1%bnd%Qd     = esm1%Qd_sum
 
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -520,7 +529,8 @@ program yelmox_esm
             ! Update forcing to present-day reference, but adjusting to ice topography
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl, &
                                   time=ts%time,time_bp=ts%time_rel, &
-                                  domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name) 
+                                  domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name,&
+                                  fmb_method=yelmo1%tpo%par%fmb_method)
            
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -574,7 +584,7 @@ program yelmox_esm
         ! and is ready for transient simulations 
 
         write(*,*)
-        write(*,*) "Performing transient."
+        write(*,*) "Performing transient." 
         write(*,*) 
 
         ! Initialize output files 
@@ -622,7 +632,7 @@ program yelmox_esm
 
             ! Get ESM climate and ocean forcing
             call calc_climate_esm(smbpal1,mshlf1,esm1,yelmo1,ctl,ts%time,ts%time_rel, &
-                                  domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name)
+                                  domain=yelmo1%par%domain,grid_name=yelmo1%par%grid_name,fmb_method=yelmo1%tpo%par%fmb_method)
             
             yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
             yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -689,7 +699,7 @@ program yelmox_esm
 contains
 
     ! === CLIMATE ====
-    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,ctl,time,time_bp,domain,grid_name,use_ref_atm,use_ref_ocn)
+    subroutine calc_climate_esm(smbp,mshlf,esm,ylmo,ctl,time,time_bp,domain,grid_name,use_ref_atm,use_ref_ocn,fmb_method)
 
         implicit none 
     
@@ -703,15 +713,15 @@ contains
         character(len=*),           intent(IN)    :: domain
         character(len=*),           intent(IN)    :: grid_name 
         logical, optional,          intent(IN)    :: use_ref_atm,use_ref_ocn
-
+        integer,                   intent(IN), optional :: fmb_method
         ! Step 1: set the reference climatologies (for reference and variability reference)
         call esm_clim_update(esm,ylmo%tpo%now%z_srf,time,ctl%time_ref,ctl%esm_use_smb,domain,grid_name)
         
         ! extrapolate towards interior of ice shelf
         if (mshlf%par%extrap_shlf) then
             ! avoid for ismip7
-            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
-            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
+            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,ABS(esm%to_var_ref%z),ylmo%bnd%z_bed)
+            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,ABS(esm%so_var_ref%z),ylmo%bnd%z_bed)
             !call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%to_var_ref%z,ylmo%bnd%z_bed)
             !call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),ylmo%tpo%now%H_ice,ylmo%bnd%basins,-esm%so_var_ref%z,ylmo%bnd%z_bed)
         end if
@@ -719,10 +729,13 @@ contains
         ! Check reference states
         if (.FALSE.) then
             ! Atm check
+            write(*,*) "OCN and ATM checks"
             write(*,*) "Ts_ref_max = ",maxval(esm%ts_ref%var(:,:,:,1))
             write(*,*) "Pr_ref_max = ",maxval(esm%pr_ref%var(:,:,:,1))
             write(*,*) "Ts_ref_min = ",minval(esm%ts_ref%var(:,:,:,1))
             write(*,*) "Pr_ref_min = ",minval(esm%pr_ref%var(:,:,:,1))
+            write(*,*) "smb_ref_max = ",maxval(esm%smb_ref%var(:,:,:,1))
+            write(*,*) "smb_ref_min = ",minval(esm%smb_ref%var(:,:,:,1))
             ! Ocean check
             write(*,*) "To_max = ",maxval(esm%to_ref%var(:,:,:,1))
             write(*,*) "So_max = ",maxval(esm%so_ref%var(:,:,:,1))
@@ -733,7 +746,7 @@ contains
         ! Step 2: Calculate anomaly fields (forcing)
         call esm_forcing_update(esm,mshlf,time,ctl%esm_use_esm,ctl%time_ref,ctl%time_hist,ctl%time_proj,ctl%time_esm_ref, &
                                 domain,ylmo%tpo%now%H_ice,ylmo%bnd%basins,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl, &
-                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.)
+                                ctl%esm_use_smb,use_ref_atm=.false.,use_ref_ocn=.false.,fmb_method=yelmo1%tpo%par%fmb_method)
 
         ! Step 3: Calculate the variability anomaly field
         call esm_variability_update(esm,mshlf,time,ctl%dtt,ctl%clim_var,ctl%time_ref, &
@@ -772,9 +785,9 @@ contains
         ! === Oceanic boundary conditions ===
         ! Update oceanic fields at desired levels
         call marshelf_interp_shelf(mshlf%now%T_shlf,mshlf,esm%to_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
-                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%to_ref%z)
+                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,ABS(esm%to_ref%z))
         call marshelf_interp_shelf(mshlf%now%S_shlf,mshlf,esm%so_ref%var(:,:,:,1),ylmo%tpo%now%H_ice, &
-                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,-esm%so_ref%z)
+                                    ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd,ylmo%bnd%z_sl,ABS(esm%so_ref%z))
 
         ! Add anomaly to reference ocean
         mshlf%now%T_shlf = mshlf%now%T_shlf + esm%dto + esm%dto_var
@@ -787,11 +800,11 @@ contains
             call fill_missing_2d(mshlf%now%S_shlf, mv)
         end if        
         
-        if (trim(domain) .eq. "Greenland") then
-            ! Directly given in TF
-            mshlf%now%dT_shlf = mshlf%now%T_shlf + esm%dto !+ esm%dto_var
-            mshlf%par%tf_method = 2
-        end if
+        ! if (trim(domain) .eq. "Greenland") then
+        !     ! Directly given in TF
+        !     mshlf%now%dT_shlf = mshlf%now%T_shlf + esm%dto !+ esm%dto_var
+        !     mshlf%par%tf_method = 2
+        ! end if
 
         ! Update bmb_shlf and mask_ocn
         call marshelf_update(mshlf,ylmo%tpo%now%H_ice,ylmo%bnd%z_bed,ylmo%tpo%now%f_grnd, &
@@ -1231,6 +1244,12 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"smb_ann",ylmo%tpo%now%smb,units="m/a water equiv.",long_name="SMB (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid) 
+        call nc_write(filename,"bmb",ylmo%tpo%now%bmb,units="m/a ice equiv.",long_name="Net basal mass balance", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"fmb",ylmo%tpo%now%fmb,units="m/a ice equiv.",long_name="Net margin-front mass balance", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
+        call nc_write(filename,"cmb",ylmo%tpo%now%cmb_flt+ylmo%tpo%now%cmb_grnd,units="m/a ice equiv.",long_name="Calving mass balance rate", &
+                        dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         if (ctl%esm_use_smb) then
             call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1546,7 +1565,7 @@ contains
         real(wp), allocatable :: z_base(:,:)
         real(wp), allocatable :: T_top_ice(:,:), T_base_grnd(:,:), T_base_flt(:,:), T_avg(:,:)
         real(wp), allocatable :: dTdz_base_grnd(:,:), dTdz_base_flt(:,:)
-        real(wp), allocatable :: flux_grl_2d(:,:), flux_clv_2d(:,:), tfbase(:,:)
+        real(wp), allocatable :: flux_grl_2d(:,:), flux_clv_2d(:,:), flux_fmb_2d(:,:), tfbase(:,:)
         real(wp), allocatable :: ux_aa(:,:), uy_aa(:,:) 
         real(wp), allocatable :: uz_s_masked(:,:), uz_b_masked(:,:)   
         
@@ -1562,6 +1581,7 @@ contains
         allocate(dTdz_base_flt   (ylmo%grd%nx, ylmo%grd%ny))
         allocate(flux_grl_2d     (ylmo%grd%nx, ylmo%grd%ny))
         allocate(flux_clv_2d     (ylmo%grd%nx, ylmo%grd%ny))
+        allocate(flux_fmb_2d     (ylmo%grd%nx, ylmo%grd%ny))
         allocate(tfbase          (ylmo%grd%nx, ylmo%grd%ny))
         allocate(ux_aa           (ylmo%grd%nx, ylmo%grd%ny))
         allocate(uy_aa           (ylmo%grd%nx, ylmo%grd%ny))
@@ -1576,13 +1596,13 @@ contains
         dTdz_base_grnd  = 0.0_wp;  dTdz_base_flt    = 0.0_wp
         flux_grl_2d     = 0.0_wp;  flux_clv_2d      = 0.0_wp  
         ux_aa           = 0.0_wp;  uy_aa            = 0.0_wp
-        
+        flux_fmb_2d     = 0.0_wp
         ! ---- unit conversion ------------------------------------------------
         rho_ice        = 917.0_wp
-        m3yr_to_kgs    = 3.2e-5_wp
-        density_corr   = rho_ice / 1000.0_wp
-        esm_correction = m3yr_to_kgs * density_corr
         yr_to_sec      = 31556952.0_wp
+        m3yr_to_kgs     = 1.0_wp / yr_to_sec
+        density_corr   = rho_ice / 1000.0_wp !from ie to we
+        esm_correction = m3yr_to_kgs * density_corr
         nz = ylmo%dyn%par%nz_aa
         
         ! ---- derived fields -------------------------------------------------
@@ -1639,6 +1659,7 @@ contains
         end where
         
         flux_clv_2d = (ylmo%tpo%now%cmb_flt+ylmo%tpo%now%cmb_grnd) * esm_correction
+        flux_fmb_2d = ylmo%tpo%now%fmb * esm_correction
 
         ! Thermal forcing at ice base (floating only)
         where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp)
@@ -1814,6 +1835,12 @@ contains
             units="kg m-2 s-1", long_name="Grounding line flux", &
             standard_name="land_ice_specific_grounding_line_flux", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+
+        ! lifmassbf : Ice front melt flux                        [MANDATORY]
+        call nc_write(filename, "lifmassbf", flux_fmb_2d, &
+            units="kg m-2 s-1", long_name="Ice front melt flux", &
+            standard_name="land_ice_specific_mass_flux_due_to_ice_front_melting", &
+            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
         ! tfbase : Thermal forcing at ice base, floating           [optional]
         call nc_write(filename, "tfbase", tfbase, &
@@ -1853,6 +1880,7 @@ contains
         real(wp) :: bmb_shlf_t       ! total BMB floating  [m3 yr-1]
         real(wp) :: flux_grl         ! total GL flux       [kg yr-1]
         real(wp) :: flux_clv         ! total calving flux  [kg yr-1]
+        real(wp) :: flux_fmb         ! total frontal flux  [kg yr-1]
         
         logical, allocatable :: mask_tot(:,:)
         logical, allocatable :: mask_grnd(:,:)
@@ -1867,13 +1895,13 @@ contains
         allocate(mask_grl  (ylmo%grd%nx, ylmo%grd%ny))
         allocate(mask_frnt (ylmo%grd%nx, ylmo%grd%ny))
         
-        ! ---- unit conversions -----------------------------------------------
+        ! ---- unit conversion ------------------------------------------------
         rho_ice        = 917.0_wp
-        m3yr_to_kgs    = 3.2e-5_wp
-        density_corr   = rho_ice / 1000.0_wp
-        esm_correction = m3yr_to_kgs * density_corr
         yr_to_sec      = 31556952.0_wp
-        
+        m3yr_to_kgs     = 1.0_wp / yr_to_sec
+        density_corr   = rho_ice / 1000.0_wp !from ie to we
+        esm_correction = m3yr_to_kgs * density_corr
+
         dx = ylmo%grd%dx
         dy = ylmo%grd%dy
         
@@ -1910,6 +1938,9 @@ contains
         ! Calving flux: sum of cmb_flt and cmb_grnd, [kg yr-1]
         flux_clv = sum(ylmo%tpo%now%cmb_flt + ylmo%tpo%now%cmb_grnd) * (dx * dy)  ! [m3 yr-1]
         
+        ! Frontal flux
+        flux_clv = sum(ylmo%tpo%now%fmb) * (dx * dy)  ! [m3 yr-1]
+
         ! ---- open file & find time index ------------------------------------
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
@@ -1933,13 +1964,13 @@ contains
         
         ! iareagr : Grounded ice area                              [MANDATORY]
         call nc_write(filename, "iareagr", reg%A_ice_g * 1.0e6_wp, &
-            units="m2", long_name="Grounded ice area", &
+            units="m^2", long_name="Grounded ice area", &
             standard_name="grounded_ice_sheet_area", &
             dim1="time", start=[n], ncid=ncid)
         
         ! iareafl : Floating ice area                              [MANDATORY]
         call nc_write(filename, "iareafl", reg%A_ice_f * 1.0e6_wp, &
-            units="m2", long_name="Floating ice area", &
+            units="m^2", long_name="Floating ice area", &
             standard_name="floating_ice_shelf_area", &
             dim1="time", start=[n], ncid=ncid)
         
@@ -1971,10 +2002,8 @@ contains
             standard_name="tendency_of_land_ice_mass_due_to_calving", &
             dim1="time", start=[n], ncid=ncid)
         
-        ! tendlifmassbf : Total ice-front melt flux                [MANDATORY]
-        ! ISMIP7-2026 separates this from calving. The kinematic approach does
-        ! TODO: replace with sum(ylmo%tpo%now%fmb * ...) when field is confirmed.
-        call nc_write(filename, "tendlifmassbf", 0.0_wp, &
+        ! tendlifmassbf : Total ice-front melt flux                [MANDATORY].
+        call nc_write(filename, "tendlifmassbf", flux_fmb * esm_correction, &
             units="kg s-1", long_name="Total ice front melting flux", &
             standard_name="tendency_of_land_ice_mass_due_to_ice_front_melting", &
             dim1="time", start=[n], ncid=ncid)
@@ -1989,8 +2018,7 @@ contains
         ! ---- close ----------------------------------------------------------
         call nc_close(ncid)
         
-        return
-        
+        return        
     end subroutine write_step_1D_cmip
 
 end program yelmox_esm
