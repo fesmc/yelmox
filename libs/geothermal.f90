@@ -24,6 +24,8 @@ module geothermal
         character(len=56)  :: obs_err_name
         real(wp)           :: f_stdev
         real(wp)           :: ghf_const 
+        logical            :: convert_ghf_units
+
     end type 
 
     type geothermal_state_class 
@@ -79,6 +81,12 @@ contains
             call nc_read(gthrm%par%obs_path,gthrm%par%obs_name,gthrm%now%ghf)
             write(*,*) "geothermal_init:: geothermal heat flux loaded from: "
             write(*,*) trim(gthrm%par%obs_path)//" : "//trim(gthrm%par%obs_name)
+
+            ! Convert units if needed (W/m^2 => mW/m^2)
+            if (gthrm%par%convert_ghf_units) then
+                gthrm%now%ghf = gthrm%now%ghf * 1000.0_wp
+                write(*,*) "geothermal_init:: ghf converted from W/m^2 to mW/m^2."
+            end if
 
             ! Also read it ghf error (e.g. standard deviation) if available
 
@@ -184,6 +192,7 @@ contains
         call nml_read(filename,nml_group,"obs_err_name",    par%obs_err_name,   init=init_pars)
         call nml_read(filename,nml_group,"f_stdev",         par%f_stdev,        init=init_pars)
         call nml_read(filename,nml_group,"ghf_const",       par%ghf_const,      init=init_pars)
+        call nml_read(filename,nml_group,"convert_ghf_units", par%convert_ghf_units, init=init_pars)
 
         ! Replace gridding template values from path
         call parse_path(par%obs_path,domain,grid_name)
