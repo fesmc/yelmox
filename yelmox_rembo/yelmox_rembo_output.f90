@@ -119,8 +119,9 @@ contains
         call nc_write(filename,"V_dT",ylmo%reg%V_ice*1e-6,units="1e6 km^3",long_name="Ice volume", &
                       dim1="dT_axis",start=[k],ncid=ncid)
 
-        ! Yelmo model metrics (model speed, dt, eta).
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+        ! Note: numerics/speed metrics now go to yelmo_metrics.nc (write_metrics);
+        ! they are no longer written here (this also removes the pc_tau_max xc/yc
+        ! field that has no place in the 1D rembo_ts.nc timeseries file).
 
         ! ===== REMBO integrated metrics (smb_tot [Gt/yr], aar [-]) =====
         ntot = count(ylmo%tpo%now%H_ice .gt. 0.0)

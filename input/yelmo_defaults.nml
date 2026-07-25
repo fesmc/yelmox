@@ -50,6 +50,9 @@
     pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1.0               ! Predictor-corrector tolerance
 
+    write_metrics    = False            ! Write numerics/speed metrics to yelmo_metrics.nc
+    write_metrics_dt = 100.0            ! [yr] Output cadence for yelmo_metrics.nc
+
 /
 
 &ytopo

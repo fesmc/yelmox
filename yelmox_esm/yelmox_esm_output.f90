@@ -57,8 +57,8 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+        ! Note: numerics/speed metrics now go to yelmo_metrics.nc (write_metrics);
+        ! they are no longer embedded here.
 
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)
@@ -418,8 +418,8 @@ contains
         ! Update the time step
         call nc_write(filename,"time",time,dim1="time",start=[n],count=[1],ncid=ncid)
 
-        ! Write model metrics (model speed, dt, eta)
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+        ! Note: numerics/speed metrics now go to yelmo_metrics.nc (write_metrics);
+        ! they are no longer embedded here.
 
         ! Write present-day data metrics (rmse[H],etc)
         call yelmo_write_step_pd_metrics(filename,ylmo,n,ncid)

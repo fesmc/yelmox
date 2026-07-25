@@ -523,6 +523,10 @@ contains
         ny = dom%yelmo%grd%G%ny
         allocate(tmp_mask(nx, ny))
 
+        ! Hand yelmo its output folder: the single source for all files yelmo
+        ! writes internally (regional 1D files below, and yelmo_metrics.nc).
+        dom%yelmo%outfldr = trim(outfldr)
+
         select case(trim(domain))
 
             case("Antarctica")
@@ -591,10 +595,11 @@ contains
 
         ! Name the regional 1D files (no grid suffix; grid is recorded in-file):
         !   global -> yelmo_ts.nc, sub-region k -> yelmo_ts_<name>.nc
-        dom%yelmo%reg%fnm = trim(outfldr)//"yelmo_ts.nc"
+        ! Paths derive from dom%yelmo%outfldr (set above).
+        dom%yelmo%reg%fnm = trim(dom%yelmo%outfldr)//"yelmo_ts.nc"
         if (dom%yelmo%par%n_reg > 0) then
             do i = 1, dom%yelmo%par%n_reg
-                dom%yelmo%regs(i)%fnm = trim(outfldr)//"yelmo_ts_"// &
+                dom%yelmo%regs(i)%fnm = trim(dom%yelmo%outfldr)//"yelmo_ts_"// &
                                         trim(dom%yelmo%regs(i)%name)//".nc"
             end do
         end if
