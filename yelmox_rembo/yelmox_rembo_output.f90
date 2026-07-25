@@ -120,7 +120,12 @@ contains
                       dim1="dT_axis",start=[k],ncid=ncid)
 
         ! Yelmo model metrics (model speed, dt, eta).
-        call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
+        ! Disabled: yelmo_write_step_model_metrics also writes the 2D field
+        ! pc_tau_max (dim1="xc",dim2="yc"), but rembo_ts.nc is a 1D timeseries
+        ! file with no xc/yc dims -> ncio aborts on nf90_inq_dimid for "xc".
+        ! Numerics/speed diagnostics will move to a dedicated yelmo_metrics.nc
+        ! (planned write_metrics option); see dev.
+        ! call yelmo_write_step_model_metrics(filename,ylmo,n,ncid)
 
         ! ===== REMBO integrated metrics (smb_tot [Gt/yr], aar [-]) =====
         ntot = count(ylmo%tpo%now%H_ice .gt. 0.0)
