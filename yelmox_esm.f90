@@ -290,13 +290,14 @@ program yelmox_esm
     ! Initialize ESM atmospheric and oceanic objects 
     ! esm_path_par = trim(outfldr)//"/"//trim(ctl%esm_par_file)
     !esm_path_par = trim(outfldr)//"/yelmo_Greenland_esm_ismip7.nml"
-    call esm_forcing_init(esm1,path_par,domain,grid_name,run_type=ctl%run_step,gcm=ctl%esm_name,scenario=ctl%esm_experiment,&
+    call esm_forcing_init(esm1,path_par,domain,grid_name,run_type=ctl%run_step,gcm=ctl%esm_name,experiment=ctl%esm_experiment,&
                           use_esm=ctl%esm_use_esm,use_smb=ctl%esm_use_smb,use_var=ctl%esm_use_var,use_hist=ctl%esm_use_hist,&
                           use_proj=ctl%esm_use_proj,fmb_method=yelmo1%tpo%par%fmb_method)
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
-
+    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%smb = 0.0_wp
+    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%tsrf = 0.0_wp
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
@@ -333,11 +334,12 @@ program yelmox_esm
         call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
             yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
-
+    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%smb = 0.0_wp
+    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%tsrf = 0.0_wp
     ! Update Yelmo boundary fields
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
-
+    
     yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
     yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf
     yelmo1%bnd%tf_shlf  = mshlf1%now%tf_shlf 
@@ -639,6 +641,9 @@ program yelmox_esm
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf   
+
+            where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) yelmo1%bnd%smb = 0.0_wp
+            where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) yelmo1%bnd%T_srf = 0.0_wp
 
             call timer_step(tmrs,comp=3,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="climate") 
 
@@ -1688,7 +1693,7 @@ contains
             standard_name="land_ice_thickness", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-        call nc_write(filename, "orog", ylmo%tpo%now%z_srf, &
+        call nc_write(filename, "orog", ylmo%tpo%now%z_srf - ylmo%bnd%z_sl, &
             units="m", long_name="Surface elevation", &
             standard_name="surface_altitude", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
@@ -1939,7 +1944,7 @@ contains
         flux_clv = sum(ylmo%tpo%now%cmb_flt + ylmo%tpo%now%cmb_grnd) * (dx * dy)  ! [m3 yr-1]
         
         ! Frontal flux
-        flux_clv = sum(ylmo%tpo%now%fmb) * (dx * dy)  ! [m3 yr-1]
+        flux_fmb = sum(ylmo%tpo%now%fmb) * (dx * dy)  ! [m3 yr-1]
 
         ! ---- open file & find time index ------------------------------------
         call nc_open(filename, ncid, writable=.TRUE.)
@@ -2010,7 +2015,7 @@ contains
         
         ! tendligroundf : Total grounding-line flux                [MANDATORY]
         ! Kinematic, convert from kg yr-1 to kg s-1.
-        call nc_write(filename, "tendligroundf", flux_grl / yr_to_sec, &
+        call nc_write(filename, "tendligroundf", - flux_grl / yr_to_sec, &
             units="kg s-1", long_name="Total grounding line flux", &
             standard_name="tendency_of_grounded_ice_sheet_mass", &
             dim1="time", start=[n], ncid=ncid)
