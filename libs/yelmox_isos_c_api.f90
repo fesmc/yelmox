@@ -10,8 +10,7 @@ module yelmox_isos_c_api
   ! unset): the remap steps the real driver does between grid_isos and
   ! grid_yelmo are skipped here, isos%out fields are used directly at
   ! (nx, ny) = the yelmo grid. dwdt_corr (grid-resolution relaxation) is an
-  ! optional isos_update arg, unused at identity grids -- omitted, same as the
-  ! driver would produce (it's built from dzbdt_corr, which is zero here).
+  ! optional isos_update arg, taken here directly from yelmo bnd%dzbdt_corr.
 
   use fastisostasy
   use isostasy_defs, only: wp
@@ -23,20 +22,20 @@ module yelmox_isos_c_api
 
 contains
 
-  subroutine isos_c_init(filename, group, nx, ny, dx, dy, time_init) &
+  subroutine isos_c_init(filename, group, nx, ny, dx, dy, time_rel_init) &
       bind(C, name="isos_init")
     use iso_c_binding
     character(c_char), intent(in) :: filename(*)
     character(c_char), intent(in) :: group(*)
     integer(c_int), value         :: nx, ny
     real(c_double), value         :: dx, dy
-    real(c_double), value         :: time_init
+    real(c_double), value         :: time_rel_init   ! ts%time_rel (constant in "const" spinups)
 
     ! Shared driver-owned barystatic sea level -- driver calls bsl_init/update
     ! once at program start, before domain_init; folded in here since this
     ! wrapper only ever serves one isostasy instance.
-    call bsl_init(bsl1, trim(c_to_f_string(filename)), real(time_init, wp))
-    call bsl_update(bsl1, real(time_init, wp))
+    call bsl_init(bsl1, trim(c_to_f_string(filename)), real(time_rel_init, wp))
+    call bsl_update(bsl1, real(time_rel_init, wp))
 
     call isos_init(isos1, trim(c_to_f_string(filename)), trim(c_to_f_string(group)), &
                     nx, ny, real(dx, wp), real(dy, wp))
@@ -64,14 +63,18 @@ contains
 
   end subroutine
 
-  subroutine isos_c_update(H_ice, time, nx, ny) bind(C, name="isos_update")
+  subroutine isos_c_update(H_ice, dwdt_corr, time, time_rel, nx, ny) bind(C, name="isos_update")
     use iso_c_binding
     integer(c_int), value      :: nx, ny
     real(c_double), intent(in) :: H_ice(nx, ny)
-    real(c_double), value      :: time
+    real(c_double), intent(in) :: dwdt_corr(nx, ny)   ! yelmo bnd%dzbdt_corr
+    real(c_double), value      :: time       ! ts%time     -> isostasy
+    real(c_double), value      :: time_rel   ! ts%time_rel -> shared sea level
 
-    call bsl_update(bsl1, real(time, wp))
-    call isos_update(isos1, real(H_ice, wp), real(time, wp), bsl1)
+    ! Same order as the driver: bsl_update(ts%time_rel) once per step, then
+    ! isos_update(ts%time) with the dzbdt correction.
+    call bsl_update(bsl1, real(time_rel, wp))
+    call isos_update(isos1, real(H_ice, wp), real(time, wp), bsl1, dwdt_corr=real(dwdt_corr, wp))
 
   end subroutine
 
