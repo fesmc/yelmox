@@ -25,3 +25,4 @@ maps/*.nc
 .claude/worktrees
 __pycache__
 *.pyc
+coordinates
