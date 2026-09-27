@@ -63,6 +63,30 @@ contains
 
   end subroutine
 
+  ! Classic restart branch (domain_startup -> bsl_startup + domain_restart_read): restore the shared
+  ! sea level from <bundle>/bsl_restart.nc, then initialise isostasy from <bundle>/isos_restart.nc
+  ! (state AND reference are read from the bundle, so no isos_init_ref call is needed).
+  subroutine isos_c_init_state_restart(fldr, z_bed, H_ice, time, time_rel, nx, ny) &
+      bind(C, name="isos_init_state_restart")
+    use iso_c_binding
+    character(c_char), intent(in) :: fldr(*)
+    integer(c_int), value         :: nx, ny
+    real(c_double), intent(in)    :: z_bed(nx, ny)
+    real(c_double), intent(in)    :: H_ice(nx, ny)
+    real(c_double), value         :: time, time_rel
+
+    character(len=1028) :: f
+
+    f = trim(c_to_f_string(fldr))
+    call bsl_restart_read(bsl1, trim(f)//"/bsl_restart.nc")
+    call bsl_update(bsl1, real(time_rel, wp))
+
+    isos1%par%use_restart = .true.
+    isos1%par%restart     = trim(f)//"/isos_restart.nc"
+    call isos_init_state(isos1, real(z_bed, wp), real(H_ice, wp), real(time, wp), bsl1)
+
+  end subroutine
+
   subroutine isos_c_update(H_ice, dwdt_corr, time, time_rel, nx, ny) bind(C, name="isos_update")
     use iso_c_binding
     integer(c_int), value      :: nx, ny
