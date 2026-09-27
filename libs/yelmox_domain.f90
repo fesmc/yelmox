@@ -40,7 +40,8 @@ module yelmox_domain
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask, &
                              smb_simple_update
     use ice_optimization, only : ice_opt_params, optimize_par_load, &
-                             optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr
+                             optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr, &
+                             optimize_tf_corr_basin
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
     use htopo,        only : htopo_class, htopo_init, htopo_write_init, htopo_write_step
@@ -1042,6 +1043,7 @@ contains
 
         real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
         character(len=256) :: gm, gy
+        character(len=8) :: tf_env
 
         if (trim(dom%ctl%equil_method) /= "opt") return
 
@@ -1078,11 +1080,20 @@ contains
         if (dom%opt%opt_tf .and. ts%time_elapsed >= dom%opt%tf_time_init &
                             .and. ts%time_elapsed <= dom%opt%tf_time_end) then
             call remap(dom, dom%mshlf%now%tf_corr, gm, tf_corr_y, gy, "con")
-            call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
-                    dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
-                    dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
-                    dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                    dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+            call get_environment_variable("YELMOX_TF_BASIN", tf_env)
+            if (trim(tf_env) == "1") then
+                ! Experimental: basin-mean tf_corr update (legacy yelmox_esm behaviour)
+                call optimize_tf_corr_basin(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
+                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%bnd%basins, &
+                        dom%opt%H_grnd_lim, dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, &
+                        dom%opt%tf_max, dom%opt%tf_basins, dt=dom%ctl%dtt)
+            else
+                call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
+                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
+                        dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
+                        dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
+                        dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+            end if
             call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
             dom%mshlf%now%tf_corr = tf_corr_m
         end if
