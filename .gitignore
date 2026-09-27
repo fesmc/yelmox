@@ -26,3 +26,5 @@ maps/*.nc
 __pycache__
 *.pyc
 coordinates
+data_fixes/
+yelmox_esm/*_javi.nml
