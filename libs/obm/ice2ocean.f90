@@ -40,8 +40,11 @@ function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx
 
     character(len=*) :: fwf_def
 
-    ! Conversion parameter 
-    conv_km3a_Sv = 1e-6*(1e9*rho_water/rho_ice)/sec_year   
+    ! Conversion parameter: ice volume [km3/yr] -> freshwater flux [Sv].
+    ! km3 -> m3 is 1e9; ice volume -> the equivalent water volume is
+    ! rho_ice/rho_water; /sec_year gives m3/s and 1e-6 gives Sv. The ratio was
+    ! inverted here, 21 % high at 910/1000. Matches yelmo_regions.f90.
+    conv_km3a_Sv = 1e-6*(1e9*rho_ice/rho_water)/sec_year   
 
     ! Grid size 
     nx = size(dHidt,1)
