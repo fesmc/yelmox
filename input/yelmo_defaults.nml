@@ -65,7 +65,6 @@
     grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     slope_bg_x          = 0.0               ! [m/m] Uniform background slope in x added to dzs/dx and dzb/dx, not contained in z_srf/z_bed (periodic domains with a tilted geometry)
     slope_bg_y          = 0.0               ! [m/m] Uniform background slope in y added to dzs/dy and dzb/dy, not contained in z_srf/z_bed (periodic domains with a tilted geometry)
-    dHdt_dyn_lim        = 100.0             ! [m/yr] Maximum allowed ice thickness change due to dynamics
     margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
     front_subgrid       = "none"            ! Subgrid ice fronts: "none" (binary f_ice), "floating", "marine" (floating + marine-grounded)
     front_H_eff_min     = 50.0              ! [m] Minimum effective thickness of front cells (front_subgrid)
