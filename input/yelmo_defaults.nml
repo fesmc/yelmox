@@ -48,7 +48,10 @@
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
     pc_eps          = 1.0               ! Predictor-corrector tolerance
-    pc_cfl_max      = 0.5               ! Courant-number backstop on the pc adaptive timestep (dt_method=2)
+    pc_cfl_max      = 0.5               ! Courant-number cap on the pc adaptive timestep (dt_method=2)
+    pc_eta_H_min    = 10.0              ! [m] Thinner ice is not included in the pc error norm
+    pc_eta_u_min    = 0.0               ! [m/yr] Slower ice is not included in the pc error norm
+    pc_eta_trim     = 0.0               ! [--] Fraction of points with the largest errors left out of the pc error norm
 
     write_metrics    = False            ! Write numerics/speed metrics to yelmo_metrics.nc
     write_metrics_dt = 100.0            ! [yr] Output cadence for yelmo_metrics.nc
@@ -91,8 +94,9 @@
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
 
     ! === frontal mass melt ===
-    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf; 3: Rignot et al. (2016) with tf_shlf and Qd.
     fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+    fmb_lambda          = 1.0               ! fmb_method=3: scaling of the Rignot et al. (2016) frontal melt (ISMIP7 protocol)
 /
 
 &ycalv
@@ -106,7 +110,8 @@
     
     ! === numeric noise === 
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
-    H_min_flt           = 75.0              ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_flt           = 10.0              ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_tau           = 10.0              ! [yr] Timescale for removing margin ice thinner than H_min_grnd/H_min_flt and isolated partial cells
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)
