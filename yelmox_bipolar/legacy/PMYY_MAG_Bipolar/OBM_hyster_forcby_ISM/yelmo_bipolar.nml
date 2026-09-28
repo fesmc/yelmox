@@ -304,7 +304,7 @@
     zeta_scale_rock = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp_rock   = 2.0  
     H_rock          = 2000.0            ! [m] Lithosphere thickness 
-    cp_rock         = 1000.0            ! [J kg-1 K-1] Specific heat capacity of bedrock
+    rhoc_rock       = 2.0e6             ! [J m-3 K-1] Volumetric heat capacity of bedrock (rho*cp)
     kt_rock         = 6.3e7             ! [J a-1 m-1 K-1] Thermal conductivity of bedrock [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
 /
 

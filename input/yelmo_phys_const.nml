@@ -5,36 +5,48 @@
     rho_ice     =  910.0            ! [kg/m^3] Density ice            
     rho_w       = 1000.0            ! [kg/m^3] Density water          
     rho_sw      = 1028.0            ! [kg/m^3] Density seawater       
-    rho_a       = 3300.0            ! [kg m-3] Density asthenosphere
-    rho_rock    = 2000.0            ! [kg m-3] Density bedrock (mantle/lithosphere)
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
     L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
     T_pmp_beta  = 9.8e-8            ! [K Pa^-1] Greve and Blatter (2009)   
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
 /
 
 &EISMINT
+    ! EISMINT I (Huybrechts et al., 1996, Table 1) and EISMINT II
+    ! (Payne et al., 2000; Payne and Baldwin, 2000, Table 1)
     sec_year    = 31556926.0        ! [s/a] EISMINT value
     g           = 9.81              ! [m s-2] Gravitational accel.
     T0          = 273.15            ! [K] Reference freezing temperature 
-    rho_ice     =  917.0            ! [kg m-3] Density ice            
+    rho_ice     =  910.0            ! [kg m-3] Density ice            
     rho_w       = 1000.0            ! [kg m-3] Density water          
     rho_sw      = 1028.0            ! [kg m-3] Density seawater       
-    rho_a       = 3300.0            ! [kg m-3] Density asthenosphere
-    rho_rock    = 2000.0            ! [kg m-3] Density bedrock (mantle/lithosphere)
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
     L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
     T_pmp_beta  = 9.7e-8            ! [K Pa^-1] EISMINT2 value (beta1     = 8.66e-4 [K m^-1])
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
 /
 
 &MISMIP3D
-    sec_year    = 31556926.0        ! [s/a] EISMINT value
-    g           = 9.81              ! [m s-2] Gravitational accel.
+    ! MISMIP (Schoof/Pattyn et al., 2012) and MISMIP3D (Pattyn et al., 2013, Table 1)
+    sec_year    = 31536000.0        ! [s/a] MISMIP3D value (3600*24*365)
+    g           = 9.8               ! [m s-2] Gravitational accel.
     T0          = 273.15            ! [K] Reference freezing temperature 
     rho_ice     =  900.0            ! [kg m-3] Density ice            
     rho_w       = 1000.0            ! [kg m-3] Density water          
-    rho_sw      = 1028.0            ! [kg m-3] Density seawater       
-    rho_a       = 3300.0            ! [kg m-3] Density asthenosphere
-    rho_rock    = 2000.0            ! [kg m-3] Density bedrock (mantle/lithosphere)
+    rho_sw      = 1000.0            ! [kg m-3] Density seawater (MISMIP3D "water density")
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
     L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
     T_pmp_beta  = 9.7e-8            ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
 /
 
 &TROUGH
@@ -44,8 +56,62 @@
     rho_ice     =  918.0            ! [kg m-3] Density ice            
     rho_w       = 1000.0            ! [kg m-3] Density water          
     rho_sw      = 1028.0            ! [kg m-3] Density seawater       
-    rho_a       = 3300.0            ! [kg m-3] Density asthenosphere
-    rho_rock    = 2000.0            ! [kg m-3] Density bedrock (mantle/lithosphere)
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
     L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
     T_pmp_beta  = 9.7e-8            ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
+/
+
+&MISMIPplus
+    ! MISMIP+ (Asay-Davis et al., 2016, Table 1)
+    sec_year    = 31556926.0        ! [s/a] MISMIP+ value (365.2422 days)
+    g           = 9.81              ! [m s-2] Gravitational accel.
+    T0          = 273.15            ! [K] Reference freezing temperature 
+    rho_ice     =  918.0            ! [kg m-3] Density ice            
+    rho_w       = 1000.0            ! [kg m-3] Density water          
+    rho_sw      = 1028.0            ! [kg m-3] Density seawater       
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
+    L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
+    T_pmp_beta  = 9.7e-8            ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
+/
+
+&ISMIPHOM
+    ! ISMIP-HOM (Pattyn et al., 2008, Table 1)
+    sec_year    = 31556926.0        ! [s/a] ISMIP-HOM value
+    g           = 9.81              ! [m s-2] Gravitational accel.
+    T0          = 273.15            ! [K] Reference freezing temperature 
+    rho_ice     =  910.0            ! [kg m-3] Density ice            
+    rho_w       = 1000.0            ! [kg m-3] Density water          
+    rho_sw      = 1028.0            ! [kg m-3] Density seawater       
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
+    L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
+    T_pmp_beta  = 9.7e-8            ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
+/
+
+&CALVINGMIP
+    ! CalvingMIP protocol (as in tests/yelmo_calving.f90 and CISM's calvingMIP setup)
+    sec_year    = 31556926.0        ! [s/a] CalvingMIP value
+    g           = 9.81              ! [m s-2] Gravitational accel.
+    T0          = 273.15            ! [K] Reference freezing temperature 
+    rho_ice     =  917.0            ! [kg m-3] Density ice            
+    rho_w       = 1000.0            ! [kg m-3] Density water          
+    rho_sw      = 1028.0            ! [kg m-3] Density seawater       
+    rho_asth    = 3300.0            ! [kg m-3] Density asthenosphere
+    L_ice       = 333500.0          ! [J kg-1] Latent heat of fusion for ice/water
+    cp_ice      = 2110.0            ! [J kg-1 K-1] Specific heat capacity of ice
+    cp_w        = 4187.0            ! [J kg-1 K-1] Specific heat capacity of pure water
+    cp_ocn      = 3974.0            ! [J kg-1 K-1] Specific heat capacity, ocean mixed layer
+    T_pmp_beta  = 9.7e-8            ! [K Pa^-1] EISMINT2 value (beta1 = 8.66e-4 [K m^-1])
+    area_seasurf = 3.618e8          ! [km2] Global sea-surface area
 /

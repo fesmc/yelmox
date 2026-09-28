@@ -374,7 +374,7 @@ T_frz            = -3.0
  zeta_scale_rock = 'exp-inv'  
  zeta_exp_rock   = 2.0        
  H_rock          = 2000.0     
- cp_rock         = 1000.0     
+ rhoc_rock         = 2.0e6
  kt_rock         = 63000000.0 
 /
 
