@@ -601,13 +601,9 @@
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
     nu              = 0.28          ! [-] Poisson ratio
-    rho_ice         = 910.          ! [kg/m^3]
-    rho_seawater    = 1028.0        ! [kg/m^3]
-    rho_water       = 1000.0        ! [kg/m^3]
     rho_uppermantle = 3400.0        ! [kg/m^3]
     rho_litho       = 3200.0        ! [kg/m^3]  Optionally set to 0 ==> decouple the elastic
                                     ! displacement from the viscous one
-    g               = 9.81          ! [m/s^2]
     r_earth         = 6.378e3       ! [km] Earth radius, Coulon et al. (2021)
     m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
 

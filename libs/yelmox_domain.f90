@@ -380,7 +380,7 @@ contains
         dom%ctl%dx_isos = dom%yelmo%grd%G%dx * (grid_i%G%dx / grid_y%G%dx)
         dom%ctl%dy_isos = dom%yelmo%grd%G%dy * (grid_i%G%dy / grid_y%G%dy)
         call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
-                       dom%ctl%dx_isos, dom%ctl%dy_isos)
+                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%yelmo%bnd%cnst)
 
         call sediments_init(dom%sed, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
                             domain, dom%yelmo%par%grid_name, group="sed"//trim(sfx))
@@ -432,7 +432,8 @@ contains
         if (trim(dom%ctl%smb_method) == "smb_simple") then
             call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x, wp), &
                                  y=real(grid_s%y, wp), lat=lats_s, &
-                                 group="smb_simple"//trim(sfx), units="m")
+                                 group="smb_simple"//trim(sfx), units="m", &
+                                 cnst=dom%yelmo%bnd%cnst)
             call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_yelmo, &
                        Href_s, dom%ctl%grid_smb, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)

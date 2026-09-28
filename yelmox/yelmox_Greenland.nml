@@ -528,8 +528,6 @@
     slope_out   = 6.09e-3    ! [m/m] linear outside ramp
     z_max_in    = 2500.0     ! [m]   inside cap
     z_max_out   = 200.0      ! [m]   outside floor
-    rho_ice     = 910.0      ! [kg/m3]
-    g           = 9.81       ! [m/s2]
 
     ! Surface temperature  t_srf = t_sl - gamma_t*max(z_syn,0), capped at t_ice_max over ice
     gamma_t     = 6.5e-3     ! [K/m] lapse rate
@@ -680,12 +678,8 @@
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
     nu              = 0.28          ! [-] Poisson ratio
-    rho_ice         = 910.          ! [kg/m^3]
-    rho_seawater    = 1028.0        ! [kg/m^3]
-    rho_water       = 1000.0        ! [kg/m^3]
     rho_uppermantle = 3400.0        ! [kg/m^3]
     rho_litho       = 3200.0        ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
-    g               = 9.81          ! [m/s^2]
     r_earth         = 6.378e3       ! [km]  Earth radius, Coulon et al. (2021)
     m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
 
