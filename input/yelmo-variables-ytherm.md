@@ -19,5 +19,4 @@
 | 15 | H_cts             | xc, yc            | m            | Height of the CTS (cold-temperate surface)    |
 | 16 | advecxy           | xc, yc, zeta      | -            | Horizontal advection                          |
 | 17 | Q_rock            | xc, yc            | W m^-2       | Heat flux from bedrock                        |
-| 18 | enth_rock         | xc, yc, zeta_rock | J m^-3       | Bedrock enthalpy                              |
-| 19 | T_rock            | xc, yc, zeta_rock | K            | Bedrock temperature                           |
+| 18 | T_rock            | xc, yc, zeta_rock | K            | Bedrock temperature                           |

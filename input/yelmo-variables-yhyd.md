@@ -12,3 +12,4 @@
 |  8 | hyd_q_y           | xc, yc            | m^2/s        | Basal water flux, y-component                 |
 |  9 | hyd_N             | xc, yc            | Pa           | Effective pressure at the bed                 |
 | 10 | hyd_kappa         | xc, yc            | -            | K24 hydraulic transmissivity field            |
+| 11 | hyd_q             | xc, yc            | m^2/s        | K24 distributed flux magnitude (Picard warm-start state) |
