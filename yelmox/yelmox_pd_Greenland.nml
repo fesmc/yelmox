@@ -125,12 +125,10 @@
     dt_method       = 2          
     dt_min          = 0.1       
     cfl_max         = 0.5        
-    cfl_diff_max    = 0.12       
     pc_method       = 'AB-SAM'   
     pc_controller   = 'PI42'     
     pc_use_H_pred   = .true.     
     pc_filter_vel   = .true.     
-    pc_corr_vel     = .false.    
     pc_n_redo       = 5          
     pc_tol          = 5.0        
     pc_eps          = 1.0        
@@ -237,7 +235,6 @@
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
-    cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     neff_nxi            = 0               ! Subgrid interpolation of hyd%N onto dyn%N_eff. 0: none, 1: Gaussian quadrature, >1: nxi x nxi subgrid.
     
 /
