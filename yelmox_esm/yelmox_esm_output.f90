@@ -530,7 +530,7 @@ contains
         type(yregions_class) :: reg
     
         integer  :: ncid, n
-        real(wp) :: rho_ice, density_corr, m3yr_to_kgs, esm_correction, yr_to_sec
+        real(wp) :: rho_ice, esm_correction
     
         real(wp) :: dx, dy
         integer  :: npts_tot, npts_flt
@@ -568,11 +568,14 @@ contains
         allocate(mask_flt (ylmo%grd%G%nx, ylmo%grd%G%ny))
     
         ! === Unit conversion factors =========================================
-        rho_ice        = 917.0_wp           ! ice density kg m-3
-        m3yr_to_kgs    = 3.2e-5_wp          ! m3 yr-1 pure water -> kg s-1
-        density_corr   = rho_ice / 1000.0_wp
-        esm_correction = m3yr_to_kgs * density_corr
-        yr_to_sec      = 31556952.0_wp
+        ! Taken from Yelmo's own constants, so the output cannot disagree with
+        ! the model that produced it. esm_correction converts a rate in
+        ! [<unit> yr-1] of ice to [kg ... s-1]; it collapses to rho_ice/sec_year,
+        ! since the old two-step form was (rho_w/sec_year)*(rho_ice/rho_w) with
+        ! rho_w/sec_year rounded to 3.2e-5 (1 % high) and sec_year written as
+        ! 31556952 (the Gregorian year) rather than Yelmo's own.
+        rho_ice        = ylmo%bnd%c%rho_ice
+        esm_correction = rho_ice / ylmo%bnd%c%sec_year
     
         ! === Masks ===========================================================
     
@@ -747,8 +750,6 @@ contains
         integer  :: ncid, n, i, j, k, nz
         
         real(wp) :: rho_ice
-        real(wp) :: density_corr
-        real(wp) :: m3yr_to_kgs
         real(wp) :: esm_correction   ! [kg m-2 s-1] per [m yr-1]
         real(wp) :: yr_to_sec
         
@@ -788,12 +789,16 @@ contains
         flux_grl_2d     = 0.0_wp;  flux_clv_2d      = 0.0_wp  
         ux_aa           = 0.0_wp;  uy_aa            = 0.0_wp
         
-        ! ---- unit conversion ------------------------------------------------
-        rho_ice        = 917.0_wp
-        m3yr_to_kgs    = 3.2e-5_wp
-        density_corr   = rho_ice / 1000.0_wp
-        esm_correction = m3yr_to_kgs * density_corr
-        yr_to_sec      = 31556952.0_wp
+        ! === Unit conversion factors =========================================
+        ! Taken from Yelmo's own constants, so the output cannot disagree with
+        ! the model that produced it. esm_correction converts a rate in
+        ! [<unit> yr-1] of ice to [kg ... s-1]; it collapses to rho_ice/sec_year,
+        ! since the old two-step form was (rho_w/sec_year)*(rho_ice/rho_w) with
+        ! rho_w/sec_year rounded to 3.2e-5 (1 % high) and sec_year written as
+        ! 31556952 (the Gregorian year) rather than Yelmo's own.
+        rho_ice        = ylmo%bnd%c%rho_ice
+        yr_to_sec      = ylmo%bnd%c%sec_year
+        esm_correction = rho_ice / yr_to_sec
         nz = ylmo%dyn%par%nz_aa
         
         ! ---- derived fields -------------------------------------------------
@@ -1056,7 +1061,7 @@ contains
         type(yregions_class) :: reg
         
         integer  :: ncid, n
-        real(wp) :: rho_ice, density_corr, m3yr_to_kgs, esm_correction, yr_to_sec
+        real(wp) :: rho_ice, esm_correction, yr_to_sec
         real(wp) :: dx, dy
         
         real(wp) :: smb_tot          ! total SMB           [m3 yr-1]
@@ -1078,12 +1083,16 @@ contains
         allocate(mask_grl  (ylmo%grd%G%nx, ylmo%grd%G%ny))
         allocate(mask_frnt (ylmo%grd%G%nx, ylmo%grd%G%ny))
         
-        ! ---- unit conversions -----------------------------------------------
-        rho_ice        = 917.0_wp
-        m3yr_to_kgs    = 3.2e-5_wp
-        density_corr   = rho_ice / 1000.0_wp
-        esm_correction = m3yr_to_kgs * density_corr
-        yr_to_sec      = 31556952.0_wp
+        ! === Unit conversion factors =========================================
+        ! Taken from Yelmo's own constants, so the output cannot disagree with
+        ! the model that produced it. esm_correction converts a rate in
+        ! [<unit> yr-1] of ice to [kg ... s-1]; it collapses to rho_ice/sec_year,
+        ! since the old two-step form was (rho_w/sec_year)*(rho_ice/rho_w) with
+        ! rho_w/sec_year rounded to 3.2e-5 (1 % high) and sec_year written as
+        ! 31556952 (the Gregorian year) rather than Yelmo's own.
+        rho_ice        = ylmo%bnd%c%rho_ice
+        yr_to_sec      = ylmo%bnd%c%sec_year
+        esm_correction = rho_ice / yr_to_sec
         
         dx = ylmo%grd%G%dx
         dy = ylmo%grd%G%dy
