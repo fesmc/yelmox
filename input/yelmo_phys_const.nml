@@ -1,5 +1,8 @@
 &Earth
-    sec_year    = 31536000.0        ! [s/a]  365*24*3600
+    sec_year    = 31556926.0        ! [s/a] 365.2422 d, the CF/UDUNITS year
+                                    ! (= fesm-utils sec_year_tropical; the two
+                                    ! agree to within a single-precision ulp,
+                                    ! which is 2 s at this magnitude)
     g           = 9.81              ! [m/s^2] Gravitational accel.
     T0          = 273.15            ! [K] Reference freezing temperature 
     rho_ice     =  910.0            ! [kg/m^3] Density ice            

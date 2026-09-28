@@ -16,7 +16,6 @@ module snapclim
     integer,  parameter :: prec = sp
     integer,  parameter :: wp   = sp 
 
-    real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
     real(wp), parameter :: pi        = 3.14159265359
 
     ! Missing value and aliases

@@ -18,7 +18,6 @@ module pico_physics
     ! below take what they need as arguments. Two groupings appear:
     !   rho_ice_g  = rho_ice*g            [Pa/m] ice overburden gradient
     !   lambda_rho = (L_ice/cp_ocn)*rho_ice/rho_sw
-    real(prec), parameter :: year_to_sec = 365.0*24.0*60.0*60.0
 
     private
     public :: calc_Tstar

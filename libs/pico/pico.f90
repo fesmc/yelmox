@@ -5,7 +5,8 @@ module pico
     use ncio 
     use pico_geometry
     use pico_physics
-    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
+    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get, &
+                              sec_year_tropical
 
     implicit none 
 
@@ -18,8 +19,9 @@ module pico
 
     ! This module declared its own copy of the physical constants, shadowing
     ! pico_physics' (private) set; only year_to_sec was ever used. The physical
-    ! constants now live in pico_param_class, set by pico_init.
-    real(wp), parameter :: year_to_sec = 365.0*24.0*60.0*60.0
+    ! constants now live in pico_param_class, set by pico_init. The year is the
+    ! CF/UDUNITS one from fesm-utils rather than a local 365 d.
+    real(wp), parameter :: year_to_sec = real(sec_year_tropical, wp)
 
     type pico_param_class
 
