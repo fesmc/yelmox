@@ -451,7 +451,8 @@ contains
         call remap(dom, dom%topo%basins,  dom%ctl%grid_name, basins_m,  dom%ctl%grid_mshlf, "nn")
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
-                           domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m)
+                           domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m, &
+                           cnst=dom%yelmo%bnd%cnst)
 
         ! Optimization state (basal friction + thermal forcing); no-op unless
         ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
@@ -1414,6 +1415,7 @@ contains
         type(tstep_class), intent(in)    :: ts
 
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
+        real(wp), allocatable :: z_srf_m(:,:)
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
         character(len=256) :: gm, gn, gc
@@ -1429,6 +1431,7 @@ contains
         call remap(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
         call remap(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
         call remap(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
+        call remap(dom, dom%topo%z_srf,   gn, z_srf_m,   gm, "bilin")
         call remap(dom, dom%topo%regions, gn, regions_m, gm, "nn")
         call remap(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
 
@@ -1442,7 +1445,7 @@ contains
         call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
                 dom%ctl%dx_mshlf, dom%clim%now%depth, to_m, so_m, dto_ann=dto_m)
         call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
-                z_sl_m, dx=dom%ctl%dx_mshlf)
+                z_sl_m, dx=dom%ctl%dx_mshlf, z_srf=z_srf_m)
     end subroutine step_marine_shelf
 
     ! ----- output (one file per module, each on its own grid; the grid is

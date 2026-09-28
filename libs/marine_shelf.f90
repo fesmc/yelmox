@@ -12,8 +12,7 @@ module marine_shelf
     use ncio_interp, only : nc_read_interp
 
     use pico 
-
-!     use yelmo_defs, only : sp, dp, wp, rho_ice, rho_w, rho_sw, g, parse_path 
+    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
 
     implicit none 
 
@@ -24,19 +23,9 @@ module marine_shelf
     ! Choose the working precision of the library (sp,dp)
     integer,  parameter :: wp = sp 
 
-    ! Physical constants 
-    real(wp), parameter :: rho_ice =  918.d0    ! Density ice           [kg/m^3] 
-    real(wp), parameter :: rho_w   = 1000.d0    ! Density water         [kg/m^3] 
-    real(wp), parameter :: rho_sw  = 1028.d0    ! Density seawater      [kg/m^3] 
-    real(wp), parameter :: g       = 9.81d0     ! Gravitational accel.  [m/s^2]
-    real(wp), parameter :: cp_o    = 3974.d0    ! [J/(kg K)] Specific heat capacity of ocean mixed layer 
-    real(wp), parameter :: L_ice   = 3.34e5     ! [J/kg] Latent heat of fusion of ice 
-    
-    real(wp), parameter :: T0      = 273.15     ! [K] Reference freezing temp 
-
-    real(wp), parameter :: lambda     = L_ice/cp_o
-    real(wp), parameter :: rho_ice_sw = rho_ice / rho_sw 
-    real(wp), parameter :: omega      = (rho_sw*cp_o) / (rho_ice*L_ice)     ! [1/K]
+    ! Physical constants live in marshelf_param_class, set by marshelf_init
+    ! from the phys_const_class it is given. rho_w, g and lambda = L_ice/cp_o
+    ! were declared here but never used, and are gone.
 
     ! Global mask value definitions
     integer, parameter :: mask_val_land           = 0 
@@ -82,7 +71,15 @@ module marine_shelf
         
         character(len=512) :: domain   
         character(len=512) :: grid_name
-        real(wp) :: rho_ice, rho_sw
+
+        ! Physical constants, from the phys_const_class given to marshelf_init
+        ! (Earth values as the standalone fallback). rho_ice and rho_sw were
+        ! already declared here but never assigned.
+        real(wp) :: rho_ice    =  910.0_wp   ! [kg/m3]
+        real(wp) :: rho_sw     = 1028.0_wp   ! [kg/m3]
+        real(wp) :: rho_ice_sw =    0.885214_wp  ! [-]   rho_ice/rho_sw
+        real(wp) :: omega      =    1.346120e-2_wp ! [1/K] (rho_sw*cp_ocn)/(rho_ice*L_ice)
+        real(wp) :: T0         =  273.15_wp  ! [K]   reference freezing temp
 
         ! Internal parameter
         logical :: use_restart
@@ -245,7 +242,7 @@ contains
 
                     if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .lt. 1.0) then
                         ! Floating ice, depth == z_ice_base
-                        depth_shlf = H_ice(i,j)*rho_ice_sw
+                        depth_shlf = H_ice(i,j)*mshlf%par%rho_ice_sw
                     else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
                         ! Grounded ice, depth == H_ocn = z_sl-z_bed 
                         depth_shlf = z_sl(i,j) - z_bed(i,j)
@@ -363,7 +360,7 @@ contains
 
                 if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .lt. 1.0) then
                 ! Floating ice, depth == z_ice_base
-                depth_shlf = H_ice(i,j)*rho_ice_sw
+                depth_shlf = H_ice(i,j)*mshlf%par%rho_ice_sw
                 else if(H_ice(i,j) .gt. 0.0 .and. f_grnd(i,j) .eq. 1.0) then
                 ! Grounded ice, depth == H_ocn = z_sl-z_bed
                 depth_shlf = z_sl(i,j) - z_bed(i,j)
@@ -433,7 +430,7 @@ contains
 
     end subroutine marshelf_interp_shelf
 
-    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx)
+    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx,z_srf)
         
         implicit none
         
@@ -446,6 +443,9 @@ contains
         real(wp), intent(IN) :: z_sl(:,:) 
         !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
         real(wp), intent(IN) :: dx   ! grid resolution [m]
+        ! Ice-surface elevation. When given, the ice-shelf base is z_srf-H_ice,
+        ! the same definition Yelmo uses, rather than a flotation reconstruction.
+        real(wp), intent(IN), optional :: z_srf(:,:)
 
         ! Local variables
         integer :: i, j, nx, ny, ngr 
@@ -470,8 +470,14 @@ contains
                 ! (even assume floating at grounding line to allow
                 ! reasonable calculations for non-binary f_grnd)
                 
-                ! Calculate height of ice-shelf base relative to sea level 
-                mshlf%now%z_base(i,j) = z_sl(i,j) - (H_ice(i,j)*rho_ice_sw)
+                ! Height of the ice-shelf base relative to sea level.
+                ! With z_srf this is Yelmo's own definition of z_base
+                ! (z_srf-H_ice); without it, reconstruct it from flotation.
+                if (present(z_srf)) then
+                    mshlf%now%z_base(i,j) = z_srf(i,j) - H_ice(i,j)
+                else
+                    mshlf%now%z_base(i,j) = z_sl(i,j) - (H_ice(i,j)*mshlf%par%rho_ice_sw)
+                end if
                 
             else 
                 ! Grounded ice, define for completeness
@@ -495,7 +501,7 @@ contains
         ! Calculate ocean water freezing point [K]
         call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base, &
                                     mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3, &
-                                    T_ref=T0)
+                                    T_ref=mshlf%par%T0)
 
         ! Calculate the thermal forcing, if desired 
         ! (not used for pico, but good to diagnose anyway and needed for other methods)
@@ -593,7 +599,7 @@ contains
                         end if 
 
                         call calc_bmb_linear(mshlf%now%bmb_shlf,mshlf%now%tf_shlf, &
-                                                                        gamma2D,omega)
+                                                                        gamma2D,mshlf%par%omega)
                             
                     case("quad","quad-slope")
 
@@ -606,7 +612,7 @@ contains
                         end if 
                         
                         call calc_bmb_quad(mshlf%now%bmb_shlf,mshlf%now%tf_shlf, &
-                                                                        gamma2D,omega)
+                                                                        gamma2D,mshlf%par%omega)
                         
                     case("quad-nl","quad-nl-slope")
 
@@ -628,7 +634,7 @@ contains
                         !where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp
 
                         call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
-                            mshlf%par%gamma_quad_nl,omega)
+                            mshlf%par%gamma_quad_nl,mshlf%par%omega)
 
                         ! jalv: beacuse of the previous limitation of tf_basin to 0, do the following line if want to play and allow some accretion
                         ! option 1: simply impose bmb_max where tf_basin is negative (quite brutal)
@@ -687,7 +693,7 @@ contains
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins,xc,yc,dx)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins,xc,yc,dx,cnst)
 
         implicit none 
 
@@ -702,6 +708,7 @@ contains
         real(wp), intent(IN), optional    :: xc(:)
         real(wp), intent(IN), optional    :: yc(:)
         real(wp), intent(IN), optional    :: dx 
+        type(phys_const_class), intent(IN), optional :: cnst
 
         ! Local variables
         integer  :: j 
@@ -713,6 +720,18 @@ contains
 
         ! Load parameters
         call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
+
+        ! Physical constants: one definition site per program when the caller
+        ! supplies the record. omega and rho_ice_sw are taken already derived,
+        ! so they cannot drift from the primitives they are built from.
+        if (present(cnst)) then
+            call phys_const_require(cnst, "marshelf_init")
+            call phys_const_get(cnst, "rho_ice",    mshlf%par%rho_ice)
+            call phys_const_get(cnst, "rho_sw",     mshlf%par%rho_sw)
+            call phys_const_get(cnst, "rho_ice_sw", mshlf%par%rho_ice_sw)
+            call phys_const_get(cnst, "omega_melt", mshlf%par%omega)
+            call phys_const_get(cnst, "T0",         mshlf%par%T0)
+        end if
 
         ! Set grid
         mshlf%grd%nx = nx
@@ -908,7 +927,7 @@ contains
 
             ! Initialize pico too 
 
-            call pico_init(mshlf%pico,filename,nx,ny,domain)
+            call pico_init(mshlf%pico,filename,nx,ny,domain,cnst=cnst)
 
         end if
 

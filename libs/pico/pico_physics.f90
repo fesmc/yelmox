@@ -13,17 +13,12 @@ module pico_physics
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: prec = sp 
 
-    ! Physical constants 
-    real(prec), parameter :: rho_ice =  917.d0       ! Density ice           [kg/m^3] 
-    real(prec), parameter :: rho_w   = 1000.d0       ! Density water         [kg/m^3] 
-    real(prec), parameter :: rho_sw  = 1028.d0       ! Density seawater      [kg/m^3] 
-    real(prec), parameter :: g       = 9.81d0        ! Gravitational accel.  [m/s^2]
-    real(prec), parameter :: cp_o    = 3974.d0       ! Specific heat capacity of ocean mixed layer [J/kg*ºC]
-    real(prec), parameter :: L_ice   = 3.34e5        ! Latent heat of fusion of ice [J/kg] 
- 
+    ! Physical constants are no longer fixed here: pico_init puts them in
+    ! pico_param_class from the phys_const_class it is given, and the routines
+    ! below take what they need as arguments. Two groupings appear:
+    !   rho_ice_g  = rho_ice*g            [Pa/m] ice overburden gradient
+    !   lambda_rho = (L_ice/cp_ocn)*rho_ice/rho_sw
     real(prec), parameter :: year_to_sec = 365.0*24.0*60.0*60.0
-    real(prec), parameter :: lambda      = L_ice/cp_o ! [ºC -> K]?
-    real(prec), parameter :: rho_ice_sw  = rho_ice / rho_sw  
 
     private
     public :: calc_Tstar
@@ -44,15 +39,16 @@ contains
     ! 
     ! =======================================
 
-    function calc_Tstar(to,so,H_ice,a_pico,b_pico,c_pico) result(T_star)
+    function calc_Tstar(to,so,H_ice,a_pico,b_pico,c_pico,rho_ice_g) result(T_star)
 
         implicit none
 
         real(prec), intent(IN)  :: to, so, H_ice
         real(prec), intent(IN)  :: a_pico, b_pico, c_pico
+        real(prec), intent(IN)  :: rho_ice_g    ! [Pa/m] rho_ice*g
         real(prec) :: T_star
 
-        T_star = a_pico*so + b_pico - c_pico*rho_ice*g*H_ice - to
+        T_star = a_pico*so + b_pico - c_pico*rho_ice_g*H_ice - to
         ! Ensures that temperature input for grounding line box should not be below pressure melting point
         ! This ensures that later equations are well solvable.
         if(T_star .gt. 0.0) T_star = 0.0 !-0.0001
@@ -62,19 +58,21 @@ contains
     end function calc_Tstar
 
     ! First T_box1
-    function calc_shelf_Tbox_1(to,so,A_box,T_star,C_over,rho_star,gamma_tstar,alpha_pico,beta_pico) result(T_box)
+    function calc_shelf_Tbox_1(to,so,A_box,T_star,C_over,rho_star,gamma_tstar,alpha_pico,beta_pico, &
+                              lambda_rho) result(T_box)
 
         implicit none
 
         real(prec), intent(IN)  :: A_box, T_star, to, so
         real(prec), intent(IN)  :: C_over, rho_star, gamma_tstar, alpha_pico, beta_pico
+        real(prec), intent(IN)  :: lambda_rho   ! [K] (L_ice/cp_ocn)*rho_ice/rho_sw
         real(prec) :: T_box
 
         ! Internal variables
         real(prec) :: g1,s1,p,q,D
 
         g1 = gamma_tstar*A_box
-        s1 = so/(lambda*rho_ice_sw)
+        s1 = so/lambda_rho
         p = g1 / (C_over * rho_star * (beta_pico * s1 - alpha_pico))
         q = p * T_star
 
@@ -88,35 +86,37 @@ contains
     end function calc_shelf_Tbox_1
 
     ! Calc S_box1
-    function calc_shelf_Sbox_1(to,so,T_box) result(S_box)
+    function calc_shelf_Sbox_1(to,so,T_box,lambda_rho) result(S_box)
 
         implicit none
 
         real(prec), intent(IN)     :: to, so, T_box
+        real(prec), intent(IN)     :: lambda_rho
         real(prec) :: S_box
 
-        S_box = so - (so/(rho_ice_sw*lambda))*(to-T_box)
+        S_box = so - (so/lambda_rho)*(to-T_box)
 
         return
 
     end function calc_shelf_Sbox_1
 
     ! Calc T and S for box n>1
-    subroutine calc_shelf_TS_box_n(T_box, S_box, A_box, T_star, CC, a_pico, gamma_tstar)
+    subroutine calc_shelf_TS_box_n(T_box, S_box, A_box, T_star, CC, a_pico, gamma_tstar, lambda_rho)
 
         implicit none
 
         real(prec), intent(INOUT)  :: T_box, S_box
         real(prec), intent(IN)     :: A_box, T_star, CC
         real(prec), intent(IN)     :: a_pico, gamma_tstar
+        real(prec), intent(IN)     :: lambda_rho
 
         ! Intern variables
         real(prec) :: g1, g2, s1
         real(prec) :: fac 
 
         g1 = A_box * gamma_tstar
-        g2 = g1/(rho_ice_sw*lambda)
-        s1 = S_box/(rho_ice_sw*lambda)        
+        g2 = g1/lambda_rho
+        s1 = S_box/lambda_rho        
 
         ! Temperature for Box i > 1
         fac = (CC + g1 - g2 * a_pico * S_box)
@@ -150,15 +150,16 @@ contains
     
     ! equation 5 in the PICO paper.
     ! calculate pressure melting point from potential temperature
-    function calc_theta_pm(so,a_pico,b_pico,c_pico,H_ice) result(theta_pm)
+    function calc_theta_pm(so,a_pico,b_pico,c_pico,H_ice,rho_ice_g) result(theta_pm)
 
         implicit none
 
         real(prec), intent(IN)     :: so, H_ice
         real(prec), intent(IN)     :: a_pico, b_pico, c_pico
+        real(prec), intent(IN)     :: rho_ice_g
         real(prec) :: theta_pm
 
-        theta_pm = a_pico*so + b_pico - c_pico*rho_ice*g*H_ice
+        theta_pm = a_pico*so + b_pico - c_pico*rho_ice_g*H_ice
 
         return
 
@@ -166,11 +167,12 @@ contains
 
     ! equation 5 in the PICO paper.
     ! calculate pressure melting point from in-situ temperature
-    function calc_T_pm(so,H_ice) result(T_pm)
+    function calc_T_pm(so,H_ice,rho_ice_g) result(T_pm)
 
         implicit none
 
         real(prec), intent(IN)     :: so, H_ice
+        real(prec), intent(IN)     :: rho_ice_g
         real(prec) :: T_pm
         real(prec) :: a_situ, b_situ, c_situ
 
@@ -179,22 +181,23 @@ contains
         b_situ = 0.0832 + 273.15 ! K
         c_situ = 7.53e-8         ! K/bar
 
-        T_pm = a_situ*so + b_situ - c_situ*rho_ice*g*H_ice
+        T_pm = a_situ*so + b_situ - c_situ*rho_ice_g*H_ice
 
         return
 
     end function calc_T_pm
 
-    function calc_melt_rate_pico(T_box,pm_point,gamma_tstar) result(bmb)
+    function calc_melt_rate_pico(T_box,pm_point,gamma_tstar,lambda_rho) result(bmb)
 
         implicit none
 
         real(prec), intent(IN) :: T_box, pm_point
         real(prec), intent(IN) :: gamma_tstar
+        real(prec), intent(IN) :: lambda_rho
         real(prec) :: bmb        
 
         ! OJO: negativo?
-        bmb = -1.0*(gamma_tstar / (lambda*rho_ice_sw))*(T_box - pm_point)
+        bmb = -1.0*(gamma_tstar / lambda_rho)*(T_box - pm_point)
 
         return
 

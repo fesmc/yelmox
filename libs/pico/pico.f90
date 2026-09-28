@@ -5,6 +5,7 @@ module pico
     use ncio 
     use pico_geometry
     use pico_physics
+    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
 
     implicit none 
 
@@ -15,17 +16,10 @@ module pico
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: wp  = sp 
 
-    ! Physical constants 
-    real(wp), parameter :: rho_ice =  917.d0        ! Density ice           [kg/m^3] 
-    real(wp), parameter :: rho_w   = 1000.d0        ! Density water         [kg/m^3] 
-    real(wp), parameter :: rho_sw  = 1028.d0        ! Density seawater      [kg/m^3] 
-    real(wp), parameter :: g       = 9.81d0         ! Gravitational accel.  [m/s^2]
-    real(wp), parameter :: cp_o    = 3974.d0        ! Specific heat capacity of ocean mixed layer [J/kg*ºC]
-    real(wp), parameter :: L_ice   = 3.34e5         ! Latent heat of fusion of ice [J/kg] 
- 
+    ! This module declared its own copy of the physical constants, shadowing
+    ! pico_physics' (private) set; only year_to_sec was ever used. The physical
+    ! constants now live in pico_param_class, set by pico_init.
     real(wp), parameter :: year_to_sec = 365.0*24.0*60.0*60.0
-    real(wp), parameter :: lambda      = L_ice/cp_o ! K
-    real(wp), parameter :: rho_ice_sw  = rho_ice / rho_sw 
 
     type pico_param_class
 
@@ -35,6 +29,12 @@ module pico
         real(wp) :: rho_star
         real(wp) :: gamma_tstar
         real(wp) :: C_over
+
+        ! Physical constants, from the phys_const_class given to pico_init
+        ! (Earth values as the standalone fallback). Only the two groupings the
+        ! physics uses are kept, so they cannot drift from each other.
+        real(wp) :: rho_ice_g  = 910.0_wp*9.81_wp          ! [Pa/m] rho_ice*g
+        real(wp) :: lambda_rho = (333500.0_wp/3974.0_wp)*(910.0_wp/1028.0_wp) ! [K]
 
         character(len=512) :: domain
 
@@ -110,7 +110,8 @@ contains
         ! PISM condition in PICO. Box 0 temperature cannot be below the pressure-melting point.
         do l = 1, ny
         do k = 1, nx
-            pm_point_box0 = calc_theta_pm(pico%now%S_box(k,l),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico,H_ice(k,l))
+            pm_point_box0 = calc_theta_pm(pico%now%S_box(k,l),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                          H_ice(k,l),pico%par%rho_ice_g)
             if (pico%now%T_box(k,l) .lt. pm_point_box0) pico%now%T_box(k,l) = pm_point_box0 + 0.001
         end do
         end do
@@ -131,11 +132,14 @@ contains
                     ! jablasco: test box 1 -> .eq. -> .ge. la m
                     if (m .eq. 1.0 .and. pico%now%boxes(i,j) .ge. 1.0) then
                         ! 1. Compute box 1
-                        T_star(i,j) = calc_Tstar(to(i,j),so(i,j),H_ice(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico)
+                        T_star(i,j) = calc_Tstar(to(i,j),so(i,j),H_ice(i,j),pico%par%a_pico,pico%par%b_pico, &
+                                                 pico%par%c_pico,pico%par%rho_ice_g)
                         pico%now%T_box(i,j) = calc_shelf_Tbox_1(to(i,j),so(i,j),pico%now%A_box(i,j),T_star(i,j), &
                                                                 pico%par%C_over,pico%par%rho_star,pico%par%gamma_tstar, &
-                                                                pico%par%alpha_pico,pico%par%beta_pico)
-                        pico%now%S_box(i,j) = calc_shelf_Sbox_1(to(i,j),so(i,j),pico%now%T_box(i,j))
+                                                                pico%par%alpha_pico,pico%par%beta_pico, &
+                                                                pico%par%lambda_rho)
+                        pico%now%S_box(i,j) = calc_shelf_Sbox_1(to(i,j),so(i,j),pico%now%T_box(i,j), &
+                                                               pico%par%lambda_rho)
                         ! Compute overtuning
                         pico%now%CC(i,j) = calc_overtuning(to(i,j),so(i,j),pico%now%T_box(i,j),pico%now%S_box(i,j), &
                                                            pico%par%C_over,pico%par%rho_star,pico%par%alpha_pico,pico%par%beta_pico)             
@@ -144,17 +148,21 @@ contains
                     else if (m .gt. 1.0 .and. pico%now%boxes(i,j) .ge. m) then
                         ! Compute rest boxes
                         T_star(i,j) = calc_Tstar(pico%now%T_box(i,j),pico%now%S_box(i,j),H_ice(i,j), &
-                                                 pico%par%a_pico,pico%par%b_pico,pico%par%c_pico)
+                                                 pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                                 pico%par%rho_ice_g)
                         call calc_shelf_TS_box_n(pico%now%T_box(i,j), pico%now%S_box(i,j), pico%now%A_box(i,j), &
-                                                 T_star(i,j), pico%now%CC(i,j), pico%par%a_pico, pico%par%gamma_tstar)
+                                                 T_star(i,j), pico%now%CC(i,j), pico%par%a_pico, &
+                                                 pico%par%gamma_tstar, pico%par%lambda_rho)
 
                     end if
 
                 end do
 
                 ! Compute melting
-                pm_point = calc_theta_pm(pico%now%S_box(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico,H_ice(i,j))
-                bmb_floating = calc_melt_rate_pico(pico%now%T_box(i,j),pm_point,pico%par%gamma_tstar)
+                pm_point = calc_theta_pm(pico%now%S_box(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                         H_ice(i,j),pico%par%rho_ice_g)
+                bmb_floating = calc_melt_rate_pico(pico%now%T_box(i,j),pm_point,pico%par%gamma_tstar, &
+                                                   pico%par%lambda_rho)
                
                 ! Apply melting to purely floating points or ocean
                 if(f_grnd(i,j) .eq. 0.0) pico%now%bmb_shlf(i,j) = bmb_floating
@@ -229,7 +237,7 @@ contains
     ! 
     ! =================
 
-    subroutine pico_init(pico,filename,nx,ny,domain)
+    subroutine pico_init(pico,filename,nx,ny,domain,cnst)
         ! Initialize pico object 
 
         implicit none
@@ -238,9 +246,27 @@ contains
         character(len=*), intent(IN)      :: filename
         integer,          intent(IN)      :: nx, ny 
         character(len=*), intent(IN)      :: domain
+        type(phys_const_class), intent(IN), optional :: cnst
+
+        ! Local variables
+        real(wp) :: rho_ice, rho_sw, rho_ice_sw, cp_ocn, L_ice, g
 
         ! Load parameters
         call pico_par_load(pico%par,domain,filename)
+
+        ! Physical constants: form the two groupings the physics needs.
+        if (present(cnst)) then
+            call phys_const_require(cnst, "pico_init")
+            call phys_const_get(cnst, "rho_ice",    rho_ice)
+            call phys_const_get(cnst, "rho_sw",     rho_sw)
+            call phys_const_get(cnst, "rho_ice_sw", rho_ice_sw)
+            call phys_const_get(cnst, "cp_ocn",     cp_ocn)
+            call phys_const_get(cnst, "L_ice",      L_ice)
+            call phys_const_get(cnst, "g",          g)
+
+            pico%par%rho_ice_g  = rho_ice*g
+            pico%par%lambda_rho = (L_ice/cp_ocn)*rho_ice_sw
+        end if
 
         ! Allocate the object 
         call pico_allocate(pico%now,nx,ny)
