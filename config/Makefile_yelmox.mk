@@ -6,12 +6,6 @@
 
 ## EXTERNAL LIBRARIES #######################################
 
-$(objdir)/basal_hydrology.o: $(libdir)/basal_hydrology.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
-$(objdir)/basal_hydro_simple.o: $(libdir)/basal_hydro_simple.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
 $(objdir)/geothermal.o: $(libdir)/geothermal.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
@@ -178,9 +172,7 @@ $(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
 ##
 #############################################################
 
-yelmox_libs = 			$(objdir)/basal_hydrology.o \
-						$(objdir)/basal_hydro_simple.o \
-					    $(objdir)/geothermal.o \
+yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/hyster.o \
 					    $(objdir)/interp1D.o \
 					    $(objdir)/insolation.o \

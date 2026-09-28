@@ -25,8 +25,6 @@
 
         real(prec), allocatable :: x(:), y(:)
         real(prec), allocatable :: lats(:,:)           ! Latitude of domain [deg N]
-        real(prec) :: rho_sw
-        real(prec) :: rho_ice
 
     end type 
 
