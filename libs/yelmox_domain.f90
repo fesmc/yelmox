@@ -641,6 +641,7 @@ contains
         call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
+        call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
 
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
@@ -932,6 +933,7 @@ contains
         call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
         call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
+        call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
 
         ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
@@ -1133,22 +1135,110 @@ contains
     ! remaps are copies, reproducing the pre-refactor behavior exactly.
 
     subroutine couple_isostasy_to_yelmo(dom)
-        ! Bedrock + sea surface from isostasy (grid_isos -> Yelmo, conservative).
+        ! Bedrock + sea surface from isostasy (grid_isos -> Yelmo). Only the
+        ! isostatic *anomaly* crosses grids: Yelmo keeps the reference bedrock it
+        ! read natively on its own grid and adds the remapped displacement,
+        !
+        !     z_bed = z_bed_ref + (w + we)
+        !     z_sl  = bsl       + (z_ss - bsl)
+        !
+        ! rather than taking isostasy's absolute z_bed, which is built internally as
+        ! ref%z_bed + w + we on a reference that was itself coarsened onto grid_isos.
+        ! Passing the absolute field would replace Yelmo's bedrock with a
+        ! grid_isos-resolution copy of it, smoothing away every trough, sill and
+        ! pinning point finer than grid_isos -- at t = 0 (w = we = 0) that is a pure
+        ! round trip carrying no isostatic signal at all. The displacement and the
+        ! sea-surface perturbation are long-wavelength, and are the only part of the
+        ! solution that is genuinely insensitive to the grid it was solved on.
+        !
+        ! Yelmo applies the same decomposition when restarting from an interpolated
+        ! file (yelmo_ice.f90, "isostatic offset from z_bed_ref"), and FastIsostasy
+        ! likewise refuses to round-trip z_bed through the ice grid on restart.
+        !
+        ! For z_sl the reference is the scalar bsl, which is uniform and so needs no
+        ! remapping; the spatial part z_ss - bsl (= isos ref%z_ss + dz_ss) is what
+        ! crosses grids.
         type(ice_domain), intent(inout) :: dom
 
-        real(wp), allocatable :: z_bed_y(:,:), z_ss_y(:,:)
+        real(wp), allocatable :: dz_bed_y(:,:), dz_ss_y(:,:)
         character(len=256) :: gi, gy
+        character(len=32)  :: mth
 
         if (.not. dom%ctl%with_isostasy) return
 
-        gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
+        gi  = trim(dom%ctl%grid_isos)
+        gy  = trim(dom%ctl%grid_yelmo)
+        mth = remap_method_smooth(dom%ctl%dx_isos, real(dom%yelmo%grd%G%dx, wp))
 
-        call remap(dom, dom%isos%out%z_bed, gi, z_bed_y, gy, "con")
-        call remap(dom, dom%isos%out%z_ss,  gi, z_ss_y,  gy, "con")
-        dom%yelmo%bnd%z_bed = z_bed_y
-        dom%yelmo%bnd%z_sl  = z_ss_y
+        call remap(dom, dom%isos%out%w + dom%isos%out%we,   gi, dz_bed_y, gy, mth)
+        call remap(dom, dom%isos%out%z_ss - dom%isos%now%bsl, gi, dz_ss_y, gy, mth)
+
+        dom%yelmo%bnd%z_bed = dom%yelmo%bnd%z_bed_ref + dz_bed_y
+        dom%yelmo%bnd%z_sl  = dom%isos%now%bsl        + dz_ss_y
     end subroutine couple_isostasy_to_yelmo
+
+    subroutine check_isostasy_reference(dom)
+        ! Verify that the reference bedrock isostasy is working from is the same
+        ! field Yelmo holds natively, because couple_isostasy_to_yelmo rebuilds
+        ! z_bed = z_bed_ref + (w + we) from the two of them independently.
+        !
+        ! They are paired by construction on a cold start (isos_init_ref is handed a
+        ! remapped yelmo%bnd%z_bed_ref), but on a restart isostasy restores its own
+        ! reference from isos_restart.nc, which may have come from a different
+        ! topography. Nothing else would catch that: the run would proceed with a
+        ! displacement field measured against one bedrock and applied to another.
+        !
+        ! isos' reference, recovered on the Yelmo grid, is out%z_bed - (w + we).
+        ! When grid_isos == grid_yelmo the remap is an exact copy, so this must
+        ! agree to round-off. On a coarser isostasy grid it cannot: the pointwise
+        ! difference is precisely the smoothing this coupling now avoids, so only
+        ! the domain mean is comparable there. Both tolerances are set to admit
+        ! that smoothing while still catching a wholly different reference field,
+        ! which differs by hundreds of metres.
+        type(ice_domain), intent(inout) :: dom
+
+        real(wp), parameter :: tol_copy  = 1e-3_wp   ! [m] identical grids: round-off only
+        real(wp), parameter :: tol_remap = 10.0_wp   ! [m] mean offset left by remapping
+
+        real(wp), allocatable :: z_bed_ref_i(:,:)
+        character(len=256) :: gi, gy
+        character(len=32)  :: mth
+        real(wp) :: dmean, dmax, tol
+        logical  :: same_grid
+
+        if (.not. dom%ctl%with_isostasy) return
+
+        gi  = trim(dom%ctl%grid_isos)
+        gy  = trim(dom%ctl%grid_yelmo)
+        mth = remap_method_smooth(dom%ctl%dx_isos, real(dom%yelmo%grd%G%dx, wp))
+
+        call remap(dom, dom%isos%out%z_bed - dom%isos%out%w - dom%isos%out%we, &
+                   gi, z_bed_ref_i, gy, mth)
+
+        same_grid = (trim(gi) == trim(gy))
+        tol       = tol_remap
+        if (same_grid) tol = tol_copy
+
+        dmean = sum(z_bed_ref_i - dom%yelmo%bnd%z_bed_ref) / real(size(z_bed_ref_i), wp)
+        dmax  = maxval(abs(z_bed_ref_i - dom%yelmo%bnd%z_bed_ref))
+
+        write(*,*) "check_isostasy_reference:: z_bed_ref (isos - yelmo) [m]"
+        write(*,*) "    grids:      ", trim(gi), " -> ", trim(gy), " (", trim(mth), ")"
+        write(*,*) "    mean diff:  ", dmean
+        write(*,*) "    max |diff|: ", dmax
+        write(*,*) "    tolerance:  ", tol
+
+        if (abs(dmean) > tol) then
+            write(*,*) ""
+            write(*,*) "check_isostasy_reference:: error: the isostasy reference bedrock does &
+                       &not match yelmo%bnd%z_bed_ref."
+            write(*,*) "  couple_isostasy_to_yelmo adds the isostatic displacement to Yelmo's own &
+                       &reference, so the two must describe the same bedrock."
+            write(*,*) "  On a restart this usually means isos_restart.nc came from a run with a &
+                       &different topography than the one Yelmo is reading now."
+            stop
+        end if
+    end subroutine check_isostasy_reference
 
     subroutine couple_smb_to_yelmo(dom)
         ! Surface mass balance + surface temperature from the active SMB model
@@ -1688,6 +1778,20 @@ contains
     end subroutine isos_write_1D_step
 
     ! ----- remap: identity-copy when src == dst, else via the coupler ---
+
+    function remap_method_smooth(dx_src, dx_dst) result(method)
+        ! Remap method for a smooth field crossing grids: bilinear to refine
+        ! (coarse -> fine), conservative to coarsen (fine -> coarse). Equal
+        ! spacings never reach a real remap -- remap_2D short-circuits to a copy.
+        real(wp), intent(in) :: dx_src, dx_dst
+        character(len=32) :: method
+
+        if (dx_dst < dx_src) then
+            method = "bilin"
+        else
+            method = "con"
+        end if
+    end function remap_method_smooth
 
     subroutine remap_2D(dom, var_src, src, var_dst, dst, method)
         type(ice_domain),      intent(inout) :: dom
