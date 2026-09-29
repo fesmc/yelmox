@@ -391,7 +391,8 @@ contains
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
 
         ! --- hi-res reference hub + coupler ---
-        call htopo_init(dom%topo, path_par, "htopo"//trim(sfx))
+        call htopo_init(dom%topo, path_par, "htopo"//trim(sfx), &
+                        grid_default=dom%ctl%grid_yelmo)
         dom%ctl%grid_name = trim(dom%topo%par%grid_name)
         if (len_trim(dom%ctl%grid_mshlf) == 0) dom%ctl%grid_mshlf = trim(dom%ctl%grid_name)
 

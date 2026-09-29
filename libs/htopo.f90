@@ -27,7 +27,7 @@ module htopo
 
     type htopo_par_class
         character(len=256) :: domain
-        character(len=256) :: grid_name       ! highest-res reference grid, e.g. "ANT-16KM"
+        character(len=256) :: grid_name = ""  ! reference grid, e.g. "ANT-16KM"; "" tracks the host grid
         character(len=512) :: topo_path
         character(len=56)  :: name_z_bed
         character(len=56)  :: name_H_ice
@@ -59,20 +59,26 @@ module htopo
 
 contains
 
-    subroutine htopo_init(htopo, filename, group, map_fldr)
+    subroutine htopo_init(htopo, filename, group, map_fldr, grid_default)
         ! Load htopo parameters, resolve its grid from the disk grid table, and
         ! read the reference fields onto that grid.
+        !
+        ! grid_default is the host's own grid (Yelmo's). A blank grid_name in
+        ! the namelist means "track it", so one resolution setting drives both
+        ! and no topography is remapped -- the same empty-string idiom that
+        ! [coupling] grid_isos / grid_clim / grid_smb / grid_mshlf use.
         type(htopo_class), intent(out) :: htopo
         character(len=*),  intent(in)  :: filename   ! parameter file
         character(len=*),  intent(in)  :: group      ! namelist group, e.g. "htopo"
         character(len=*),  intent(in), optional :: map_fldr
+        character(len=*),  intent(in), optional :: grid_default
 
         character(len=256) :: mfldr
 
         mfldr = "maps"
         if (present(map_fldr)) mfldr = trim(map_fldr)
 
-        call htopo_par_load(htopo%par, filename, group)
+        call htopo_par_load(htopo%par, filename, group, grid_default)
 
         ! Topo grid definition (nx,ny + coordinates) from grid_<name>.txt.
         call grid_cdo_read_desc(htopo%grid, trim(htopo%par%grid_name), trim(mfldr))
@@ -103,9 +109,10 @@ contains
 
     end subroutine htopo_init
 
-    subroutine htopo_par_load(par, filename, group)
+    subroutine htopo_par_load(par, filename, group, grid_default)
         type(htopo_par_class), intent(out) :: par
         character(len=*),      intent(in)  :: filename, group
+        character(len=*),      intent(in), optional :: grid_default
 
         call nml_read(filename, group, "domain",       par%domain)
         call nml_read(filename, group, "grid_name",    par%grid_name)
@@ -119,6 +126,18 @@ contains
         call nml_read(filename, group, "regions_load", par%regions_load)
         call nml_read(filename, group, "regions_path", par%regions_path)
         call nml_read(filename, group, "name_regions", par%name_regions)
+
+        ! A blank grid_name tracks the host's grid, so that htopo reads its
+        ! reference topography natively and the hub <-> Yelmo maps are
+        ! identities. Applied before the paths below are templated.
+        if (len_trim(par%grid_name) == 0) then
+            if (.not. present(grid_default)) then
+                write(*,*) "htopo_par_load:: error: "//trim(group)//".grid_name is blank &
+                           &and no host grid was supplied to fall back on."
+                stop
+            end if
+            par%grid_name = trim(grid_default)
+        end if
 
         ! Resolve {domain}/{grid_name} against htopo's own (highest-res) grid.
         call parse_path(par%topo_path,    par%domain, par%grid_name)

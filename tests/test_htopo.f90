@@ -7,6 +7,7 @@ program test_htopo
     implicit none
 
     type(htopo_class) :: ht
+    type(htopo_class) :: ht_blank
     integer :: fails
 
     fails = 0
@@ -31,6 +32,23 @@ program test_htopo
     end if
     if (maxval(ht%basins) < 1.0) then
         write(*,*) "FAIL: basins look empty"; fails = fails + 1
+    end if
+
+    ! A blank grid_name must adopt the host grid handed in as grid_default,
+    ! so that one resolution setting drives both and no topography is remapped.
+    call htopo_init(ht_blank, "tests/test_htopo_blank.nml", "htopo", map_fldr="maps", &
+                    grid_default="ANT-16KM")
+
+    write(*,*) "blank grid_name resolves to: "//trim(ht_blank%par%grid_name)
+
+    if (trim(ht_blank%par%grid_name) /= "ANT-16KM") then
+        write(*,*) "FAIL: blank grid_name did not track grid_default"; fails = fails + 1
+    end if
+    if (ht_blank%nx /= ht%nx .or. ht_blank%ny /= ht%ny) then
+        write(*,*) "FAIL: blank grid_name gave a different grid size"; fails = fails + 1
+    end if
+    if (maxval(abs(ht_blank%z_bed - ht%z_bed)) /= 0.0) then
+        write(*,*) "FAIL: blank grid_name read different topography"; fails = fails + 1
     end if
 
     if (fails > 0) stop 1
