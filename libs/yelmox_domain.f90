@@ -628,6 +628,7 @@ contains
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
         character(len=256) :: gi, gy, gc, gn
+        character(len=32)  :: mth_load
 
         gi = trim(dom%ctl%grid_isos)
         gy = trim(dom%ctl%grid_yelmo)
@@ -635,11 +636,12 @@ contains
         gn = trim(dom%ctl%grid_name)
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
-        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
-        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
+        mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
+        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, mth_load)
+        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, mth_load)
         call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
-        call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, "bilin")
+        call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, mth_load)
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, mth_load)
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
         call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
@@ -899,6 +901,7 @@ contains
 
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         character(len=256) :: gi, gy
+        character(len=32)  :: mth_load
 
         gi = trim(dom%ctl%grid_isos)
         gy = trim(dom%ctl%grid_yelmo)
@@ -930,8 +933,9 @@ contains
         ! bsl was already restored + updated by the driver before this call.
         dom%isos%par%use_restart = .true.
         dom%isos%par%restart     = trim(fldr)//"/isos_restart.nc"
-        call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
+        mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
+        call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, mth_load)
+        call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, mth_load)
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
         call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
@@ -1113,6 +1117,7 @@ contains
 
         real(wp), allocatable :: H_ice_i(:,:), dwdt_i(:,:)
         character(len=256) :: gi, gy
+        character(len=32)  :: mth_load
 
         if (.not. dom%ctl%with_isostasy) return
 
@@ -1120,8 +1125,9 @@ contains
         gy = trim(dom%ctl%grid_yelmo)
 
         ! ice load + correction: Yelmo -> isos grid
-        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i, gi, "bilin")
-        call remap(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, "bilin")
+        mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i, gi, mth_load)
+        call remap(dom, dom%yelmo%bnd%dzbdt_corr, gy, dwdt_i,  gi, mth_load)
 
         call isos_update(dom%isos, H_ice_i, ts%time, bsl, dwdt_corr=dwdt_i)
     end subroutine step_isostasy
@@ -1780,9 +1786,13 @@ contains
     ! ----- remap: identity-copy when src == dst, else via the coupler ---
 
     function remap_method_smooth(dx_src, dx_dst) result(method)
-        ! Remap method for a smooth field crossing grids: bilinear to refine
-        ! (coarse -> fine), conservative to coarsen (fine -> coarse). Equal
-        ! spacings never reach a real remap -- remap_2D short-circuits to a copy.
+        ! Remap method for a field crossing the Yelmo/isostasy boundary: bilinear
+        ! to refine (coarse -> fine), conservative to coarsen (fine -> coarse).
+        ! Coarsening an ice load or a displacement by averaging over the target
+        ! cell is what keeps the driving mass, rather than sampling one point of
+        ! it; refining a long-wavelength field wants the smooth interpolant, not
+        ! piecewise-constant blocks. Equal spacings never reach a real remap --
+        ! remap_2D short-circuits to a copy.
         real(wp), intent(in) :: dx_src, dx_dst
         character(len=32) :: method
 
