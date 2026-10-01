@@ -329,9 +329,10 @@ there, so the drivers only differ in config parsing + the loop over domains).
 Common driver plumbing also lives in `yelmox_domain`, so every flavor uses the
 same handful of calls:
 
-- **`timeline_init(ts, dtt, path_par, group [, time_ref, cal])`** — reads the
-  run's timeline group (`[ctrl]`, or the esm `run_step` group) and initializes
-  the driver-owned timestepper. `domain_init` takes the same group name
+- **`tstep_init(ts, path_par, group, dtt [, time_ref, cal])`** (fesm-utils
+  `timestepping`, namelist form) — reads the run's timeline group (`[ctrl]`, or
+  the esm `run_step` group) and initializes the driver-owned timestepper.
+  `domain_init` takes the same group name
   (`timeline_group`, default `"ctrl"`) and reads the values the domain logic
   needs (`tstep_method`, `dtt`) itself — nothing is injected after init.
 - **`domain_startup(dom, ts, bsl [, restore_bsl])`** — cold start
@@ -342,8 +343,17 @@ same handful of calls:
   their cold branch and call this on the restart branch only.
 - **`run_restart_write(dom, bsl, time)`** — the single-domain restart bundle
   (domain sub-models + run-level `bsl_restart.nc`, one auto-named folder).
-- **`tstep_due(time, dt)`** — the shared cadence predicate (restart, `dt_clim`,
-  CMIP output); `dt <= 0` disables a cadence.
+- **`cadence_due(time, dt)`** — the cadence predicate for `dt_clim` and the
+  esm CMIP output; `dt <= 0` disables a cadence. Output and restart bundles
+  follow fesm-utils `timeout` schedules (`[tm_1D]`, `[tm_2D]`, `[tm_2Dsm]`,
+  `[tm_rst]`); a restart bundle is always written at `time_end`.
+
+Every driver loop has the same shape: output and restarts are written at the
+top of the loop for the current time (`time_init` on the first pass), then the
+loop exits if the run is finished (`time_end`, or a tripped kill switch), else
+`tstep_update` advances the time and the domain is stepped. Each output call
+appears once, and the final state + restart bundle are written on the last
+pass (`timeout_check(...) .or. ts%is_finished`).
 
 The `[coupling<suffix>]` group is the single, complete description of a domain:
 every `domain_ctl` switch is a required key there (`with_ice_sheet`,
@@ -386,20 +396,22 @@ program yelmox_bipolar
     type(obm_class)        :: obm      ! shared, driver-owned
     type(obm_coupling_ctl) :: oc       ! obm_coupling's own control
 
-    call timeline_init(ts, dtt, path_par, "ctrl")          ! shared timeline
+    call tstep_init(ts, path_par, "ctrl", dtt)             ! shared timeline
     call obm_ctl_load(oc, path_par)                        ! [ctrl] exchange switches
     call bsl_startup(bsl, ts, restart_bsl)                 ! run-level bsl restore
     ! per domain: domain_init(group_suffix) + domain_startup(restore_bsl=.false.)
     call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
 
-    do while (.not. ts%is_finished)
+    do
+        ! per-domain output/restart (subfolder each) + shared bsl/obm restart
+        if (ts%is_finished) exit
+        call tstep_update(ts, dtt)
         call bsl_update(bsl, ts%time_rel)                  ! once, shared
         call advance_isostasy(dom_north); call advance_isostasy(dom_south)
         if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
         call advance_dynamics(dom_north); call advance_dynamics(dom_south)
         call obm_exchange(oc, obm, dom_north, dom_south, ...)   ! atm2obm, fwf, hyster, obm2ism
         call step_marine_shelf(dom_north, ...); call step_marine_shelf(dom_south, ...)
-        ! per-domain output/restart (subfolder each) + shared bsl/obm restart
     end do
 end program
 ```
@@ -438,20 +450,22 @@ program yelmox_esm
     type(esm_forcing_class) :: esm    ! driver-owned climate (replaces snapclim)
 
     call esm_ctl_load(ec, esm, path_par)      ! [ctrl] run_step + [esm] + [run_step]
-    call timeline_init(ts, ec%dtt, path_par, trim(ec%run_step), &
-                       time_ref=2000.0_wp, cal=.true.)   ! per-phase timeline
+    call tstep_init(ts, path_par, trim(ec%run_step), ec%dtt, &
+                    time_ref=2000.0_wp, cal=.true.)      ! per-phase timeline
     call domain_init(dom, path_par, ts%time, init_climate=.false., &   ! skip snapclim
                      timeline_group=trim(ec%run_step))
     call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_clim)      ! on esm's own grid
     ! cold: esm_cold_start (contained); restart: domain_startup + re-forcing
 
-    do while (.not. ts%is_finished)
+    do
+        ! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on [tm_rst]
+        if (ts%is_finished) exit
+        call tstep_update(ts, dom%ctl%dtt)
         call bsl_update(bsl, ...)                       ! once, shared
         call step_optimize(dom, ts); call step_isostasy(dom, ts, bsl)
         call step_icesheet(dom, ts); call refresh_htopo(dom)
         call step_climate_esm(dom, esm, ec, ts)         ! esm + smbpal (contained)
         call step_marine_shelf_esm(dom, esm, ec, ts)    ! esm ocean BCs (contained)
-        ! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on tstep_due
     end do
 end program
 ```

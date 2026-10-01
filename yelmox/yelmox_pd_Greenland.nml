@@ -27,6 +27,13 @@
     times           = 0
 /
 
+&tm_rst
+    method          = "const"           ! "none", "const", "file", "times" (+ always at time_end)
+    dt              = 20e3
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
 &opt
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
@@ -736,7 +743,6 @@
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"    ! "none", "relax", "opt"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
-    dt_restart      = 20e3     ! [yr] Frequency of writing restart files
     dt_clim         = 5.0     ! [yr] Frequency of snapclim snapshot updates
     grid_mshlf = "GRL-16KM"    ! identity hub (= grid_yelmo); set finer for multigrid
     grid_isos  = "GRL-16KM"    ! isostasy grid (default = grid_yelmo)

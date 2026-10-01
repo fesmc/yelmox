@@ -27,6 +27,13 @@
     times           = 0
 /
 
+&tm_rst
+    method          = "const"           ! "none", "const", "file", "times" (+ always at time_end)
+    dt              = 20e3
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
 &yelmo
     domain          = "North"
     grid_name       = "NH-32KM"
@@ -694,7 +701,6 @@
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"    ! "none", "relax", "opt"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
-    dt_restart      = 20e3     ! [yr] Frequency of writing restart files
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     grid_mshlf = "NH-32KM"    ! identity hub (= grid_yelmo); set finer for multigrid
     grid_isos  = "NH-32KM"    ! isostasy grid (default = grid_yelmo)

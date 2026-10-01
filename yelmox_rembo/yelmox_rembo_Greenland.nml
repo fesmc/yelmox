@@ -19,7 +19,6 @@
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (legacy optimize=False -> none)
     smb_method      = "smbpal" ! REMBO stages its smb into the smbpal carrier (dom%smb%ann)
-    dt_restart      = 20e3     ! [yr] Frequency of writing restart bundles
     dt_clim         = 10.0     ! [yr] Frequency of snapclim (ocean) snapshot updates
     grid_mshlf = "GRL-16KM"    ! marine-shelf grid (== grid_yelmo)
     grid_isos  = "GRL-16KM"    ! isostasy grid      (== grid_yelmo)
@@ -75,6 +74,13 @@
 &tm_2D
     method          = "const"           ! "const", "file", "times"
     dt              = 5e3
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_rst
+    method          = "const"           ! "none", "const", "file", "times" (+ always at time_end)
+    dt              = 20e3
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0
 /

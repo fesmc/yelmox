@@ -18,7 +18,6 @@
     with_marine_shelf = False  ! Ocean forcing off (mountain glacier: no ocean)
     equil_method    = "none"   ! "none", "relax", "opt"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
-    dt_restart      = 10e3     ! [yr] Frequency of writing restart bundles
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     grid_mshlf = "PYR-1KM"     ! marine-shelf grid (== grid_yelmo)
     grid_isos  = "PYR-1KM"     ! isostasy grid      (== grid_yelmo)
@@ -75,6 +74,13 @@
 
 &tm_2Dsm
     method          = "const"           ! "const", "file", "times"
+    dt              = 10e3
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+&tm_rst
+    method          = "const"           ! "none", "const", "file", "times" (+ always at time_end)
     dt              = 10e3
     file            = "input/timeout_ramp_100kyr.txt"
     times           = 0

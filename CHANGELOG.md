@@ -3,6 +3,31 @@
 All notable changes to YelmoX are recorded here. Each version corresponds to an
 annotated git tag. Dates are release (tag) dates.
 
+## [Unreleased]
+
+### Changed
+- Driver time loops (`yelmox`, `yelmox_bipolar`, `yelmox_esm`, `yelmox_rembo`):
+  output and restarts are written at the top of the loop for the current time
+  (`time_init` on the first pass), then the loop exits once finished, else
+  `tstep_update` advances the time and the domain is stepped. Each output call
+  appears once; the final state and a final restart bundle are written on the
+  last pass, also when the tsgen kill switch trips. Requires fesm-utils with
+  `tstep_update` advancing on every call.
+- The zero-length first step at `time_init` is gone. It also ran an extra
+  basal-friction optimisation update (and, in `yelmox_bipolar`, an extra OBM
+  step) at every start, so results of cold starts change slightly.
+- Restart cadence: `[coupling] dt_restart` is replaced by a `[tm_rst]` timeout
+  group (`method = none|const|file|times`, `dt`, `file`, `times`); a restart
+  bundle is always written at `time_end`. Par files updated (`dt_restart = X`
+  -> `method = "const"`, `dt = X`). In `yelmox_bipolar` the cadence is shared
+  by both domains.
+- Timeline set up with fesm-utils `tstep_init(ts, path_par, group, dtt, ...)`
+  (namelist form); `tstep_due` renamed `cadence_due` (only `dt_clim` and the
+  esm CMIP output use it).
+
+### Removed
+- `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
+
 ## [v2.3] - 2026-07-15
 
 ### Added

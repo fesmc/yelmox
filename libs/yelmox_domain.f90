@@ -14,7 +14,7 @@ module yelmox_domain
 
     use nml,          only : nml_read
     use ncio
-    use timestepping, only : tstep_class, tstep_init
+    use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, yelmo_update_equil, &
                              yelmo_init_state, yelmo_init_topo, yelmo_print_bound, &
@@ -75,7 +75,6 @@ module yelmox_domain
         character(len=56) :: tstep_method = "const"
         real(wp) :: dtt         = 10.0_wp
         ! Cadences + methods ([coupling]).
-        real(wp) :: dt_restart  = 0.0_wp
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"
@@ -171,7 +170,7 @@ module yelmox_domain
     public :: tsforcing_class, tsforcing_init, tsforcing_update
     public :: tsforcing_restart_due, tsforcing_restart_fldr, tsforcing_kill
     public :: tsforcing_restart_write, tsforcing_restart_read, tsforcing_write_step
-    public :: timeline_init, tstep_due
+    public :: cadence_due
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
     public :: domain_startup, bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
@@ -192,53 +191,14 @@ module yelmox_domain
 
 contains
 
-    subroutine timeline_init(ts, dtt, path_par, group, time_ref, cal)
-        ! Read the run's shared timeline ([<group>]: tstep_method, tstep_const,
-        ! time_init, time_end, dtt) and initialize the driver-owned timestepper.
-        ! The same group name is passed to domain_init (timeline_group), so the
-        ! domain reads the timeline values it needs itself -- drivers never
-        ! inject them. time_ref sets the calendar reference (default 1950.0);
-        ! cal=.true. applies tstep_const as a calendar constant (const_cal, the
-        ! ESM convention) instead of a relative one (const_rel).
-        type(tstep_class), intent(out) :: ts
-        real(wp),          intent(out) :: dtt
-        character(len=*),  intent(in)  :: path_par
-        character(len=*),  intent(in)  :: group
-        real(wp), optional, intent(in) :: time_ref
-        logical,  optional, intent(in) :: cal
-
-        character(len=56) :: tstep_method
-        real(wp) :: tstep_const, time_init, time_end, tref
-        logical  :: is_cal
-
-        tref = 1950.0_wp
-        if (present(time_ref)) tref = time_ref
-        is_cal = .false.
-        if (present(cal)) is_cal = cal
-
-        call nml_read(path_par, group, "tstep_method", tstep_method)
-        call nml_read(path_par, group, "tstep_const",  tstep_const)
-        call nml_read(path_par, group, "time_init",    time_init)
-        call nml_read(path_par, group, "time_end",     time_end)
-        call nml_read(path_par, group, "dtt",          dtt)
-
-        if (is_cal) then
-            call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
-                            time_ref=tref, const_rel=0.0_wp, const_cal=tstep_const)
-        else
-            call tstep_init(ts, time_init, time_end, method=tstep_method, units="year", &
-                            time_ref=tref, const_rel=tstep_const)
-        end if
-    end subroutine timeline_init
-
-    function tstep_due(time, dt) result(due)
+    function cadence_due(time, dt) result(due)
         ! Cadence predicate: true when `time` falls on the dt grid (0.01-yr
         ! precision). dt <= 0 disables the cadence (never due).
         real(wp), intent(in) :: time, dt
         logical :: due
         due = .false.
         if (dt > 0.0_wp) due = (mod(nint(time*100), nint(dt*100)) == 0)
-    end function tstep_due
+    end function cadence_due
 
     subroutine bsl_startup(bsl, ts, fldr)
         ! Restore the shared, driver-owned barystatic sea level from a run-level
@@ -334,7 +294,7 @@ contains
         !
         ! timeline_group (optional, default "ctrl") names the group holding the
         ! run's shared timeline -- the same group the driver passes to
-        ! timeline_init -- from which the domain reads tstep_method/dtt itself.
+        ! tstep_init -- from which the domain reads tstep_method/dtt itself.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
@@ -959,7 +919,7 @@ contains
         ! Load this domain's setup + coupling + output config. All groups carry an
         ! optional domain suffix (e.g. "_north"), so several domains can coexist in
         ! one parameter file without group.name collisions (matters for runme -p).
-        ! The shared timeline is driver-owned (timeline_init); the values the
+        ! The shared timeline is driver-owned (tstep_init); the values the
         ! domain logic needs (tstep_method, dtt) are read from the same
         ! timeline_group here, so nothing is injected after init.
         type(domain_ctl), intent(inout) :: ctl
@@ -977,7 +937,8 @@ contains
         call nml_read(path_par, timeline_group, "dtt",          ctl%dtt)
 
         ! Domain setup + coupling ([coupling<suffix>]): active components, methods,
-        ! per-component grids, restart bundle, restart cadence.
+        ! per-component grids, restart bundle. The restart cadence is the
+        ! driver's [tm_rst] timeout.
         gc = "coupling"//trim(suffix)
         call nml_read(path_par, gc, "with_ice_sheet",    ctl%with_ice_sheet)
         call nml_read(path_par, gc, "with_isostasy",     ctl%with_isostasy)
@@ -986,7 +947,6 @@ contains
         call nml_read(path_par, gc, "equil_method",   ctl%equil_method)
         ctl%smb_method = "smbpal"
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
-        call nml_read(path_par, gc, "dt_restart",     ctl%dt_restart)
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
 
         ! Domain-specific startup / physics switches (Greenland only; keep False
@@ -1394,7 +1354,7 @@ contains
         gn = trim(dom%ctl%grid_name)
 
         ! snapclim snapshot on grid_clim, updated on the dt_clim cadence
-        if (tstep_due(ts%time_elapsed, dom%ctl%dt_clim)) then
+        if (cadence_due(ts%time_elapsed, dom%ctl%dt_clim)) then
             call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
             call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time, &
