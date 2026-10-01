@@ -44,6 +44,8 @@ annotated git tag. Dates are release (tag) dates.
   the current `{grid}_TOPO-BedMachine.nc` and `{grid}_GHF-HR24.nc` (the old
   `TOPO_BedMachineAntarctica-v3` and `GHF-M17` files are no longer in
   `ice_data`).
+- `input/esm/esm_ant_1pctCO2.nml`: meltMIP OI ocean reference read from
+  `ice_data/ISMIP7/` (shared with ISMIP7), not a separate `1pctCO2/` copy.
 - `scripts/1pctCO2/opt_ant.sh`: `resolution` now sets `yelmo.grid_name`
   (it only named the output folder).
 - `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb

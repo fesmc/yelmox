@@ -12,10 +12,11 @@
 ! Reference climatology: RACMO2.3 (t2m/precip/z_srf) + meltMIP OI (thetao/so) -- both
 ! Antarctic products that DO exist on this machine.
 !
-! *** DATA-PENDING: the 1pctCO2 forcing itself is NOT on this machine (2026-07). ***
+! meltMIP OI ocean reference: shared with ISMIP7 (ice_data/ISMIP7/.../meltMIP/).
+!
+! *** DATA-PENDING: the 1pctCO2 forcing itself is NOT on Levante (2026-10). ***
 ! The whole ice_data/1pctCO2/ tree is absent. Expected layout (realization r1i1p4f1):
-!   ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_{tas,pr,thetao,so}.nc
-!   ice_data/1pctCO2/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_{thetao,so}_extrap.nc
+!   ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_{tas,pr,orog,thetao,so}.nc
 ! Window is 2020-2160 (140 yr). Verify these paths/vars/time axes once the data is
 ! staged, then smoke-test via run_1pctco2_antarctica.sh (spinup -> scenarios).
 ! ============================================================================
@@ -93,7 +94,7 @@
 
 ! ======== Reference period ========
 &gcm_to_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_thetao_extrap.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_thetao_extrap.nc"
     name        = "thetao"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
@@ -101,7 +102,7 @@
 /
 
 &gcm_so_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_so_extrap.nc"
+    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_so_extrap.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
