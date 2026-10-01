@@ -16,8 +16,7 @@ program yelmox_rembo
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, dp, yelmo_end, &
                       yelmo_init_state, yelmo_update_equil, yelmo_print_bound
-    use fastisostasy, only : bsl_class, bsl_init, bsl_update, &
-                             isos_init_ref, isos_init_state
+    use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use yelmox_climate, only : climate_update
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
                                rembo_ann, rembo_restart_write
@@ -274,21 +273,8 @@ contains
         real(wp),              intent(in)    :: dT_summer, dT_ocn
         real(wp),              intent(in)    :: time_equil, dtt
 
-        real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
-        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
-        character(len=256) :: gi, gy
-
-        gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
-
         ! Isostasy reference + initial state (isostasy runs on grid_isos).
-        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
-        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
-        call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
-        call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
-        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
-        call couple_isostasy_to_yelmo(dom)
+        call domain_init_isostasy(dom, ts, bsl)
 
         ! Hub mirror + first REMBO / ocean / marine forcing.
         call refresh_htopo(dom)

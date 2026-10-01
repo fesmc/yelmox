@@ -292,21 +292,8 @@ contains
         type(tstep_class),    intent(in)    :: ts
         type(bsl_class),      intent(inout) :: bsl
 
-        real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
-        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
-        character(len=256) :: gi, gy
-
-        gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
-
         ! Isostasy reference + initial state (isostasy runs on grid_isos).
-        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, "bilin")
-        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, "bilin")
-        call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
-        call remap(dom, dom%yelmo%bnd%z_bed,     gy, z_bed_i, gi, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%H_ice, gy, H_ice_i, gi, "bilin")
-        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
-        call couple_isostasy_to_yelmo(dom)
+        call domain_init_isostasy(dom, ts, bsl)
 
         ! Hub mirror + first ESM forcing (init=.true. runs the smbpal ITM equil).
         call refresh_htopo(dom)

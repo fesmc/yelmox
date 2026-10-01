@@ -171,7 +171,7 @@ module yelmox_domain
     public :: tsforcing_restart_due, tsforcing_restart_fldr, tsforcing_kill
     public :: tsforcing_restart_write, tsforcing_restart_read, tsforcing_write_step
     public :: cadence_due
-    public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
+    public :: domain_init, domain_regions_init, domain_init_state, domain_init_isostasy, yelmox_step
     public :: domain_startup, bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
@@ -587,27 +587,14 @@ contains
         real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
         real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
 
-        real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
-        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        character(len=256) :: gi, gy, gc, gn
-        character(len=32)  :: mth_load
+        character(len=256) :: gc, gn
 
-        gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
         gc = trim(dom%ctl%grid_clim)
         gn = trim(dom%ctl%grid_name)
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
-        mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
-        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, mth_load)
-        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, mth_load)
-        call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
-        call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, mth_load)
-        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, mth_load)
-        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
-        call check_isostasy_reference(dom)
-        call couple_isostasy_to_yelmo(dom)
+        call domain_init_isostasy(dom, ts, bsl)
 
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call refresh_htopo(dom)
@@ -646,6 +633,34 @@ contains
         call domain_init_special(dom, ts)
 
     end subroutine domain_init_state
+
+    subroutine domain_init_isostasy(dom, ts, bsl)
+        ! Cold-start isostasy: reference and initial state on grid_isos from the
+        ! Yelmo geometry, checked against Yelmo's own reference bedrock, then the
+        ! bedrock / sea surface landed on the Yelmo grid. The ice load is
+        ! coarsened conservatively (refined bilinearly), as in step_isostasy.
+        type(ice_domain),  intent(inout) :: dom
+        type(tstep_class), intent(in)    :: ts
+        type(bsl_class),   intent(inout) :: bsl
+
+        real(wp), allocatable :: z_bed_ref_i(:,:), H_ice_ref_i(:,:)
+        real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
+        character(len=256) :: gi, gy
+        character(len=32)  :: mth_load
+
+        gi = trim(dom%ctl%grid_isos)
+        gy = trim(dom%ctl%grid_yelmo)
+
+        mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
+        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, mth_load)
+        call remap(dom, dom%yelmo%bnd%H_ice_ref, gy, H_ice_ref_i, gi, mth_load)
+        call isos_init_ref(dom%isos, z_bed_ref_i, H_ice_ref_i)
+        call remap(dom, dom%yelmo%bnd%z_bed,      gy, z_bed_i,     gi, mth_load)
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_i,     gi, mth_load)
+        call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
+        call check_isostasy_reference(dom)
+        call couple_isostasy_to_yelmo(dom)
+    end subroutine domain_init_isostasy
 
     subroutine domain_init_special(dom, ts)
         ! Domain-specific cold-start startup, dispatched on domain name. Mirrors
