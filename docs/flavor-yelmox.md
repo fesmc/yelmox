@@ -15,12 +15,12 @@ shared barystatic sea level. It is the reference implementation of the multigrid
 
 | Role | Module | Grid |
 |---|---|---|
-| Ice sheet | Yelmo | `grid_yelmo` |
+| Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
 | Climate (atmosphere + ocean) | snapclim | `grid_clim` |
 | Surface mass balance | smbpal (or `smb_simple`) | `grid_smb` |
 | Sub-shelf melt | marine_shelf | `grid_mshlf` |
-| Geometry hub | htopo | `grid_name` (hi-res) |
+| Geometry hub | htopo | `grid_hub` (hi-res) |
 
 Each module runs on its own configurable grid; the coupler remaps fields between
 grids at the moment of coupling. See [Multigrid coupling](multigrid.md).

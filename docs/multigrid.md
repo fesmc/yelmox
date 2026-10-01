@@ -213,10 +213,10 @@ module yelmox_domain
     type domain_ctl
         logical :: with_ice_sheet, with_isostasy, with_marine_shelf, with_climate
         character(len=256) :: domain       ! e.g. "Antarctica"
-        character(len=256) :: grid_name    ! highest-res reference grid = htopo,
+        character(len=256) :: grid_hub     ! highest-res reference grid = htopo,
                                            !   e.g. "ANT-16KM" (ctl's top level)
-        character(len=256) :: grid_yelmo   ! Yelmo grid, e.g. "ANT-32KM"
-        character(len=256) :: grid_mshlf   ! marine-shelf grid (may equal grid_name)
+        character(len=256) :: grid_ice     ! Yelmo grid, e.g. "ANT-32KM"
+        character(len=256) :: grid_mshlf   ! marine-shelf grid (may equal grid_hub)
         ! ... time control, output config
     end type
 
@@ -240,8 +240,8 @@ contains
         ! 2. htopo_init(dom%topo, path_par, "htopo")   ! hi-res reference hub
         ! 3. coupler_init(dom%cpl)                      ! grids resolve from maps/*.txt
         ! 4. prime known maps (fail fast, cost up front):
-        !      coupler_prime(dom%cpl, ctl%grid_yelmo, ctl%grid_name, "bilin")
-        !      coupler_prime(dom%cpl, ctl%grid_name, ctl%grid_yelmo, "con")
+        !      coupler_prime(dom%cpl, ctl%grid_ice, ctl%grid_hub, "bilin")
+        !      coupler_prime(dom%cpl, ctl%grid_hub, ctl%grid_ice, "con")
         ! No coupler_add_grid needed: names resolve from grid_<name>.txt on disk.
     end subroutine
 
@@ -258,9 +258,9 @@ contains
         if (.not. dom%ctl%with_marine_shelf) return
 
         ! remap Yelmo -> mshlf grid (bilin)
-        call remap(dom%cpl, dom%yelmo%tpo%now%H_ice, dom%ctl%grid_yelmo, &
+        call remap(dom%cpl, dom%yelmo%tpo%now%H_ice, dom%ctl%grid_ice, &
                    H_ice, dom%ctl%grid_mshlf, method="bilin")
-        call remap(dom%cpl, dom%yelmo%bnd%z_bed, dom%ctl%grid_yelmo, &
+        call remap(dom%cpl, dom%yelmo%bnd%z_bed, dom%ctl%grid_ice, &
                    z_bed, dom%ctl%grid_mshlf, method="bilin")
         ! ... remaining inputs; unit-convert in place (newfield = f(buf))
 
@@ -269,9 +269,9 @@ contains
 
         ! aggregate outputs back to Yelmo (con is the default)
         call remap(dom%cpl, dom%mshlf%now%bmb_shlf, dom%ctl%grid_mshlf, &
-                   bmb, dom%ctl%grid_yelmo, stat="mean")
+                   bmb, dom%ctl%grid_ice, stat="mean")
         call remap(dom%cpl, dom%mshlf%now%T_shlf, dom%ctl%grid_mshlf, &
-                   T_shlf, dom%ctl%grid_yelmo, stat="mean")
+                   T_shlf, dom%ctl%grid_ice, stat="mean")
         dom%yelmo%bnd%bmb_shlf = bmb
         dom%yelmo%bnd%T_shlf   = T_shlf
     end subroutine
@@ -288,7 +288,7 @@ remaps *from*. On the topo grid it holds static masks `regions`/`basins` (loaded
 once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later refreshed
 each step from Yelmo/isostasy). It is configured by its own `[htopo]` namelist
 group, whose `domain`/`grid_name` name the highest-res level and drive the
-`{domain}/{grid_name}` path templating (`ctl%grid_name` mirrors `[htopo]
+`{domain}/{grid_name}` path templating (`ctl%grid_hub` mirrors `[htopo]
 grid_name`):
 
 ```
@@ -433,7 +433,7 @@ end program
   remapped to `grid_mshlf` before `marshelf_update`; `esm.f90` is untouched.
   Geometry comes from the hub, remapped to whichever grid a step needs; SMB / ocean
   BCs aggregate back to Yelmo. With `grid_clim == grid_smb == grid_mshlf ==
-  grid_name == grid_yelmo` every remap is an identity copy, reproducing
+  grid_hub == grid_ice` every remap is an identity copy, reproducing
   `yelmox_esm.f90`; set `grid_clim` to a coarse ESM grid and it genuinely fans out.
   Config splits ESM-specific control ([esm] + the run_step group
   [spinup]/[transient]: `time_ref/hist/proj/esm_ref`, `use_*`, CMIP output) from

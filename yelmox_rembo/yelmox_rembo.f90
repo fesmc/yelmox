@@ -94,7 +94,7 @@ program yelmox_rembo
     write(*,*)
     write(*,*) "yelmox_rembo: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
-    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
+    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_ice), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
     write(*,*)
 
     ! === output setup ===
@@ -221,20 +221,20 @@ contains
         logical, intent(in), optional :: init
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_sl_c(:,:), basins_c(:,:)
-        character(len=256) :: gc, gn
+        character(len=256) :: gc, gh
         logical :: is_init
 
         is_init = .false.
         if (present(init)) is_init = init
 
         gc = trim(dom%ctl%grid_clim)
-        gn = trim(dom%ctl%grid_name)
+        gh = trim(dom%ctl%grid_hub)
 
         ! Geometry from the hub -> REMBO/clim grid.
-        call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
-        call remap(dom, dom%topo%H_ice,  gn, H_ice_c,  gc, "bilin")
-        call remap(dom, dom%topo%z_sl,   gn, z_sl_c,   gc, "bilin")
-        call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
+        call remap(dom, dom%topo%z_srf,  gh, z_srf_c,  gc, "bilin")
+        call remap(dom, dom%topo%H_ice,  gh, H_ice_c,  gc, "bilin")
+        call remap(dom, dom%topo%z_sl,   gh, z_sl_c,   gc, "bilin")
+        call remap(dom, dom%topo%basins, gh, basins_c, gc, "nn")
 
         ! REMBO atmosphere + surface mass balance (double precision internally).
         if (is_init .and. .not. dom%yelmo%par%use_restart) then

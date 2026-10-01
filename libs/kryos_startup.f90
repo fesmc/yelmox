@@ -118,10 +118,10 @@ contains
         type(tsforcing_class), intent(in), optional :: tsf
 
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        character(len=256) :: gc, gn
+        character(len=256) :: gc, gh
 
         gc = trim(dom%ctl%grid_clim)
-        gn = trim(dom%ctl%grid_name)
+        gh = trim(dom%ctl%grid_hub)
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call domain_init_isostasy(dom, ts, bsl)
@@ -133,8 +133,8 @@ contains
         ! surface mass balance on grid_smb (smbpal or smb_simple; init=.true.
         ! runs the smbpal ITM equilibration before the first update).
         if (dom%ctl%with_climate) then
-            call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
-            call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
+            call remap(dom, dom%topo%z_srf,  gh, z_srf_c,  gc, "bilin")
+            call remap(dom, dom%topo%basins, gh, basins_c, gc, "nn")
             call update_climate(dom, z_srf_c, basins_c, ts%time_rel, tsf)
             call step_smb(dom, ts, init=.true.)
         end if
@@ -174,7 +174,7 @@ contains
         character(len=32)  :: mth_load
 
         gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
         call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, mth_load)
@@ -384,7 +384,7 @@ contains
         character(len=32)  :: mth_load
 
         gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         ! Restore Yelmo first: it provides the current H_ice/z_bed for isostasy.
         ! Two reads are needed, mirroring yelmo's native init-from-restart:

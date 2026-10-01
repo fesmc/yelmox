@@ -46,7 +46,7 @@ contains
         if (trim(dom%ctl%equil_method) /= "opt") return
 
         gm = trim(dom%ctl%grid_mshlf)
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         ! Topography relaxation ramp (gl + grounding-zone relaxing while active).
         if (ts%time_elapsed <= dom%opt%rel_time2) then
@@ -92,7 +92,7 @@ contains
         ! Run isostasy on its own grid: ice load from Yelmo (bilin). The bedrock /
         ! sea-surface outputs stay on grid_isos (in dom%isos%out); they are landed
         ! on the Yelmo grid by couple_isostasy_to_yelmo (in step_icesheet, before
-        ! yelmo_update). Assumes grid_isos is at least as fine as grid_yelmo
+        ! yelmo_update). Assumes grid_isos is at least as fine as grid_ice
         ! (identity when equal). bsl is the shared, driver-owned sea level (already
         ! updated for this step by the driver); isos_update reads it and, under
         ! fastiso/mixed, writes back the prognostic bsl_now -- so with several
@@ -108,7 +108,7 @@ contains
         if (.not. dom%ctl%with_isostasy) return
 
         gi = trim(dom%ctl%grid_isos)
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         ! ice load + correction: Yelmo -> isos grid
         mth_load = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
@@ -170,7 +170,7 @@ contains
         if (.not. dom%ctl%with_isostasy) return
 
         gi  = trim(dom%ctl%grid_isos)
-        gy  = trim(dom%ctl%grid_yelmo)
+        gy  = trim(dom%ctl%grid_ice)
         mth = remap_method_smooth(dom%ctl%dx_isos, real(dom%yelmo%grd%G%dx, wp))
 
         call remap(dom, dom%isos%out%w + dom%isos%out%we,   gi, dz_bed_y, gy, mth)
@@ -192,7 +192,7 @@ contains
         ! displacement field measured against one bedrock and applied to another.
         !
         ! isos' reference, recovered on the Yelmo grid, is out%z_bed - (w + we).
-        ! When grid_isos == grid_yelmo the remap is an exact copy, so this must
+        ! When grid_isos == grid_ice the remap is an exact copy, so this must
         ! agree to round-off. On a coarser isostasy grid it cannot: the pointwise
         ! difference is precisely the smoothing this coupling now avoids, so only
         ! the domain mean is comparable there. Both tolerances are set to admit
@@ -212,7 +212,7 @@ contains
         if (.not. dom%ctl%with_isostasy) return
 
         gi  = trim(dom%ctl%grid_isos)
-        gy  = trim(dom%ctl%grid_yelmo)
+        gy  = trim(dom%ctl%grid_ice)
         mth = remap_method_smooth(dom%ctl%dx_isos, real(dom%yelmo%grd%G%dx, wp))
 
         call remap(dom, dom%isos%out%z_bed - dom%isos%out%w - dom%isos%out%we, &
@@ -258,7 +258,7 @@ contains
 
         gs = trim(dom%ctl%grid_smb)
         gc = trim(dom%ctl%grid_clim)
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         if (trim(dom%ctl%smb_method) == "smb_simple") then
             call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
@@ -298,7 +298,7 @@ contains
         if (.not. dom%ctl%with_marine_shelf) return
 
         gm = trim(dom%ctl%grid_mshlf)
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
         call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
@@ -332,17 +332,17 @@ contains
         type(tsforcing_class), intent(in), optional :: tsf
 
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        character(len=256) :: gc, gn
+        character(len=256) :: gc, gh
 
         if (.not. dom%ctl%with_climate) return
 
         gc = trim(dom%ctl%grid_clim)
-        gn = trim(dom%ctl%grid_name)
+        gh = trim(dom%ctl%grid_hub)
 
         ! snapclim snapshot on grid_clim, updated on the dt_clim cadence
         if (cadence_due(ts%time_elapsed, dom%ctl%dt_clim)) then
-            call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
-            call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
+            call remap(dom, dom%topo%z_srf,   gh, z_srf_c,  gc, "bilin")
+            call remap(dom, dom%topo%basins,  gh, basins_c, gc, "nn")
             call update_climate(dom, z_srf_c, basins_c, ts%time, tsf)
         end if
     end subroutine step_climate
@@ -382,7 +382,7 @@ contains
 
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
         real(wp), allocatable :: tsl_s(:,:), Href_s(:,:)
-        character(len=256) :: gc, gs, gn, gy
+        character(len=256) :: gc, gs, gh, gy
         logical :: is_init
 
         if (.not. dom%ctl%with_climate) return
@@ -392,13 +392,13 @@ contains
 
         gc = trim(dom%ctl%grid_clim)
         gs = trim(dom%ctl%grid_smb)
-        gn = trim(dom%ctl%grid_name)
-        gy = trim(dom%ctl%grid_yelmo)
+        gh = trim(dom%ctl%grid_hub)
+        gy = trim(dom%ctl%grid_ice)
 
         if (trim(dom%ctl%smb_method) == "smb_simple") then
             ! smb_simple: surface elevation + sea-level temperature, masked to the
             ! reference ice extent (refreshed each call in case H_ice_ref changed).
-            call remap(dom, dom%topo%z_srf,          gn, z_srf_s, gs, "bilin")
+            call remap(dom, dom%topo%z_srf,          gh, z_srf_s, gs, "bilin")
             call remap(dom, dom%clim%now%tsl_ann,     gc, tsl_s,   gs, "bilin")
             call remap(dom, dom%yelmo%bnd%H_ice_ref,  gy, Href_s,  gs, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
@@ -407,8 +407,8 @@ contains
             ! smbpal (monthly)
             call remap(dom, dom%clim%now%tas, gc, tas_s, gs, "bilin")
             call remap(dom, dom%clim%now%pr,  gc, pr_s,  gs, "bilin")
-            call remap(dom, dom%topo%z_srf,  gn, z_srf_s, gs, "bilin")
-            call remap(dom, dom%topo%H_ice,  gn, H_ice_s, gs, "bilin")
+            call remap(dom, dom%topo%z_srf,  gh, z_srf_s, gs, "bilin")
+            call remap(dom, dom%topo%H_ice,  gh, H_ice_s, gs, "bilin")
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
                 call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
                         ts%time_rel, time_equil=100.0_wp)
@@ -423,16 +423,16 @@ contains
         ! coupling steps. Static masks (regions/basins) are not refreshed.
         type(kryos_domain), intent(inout) :: dom
 
-        call remap(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_yelmo, &
-                              dom%topo%H_ice,  dom%ctl%grid_name, "bilin")
-        call remap(dom, dom%yelmo%bnd%z_bed,      dom%ctl%grid_yelmo, &
-                              dom%topo%z_bed,  dom%ctl%grid_name, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%f_grnd, dom%ctl%grid_yelmo, &
-                              dom%topo%f_grnd, dom%ctl%grid_name, "bilin")
-        call remap(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_yelmo, &
-                              dom%topo%z_sl,   dom%ctl%grid_name, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_yelmo, &
-                              dom%topo%z_srf,  dom%ctl%grid_name, "bilin")
+        call remap(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_ice, &
+                              dom%topo%H_ice,  dom%ctl%grid_hub, "bilin")
+        call remap(dom, dom%yelmo%bnd%z_bed,      dom%ctl%grid_ice, &
+                              dom%topo%z_bed,  dom%ctl%grid_hub, "bilin")
+        call remap(dom, dom%yelmo%tpo%now%f_grnd, dom%ctl%grid_ice, &
+                              dom%topo%f_grnd, dom%ctl%grid_hub, "bilin")
+        call remap(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_ice, &
+                              dom%topo%z_sl,   dom%ctl%grid_hub, "bilin")
+        call remap(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_ice, &
+                              dom%topo%z_srf,  dom%ctl%grid_hub, "bilin")
     end subroutine refresh_hub
 
     subroutine step_marine_shelf(dom, ts)
@@ -446,22 +446,22 @@ contains
         real(wp), allocatable :: z_srf_m(:,:)
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
-        character(len=256) :: gm, gn, gc
+        character(len=256) :: gm, gh, gc
 
         if (.not. dom%ctl%with_marine_shelf) return
 
         gm = trim(dom%ctl%grid_mshlf)
-        gn = trim(dom%ctl%grid_name)
+        gh = trim(dom%ctl%grid_hub)
         gc = trim(dom%ctl%grid_clim)
 
         ! geometry + masks: hub -> mshlf grid
-        call remap(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
-        call remap(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
-        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
-        call remap(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
-        call remap(dom, dom%topo%z_srf,   gn, z_srf_m,   gm, "bilin")
-        call remap(dom, dom%topo%regions, gn, regions_m, gm, "nn")
-        call remap(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
+        call remap(dom, dom%topo%H_ice,   gh, H_ice_m,   gm, "bilin")
+        call remap(dom, dom%topo%z_bed,   gh, z_bed_m,   gm, "bilin")
+        call remap(dom, dom%topo%f_grnd,  gh, f_grnd_m,  gm, "bilin")
+        call remap(dom, dom%topo%z_sl,    gh, z_sl_m,    gm, "bilin")
+        call remap(dom, dom%topo%z_srf,   gh, z_srf_m,   gm, "bilin")
+        call remap(dom, dom%topo%regions, gh, regions_m, gm, "nn")
+        call remap(dom, dom%topo%basins,  gh, basins_m,  gm, "nn")
 
         ! ocean forcing (3D): snapclim (grid_clim) -> mshlf grid
         call remap(dom, dom%clim%now%to_ann, gc, to_m, gm, "bilin")

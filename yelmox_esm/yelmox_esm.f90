@@ -17,7 +17,7 @@ program yelmox_esm
     ! a step needs. marshelf_interp_shelf reads only mshlf%par (grid-agnostic), so
     ! the ESM ocean interpolation runs on grid_clim and the resulting T_shlf/S_shlf
     ! are remapped to grid_mshlf. With grid_clim == grid_smb == grid_mshlf ==
-    ! grid_yelmo == grid_name every remap is an identity copy; set grid_clim to a
+    ! grid_ice == grid_hub every remap is an identity copy; set grid_clim to a
     ! coarse ESM grid and it genuinely fans out.
     !
     ! Output (yelmo / yelmo_sm / yelmo_ts_esm and the CMIP-formatted files) is
@@ -138,7 +138,7 @@ program yelmox_esm
     write(*,*)
     write(*,*) "yelmox_esm: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
-    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
+    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_ice), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
     write(*,*) "  esm  grid   : "//trim(dom%ctl%grid_clim)
     write(*,*) "  smb  grid   : "//trim(dom%ctl%grid_smb)
     write(*,*) "  mshlf grid  : "//trim(dom%ctl%grid_mshlf)
@@ -353,24 +353,24 @@ contains
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
         real(wp), allocatable :: smb_ann_s(:,:), dsmb_s(:,:), dsmbdz_s(:,:)
         real(wp), allocatable :: pd_zsrf_s(:,:), tsrf_s(:,:)
-        character(len=256) :: ge, gn, gy, gs
+        character(len=256) :: ge, gh, gy, gs
         logical :: is_init
 
         is_init = .false.
         if (present(init)) is_init = init
 
         ge = trim(dom%ctl%grid_clim)    ! esm grid (esm's own working grid)
-        gn = trim(dom%ctl%grid_name)    ! hub grid
-        gy = trim(dom%ctl%grid_yelmo)
+        gh = trim(dom%ctl%grid_hub)    ! hub grid
+        gy = trim(dom%ctl%grid_ice)
         gs = trim(dom%ctl%grid_smb)
 
         ! Geometry: hub -> esm grid.
-        call remap(dom, dom%topo%z_srf,   gn, z_srf_e,  ge, "bilin")
-        call remap(dom, dom%topo%H_ice,   gn, H_ice_e,  ge, "bilin")
-        call remap(dom, dom%topo%z_bed,   gn, z_bed_e,  ge, "bilin")
-        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_e, ge, "bilin")
-        call remap(dom, dom%topo%z_sl,    gn, z_sl_e,   ge, "bilin")
-        call remap(dom, dom%topo%basins,  gn, basins_e, ge, "nn")
+        call remap(dom, dom%topo%z_srf,   gh, z_srf_e,  ge, "bilin")
+        call remap(dom, dom%topo%H_ice,   gh, H_ice_e,  ge, "bilin")
+        call remap(dom, dom%topo%z_bed,   gh, z_bed_e,  ge, "bilin")
+        call remap(dom, dom%topo%f_grnd,  gh, f_grnd_e, ge, "bilin")
+        call remap(dom, dom%topo%z_sl,    gh, z_sl_e,   ge, "bilin")
+        call remap(dom, dom%topo%basins,  gh, basins_e, ge, "nn")
 
         ! Step 1: reference climatology (lapse-rate / precip scaling to z_srf).
         call esm_clim_update(esm, z_srf_e, ts%time, ec%time_ref, ec%use_smb, &
@@ -405,8 +405,8 @@ contains
             call remap(dom, sum(esm%dsmb, dim=3)/12.0_wp, ge, dsmb_s,  gs, "bilin")
             call remap(dom, esm%dsmbdz,                ge, dsmbdz_s,  gs, "bilin")
             call remap(dom, dom%yelmo%dta%pd%z_srf,    gy, pd_zsrf_s, gs, "bilin")
-            call remap(dom, dom%topo%z_srf,            gn, z_srf_s,   gs, "bilin")
-            call remap(dom, dom%topo%H_ice,            gn, H_ice_s,   gs, "bilin")
+            call remap(dom, dom%topo%z_srf,            gh, z_srf_s,   gs, "bilin")
+            call remap(dom, dom%topo%H_ice,            gh, H_ice_s,   gs, "bilin")
             call remap(dom, sum(esm%t2m + esm%dts + esm%dts_var, dim=3)/12.0_wp, &
                        ge, tsrf_s, gs, "bilin")
             dom%smb%ann%smb  = smb_ann_s + dsmb_s - dsmbdz_s*(pd_zsrf_s - z_srf_s)
@@ -417,8 +417,8 @@ contains
             ! from the hub. init=.true. runs the ITM snowpack equilibration first.
             call remap(dom, esm%t2m + esm%dts + esm%dts_var, ge, tas_s, gs, "bilin")
             call remap(dom, esm%pr  * esm%dpr * esm%dpr_var, ge, pr_s,  gs, "bilin")
-            call remap(dom, dom%topo%z_srf, gn, z_srf_s, gs, "bilin")
-            call remap(dom, dom%topo%H_ice, gn, H_ice_s, gs, "bilin")
+            call remap(dom, dom%topo%z_srf, gh, z_srf_s, gs, "bilin")
+            call remap(dom, dom%topo%H_ice, gh, H_ice_s, gs, "bilin")
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
                 call remap(dom, esm%t2m + esm%dts, ge, tas_s, gs, "bilin")
                 call remap(dom, esm%pr  * esm%dpr, ge, pr_s,  gs, "bilin")
@@ -454,20 +454,20 @@ contains
         real(wp), allocatable :: T_shlf_e(:,:), S_shlf_e(:,:), dT_shlf_e(:,:)
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
-        character(len=256) :: ge, gm, gn
+        character(len=256) :: ge, gm, gh
 
         if (.not. dom%ctl%with_marine_shelf) return
 
         ge = trim(dom%ctl%grid_clim)    ! esm grid (ocean fields live here)
         gm = trim(dom%ctl%grid_mshlf)   ! marine-shelf grid
-        gn = trim(dom%ctl%grid_name)    ! hub grid
+        gh = trim(dom%ctl%grid_hub)    ! hub grid
 
         ! --- Ocean forcing on the esm grid ---
         ! Geometry for the shelf-depth interpolation: hub -> esm grid.
-        call remap(dom, dom%topo%H_ice,  gn, H_ice_e,  ge, "bilin")
-        call remap(dom, dom%topo%z_bed,  gn, z_bed_e,  ge, "bilin")
-        call remap(dom, dom%topo%f_grnd, gn, f_grnd_e, ge, "bilin")
-        call remap(dom, dom%topo%z_sl,   gn, z_sl_e,   ge, "bilin")
+        call remap(dom, dom%topo%H_ice,  gh, H_ice_e,  ge, "bilin")
+        call remap(dom, dom%topo%z_bed,  gh, z_bed_e,  ge, "bilin")
+        call remap(dom, dom%topo%f_grnd, gh, f_grnd_e, ge, "bilin")
+        call remap(dom, dom%topo%z_sl,   gh, z_sl_e,   ge, "bilin")
 
         allocate(T_shlf_e(size(H_ice_e,1), size(H_ice_e,2)))
         allocate(S_shlf_e(size(H_ice_e,1), size(H_ice_e,2)))
@@ -490,12 +490,12 @@ contains
 
         ! --- Marine-shelf basal melt on grid_mshlf ---
         ! Geometry + masks: hub -> mshlf grid.
-        call remap(dom, dom%topo%H_ice,   gn, H_ice_m,   gm, "bilin")
-        call remap(dom, dom%topo%z_bed,   gn, z_bed_m,   gm, "bilin")
-        call remap(dom, dom%topo%f_grnd,  gn, f_grnd_m,  gm, "bilin")
-        call remap(dom, dom%topo%z_sl,    gn, z_sl_m,    gm, "bilin")
-        call remap(dom, dom%topo%regions, gn, regions_m, gm, "nn")
-        call remap(dom, dom%topo%basins,  gn, basins_m,  gm, "nn")
+        call remap(dom, dom%topo%H_ice,   gh, H_ice_m,   gm, "bilin")
+        call remap(dom, dom%topo%z_bed,   gh, z_bed_m,   gm, "bilin")
+        call remap(dom, dom%topo%f_grnd,  gh, f_grnd_m,  gm, "bilin")
+        call remap(dom, dom%topo%z_sl,    gh, z_sl_m,    gm, "bilin")
+        call remap(dom, dom%topo%regions, gh, regions_m, gm, "nn")
+        call remap(dom, dom%topo%basins,  gh, basins_m,  gm, "nn")
 
         call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
                              z_sl_m, dx=dom%ctl%dx_mshlf)
@@ -518,7 +518,7 @@ contains
         character(len=256) :: ge, gy
 
         ge = trim(dom%ctl%grid_clim)    ! esm grid
-        gy = trim(dom%ctl%grid_yelmo)
+        gy = trim(dom%ctl%grid_ice)
 
         call remap(dom, esm%Qd_ann, ge, Qd_y, gy, "con")
         dom%yelmo%bnd%Qd = Qd_y

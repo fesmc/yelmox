@@ -28,6 +28,8 @@ annotated git tag. Dates are release (tag) dates.
 - `step_climate` and `domain_startup` take the transient forcing object (`tsf`)
   as one optional argument instead of `dTa`/`dTo`/`dSo`; `update_climate` applies
   its anomalies only when it is active.
+- `domain_ctl` grid names: `grid_name` -> `grid_hub` (the hi-res hub),
+  `grid_yelmo` -> `grid_ice` (Yelmo).
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

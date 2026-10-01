@@ -66,11 +66,11 @@ module kryos
 
         ! Domain + grid names (the source of truth for remap keys).
         character(len=256) :: domain     = ""   ! e.g. "Antarctica"
-        character(len=256) :: grid_name  = ""   ! hi-res reference (htopo), highest res
-        character(len=256) :: grid_yelmo = ""   ! Yelmo grid
-        character(len=256) :: grid_mshlf = ""   ! marine-shelf grid ([coupling]; default = grid_name)
+        character(len=256) :: grid_hub   = ""   ! hi-res reference (htopo), highest res
+        character(len=256) :: grid_ice   = ""   ! Yelmo grid
+        character(len=256) :: grid_mshlf = ""   ! marine-shelf grid ([coupling]; default = grid_hub)
         real(wp) :: dx_mshlf = 0.0_wp           ! marine-shelf grid spacing (Yelmo dx units)
-        character(len=256) :: grid_isos = ""    ! isostasy grid ([coupling]; default = grid_yelmo)
+        character(len=256) :: grid_isos = ""    ! isostasy grid ([coupling]; default = grid_ice)
         real(wp) :: dx_isos = 0.0_wp            ! isostasy grid spacing in x (Yelmo dx units)
         real(wp) :: dy_isos = 0.0_wp            ! isostasy grid spacing in y (Yelmo dy units)
         ! grid_clim sets the grid of BOTH the reference climatology (often from a
@@ -78,7 +78,7 @@ module kryos
         ! a coarser climate model). A coarse grid_clim matches the forcing but
         ! loses detail of the high-res reference. Until the two get separate
         ! grids, set grid_clim to the highest-resolution climate input.
-        character(len=256) :: grid_clim = ""    ! climate grid ([coupling]; default = grid_yelmo)
+        character(len=256) :: grid_clim = ""    ! climate grid ([coupling]; default = grid_ice)
         real(wp) :: dx_clim = 0.0_wp            ! climate grid spacing (Yelmo dx units)
         character(len=256) :: grid_smb = ""     ! smb grid ([coupling]; default = grid_clim)
 
@@ -201,13 +201,13 @@ contains
                         group="yelmo"//trim(sfx))
         domain = trim(dom%yelmo%par%domain)
         dom%ctl%domain     = trim(domain)
-        dom%ctl%grid_yelmo = trim(dom%yelmo%par%grid_name)
+        dom%ctl%grid_ice = trim(dom%yelmo%par%grid_name)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
-        ! Isostasy on its configured grid ([coupling] grid_isos; default = grid_yelmo).
-        if (len_trim(dom%ctl%grid_isos) == 0) dom%ctl%grid_isos = trim(dom%ctl%grid_yelmo)
+        ! Isostasy on its configured grid ([coupling] grid_isos; default = grid_ice).
+        if (len_trim(dom%ctl%grid_isos) == 0) dom%ctl%grid_isos = trim(dom%ctl%grid_ice)
         call grid_cdo_read_desc(grid_i, trim(dom%ctl%grid_isos),  MAP_FLDR)
-        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_yelmo), MAP_FLDR)
+        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         nx_i = grid_i%G%nx
         ny_i = grid_i%G%ny
         ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
@@ -226,25 +226,25 @@ contains
 
         ! --- hi-res reference hub + coupler ---
         call htopo_init(dom%topo, path_par, "htopo"//trim(sfx), &
-                        grid_default=dom%ctl%grid_yelmo)
-        dom%ctl%grid_name = trim(dom%topo%par%grid_name)
-        if (len_trim(dom%ctl%grid_mshlf) == 0) dom%ctl%grid_mshlf = trim(dom%ctl%grid_name)
+                        grid_default=dom%ctl%grid_ice)
+        dom%ctl%grid_hub = trim(dom%topo%par%grid_name)
+        if (len_trim(dom%ctl%grid_mshlf) == 0) dom%ctl%grid_mshlf = trim(dom%ctl%grid_hub)
 
         ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
         call coupler_init(dom%cpl)
-        call coupler_prime(dom%cpl, dom%ctl%grid_yelmo, dom%ctl%grid_name, "bilin")  ! Yelmo -> hub
-        call coupler_prime(dom%cpl, dom%ctl%grid_name, dom%ctl%grid_yelmo, "con")    ! hub -> Yelmo
+        call coupler_prime(dom%cpl, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
+        call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
 
-        ! --- climate on its configured grid ([coupling] grid_clim; default = grid_yelmo) ---
+        ! --- climate on its configured grid ([coupling] grid_clim; default = grid_ice) ---
         ! snapclim reads grid-specific input data, so grid_clim must be a grid whose
         ! forcing files exist (the Yelmo grid for the standard setup).
-        if (len_trim(dom%ctl%grid_clim) == 0) dom%ctl%grid_clim = trim(dom%ctl%grid_yelmo)
+        if (len_trim(dom%ctl%grid_clim) == 0) dom%ctl%grid_clim = trim(dom%ctl%grid_ice)
         call grid_cdo_read_desc(grid_c, trim(dom%ctl%grid_clim), MAP_FLDR)
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny
         dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
         if (do_climate) then
-            call remap(dom, dom%topo%basins, dom%ctl%grid_name, basins_c, dom%ctl%grid_clim, "nn")
+            call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
             call climate_init(dom%cl, path_par, domain, trim(dom%ctl%grid_clim), &
                               nx_c, ny_c, time, basins_c, group="snap"//trim(sfx))
         end if
@@ -269,7 +269,7 @@ contains
                                  y=real(grid_s%y, wp), lat=lats_s, &
                                  group="smb_simple"//trim(sfx), units="m", &
                                  cnst=dom%yelmo%bnd%cnst)
-            call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_yelmo, &
+            call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_ice, &
                        Href_s, dom%ctl%grid_smb, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
         end if
@@ -282,8 +282,8 @@ contains
         dom%ctl%dx_mshlf = dom%yelmo%grd%G%dx * (grid_m%G%dx / grid_y%G%dx)
 
         ! Region/basin masks on the mshlf grid (from the hub).
-        call remap(dom, dom%topo%regions, dom%ctl%grid_name, regions_m, dom%ctl%grid_mshlf, "nn")
-        call remap(dom, dom%topo%basins,  dom%ctl%grid_name, basins_m,  dom%ctl%grid_mshlf, "nn")
+        call remap(dom, dom%topo%regions, dom%ctl%grid_hub, regions_m, dom%ctl%grid_mshlf, "nn")
+        call remap(dom, dom%topo%basins,  dom%ctl%grid_hub, basins_m,  dom%ctl%grid_mshlf, "nn")
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
                            domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m, &

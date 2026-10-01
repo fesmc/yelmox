@@ -30,7 +30,7 @@ contains
         integer              :: i, nx, ny
 
         domain    = trim(dom%ctl%domain)
-        grid_name = trim(dom%ctl%grid_yelmo)
+        grid_name = trim(dom%ctl%grid_ice)
         nx = dom%yelmo%grd%G%nx
         ny = dom%yelmo%grd%G%ny
         allocate(tmp_mask(nx, ny))
