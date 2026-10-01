@@ -318,7 +318,7 @@
 
     ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
-    k24_flux_solver                  = 0
+    k24_flux_solver                  = 3
     k24_manning_exponent             = 3.0
     k24_latent_heat_water            = 3.35e5
     k24_bed_thickness                = 0.1

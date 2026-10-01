@@ -10,7 +10,9 @@ annotated git tag. Dates are release (tag) dates.
   the domain border as before; the capacity basal BC keys of `ytherm`, now the
   default, so results change; the K24 options of `yhyd`). Par files rename
   `yhyd.k24_long_coupling_water = 5` to `k24_coupling_length_kamb86 = 10` (yelmo's
-  rename, twice the old value). Requires that yelmo dev.
+  rename, twice the old value) and set `yhyd.k24_flux_solver = 3` (the taped solver,
+  which FastHydrology's default routing scheme now requires; K24 transport is off
+  in all par files, so results do not change). Requires that yelmo dev.
 - Follows yelmo dev with the renumbered `ytherm.qb_method` (1: faces, 2: faces to
   quadrature nodes, 3: simple stagger, 4: quadrature). The par files keep
   `qb_method = 2`, which now selects the energy-consistent "faces to quadrature
