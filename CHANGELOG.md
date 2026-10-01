@@ -6,6 +6,11 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Follows yelmo dev: `input/` yelmo copies re-synced (`yelmo.mask_border`, `"auto"`:
+  the domain border as before; the capacity basal BC keys of `ytherm`, now the
+  default, so results change; the K24 options of `yhyd`). Par files rename
+  `yhyd.k24_long_coupling_water = 5` to `k24_coupling_length_kamb86 = 10` (yelmo's
+  rename, twice the old value). Requires that yelmo dev.
 - Follows yelmo dev with the renumbered `ytherm.qb_method` (1: faces, 2: faces to
   quadrature nodes, 3: simple stagger, 4: quadrature). The par files keep
   `qb_method = 2`, which now selects the energy-consistent "faces to quadrature

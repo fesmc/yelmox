@@ -20,3 +20,7 @@
 | 16 | advecxy           | xc, yc, zeta      | J kg^-1 yr^-1 | Horizontal advection of enth (of T_ice in K yr^-1 if method=temp) |
 | 17 | Q_rock            | xc, yc            | mW m^-2      | Heat flux from bedrock                        |
 | 18 | T_rock            | xc, yc, zeta_rock | K            | Bedrock temperature                           |
+| 19 | bmb_grnd_star     | xc, yc            | m/yr         | Grounded bmb of a base held at T_pmp (capacity rule) |
+| 20 | bc_b              | xc, yc            | -            | Basal BC used: 0 none, 1 held at T_pmp, 2 flux |
+| 21 | bmb_clamp         | xc, yc            | m/yr         | Freeze-on removed by the capacity clamp       |
+| 22 | melt_int          | xc, yc            | m/yr         | Englacial water drained to the bed            |
