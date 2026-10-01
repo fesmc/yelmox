@@ -59,6 +59,8 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- smbpal: the state is zeroed on allocation; `alb_s` (only set with ITM
+  ablation) was written uninitialised to `smbpal_restart.nc`.
 - `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
   `obs_err_name` and `f_stdev` (startup stopped on the nml read).
 - `yelmox_esm_Antarctica.nml`: topography and geothermal heat flux read from
