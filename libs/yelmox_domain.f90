@@ -430,8 +430,8 @@ contains
     end subroutine domain_init
 
     subroutine negis_par_load(ngs, path_par, suffix)
-        ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]). Ported from
-        ! yelmox.f90; only read when [coupling] use_negis is set.
+        ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]). Only read
+        ! when [coupling] use_negis is set.
         type(negis_params), intent(inout) :: ngs
         character(len=*),   intent(in)    :: path_par
         character(len=*),   intent(in)    :: suffix
@@ -581,8 +581,7 @@ contains
 
     subroutine domain_init_state(dom, ts, bsl, dTa, dTo, dSo)
         ! Build the initial boundary state and initialize the Yelmo state
-        ! variables. Lifted from yelmox.f90's "update initial boundary conditions"
-        ! block (minimal core: no smb_simple / domain-special / optimization).
+        ! variables, then run the domain-specific cold-start setup.
         ! bsl is the shared, driver-owned sea level; the driver has already called
         ! bsl_update for the initial time, so this routine only consumes it. The
         ! optional dTa/dTo/dSo apply the initial transient-forcing anomalies to the
@@ -669,9 +668,8 @@ contains
     end subroutine domain_init_isostasy
 
     subroutine domain_init_special(dom, ts)
-        ! Domain-specific cold-start startup, dispatched on domain name. Mirrors
-        ! yelmox.f90's per-domain startup block. The DEFAULT (incl. Antarctica)
-        ! path runs a short equilibration to synchronize the model fields.
+        ! Domain-specific cold-start startup, dispatched on domain name. The
+        ! DEFAULT (incl. Antarctica) path runs a short equilibration to synchronize the model fields.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
@@ -728,11 +726,10 @@ contains
         ! from the ICE-6G_C LGM reconstruction. Sets the reconstructed grounded
         ! ice as the initial thickness (method-dependent), refreshes the surface
         ! and (via the hub) the climate/smb, and stabilizes the dynamic fields.
-        ! Ported from yelmox.f90's yelmox_init_{laurentide,north}_lgm.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         character(len=*),  intent(in)    :: region   ! "Laurentide" or "North"
-        character(len=*),  intent(in)    :: method   ! "const", "ref_lgm", else zero
+        character(len=*),  intent(in)    :: method   ! "ref_lgm", else zero
 
         character(len=1024) :: path_lgm, grid_name
         integer  :: nx, ny
@@ -750,14 +747,6 @@ contains
 
         ! Determine the initial ice thickness.
         select case(trim(method))
-            case("const")
-                dom%yelmo%tpo%now%H_ice = 0.0_wp
-                where (dom%yelmo%bnd%regions == 1.1_wp .and. dom%yelmo%bnd%z_bed > 0.0_wp) &
-                    dom%yelmo%tpo%now%H_ice = 1000.0_wp
-                where (dom%yelmo%bnd%regions == 1.12_wp) dom%yelmo%tpo%now%H_ice = 1000.0_wp
-                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=real(dom%yelmo%grd%G%dx,wp), f_sigma=3.0_wp)
-                call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
-                                     dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
             case("ref_lgm")
                 where ( dom%yelmo%bnd%z_bed > -500.0_wp .and. &
                         (dom%yelmo%bnd%regions == 1.1_wp  .or. &
@@ -784,28 +773,18 @@ contains
         end if
 
         ! Refresh the hub and climate/smb to reflect the new geometry, then land
-        ! the smb on the Yelmo grid (used/adjusted just below).
+        ! the smb on the Yelmo grid for the stabilization below.
         call refresh_htopo(dom)
         call step_climate(dom, ts)
         call couple_smb_to_yelmo(dom)
 
-        if (trim(method) == "const") then
-            ! Ensure ice can grow on high-latitude land (mainly Cordilleran).
-            where (dom%yelmo%bnd%regions == 1.1_wp .and. dom%yelmo%grd%lat > 50.0_wp .and. &
-                   dom%yelmo%bnd%z_bed > 0.0_wp .and. dom%yelmo%bnd%smb < 0.0_wp) &
-                dom%yelmo%bnd%smb = 0.5_wp
-            if (dom%ctl%with_ice_sheet) &
-                call yelmo_update_equil(dom%yelmo, ts%time, time_tot=5e3_wp, dt=5.0_wp, &
-                                        topo_fixed=.FALSE.)
-        else
-            ! ref_lgm / zero: stabilize dynamic fields with a raised beta_min.
-            if (dom%ctl%with_ice_sheet) then
-                beta_min_save = dom%yelmo%dyn%par%beta_min
-                dom%yelmo%dyn%par%beta_min = 100.0_wp
-                call yelmo_update_equil(dom%yelmo, ts%time, time_tot=2e2_wp, dt=5.0_wp, &
-                                        topo_fixed=.FALSE.)
-                dom%yelmo%dyn%par%beta_min = beta_min_save
-            end if
+        ! Stabilize the dynamic fields with a raised beta_min.
+        if (dom%ctl%with_ice_sheet) then
+            beta_min_save = dom%yelmo%dyn%par%beta_min
+            dom%yelmo%dyn%par%beta_min = 100.0_wp
+            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=2e2_wp, dt=5.0_wp, &
+                                    topo_fixed=.FALSE.)
+            dom%yelmo%dyn%par%beta_min = beta_min_save
         end if
 
     end subroutine domain_init_lgm_north
@@ -1043,7 +1022,7 @@ contains
         ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
         ! Yelmo grid, so the correction is lifted to the Yelmo grid (tf_corr_y),
         ! optimized there, and remapped back to the shelf grid. At identity grids
-        ! both remaps are copies, reproducing yelmox.f90 exactly.
+        ! both remaps are copies.
         type(ice_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
@@ -1131,7 +1110,7 @@ contains
     ! called from step_icesheet (before yelmo_update) and from the init/restart
     ! paths (before yelmo_init_state), so the Yelmo boundary assembly lives in one
     ! place. Each is a no-op when its component is inactive. At identity grids the
-    ! remaps are copies, reproducing the pre-refactor behavior exactly.
+    ! remaps are copies.
 
     subroutine couple_isostasy_to_yelmo(dom)
         ! Bedrock + sea surface from isostasy (grid_isos -> Yelmo). Only the
@@ -1326,8 +1305,8 @@ contains
     subroutine negis_update_cb_ref(ylmo, ngs, time)
         ! Northeast Greenland Ice Stream cb_ref modification: recompute cb_ref from
         ! bed properties (calc_cb_ref), then scale the NEGIS basins (9.1/9.2/9.3)
-        ! by time-dependent factors. Ported from yelmox.f90. Requires the [negis]
-        ! cf_* parameters to be loaded; disabled by default (see domain_regions_init).
+        ! by time-dependent factors. Requires the [negis] cf_* parameters, loaded
+        ! in domain_init when [coupling] use_negis is set.
         type(yelmo_class),  intent(inout) :: ylmo
         type(negis_params), intent(inout) :: ngs
         real(wp),           intent(in)    :: time
@@ -1447,8 +1426,8 @@ contains
 
     subroutine calc_glacial_smb(smb, lat2D, ta_ann, ta_ann_pd)
         ! Reduce (scale up toward zero) negative surface mass balance during
-        ! glacial conditions, above a latitude limit. Ported verbatim from
-        ! yelmox.f90; the glacial index is derived from the domain-mean cooling.
+        ! glacial conditions, above a latitude limit. The
+        ! glacial index is derived from the domain-mean cooling.
         real(wp), intent(inout) :: smb(:,:)
         real(wp), intent(in)    :: lat2D(:,:)
         real(wp), intent(in)    :: ta_ann(:,:)

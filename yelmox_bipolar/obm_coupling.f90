@@ -1,7 +1,6 @@
 module obm_coupling
     ! Bipolar ocean coupling: exchanges scalars between an ice_domain (Yelmo +
-    ! snapclim) and the shared Ocean Box Model (OBM). Ported from
-    ! yelmox_bipolar.f90. This is a bridge module -- it sits above both
+    ! snapclim) and the shared Ocean Box Model (OBM). This is a bridge module -- it sits above both
     ! yelmox_domain (ice_domain) and the libs/obm ocean box model. It is only
     ! pertinent to the bipolar flavor, so it lives here next to its driver.
     !
@@ -236,8 +235,7 @@ contains
     subroutine update_bipolar_hyster_forcing(t, t0, obm, dt, branch_time_thr, &
                                              rate, forcing, forc_method)
         ! Hysteresis forcing for the nautilus box model: nudge one obm control
-        ! (phit/phin/fs/fn, or fn+fs) along a prescribed path. Ported verbatim
-        ! from yelmox_bipolar.f90.
+        ! (phit/phin/fs/fn, or fn+fs) along a prescribed path.
         real(wp),          intent(in)    :: t, t0
         type(obm_class),   intent(inout) :: obm
         real(wp),          intent(in)    :: dt
@@ -282,7 +280,7 @@ contains
         end select
     end subroutine update_bipolar_hyster_forcing
 
-    ! ----- private helpers (ported from yelmox_bipolar.f90) -----
+    ! ----- private helpers -----
 
     function series_interp(series_time, series_var, time) result(var)
         ! Linear interpolation of a (time, var) series at `time`.
@@ -322,7 +320,7 @@ contains
 
     function r8_normal_ab(a, b) result(val)
         ! Sample of a normal PDF with mean a, standard deviation b (Box-Muller).
-        ! Ported from yelmox_bipolar.f90 (John Burkardt, MIT license).
+        ! After John Burkardt (MIT license).
         real(wp), intent(in) :: a, b
         real(wp) :: val
 

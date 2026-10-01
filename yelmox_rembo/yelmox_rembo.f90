@@ -8,7 +8,7 @@ program yelmox_rembo
     ! REMBO on the domain grid and stages its smb/T_srf into the SMB carrier
     ! (dom%smb%ann), which couple_smb_to_yelmo lands on the Yelmo grid like any other
     ! module. Hysteresis forcing (dT) and REMBO itself are driver-owned (REMBO keeps
-    ! its module-global state rembo_ann); see yelmox_rembo/legacy for the original.
+    ! its module-global state rembo_ann).
 
     use nml
     use ncio

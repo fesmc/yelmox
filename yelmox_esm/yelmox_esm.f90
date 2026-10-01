@@ -4,7 +4,7 @@ program yelmox_esm
     ! Reuses the shared multigrid domain machinery (libs/yelmox_domain.f90) for
     ! everything except climate: one ice_domain with each sub-model on its own
     ! configurable grid, the hi-res topography hub, and the coupler maps. The
-    ! climate/ocean forcing comes from the ESM module (libs/esm.f90) rather than
+    ! climate/ocean forcing comes from the ESM module (libs/esm_forcing.f90) rather than
     ! snapclim, so the driver owns an esm_forcing_class and calls its own
     ! step_climate_esm / step_marine_shelf_esm in place of the snapclim-based
     ! step_climate / step_marine_shelf.
@@ -17,11 +17,11 @@ program yelmox_esm
     ! a step needs. marshelf_interp_shelf reads only mshlf%par (grid-agnostic), so
     ! the ESM ocean interpolation runs on grid_clim and the resulting T_shlf/S_shlf
     ! are remapped to grid_mshlf. With grid_clim == grid_smb == grid_mshlf ==
-    ! grid_yelmo == grid_name every remap is an identity copy, reproducing
-    ! yelmox_esm.f90; set grid_clim to a coarse ESM grid and it genuinely fans out.
+    ! grid_yelmo == grid_name every remap is an identity copy; set grid_clim to a
+    ! coarse ESM grid and it genuinely fans out.
     !
-    ! Output (yelmo / yelmo_sm / yelmo_ts_esm and the CMIP-formatted files) is kept
-    ! identical to yelmox_esm.f90 via yelmox_esm_output. See docs/multigrid.md.
+    ! Output (yelmo / yelmo_sm / yelmo_ts_esm and the CMIP-formatted files) is
+    ! written by yelmox_esm_output. See docs/multigrid.md.
 
     use nml
     use ncio
@@ -141,7 +141,7 @@ program yelmox_esm
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)
 
-    ! Sea level + isostasy output init (parity with yelmox_esm.f90; init only).
+    ! Sea level + isostasy output files (created only; not appended in the loop).
     call bsl_write_init(bsl, file_bsl, ts%time)
     call isos_write_init_extended(dom%isos, file_isos, ts%time)
 
@@ -282,10 +282,10 @@ contains
 
     ! ---------------------------------------------------------------------------
     subroutine esm_cold_start(dom, esm, ec, ts, bsl)
-        ! Build the initial boundary state for a cold start (no restart), mirroring
-        ! yelmox_esm.f90's initialization: isostasy reference/state, first climate
-        ! forcing, snowpack equilibration, Yelmo state init, optional shelf kill,
-        ! and (for the "opt" spinup) the Yelmo equilibration passes.
+        ! Build the initial boundary state for a cold start (no restart): isostasy
+        ! reference/state, first climate forcing, snowpack equilibration, Yelmo
+        ! state init, optional shelf kill, and (for the "opt" spinup) the Yelmo
+        ! equilibration passes.
         type(ice_domain),     intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params), intent(in)    :: ec

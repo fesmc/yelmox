@@ -15,7 +15,7 @@ program yelmox_bipolar
     ! ice_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
-    ! Per-step coupling order (matches yelmox_bipolar): shared sea level, then per
+    ! Per-step coupling order: shared sea level, then per
     ! domain spinup + isostasy, then one OBM step, then per domain ice sheet +
     ! climate, then the ocean exchanges (atm->obm, ism->obm freshwater flux,
     ! hysteresis forcing, obm->ism ocean temperature), then per domain marine

@@ -1,10 +1,7 @@
 module yelmox_esm_output
     ! Output writers for the multigrid ESM driver (yelmox_esm).
     !
-    ! Ported verbatim from yelmox_esm.f90's contained writers so the ESM driver
-    ! keeps identical NetCDF output. The two 2D writers that read the (program-
-    ! local) ctrl_params ESM/SMB switch now take an explicit use_smb logical
-    ! instead of host-associating it.
+    ! The two 2D writers take the ESM/SMB switch as an explicit use_smb logical.
     !
     !   write_step_2D_combined   standard heavy 2D output
     !   write_step_2D_small      small 2D output
