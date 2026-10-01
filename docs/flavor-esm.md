@@ -8,7 +8,7 @@ snapclim/smbpal** as the climate and ocean forcing. The driver owns an
 a first-class component on its own `grid_clim`, and remaps its fields onto the
 consumer grids just like any other module.
 
-- **Program:** `yelmox_esm/yelmox_esm.f90` + `yelmox_esm/yelmox_esm_output.f90` + `libs/yelmox_domain.f90`.
+- **Program:** `yelmox_esm/yelmox_esm.f90` + `yelmox_esm/yelmox_esm_output.f90` + `libs/kryos*.f90`.
 - **Build:** `make yelmox_esm`
 - **Config:** `yelmox_esm/yelmox_esm_Antarctica.nml` (and `..._nudge.nml`).
 

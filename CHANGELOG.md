@@ -8,6 +8,11 @@ annotated git tag. Dates are release (tag) dates.
 ### Changed
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
+- `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,
+  configuration, init, `remap`), `kryos_regions` (region-specific masks and
+  physics), `kryos_coupling` (`step_*`, `couple_*_to_yelmo`), `kryos_startup`
+  (cold start, restart bundles), `kryos_output` and `kryos_forcing` (`tsforcing`).
+  Code is moved unchanged; drivers import each name explicitly.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

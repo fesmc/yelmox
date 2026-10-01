@@ -46,7 +46,7 @@ $(objdir)/snapesm.o: $(libdir)/snapesm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # ---- Climate backend selection: snapclim (default) or snapesm ----------------
-# The backend-agnostic domain (yelmox_domain) reads dom%clim, filled by the
+# The backend-agnostic domain (kryos) reads dom%clim, filled by the
 # yelmox_climate adapter. Both adapter variants share the module name yelmox_climate;
 # CLIMATE selects which source (and backend object) is compiled. Build with e.g.
 #   make yelmox CLIMATE=snapesm
@@ -69,19 +69,39 @@ $(objdir)/yelmox_climate.o: $(yelmox_climate_src) $(objdir)/climate_out.o $(clim
 $(objdir)/htopo.o: $(libdir)/htopo.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# Multigrid coupling driver support (kryos_domain + step_* primitives)
-$(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o \
+# Kryos: the domain (kryos_domain + config + init + remap) and the modules built
+# on it -- region-specific physics, per-step coupling, cold start + restarts,
+# output, and the driver-owned transient forcing.
+$(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o \
 						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
 						$(objdir)/htopo.o \
-						$(objdir)/sediments.o $(objdir)/geothermal.o \
+						$(objdir)/sediments.o $(objdir)/geothermal.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+$(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o \
 						$(objdir)/ice_sub_regions.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
-# Bipolar ocean coupling: bridge over kryos_domain (yelmox_domain) + the obm box
-# model. Lives alongside the bipolar driver in yelmox_bipolar/ -- it is only
-# pertinent to that flavor -- and is linked via obm_libs (bipolar targets only).
-$(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/yelmox_domain.o \
+$(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
+						$(objdir)/kryos_regions.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+$(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
+
+$(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \
+						$(objdir)/kryos_regions.o $(objdir)/kryos_coupling.o \
+						$(objdir)/kryos_forcing.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+$(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+# Bipolar ocean coupling: bridge over kryos_domain + the obm box model. Lives
+# alongside the bipolar driver in yelmox_bipolar/ -- it is only pertinent to
+# that flavor -- and is linked via obm_libs (bipolar targets only).
+$(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
@@ -193,8 +213,13 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/yelmox_climate.o \
 					    $(climate_backend_obj) \
 						$(objdir)/htopo.o \
-						$(objdir)/yelmox_domain.o \
-						$(objdir)/ice_sub_regions.o
+						$(objdir)/ice_sub_regions.o \
+						$(objdir)/kryos.o \
+						$(objdir)/kryos_regions.o \
+						$(objdir)/kryos_coupling.o \
+						$(objdir)/kryos_forcing.o \
+						$(objdir)/kryos_startup.o \
+						$(objdir)/kryos_output.o
 
 # Ocean box model stack + its kryos_domain coupling bridge: bipolar-only, linked
 # on top of yelmox_libs by the yelmox_bipolar targets.

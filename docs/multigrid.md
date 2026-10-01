@@ -1,7 +1,9 @@
 # Multigrid coupling (`yelmox`)
 
 Design doc for a multigrid rewrite of the yelmox driver. Status: **implemented**
-(`yelmox.f90` + `libs/yelmox_domain.f90`); single-domain parity with
+(`yelmox.f90` + `libs/yelmox_domain.f90`, since split into the `libs/kryos*.f90`
+modules: `kryos`, `kryos_regions`, `kryos_coupling`, `kryos_startup`, `kryos_output`,
+`kryos_forcing`); single-domain parity with
 `yelmox.f90` validated, multi-domain (bipolar) runs, optimization + smb_simple +
 domain-specific startups ported. The bipolar driver (`yelmox_bipolar.f90`) also
 carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level

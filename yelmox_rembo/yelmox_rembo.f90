@@ -21,7 +21,18 @@ program yelmox_rembo
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
                                rembo_ann, rembo_restart_write
     use tsgen, only : tsgen_class
-    use yelmox_domain
+    use kryos,          only : kryos_domain, domain_init, remap
+    use kryos_regions,  only : domain_regions_init, domain_init_marine_ice
+    use kryos_coupling, only : step_optimize, step_isostasy, step_icesheet, &
+                               refresh_htopo, step_marine_shelf, couple_smb_to_yelmo, &
+                               couple_marine_to_yelmo
+    use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write, &
+                               restart_bundle_dir
+    use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
+                               tsforcing_kill, tsforcing_restart_read
+    use kryos_output,   only : domain_write_init, domain_write_step, &
+                               domain_write_init_sm, domain_write_step_sm, &
+                               domain_write_1D
     use yelmox_rembo_output
 
     implicit none

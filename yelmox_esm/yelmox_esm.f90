@@ -35,7 +35,12 @@ program yelmox_esm
     use marine_shelf, only : marshelf_update, marshelf_interp_shelf, ocn_variable_extrapolation
     use smbpal,       only : smbpal_update_monthly, smbpal_update_monthly_equil
 
-    use yelmox_domain
+    use kryos,          only : kryos_domain, domain_init, remap, cadence_due
+    use kryos_regions,  only : domain_regions_init
+    use kryos_coupling, only : step_optimize, step_isostasy, step_icesheet, &
+                               refresh_htopo, couple_smb_to_yelmo, &
+                               couple_marine_to_yelmo
+    use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write
     use yelmox_esm_output
 
     implicit none

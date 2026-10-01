@@ -12,7 +12,17 @@ program yelmox
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
-    use yelmox_domain
+    use kryos,          only : kryos_domain, domain_init
+    use kryos_regions,  only : domain_regions_init
+    use kryos_coupling, only : yelmox_step, step_climate, step_marine_shelf
+    use kryos_startup,  only : domain_startup, run_restart_write
+    use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
+                               tsforcing_kill, tsforcing_restart_due, &
+                               tsforcing_restart_fldr, tsforcing_restart_read, &
+                               tsforcing_write_step
+    use kryos_output,   only : domain_write_init, domain_write_step, &
+                               domain_write_init_sm, domain_write_step_sm, &
+                               domain_write_1D
 
     implicit none
 

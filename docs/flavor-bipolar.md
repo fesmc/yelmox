@@ -9,7 +9,7 @@ hemispheres. Each domain is a full `kryos_domain` (the same one the single-domai
 [`yelmox`](flavor-yelmox.md) uses); the driver interleaves the `step_*` primitives
 across both domains plus the OBM.
 
-- **Program:** `yelmox_bipolar/yelmox_bipolar.f90` + `yelmox_bipolar/obm_coupling.f90` + `libs/yelmox_domain.f90`.
+- **Program:** `yelmox_bipolar/yelmox_bipolar.f90` + `yelmox_bipolar/obm_coupling.f90` + `libs/kryos*.f90`.
 - **Build:** `make yelmox_bipolar` (links the OBM stack, `$(obm_libs)`).
 - **Config:** `yelmox_bipolar/yelmox_bipolar_Bipolar.nml`.
 

@@ -28,7 +28,15 @@ program yelmox_bipolar
     use timeout
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
-    use yelmox_domain
+    use kryos,          only : kryos_domain, domain_init
+    use kryos_regions,  only : domain_regions_init
+    use kryos_coupling, only : step_optimize, step_isostasy, step_icesheet, &
+                               refresh_htopo, step_climate, step_marine_shelf
+    use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
+                               restart_bundle_dir, restart_bundle_mkdir
+    use kryos_output,   only : domain_write_init, domain_write_step, &
+                               domain_write_init_sm, domain_write_step_sm, &
+                               domain_write_1D
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart

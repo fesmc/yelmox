@@ -7,7 +7,7 @@ ocean) and **smbpal** (surface mass balance), with FastIsostasy bedrock and a
 shared barystatic sea level. It is the reference implementation of the multigrid
 `kryos_domain` and the template the other flavors specialize.
 
-- **Program:** `yelmox/yelmox.f90` (thin driver) + `libs/yelmox_domain.f90` (all coupling).
+- **Program:** `yelmox/yelmox.f90` (thin driver) + `libs/kryos*.f90` (domain, coupling, startup, output).
 - **Build:** `make yelmox`
 - **Configs:** `yelmox/yelmox_<domain>.nml` (Antarctica, Greenland, North, LIS, Pyrenees, SRG, plus `pd_` present-day variants).
 

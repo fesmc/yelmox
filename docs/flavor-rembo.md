@@ -8,7 +8,7 @@ snapclim + smbpal atmosphere/SMB**. The ocean forcing still comes from snapclim.
 REMBO's SMB is staged into the shared SMB carrier so the generic
 `couple_smb_to_yelmo` lands it on the Yelmo grid like any other SMB module.
 
-- **Program:** `yelmox_rembo/yelmox_rembo.f90` + `yelmox_rembo/yelmox_rembo_output.f90` + `libs/yelmox_domain.f90`.
+- **Program:** `yelmox_rembo/yelmox_rembo.f90` + `yelmox_rembo/yelmox_rembo_output.f90` + `libs/kryos*.f90`.
 - **Build:** `make yelmox_rembo` (links the REMBO stack; prereq `rembo-static`).
 - **Configs:** `yelmox_rembo/yelmox_rembo_Greenland.nml` (main) + `yelmox_rembo/rembo_Greenland.nml` (REMBO's own parameters, staged into the run dir).
 

@@ -21,7 +21,7 @@ module obm_coupling
     use nml,           only : nml_read
     use ncio,          only : nc_read
     use yelmo,         only : wp
-    use yelmox_domain, only : kryos_domain
+    use kryos,         only : kryos_domain
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
     use ocean2ice,     only : calc_ocean_temperature_field
