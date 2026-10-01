@@ -6,6 +6,9 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- `input/`: yelmo input copies re-synced with yelmo kryos-init (`yelmo_defaults.nml`:
+  `yelmo.mask_border`; `yelmo-variables-ydyn.md`: `H_ice_solv`, `f_ice_solv`).
+  Requires a yelmo with these keys.
 - **New `[domain]` group defines the domain** (`[domain_north]`/`[domain_south]`
   in bipolar): `name`, the grid of every component (`grid_hub`, `grid_ice`,
   `grid_isos`, `grid_clim`, `grid_smb`, `grid_mshlf`; blank = default) and the
