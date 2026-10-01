@@ -22,7 +22,7 @@
     dt_clim         = 10.0     ! [yr] Frequency of snapclim (ocean) snapshot updates
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
-    ! Domain-specific switches (Greenland).
+    ! Optional switches.
     scale_glacial_smb       = False   ! Reduce negative glacial smb (snapclim-based; unused with REMBO)
     lim_pd_ice              = True    ! Extra melt outside PD ice extent
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)

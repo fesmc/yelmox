@@ -823,10 +823,10 @@
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
-    ! Domain-specific switches (Greenland only; keep False elsewhere).
-    scale_glacial_smb       = False   ! Reduce negative glacial smb (Greenland)
-    lim_pd_ice              = False   ! Extra melt outside PD ice extent (Greenland)
-    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
+    ! Optional switches.
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_south] group)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis_south] group)
     greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
@@ -1302,8 +1302,8 @@
     dt_clim         = 10.0
     restart    = "None"
 
-    ! Domain-specific switches (Greenland).
-    scale_glacial_smb       = False   ! Reduce negative glacial smb
+    ! Optional switches.
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_north] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
     greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start

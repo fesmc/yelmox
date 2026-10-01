@@ -397,8 +397,9 @@ pass (`timeout_check(...) .or. ts%is_finished`).
 The `[coupling<suffix>]` group is the single, complete description of a domain:
 every `domain_ctl` switch is a required key there (`with_ice_sheet`,
 `with_isostasy`, `with_climate`, `with_marine_shelf`, methods, cadences,
-per-component grids, restart, and the Greenland-specific startup switches --
-`use_negis=True` additionally loads a `[negis<suffix>]` group).
+per-component grids, restart, and the optional startup/physics switches --
+`use_negis=True` additionally loads a `[negis<suffix>]` group, `scale_glacial_smb=True`
+a `[glacial_smb<suffix>]` group).
 
 - **`yelmox`** (single domain) — argument is one domain nml; one `kryos_domain`,
   output to the run dir.

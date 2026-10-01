@@ -18,7 +18,7 @@
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
-    ! Domain-specific switches (Greenland only; keep False here).
+    ! Optional switches.
     scale_glacial_smb       = False
     lim_pd_ice              = False
     use_negis               = False

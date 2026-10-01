@@ -69,6 +69,11 @@ annotated git tag. Dates are release (tag) dates.
   restart). A Greenland cold start with `method = -1` and no optimization (e.g.
   `yelmox_esm_Greenland*.nml` with `equil_method = "none"`) now starts from
   Yelmo's `cb_ref = 1` fallback instead of 40.
+- `scale_glacial_smb` and `use_negis` apply to any domain, not only to one named
+  Greenland. `scale_glacial_smb = True` needs a `[glacial_smb]` group (`dt_lgm`,
+  `lat_lim`, `fac_lim`; were fixed at -8 K, 55°N, 0.9); `[negis]` gains
+  `basin_centre`/`basin_south`/`basin_north` (were fixed at 9.1/9.2/9.3). No par
+  file sets either switch.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

@@ -271,12 +271,12 @@ contains
         dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
         dom%yelmo%bnd%T_srf = tsrf_y
 
-        ! Glacial-smb modification (Greenland): reduce large negative smb toward a
+        ! Glacial-smb modification: reduce large negative smb toward a
         ! quasi glacial-interglacial index. Operates on the aggregated Yelmo-grid smb.
-        if (trim(dom%ctl%domain) == "Greenland" .and. dom%ctl%scale_glacial_smb) then
+        if (dom%ctl%scale_glacial_smb) then
             call remap(dom, dom%clim%now%ta_ann, gc, ta_y,    gy, "bilin")
             call remap(dom, dom%clim%ref%ta_ann, gc, ta_pd_y, gy, "bilin")
-            call calc_glacial_smb(dom%yelmo%bnd%smb, real(dom%yelmo%grd%lat,wp), ta_y, ta_pd_y)
+            call calc_glacial_smb(dom%yelmo%bnd%smb, real(dom%yelmo%grd%lat,wp), ta_y, ta_pd_y, dom%gsmb)
         end if
 
         ! Limit to present-day ice extent: impose extra melt (4 m ie/a) wherever
@@ -312,8 +312,8 @@ contains
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
-        ! Greenland NEGIS: update cb_ref from bed properties + NEGIS scaling.
-        if (trim(dom%ctl%domain) == "Greenland" .and. dom%ngs%use_negis_par) &
+        ! NEGIS: update cb_ref from bed properties + NEGIS scaling.
+        if (dom%ngs%use_negis_par) &
             call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time)
 
         if (.not. dom%ctl%with_ice_sheet) return

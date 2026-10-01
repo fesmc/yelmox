@@ -53,11 +53,11 @@ module kryos
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"
 
-        ! Domain-specific startup / physics switches ([coupling]; Greenland only).
+        ! Optional startup / physics switches ([coupling]).
         logical :: greenland_init_marine_H = .false.   ! impose LGM-like marine ice at start
-        logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb (Greenland)
-        logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent (Greenland/rembo)
-        logical :: use_negis               = .false.   ! NEGIS cb_ref modification (Greenland)
+        logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb ([glacial_smb] group)
+        logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent
+        logical :: use_negis               = .false.   ! NEGIS cb_ref modification ([negis] group)
 
         ! Which components are active in this domain's coupling sequence.
         logical :: with_ice_sheet    = .true.
@@ -105,7 +105,18 @@ module kryos
         real(wp) :: cf_north  = 1.0_wp
         real(wp) :: cf_south  = 1.0_wp
         real(wp) :: cf_x    = 1.0_wp
+        real(wp) :: basin_centre = 9.1_wp   ! basin codes of the NEGIS parts
+        real(wp) :: basin_south  = 9.2_wp
+        real(wp) :: basin_north  = 9.3_wp
     end type negis_params
+
+    ! Glacial smb scaling parameters: negative smb above lat_lim is reduced by
+    ! up to fac_lim, with a glacial index from the domain-mean cooling (dt_lgm = full glacial).
+    type glacial_smb_params
+        real(wp) :: dt_lgm  = -8.0_wp    ! [K] domain-mean cooling of a full glacial
+        real(wp) :: lat_lim = 55.0_wp    ! [deg] latitude above which smb is scaled
+        real(wp) :: fac_lim = 0.9_wp     ! [1] maximum reduction of negative smb
+    end type glacial_smb_params
 
     type kryos_domain
         type(yelmo_class)      :: yelmo
@@ -120,12 +131,13 @@ module kryos
         type(htopo_class)      :: topo    ! hi-res geometry reference hub
         type(coupler_class)    :: cpl     ! this region's grid resolution + map cache
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
-        type(negis_params)     :: ngs     ! Greenland NEGIS cb_ref modification
+        type(negis_params)     :: ngs     ! NEGIS cb_ref modification
+        type(glacial_smb_params) :: gsmb  ! glacial smb scaling
         type(domain_ctl)       :: ctl
     end type kryos_domain
 
     public :: MAP_FLDR
-    public :: domain_ctl, negis_params, kryos_domain
+    public :: domain_ctl, negis_params, glacial_smb_params, kryos_domain
     public :: domain_init
     public :: cadence_due
     ! remap is used by every coupling step, and by flavor drivers (e.g. the ESM
@@ -318,9 +330,10 @@ contains
         ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
         call domain_opt_init(dom, path_par, trim(sfx))
 
-        ! NEGIS cb_ref modification (Greenland): load its [negis] parameters when
-        ! enabled, so use_negis=True cannot silently run with default factors.
-        if (dom%ctl%use_negis) call negis_par_load(dom%ngs, path_par, trim(sfx))
+        ! NEGIS cb_ref modification and glacial smb scaling: load their groups
+        ! when enabled, so they cannot silently run with default parameters.
+        if (dom%ctl%use_negis)         call negis_par_load(dom%ngs, path_par, trim(sfx))
+        if (dom%ctl%scale_glacial_smb) call glacial_smb_par_load(dom%gsmb, path_par, trim(sfx))
 
     end subroutine domain_init
 
@@ -337,7 +350,22 @@ contains
         call nml_read(path_par, "negis"//trim(suffix), "cf_centre", ngs%cf_centre)
         call nml_read(path_par, "negis"//trim(suffix), "cf_north",  ngs%cf_north)
         call nml_read(path_par, "negis"//trim(suffix), "cf_south",  ngs%cf_south)
+        call nml_read(path_par, "negis"//trim(suffix), "basin_centre", ngs%basin_centre)
+        call nml_read(path_par, "negis"//trim(suffix), "basin_south",  ngs%basin_south)
+        call nml_read(path_par, "negis"//trim(suffix), "basin_north",  ngs%basin_north)
     end subroutine negis_par_load
+
+    subroutine glacial_smb_par_load(gsmb, path_par, suffix)
+        ! Load the glacial smb scaling parameters ([glacial_smb<suffix>]). Only
+        ! read when [coupling] scale_glacial_smb is set.
+        type(glacial_smb_params), intent(inout) :: gsmb
+        character(len=*),         intent(in)    :: path_par
+        character(len=*),         intent(in)    :: suffix
+
+        call nml_read(path_par, "glacial_smb"//trim(suffix), "dt_lgm",  gsmb%dt_lgm)
+        call nml_read(path_par, "glacial_smb"//trim(suffix), "lat_lim", gsmb%lat_lim)
+        call nml_read(path_par, "glacial_smb"//trim(suffix), "fac_lim", gsmb%fac_lim)
+    end subroutine glacial_smb_par_load
 
     subroutine domain_opt_init(dom, path_par, suffix)
         ! Load optimization parameters and prepare Yelmo for external cb_ref:
@@ -429,8 +457,8 @@ contains
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
 
-        ! Domain-specific startup / physics switches (Greenland only; keep False
-        ! elsewhere). use_negis additionally requires a [negis<suffix>] group.
+        ! Optional startup / physics switches. use_negis and scale_glacial_smb
+        ! additionally require a [negis<suffix>] / [glacial_smb<suffix>] group.
         call nml_read(path_par, gc, "scale_glacial_smb",       ctl%scale_glacial_smb)
         call nml_read(path_par, gc, "lim_pd_ice",              ctl%lim_pd_ice)
         call nml_read(path_par, gc, "use_negis",               ctl%use_negis)
