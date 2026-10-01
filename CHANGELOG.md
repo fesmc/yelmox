@@ -44,6 +44,12 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- SRG (Patagonia) runs again: `maps/grid_SRG-250M.txt` describes its grid (UTM
+  zone 18S, 250 m), which the multigrid setup needs. Isostasy is off by
+  default; when on, it runs on the new `SRG-16KM` grid (5x3 cells over the
+  domain; at 250 m the padded FFT domain did not fit in memory). Requires fesm-utils with the transverse Mercator
+  projection, and the `ice_data/SRG/SRG-250M` files with ascending `yc` (flipped
+  on 2026-10-01).
 - `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
   `obs_err_name` and `f_stdev` (startup stopped on the nml read).
 - `yelmox_esm_Antarctica.nml`: topography and geothermal heat flux read from
