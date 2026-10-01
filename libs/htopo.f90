@@ -1,20 +1,19 @@
 module htopo
-    ! Hi-resolution topography reference hub for multigrid yelmox.
+    ! Hi-resolution geometry hub of a domain (multigrid yelmox).
     !
-    ! htopo sits *above* all physics modules (including Yelmo): its grid is the
-    ! finest resolution in the setup, and it is the reference geometry that the
-    ! coupler remaps *from* when a coarser module needs z_bed/H_ice/z_srf/masks.
+    ! The hub sits *above* all physics modules (including Yelmo): its grid
+    ! (grid_hub) is the finest resolution in the setup, and it is the reference
+    ! geometry that the coupler remaps *from* when a coarser module needs
+    ! z_bed/H_ice/z_srf/masks.
     !
     ! Two provenance classes of field live here:
-    !   * regions, basins   -- static hi-res masks, loaded once from file;
+    !   * regions, basins   -- static hi-res code masks, loaded once from file;
     !   * z_bed, H_ice, z_srf -- dynamic geometry, loaded here as the initial
-    !     reference and (later) refreshed each step from Yelmo/isostasy.
+    !     reference and refreshed each step from the models (refresh_hub).
     !
-    ! Field paths are templated with {domain}/{grid_name} exactly like Yelmo's
-    ! boundary config, but resolved against htopo's own (highest-res) grid_name.
-    !
-    ! Status: loader only. Refresh-from-model and remap helpers come with the
-    ! coupling steps.
+    ! The file paths and variable names come from the domain definition
+    ! (&domain); {domain}/{grid_name} in the paths resolve to the domain name
+    ! and the hub grid.
 
     use nml
     use ncio
@@ -27,17 +26,13 @@ module htopo
 
     type htopo_par_class
         character(len=256) :: domain
-        character(len=256) :: grid_name = ""  ! reference grid, e.g. "ANT-16KM"; "" tracks the host grid
+        character(len=256) :: grid_name       ! hub grid (grid_hub), e.g. "ANT-16KM"
         character(len=512) :: topo_path
-        character(len=56)  :: name_z_bed
-        character(len=56)  :: name_H_ice
-        character(len=56)  :: name_z_srf
-        logical            :: basins_load    ! read basins from file? (else default 1.0)
-        character(len=512) :: basins_path
-        character(len=56)  :: name_basins
-        logical            :: regions_load   ! read regions from file? (else default 1.0)
-        character(len=512) :: regions_path
-        character(len=56)  :: name_regions
+        character(len=56)  :: topo_names(3)   ! z_bed, H_ice, z_srf
+        character(len=512) :: regions_path    ! "" = no file (regions = 1)
+        character(len=56)  :: regions_var
+        character(len=512) :: basins_path     ! "" = no file (basins = 1)
+        character(len=56)  :: basins_var
     end type
 
     type htopo_class
@@ -59,26 +54,22 @@ module htopo
 
 contains
 
-    subroutine htopo_init(htopo, filename, group, map_fldr, grid_default)
-        ! Load htopo parameters, resolve its grid from the disk grid table, and
-        ! read the reference fields onto that grid.
-        !
-        ! grid_default is the host's own grid (Yelmo's). A blank grid_name in
-        ! the namelist means "track it", so one resolution setting drives both
-        ! and no topography is remapped -- the same empty-string idiom that
-        ! [coupling] grid_isos / grid_clim / grid_smb / grid_mshlf use.
+    subroutine htopo_init(htopo, filename, group, domain, grid_name, map_fldr)
+        ! Load the hub's file paths from the domain definition, resolve its grid
+        ! from the disk grid table, and read the reference fields onto that grid.
         type(htopo_class), intent(out) :: htopo
         character(len=*),  intent(in)  :: filename   ! parameter file
-        character(len=*),  intent(in)  :: group      ! namelist group, e.g. "htopo"
+        character(len=*),  intent(in)  :: group      ! namelist group, e.g. "domain"
+        character(len=*),  intent(in)  :: domain     ! domain name
+        character(len=*),  intent(in)  :: grid_name  ! hub grid (grid_hub)
         character(len=*),  intent(in), optional :: map_fldr
-        character(len=*),  intent(in), optional :: grid_default
 
         character(len=256) :: mfldr
 
         mfldr = "maps"
         if (present(map_fldr)) mfldr = trim(map_fldr)
 
-        call htopo_par_load(htopo%par, filename, group, grid_default)
+        call htopo_par_load(htopo%par, filename, group, domain, grid_name)
 
         ! Topo grid definition (nx,ny + coordinates) from grid_<name>.txt.
         call grid_cdo_read_desc(htopo%grid, trim(htopo%par%grid_name), trim(mfldr))
@@ -93,53 +84,41 @@ contains
         allocate(htopo%f_grnd(htopo%nx,htopo%ny)); htopo%f_grnd = 0.0_wp
         allocate(htopo%z_sl(htopo%nx,htopo%ny));   htopo%z_sl   = 0.0_wp
 
-        call nc_read(htopo%par%topo_path,    htopo%par%name_z_bed,   htopo%z_bed)
-        call nc_read(htopo%par%topo_path,    htopo%par%name_H_ice,   htopo%H_ice)
-        call nc_read(htopo%par%topo_path,    htopo%par%name_z_srf,   htopo%z_srf)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(1), htopo%z_bed)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(2), htopo%H_ice)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(3), htopo%z_srf)
 
-        ! Static masks: load from file only when enabled, else default to a single
-        ! region/basin (1.0). Lets paleo domains without mask files run by setting
-        ! regions_load/basins_load = False (mirrors Yelmo core's yelmo_masks).
+        ! Static masks: load from file when a path is given, else default to a
+        ! single region/basin (1.0), so paleo domains without mask files run.
         htopo%regions = 1.0_wp
         htopo%basins  = 1.0_wp
-        if (htopo%par%regions_load) &
-            call nc_read(htopo%par%regions_path, htopo%par%name_regions, htopo%regions)
-        if (htopo%par%basins_load) &
-            call nc_read(htopo%par%basins_path,  htopo%par%name_basins,  htopo%basins)
+        if (len_trim(htopo%par%regions_path) > 0) &
+            call nc_read(htopo%par%regions_path, htopo%par%regions_var, htopo%regions)
+        if (len_trim(htopo%par%basins_path) > 0) &
+            call nc_read(htopo%par%basins_path,  htopo%par%basins_var,  htopo%basins)
 
     end subroutine htopo_init
 
-    subroutine htopo_par_load(par, filename, group, grid_default)
+    subroutine htopo_par_load(par, filename, group, domain, grid_name)
         type(htopo_par_class), intent(out) :: par
         character(len=*),      intent(in)  :: filename, group
-        character(len=*),      intent(in), optional :: grid_default
+        character(len=*),      intent(in)  :: domain, grid_name
 
-        call nml_read(filename, group, "domain",       par%domain)
-        call nml_read(filename, group, "grid_name",    par%grid_name)
+        par%domain    = trim(domain)
+        par%grid_name = trim(grid_name)
+
+        ! Blank paths read as "" (nml_read leaves the value untouched)
+        par%regions_path = ""
+        par%basins_path  = ""
+
         call nml_read(filename, group, "topo_path",    par%topo_path)
-        call nml_read(filename, group, "name_z_bed",   par%name_z_bed)
-        call nml_read(filename, group, "name_H_ice",   par%name_H_ice)
-        call nml_read(filename, group, "name_z_srf",   par%name_z_srf)
-        call nml_read(filename, group, "basins_load",  par%basins_load)
-        call nml_read(filename, group, "basins_path",  par%basins_path)
-        call nml_read(filename, group, "name_basins",  par%name_basins)
-        call nml_read(filename, group, "regions_load", par%regions_load)
+        call nml_read(filename, group, "topo_names",   par%topo_names)
         call nml_read(filename, group, "regions_path", par%regions_path)
-        call nml_read(filename, group, "name_regions", par%name_regions)
+        call nml_read(filename, group, "regions_var",  par%regions_var)
+        call nml_read(filename, group, "basins_path",  par%basins_path)
+        call nml_read(filename, group, "basins_var",   par%basins_var)
 
-        ! A blank grid_name tracks the host's grid, so that htopo reads its
-        ! reference topography natively and the hub <-> Yelmo maps are
-        ! identities. Applied before the paths below are templated.
-        if (len_trim(par%grid_name) == 0) then
-            if (.not. present(grid_default)) then
-                write(*,*) "htopo_par_load:: error: "//trim(group)//".grid_name is blank &
-                           &and no host grid was supplied to fall back on."
-                stop
-            end if
-            par%grid_name = trim(grid_default)
-        end if
-
-        ! Resolve {domain}/{grid_name} against htopo's own (highest-res) grid.
+        ! Resolve {domain}/{grid_name} against the hub grid.
         call parse_path(par%topo_path,    par%domain, par%grid_name)
         call parse_path(par%basins_path,  par%domain, par%grid_name)
         call parse_path(par%regions_path, par%domain, par%grid_name)

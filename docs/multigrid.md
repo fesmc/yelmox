@@ -237,7 +237,7 @@ contains
 
     subroutine domain_init(dom, path_par, ...)
         ! 1. init sub-models (Yelmo etc. on their own grids)
-        ! 2. htopo_init(dom%topo, path_par, "htopo")   ! hi-res reference hub
+        ! 2. htopo_init(dom%topo, path_par, "domain", ...)   ! hi-res reference hub
         ! 3. coupler_init(dom%cpl)                      ! grids resolve from maps/*.txt
         ! 4. prime known maps (fail fast, cost up front):
         !      coupler_prime(dom%cpl, ctl%grid_ice, ctl%grid_hub, "bilin")
@@ -280,37 +280,41 @@ contains
 end module yelmox_domain
 ```
 
-### Hi-res topography hub (htopo)
+### Domain definition (`[domain]`) and the hi-res hub (htopo)
 
-`htopo` sits *above* every physics module (including Yelmo): its grid is the
-finest resolution in the setup, and it is the reference geometry the coupler
-remaps *from*. On the topo grid it holds static masks `regions`/`basins` (loaded
-once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later refreshed
-each step from Yelmo/isostasy). It is configured by its own `[htopo]` namelist
-group, whose `domain`/`grid_name` name the highest-res level and drive the
-`{domain}/{grid_name}` path templating (`ctl%grid_hub` mirrors `[htopo]
-grid_name`):
+One `[domain]` group (`[domain_north]`/`[domain_south]` in bipolar) defines the
+domain: its name, the grid of every component, and the hub's topography and code
+masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer sets
+`domain`/`grid_name`). A blank component grid takes its default:
 
 ```
-&htopo
-    domain       = "Antarctica"
-    grid_name    = "ANT-16KM"
+&domain
+    name         = "Antarctica"
+    grid_hub     = "ANT-16KM"   ! hi-res geometry hub
+    grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
+    grid_isos    = ""           ! isostasy                             [grid_ice]
+    grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
+    grid_smb     = ""           ! surface mass balance                 [grid_clim]
+    grid_mshlf   = ""           ! marine shelf                         [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    name_z_bed   = "z_bed"   name_H_ice = "H_ice"   name_z_srf = "z_srf"
-    basins_load  = True
+    topo_names   = "z_bed" "H_ice" "z_srf"
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
+    regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    basins_var   = "basin"
 /
 ```
 
-`htopo_init` resolves the grid from `grid_<name>.txt` (the disk grid table) and
-reads the fields onto it — validated by `tests/test_htopo.f90` against the real
-ANT-16KM data. Set `basins_load`/`regions_load = False` (mirroring Yelmo core's
-`[yelmo_masks]`) when a domain has no mask file — e.g. paleo domains; the field
-defaults to `1.0` (single region/basin) and the path is left unread.
+`htopo` holds the hub. It sits *above* every physics module (including Yelmo):
+its grid (`grid_hub`) is the finest resolution in the setup, and it is the
+reference geometry the coupler remaps *from*. On the hub grid it holds static
+code masks `regions`/`basins` (loaded once) and geometry `z_bed`/`H_ice`/`z_srf`
+(initial reference, later refreshed each step from Yelmo/isostasy).
+`{domain}/{grid_name}` in the paths resolve to `name`/`grid_hub`. `htopo_init`
+resolves the grid from `grid_<name>.txt` (the disk grid table) and reads the
+fields onto it — validated by `tests/test_htopo.f90` against the real ANT-16KM
+data. A blank mask path (e.g. paleo domains without mask files) leaves the mask
+at `1.0` (single region/basin).
 
 ### Buffers
 
@@ -437,7 +441,7 @@ end program
   `yelmox_esm.f90`; set `grid_clim` to a coarse ESM grid and it genuinely fans out.
   Config splits ESM-specific control ([esm] + the run_step group
   [spinup]/[transient]: `time_ref/hist/proj/esm_ref`, `use_*`, CMIP output) from
-  the shared mg groups ([coupling]/[output]/[htopo]). Output (incl. the
+  the shared mg groups ([domain]/[coupling]/[output]). Output (incl. the
   CMIP-formatted files) is kept identical to `yelmox_esm.f90` via the
   `yelmox_esm_output` module (in the same folder). Invoke with
   `runme -e esm -n yelmox_esm/yelmox_esm_Antarctica.nml`.
@@ -483,7 +487,7 @@ end program
    `dp`/`sp`/`int` variants. `remap` provides matching `dp`/`sp`/`int` × 2d/3d
    wrappers under one generic interface, each calling the generic `map_field`.
    *(Done.)*
-3. **Grid names** are sourced from `domain_ctl` (and `[htopo]`) as the source of
+3. **Grid names** are sourced from `domain_ctl` (read from `[domain]`) as the source of
    truth for `remap` keys.
 4. **Conservative area basis.** `"con"` weights on projected cell area — sanity
    check mass conservation of `z_bed`/`bmb` aggregation on a real grid pair before

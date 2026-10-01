@@ -7,12 +7,12 @@ program test_htopo
     implicit none
 
     type(htopo_class) :: ht
-    type(htopo_class) :: ht_blank
+    type(htopo_class) :: ht_nomask
     integer :: fails
 
     fails = 0
 
-    call htopo_init(ht, "tests/test_htopo.nml", "htopo", map_fldr="maps")
+    call htopo_init(ht, "tests/test_htopo.nml", "domain", "Antarctica", "ANT-16KM", map_fldr="maps")
 
     write(*,*) "htopo grid   : "//trim(ht%par%grid_name), " nx,ny =", ht%nx, ht%ny
     write(*,*) "z_bed  range :", minval(ht%z_bed),   maxval(ht%z_bed)
@@ -34,21 +34,16 @@ program test_htopo
         write(*,*) "FAIL: basins look empty"; fails = fails + 1
     end if
 
-    ! A blank grid_name must adopt the host grid handed in as grid_default,
-    ! so that one resolution setting drives both and no topography is remapped.
-    call htopo_init(ht_blank, "tests/test_htopo_blank.nml", "htopo", map_fldr="maps", &
-                    grid_default="ANT-16KM")
+    ! Blank mask paths: no mask files are read and the masks default to 1.
+    call htopo_init(ht_nomask, "tests/test_htopo.nml", "domain_nomask", "Antarctica", "ANT-16KM", &
+                    map_fldr="maps")
 
-    write(*,*) "blank grid_name resolves to: "//trim(ht_blank%par%grid_name)
-
-    if (trim(ht_blank%par%grid_name) /= "ANT-16KM") then
-        write(*,*) "FAIL: blank grid_name did not track grid_default"; fails = fails + 1
+    if (minval(ht_nomask%regions) /= 1.0 .or. maxval(ht_nomask%regions) /= 1.0 .or. &
+        minval(ht_nomask%basins)  /= 1.0 .or. maxval(ht_nomask%basins)  /= 1.0) then
+        write(*,*) "FAIL: blank mask paths did not give masks of 1"; fails = fails + 1
     end if
-    if (ht_blank%nx /= ht%nx .or. ht_blank%ny /= ht%ny) then
-        write(*,*) "FAIL: blank grid_name gave a different grid size"; fails = fails + 1
-    end if
-    if (maxval(abs(ht_blank%z_bed - ht%z_bed)) /= 0.0) then
-        write(*,*) "FAIL: blank grid_name read different topography"; fails = fails + 1
+    if (maxval(abs(ht_nomask%z_bed - ht%z_bed)) /= 0.0) then
+        write(*,*) "FAIL: blank mask paths changed the topography"; fails = fails + 1
     end if
 
     if (fails > 0) stop 1

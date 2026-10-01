@@ -19,10 +19,6 @@
     equil_method    = "none"   ! "none", "relax", "opt"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
-    grid_mshlf = "PYR-1KM"     ! marine-shelf grid (== grid_yelmo)
-    grid_isos  = "PYR-1KM"     ! isostasy grid      (== grid_yelmo)
-    grid_clim  = "PYR-1KM"     ! climate grid       (== grid_yelmo)
-    grid_smb   = "PYR-1KM"     ! smb grid           (== grid_clim)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
     ! Domain-specific switches (Greenland only; keep False here).
@@ -41,21 +37,25 @@
     write_htopo = True
 /
 
-&htopo
-    domain       = "Pyrenees"
-    grid_name    = ""              ! "" tracks the Yelmo grid (topo read natively, no remapping)
+&domain
+    ! Domain definition: name, the grid of every component, and the hub's
+    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Pyrenees"
+    grid_hub     = "PYR-1KM"          ! hi-res geometry hub
+    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_isos    = "PYR-1KM"          ! isostasy [grid_ice]
+    grid_clim    = "PYR-1KM"          ! reference climate + transient forcing [grid_ice]
+    grid_smb     = "PYR-1KM"          ! surface mass balance [grid_clim]
+    grid_mshlf   = "PYR-1KM"          ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
-    name_z_bed   = "z_bed"
-    name_H_ice   = "H_ice"
-    name_z_srf   = "z_srf"
+    topo_names   = "z_bed" "H_ice" "z_srf"  ! z_bed, H_ice, z_srf
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
+    regions_var  = "mask"
     ! No basins field for this domain (basins are consumed only by marine_shelf,
-    ! which is off here); skip the load and default basins to 1.0.
-    basins_load  = False
-    basins_path  = "none"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    ! which is off here); no file, so basins default to 1.0.
+    basins_path  = ""                 ! "" = none (basins = 1)
+    basins_var   = "basin"
 /
 
 &tm_1D
@@ -112,8 +112,7 @@
 /
 
 &yelmo
-    domain          = "Pyrenees"
-    grid_name       = "PYR-1KM"
+    ! domain and grid_name come from &domain
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions

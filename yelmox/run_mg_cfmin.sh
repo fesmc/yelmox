@@ -33,9 +33,9 @@ run_case() {
     local ygrid="$1" mgrid="$2"
     local out="$OUTROOT/y${ygrid#ANT-}_m${mgrid#ANT-}"
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
-        -p yelmo.grid_name="$ygrid" htopo.grid_name="$mgrid" \
-           coupling.grid_mshlf="$mgrid" coupling.grid_isos="$ygrid" \
-           coupling.grid_clim=ANT-32KM coupling.grid_smb="$ygrid" \
+        -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
+           domain.grid_mshlf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_smb="$ygrid" \
            ctrl.time_end=25e3 \
            tm_2D.dt=1000 ytopo.gz_Hg1=100 \
            ytill.cf_min="$CFMIN"

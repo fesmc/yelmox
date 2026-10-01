@@ -4,7 +4,7 @@ resolution=ANT-16KM
 output_path=output_albedo/ismip7/${resolution}/opt-l21-bedmap3
 
 ctrl_params=(
-    "yelmo.grid_name=${resolution}"
+    "domain.grid_hub=${resolution}"
     "isos.rheology_file=isostasy_data/earth_structure/yelmo/${resolution}_GIA_HR24.nc"
     "ctrl.run_step=spinup"
     "esm.use_smb=True"

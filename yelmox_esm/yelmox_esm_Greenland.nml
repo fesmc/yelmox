@@ -132,8 +132,7 @@
 /
 
 &yelmo
-    domain          = "Greenland"
-    grid_name       = "GRL-8KM"
+    ! domain and grid_name come from &domain
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
@@ -641,25 +640,27 @@
     restart    = "None"
 /
 
-&htopo
-    ! Hi-res geometry hub. grid_name = the reference (finest) grid; the coupler
-    ! remaps from it. For ESM parity keep it equal to the Yelmo grid (identity).
-    domain       = "Greenland"
-    grid_name    = ""              ! "" tracks the Yelmo grid (topo read natively, no remapping)
+&domain
+    ! Domain definition: name, the grid of every component, and the hub's
+    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Greenland"
+    grid_hub     = "GRL-8KM"          ! hi-res geometry hub
+    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_isos    = ""                 ! isostasy [grid_ice]
+    grid_clim    = ""                 ! reference climate + transient forcing [grid_ice]
+    grid_smb     = ""                 ! surface mass balance [grid_clim]
+    grid_mshlf   = ""                 ! marine shelf [grid_hub]
     topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    name_z_bed   = "bed"
-    name_H_ice   = "thickness"
-    name_z_srf   = "surface_grimp"
-    basins_load  = True
-    basins_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    name_basins  = "mouginot_basins"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    topo_names   = "bed" "thickness" "surface_grimp"  ! z_bed, H_ice, z_srf
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
+    regions_var  = "mask"
+    basins_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"  ! "" = none (basins = 1)
+    basins_var   = "mouginot_basins"
 /
 
 &coupling
-    ! Domain setup: active components + methods, per-component grids, restart.
+    ! Coupling: active components + methods, restart.
     ! Empty grids default to the Yelmo grid, so esm (grid_clim), smbpal
     ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
@@ -671,10 +672,6 @@
     equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates (unused: esm forcing)
-    grid_clim  = ""            ! esm grid (esm's own working grid); default = grid_yelmo
-    grid_smb   = ""            ! smb grid; default = grid_clim
-    grid_mshlf = ""            ! marine-shelf grid; default = grid_name (= Yelmo grid here)
-    grid_isos  = ""            ! isostasy grid; default = grid_yelmo
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
     ! Domain-specific switches (Greenland only; keep False elsewhere).

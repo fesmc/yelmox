@@ -64,13 +64,14 @@ module kryos
         logical :: with_marine_shelf = .true.
         logical :: with_climate      = .true.
 
-        ! Domain + grid names (the source of truth for remap keys).
+        ! Domain name + grid of every component ([domain]; the source of truth
+        ! for remap keys). A blank component grid takes its default.
         character(len=256) :: domain     = ""   ! e.g. "Antarctica"
-        character(len=256) :: grid_hub   = ""   ! hi-res reference (htopo), highest res
-        character(len=256) :: grid_ice   = ""   ! Yelmo grid
-        character(len=256) :: grid_mshlf = ""   ! marine-shelf grid ([coupling]; default = grid_hub)
+        character(len=256) :: grid_hub   = ""   ! hi-res geometry hub, highest res
+        character(len=256) :: grid_ice   = ""   ! Yelmo grid (default = grid_hub)
+        character(len=256) :: grid_mshlf = ""   ! marine-shelf grid (default = grid_hub)
         real(wp) :: dx_mshlf = 0.0_wp           ! marine-shelf grid spacing (Yelmo dx units)
-        character(len=256) :: grid_isos = ""    ! isostasy grid ([coupling]; default = grid_ice)
+        character(len=256) :: grid_isos = ""    ! isostasy grid (default = grid_ice)
         real(wp) :: dx_isos = 0.0_wp            ! isostasy grid spacing in x (Yelmo dx units)
         real(wp) :: dy_isos = 0.0_wp            ! isostasy grid spacing in y (Yelmo dy units)
         ! grid_clim sets the grid of BOTH the reference climatology (often from a
@@ -78,9 +79,9 @@ module kryos
         ! a coarser climate model). A coarse grid_clim matches the forcing but
         ! loses detail of the high-res reference. Until the two get separate
         ! grids, set grid_clim to the highest-resolution climate input.
-        character(len=256) :: grid_clim = ""    ! climate grid ([coupling]; default = grid_ice)
+        character(len=256) :: grid_clim = ""    ! climate grid (default = grid_ice)
         real(wp) :: dx_clim = 0.0_wp            ! climate grid spacing (Yelmo dx units)
-        character(len=256) :: grid_smb = ""     ! smb grid ([coupling]; default = grid_clim)
+        character(len=256) :: grid_smb = ""     ! smb grid (default = grid_clim)
 
         ! Restart bundle folder ([coupling]); "None" = cold start.
         character(len=512) :: restart = "None"
@@ -153,6 +154,10 @@ contains
         ! driver-owned object (one per run, common to every domain), so it is
         ! initialized by the driver and passed into the isostasy steps.
         !
+        ! The domain definition ([domain]: name, component grids, hub topography
+        ! and masks) is read first; Yelmo gets the domain name and its grid
+        ! from it.
+        !
         ! group_suffix (optional, default "") is appended to every namelist group
         ! name (yelmo -> yelmo<suffix>, coupling -> coupling<suffix>, ...), so
         ! several domains can share one parameter file with disjoint group names
@@ -193,19 +198,17 @@ contains
         tgroup = "ctrl"
         if (present(timeline_group)) tgroup = trim(timeline_group)
 
-        ! --- run control ---
+        ! --- domain definition + run control ---
         call domain_ctl_load(dom%ctl, path_par, trim(sfx), trim(tgroup))
+        domain = trim(dom%ctl%domain)
 
-        ! --- ice sheet (grid read from file) ---
+        ! --- ice sheet (on grid_ice; grid read from file) ---
         call yelmo_init(dom%yelmo, filename=path_par, grid_def="file", time=time, &
+                        domain=domain, grid_name=dom%ctl%grid_ice, &
                         group="yelmo"//trim(sfx))
-        domain = trim(dom%yelmo%par%domain)
-        dom%ctl%domain     = trim(domain)
-        dom%ctl%grid_ice = trim(dom%yelmo%par%grid_name)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
-        ! Isostasy on its configured grid ([coupling] grid_isos; default = grid_ice).
-        if (len_trim(dom%ctl%grid_isos) == 0) dom%ctl%grid_isos = trim(dom%ctl%grid_ice)
+        ! Isostasy on its configured grid (grid_isos).
         call grid_cdo_read_desc(grid_i, trim(dom%ctl%grid_isos),  MAP_FLDR)
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         nx_i = grid_i%G%nx
@@ -217,28 +220,24 @@ contains
                        dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%yelmo%bnd%cnst)
 
         call sediments_init(dom%sed, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
-                            domain, dom%yelmo%par%grid_name, group="sed"//trim(sfx))
+                            domain, dom%ctl%grid_ice, group="sed"//trim(sfx))
         dom%yelmo%bnd%H_sed = dom%sed%now%H
 
         call geothermal_init(dom%gthrm, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
-                             domain, dom%yelmo%par%grid_name, group="ghf"//trim(sfx))
+                             domain, dom%ctl%grid_ice, group="ghf"//trim(sfx))
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
 
-        ! --- hi-res reference hub + coupler ---
-        call htopo_init(dom%topo, path_par, "htopo"//trim(sfx), &
-                        grid_default=dom%ctl%grid_ice)
-        dom%ctl%grid_hub = trim(dom%topo%par%grid_name)
-        if (len_trim(dom%ctl%grid_mshlf) == 0) dom%ctl%grid_mshlf = trim(dom%ctl%grid_hub)
+        ! --- hi-res geometry hub (topography + masks from [domain]) + coupler ---
+        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), domain, dom%ctl%grid_hub)
 
         ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
         call coupler_init(dom%cpl)
         call coupler_prime(dom%cpl, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
         call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
 
-        ! --- climate on its configured grid ([coupling] grid_clim; default = grid_ice) ---
+        ! --- climate on its configured grid (grid_clim) ---
         ! snapclim reads grid-specific input data, so grid_clim must be a grid whose
         ! forcing files exist (the Yelmo grid for the standard setup).
-        if (len_trim(dom%ctl%grid_clim) == 0) dom%ctl%grid_clim = trim(dom%ctl%grid_ice)
         call grid_cdo_read_desc(grid_c, trim(dom%ctl%grid_clim), MAP_FLDR)
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny
@@ -249,9 +248,8 @@ contains
                               nx_c, ny_c, time, basins_c, group="snap"//trim(sfx))
         end if
 
-        ! --- smb on its configured grid ([coupling] grid_smb; default = grid_clim) ---
+        ! --- smb on its configured grid (grid_smb) ---
         ! smbpal reads no grid-specific data; only lats (insolation) is physical.
-        if (len_trim(dom%ctl%grid_smb) == 0) dom%ctl%grid_smb = trim(dom%ctl%grid_clim)
         call grid_cdo_read_desc(grid_s, trim(dom%ctl%grid_smb), MAP_FLDR)
         nx_s = grid_s%G%nx
         ny_s = grid_s%G%ny
@@ -349,18 +347,18 @@ contains
     end subroutine domain_opt_init
 
     subroutine domain_ctl_load(ctl, path_par, suffix, timeline_group)
-        ! Load this domain's setup + coupling + output config. All groups carry an
-        ! optional domain suffix (e.g. "_north"), so several domains can coexist in
-        ! one parameter file without group.name collisions (matters for runme -p).
-        ! The shared timeline is driver-owned (tstep_init); the values the
-        ! domain logic needs (tstep_method, dtt) are read from the same
-        ! timeline_group here, so nothing is injected after init.
+        ! Load this domain's definition + coupling + output config. All groups
+        ! carry an optional domain suffix (e.g. "_north"), so several domains can
+        ! coexist in one parameter file without group.name collisions (matters
+        ! for runme -p). The shared timeline is driver-owned (tstep_init); the
+        ! values the domain logic needs (tstep_method, dtt) are read from the
+        ! same timeline_group here, so nothing is injected after init.
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(in)    :: timeline_group
 
-        character(len=256) :: gc, go
+        character(len=256) :: gd, gc, go
 
         ctl%path_par = trim(path_par)
 
@@ -369,9 +367,31 @@ contains
         call nml_read(path_par, timeline_group, "tstep_method", ctl%tstep_method)
         call nml_read(path_par, timeline_group, "dtt",          ctl%dtt)
 
-        ! Domain setup + coupling ([coupling<suffix>]): active components, methods,
-        ! per-component grids, restart bundle. The restart cadence is the
-        ! driver's [tm_rst] timeout.
+        ! Domain definition ([domain<suffix>]): name and the grid of every
+        ! component. The hub's topography and masks are read by htopo_init.
+        gd = "domain"//trim(suffix)
+        call nml_read(path_par, gd, "name",     ctl%domain)
+        call nml_read(path_par, gd, "grid_hub", ctl%grid_hub)
+        ctl%grid_ice   = ""
+        ctl%grid_isos  = ""
+        ctl%grid_clim  = ""
+        ctl%grid_smb   = ""
+        ctl%grid_mshlf = ""
+        call nml_read(path_par, gd, "grid_ice",   ctl%grid_ice)
+        call nml_read(path_par, gd, "grid_isos",  ctl%grid_isos)
+        call nml_read(path_par, gd, "grid_clim",  ctl%grid_clim)
+        call nml_read(path_par, gd, "grid_smb",   ctl%grid_smb)
+        call nml_read(path_par, gd, "grid_mshlf", ctl%grid_mshlf)
+
+        ! A blank component grid takes its default.
+        if (len_trim(ctl%grid_ice)   == 0) ctl%grid_ice   = trim(ctl%grid_hub)
+        if (len_trim(ctl%grid_isos)  == 0) ctl%grid_isos  = trim(ctl%grid_ice)
+        if (len_trim(ctl%grid_clim)  == 0) ctl%grid_clim  = trim(ctl%grid_ice)
+        if (len_trim(ctl%grid_smb)   == 0) ctl%grid_smb   = trim(ctl%grid_clim)
+        if (len_trim(ctl%grid_mshlf) == 0) ctl%grid_mshlf = trim(ctl%grid_hub)
+
+        ! Coupling ([coupling<suffix>]): active components, methods, restart
+        ! bundle. The restart cadence is the driver's [tm_rst] timeout.
         gc = "coupling"//trim(suffix)
         call nml_read(path_par, gc, "with_ice_sheet",    ctl%with_ice_sheet)
         call nml_read(path_par, gc, "with_isostasy",     ctl%with_isostasy)
@@ -389,14 +409,6 @@ contains
         call nml_read(path_par, gc, "use_negis",               ctl%use_negis)
         call nml_read(path_par, gc, "greenland_init_marine_H", ctl%greenland_init_marine_H)
 
-        ctl%grid_mshlf = ""
-        call nml_read(path_par, gc, "grid_mshlf",     ctl%grid_mshlf)
-        ctl%grid_isos = ""
-        call nml_read(path_par, gc, "grid_isos",      ctl%grid_isos)
-        ctl%grid_clim = ""
-        call nml_read(path_par, gc, "grid_clim",      ctl%grid_clim)
-        ctl%grid_smb = ""
-        call nml_read(path_par, gc, "grid_smb",       ctl%grid_smb)
         ctl%restart = "None"
         call nml_read(path_par, gc, "restart",        ctl%restart)
 

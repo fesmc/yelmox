@@ -4,7 +4,7 @@ resolution=GRL-8KM
 output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp
 
 ctrl_params=(
-    "yelmo.grid_name=${resolution}"
+    "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
     "esm.use_smb=True"
     "coupling.equil_method=opt"

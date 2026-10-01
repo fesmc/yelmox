@@ -4,7 +4,7 @@ resolution=ANT-16KM
 output_path=output_albedo/1pctCO2/opt-${resolution}-l21-bedmap3
 
 ctrl_params=(
-    "yelmo.grid_name=${resolution}"
+    "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
     "esm.use_smb=False"
     "coupling.equil_method=opt"

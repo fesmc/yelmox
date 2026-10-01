@@ -59,7 +59,7 @@ case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
       -p ctrl.run_step=spinup esm.experiment=ctrl esm.esm_name="$GCM" \
-         yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+         domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
@@ -67,7 +67,7 @@ case "${1:-}" in
       runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.use_esm=True esm.use_hist=False esm.use_proj=True \
-           yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+           domain.grid_hub="$GRID" \
            coupling.restart="$BUNDLE" \
            transient.time_init="$PROJ_INIT" transient.time_end="$PROJ_END"
     done

@@ -11,7 +11,7 @@
 /
 
 &coupling
-    ! Domain setup: active components + methods, per-component grids, restart.
+    ! Coupling: active components + methods, restart.
     ! REMBO is single-grid (Greenland): every component runs on GRL-16KM.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
@@ -20,10 +20,6 @@
     equil_method    = "none"   ! "none", "relax", "opt" (legacy optimize=False -> none)
     smb_method      = "smbpal" ! REMBO stages its smb into the smbpal carrier (dom%smb%ann)
     dt_clim         = 10.0     ! [yr] Frequency of snapclim (ocean) snapshot updates
-    grid_mshlf = "GRL-16KM"    ! marine-shelf grid (== grid_yelmo)
-    grid_isos  = "GRL-16KM"    ! isostasy grid      (== grid_yelmo)
-    grid_clim  = "GRL-16KM"    ! climate/REMBO grid (== grid_yelmo)
-    grid_smb   = "GRL-16KM"    ! smb grid           (== grid_clim)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
     ! Domain-specific switches (Greenland).
@@ -33,19 +29,23 @@
     greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
-&htopo
-    domain       = "Greenland"
-    grid_name    = ""              ! "" tracks the Yelmo grid (topo read natively, no remapping)
+&domain
+    ! Domain definition: name, the grid of every component, and the hub's
+    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Greenland"
+    grid_hub     = "GRL-16KM"         ! hi-res geometry hub
+    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_isos    = "GRL-16KM"         ! isostasy [grid_ice]
+    grid_clim    = "GRL-16KM"         ! reference climate + transient forcing [grid_ice]
+    grid_smb     = "GRL-16KM"         ! surface mass balance [grid_clim]
+    grid_mshlf   = "GRL-16KM"         ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17-v5.nc"
-    name_z_bed   = "z_bed"
-    name_H_ice   = "H_ice"
-    name_z_srf   = "z_srf"
-    basins_load  = True
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    topo_names   = "z_bed" "H_ice" "z_srf"  ! z_bed, H_ice, z_srf
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
+    regions_var  = "mask"
+    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
+    basins_var   = "basin"
 /
 
 &output
@@ -143,8 +143,7 @@
 /
 
 &yelmo
-    domain          = "Greenland"
-    grid_name       = "GRL-16KM"
+    ! domain and grid_name come from &domain
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions

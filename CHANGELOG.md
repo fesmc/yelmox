@@ -6,6 +6,16 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- **New `[domain]` group defines the domain** (`[domain_north]`/`[domain_south]`
+  in bipolar): `name`, the grid of every component (`grid_hub`, `grid_ice`,
+  `grid_isos`, `grid_clim`, `grid_smb`, `grid_mshlf`; blank = default) and the
+  hub's topography and code masks (`topo_path`, `topo_names`, `regions_path`/`_var`,
+  `basins_path`/`_var`; a blank mask path gives a mask of 1). It replaces
+  `[htopo]`, the `grid_*` keys of `[coupling]` and `domain`/`grid_name` in
+  `[yelmo]` (Yelmo gets them from `[domain]`). All par files and run scripts are
+  migrated (`yelmo.grid_name`/`htopo.grid_name` -> `domain.grid_ice`/`grid_hub`,
+  `coupling.grid_*` -> `domain.grid_*`); results are unchanged. The hub grid
+  no longer tracks the Yelmo grid: `grid_ice = ""` tracks the hub instead.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

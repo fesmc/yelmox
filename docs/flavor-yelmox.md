@@ -22,7 +22,7 @@ shared barystatic sea level. It is the reference implementation of the multigrid
 | Sub-shelf melt | marine_shelf | `grid_mshlf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
 
-Each module runs on its own configurable grid; the coupler remaps fields between
+Each module runs on its own grid, set in `[domain]`; the coupler remaps fields between
 grids at the moment of coupling. See [Multigrid coupling](multigrid.md).
 
 ## Stepping order

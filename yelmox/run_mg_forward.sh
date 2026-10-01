@@ -53,9 +53,9 @@ run_fwd() {
     fi
 
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
-        -p yelmo.grid_name="$ygrid" htopo.grid_name="$mgrid" \
-           coupling.grid_mshlf="$mgrid" coupling.grid_isos="$ygrid" \
-           coupling.grid_clim=ANT-32KM coupling.grid_smb="$ygrid" \
+        -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
+           domain.grid_mshlf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_smb="$ygrid" \
            coupling.restart="$restart" coupling.equil_method=none \
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \
