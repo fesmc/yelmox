@@ -21,3 +21,5 @@
 | 17 | H_ice_ref         | xc, yc      | m           | Reference ice thickness for relaxation routines        |
 | 18 | z_bed_ref         | xc, yc      | m           | Reference bedrock elevation for relaxation routines    |
 | 19 | mask_ice          | xc, yc      | -           | Ice mask (0=none, 1=fixed, 2=dynamic)                  |
+| 20 | z_bed_n           | xc, yc      | m           | Bedrock elevation at the previous yelmo_update call    |
+| 21 | z_sl_n            | xc, yc      | m           | Sea level at the previous yelmo_update call            |
