@@ -40,6 +40,10 @@ annotated git tag. Dates are release (tag) dates.
 ### Fixed
 - `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
   `obs_err_name` and `f_stdev` (startup stopped on the nml read).
+- `yelmox_esm_Antarctica.nml`: topography and geothermal heat flux read from
+  the current `{grid}_TOPO-BedMachine.nc` and `{grid}_GHF-HR24.nc` (the old
+  `TOPO_BedMachineAntarctica-v3` and `GHF-M17` files are no longer in
+  `ice_data`).
 - `scripts/1pctCO2/opt_ant.sh`: `resolution` now sets `yelmo.grid_name`
   (it only named the output folder).
 - `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb
