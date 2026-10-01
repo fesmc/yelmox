@@ -23,6 +23,15 @@ annotated git tag. Dates are release (tag) dates.
   entry; `""` = none, 0). Par files take the name from `yelmo_init_topo`, except
   where that was not a bed-roughness field (`bed`, `bed_bedmap3`, `H_ice`,
   `none`), which become `""`. SRG keeps `z_bed_err`.
+- **Yelmo is populated from the domain.** Its grid comes from
+  `maps/grid_<grid_ice>.txt`, and the hub topography, remapped conservatively to
+  `grid_ice`, is both its initial topography and its present-day reference
+  (`H_ice_ref`, `z_bed_ref`, optimization target). Par files drop `yelmo.grid_path`,
+  `yelmo_init_topo.init_topo_load/path/names` and `yelmo_data.pd_topo_load/path/names`.
+  Unchanged where `grid_ice = grid_hub`; where they differ (yelmox Antarctica,
+  bipolar south: Yelmo 32 km, hub 16 km) Yelmo starts from the remapped 16 km
+  topography instead of its own 32 km files. `f_grnd_pin` (diagnostic) changes
+  where `z_bed_sd` was read from a non-roughness field. Requires yelmo kryos-init.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

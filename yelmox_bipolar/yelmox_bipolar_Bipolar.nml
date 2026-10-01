@@ -385,8 +385,7 @@
 /
 
 &yelmo_south
-    ! domain and grid_name come from &domain_south
-    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    ! domain, grid_name and the grid come from &domain_south
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     nml_ytopo       = "ytopo"
@@ -431,9 +430,7 @@
 /
 
 &yelmo_init_topo_south
-    init_topo_load    = True 
-    init_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    init_topo_names   = "H_ice" "z_bed" "z_bed_sd" "z_srf"      ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The initial topography comes from the hub ([domain_south])
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -442,9 +439,7 @@
 /
 
 &yelmo_data_south
-    pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The present-day topography comes from the hub ([domain_south])
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc" 
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
@@ -874,8 +869,7 @@
 /
 
 &yelmo_north
-    ! domain and grid_name come from &domain_north
-    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    ! domain, grid_name and the grid come from &domain_north
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     nml_ytopo       = "ytopo"
@@ -920,9 +914,7 @@
 /
 
 &yelmo_init_topo_north
-    init_topo_load    = True 
-    init_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    init_topo_names   = "H_ice" "z_bed" "z_bed_sd" "z_srf"      ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The initial topography comes from the hub ([domain_north])
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -931,9 +923,7 @@
 /
 
 &yelmo_data_north
-    pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The present-day topography comes from the hub ([domain_north])
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)

@@ -22,7 +22,7 @@ module kryos
 
     use nml,          only : nml_read
     use coords,       only : grid_class, grid_cdo_read_desc
-    use yelmo,        only : yelmo_class, wp, yelmo_init
+    use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_init_grid, ytopo_input_class
     use marine_shelf, only : marshelf_class, marshelf_init
     use fastisostasy, only : isos_class, isos_init
     use climate_out,    only : climate_out_class
@@ -155,8 +155,9 @@ contains
         ! initialized by the driver and passed into the isostasy steps.
         !
         ! The domain definition ([domain]: name, component grids, hub topography
-        ! and masks) is read first; Yelmo gets the domain name and its grid
-        ! from it.
+        ! and masks) is read first and the hub loaded. Yelmo is then populated
+        ! from the domain like the other components: its grid, and its initial
+        ! and present-day topography remapped from the hub.
         !
         ! group_suffix (optional, default "") is appended to every namelist group
         ! name (yelmo -> yelmo<suffix>, coupling -> coupling<suffix>, ...), so
@@ -188,6 +189,7 @@ contains
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
         real(wp), allocatable :: xs(:), ys(:), lats_s(:,:), Href_s(:,:)
+        type(ytopo_input_class) :: topo_y
 
         sfx = ""
         if (present(group_suffix)) sfx = trim(group_suffix)
@@ -202,15 +204,32 @@ contains
         call domain_ctl_load(dom%ctl, path_par, trim(sfx), trim(tgroup))
         domain = trim(dom%ctl%domain)
 
-        ! --- ice sheet (on grid_ice; grid read from file) ---
-        call yelmo_init(dom%yelmo, filename=path_par, grid_def="file", time=time, &
+        ! --- hi-res geometry hub (topography + masks from [domain]) + coupler ---
+        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), domain, dom%ctl%grid_hub)
+
+        ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
+        call coupler_init(dom%cpl)
+        call coupler_prime(dom%cpl, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
+        call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
+
+        ! --- ice sheet on grid_ice, with the hub's topography ---
+        ! The hub topography is both Yelmo's initial state and its present-day
+        ! reference (H_ice_ref, z_bed_ref, optimization target).
+        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
+        call yelmo_init_grid(dom%yelmo%grd, grid_y)
+
+        call remap(dom, dom%topo%z_bed,    dom%ctl%grid_hub, topo_y%z_bed,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%H_ice,    dom%ctl%grid_hub, topo_y%H_ice,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%z_srf,    dom%ctl%grid_hub, topo_y%z_srf,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%z_bed_sd, dom%ctl%grid_hub, topo_y%z_bed_sd, dom%ctl%grid_ice, "con")
+
+        call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
-                        group="yelmo"//trim(sfx))
+                        group="yelmo"//trim(sfx), topo_init=topo_y, topo_pd=topo_y)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
         ! Isostasy on its configured grid (grid_isos).
         call grid_cdo_read_desc(grid_i, trim(dom%ctl%grid_isos),  MAP_FLDR)
-        call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         nx_i = grid_i%G%nx
         ny_i = grid_i%G%ny
         ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
@@ -226,14 +245,6 @@ contains
         call geothermal_init(dom%gthrm, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
                              domain, dom%ctl%grid_ice, group="ghf"//trim(sfx))
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
-
-        ! --- hi-res geometry hub (topography + masks from [domain]) + coupler ---
-        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), domain, dom%ctl%grid_hub)
-
-        ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
-        call coupler_init(dom%cpl)
-        call coupler_prime(dom%cpl, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
-        call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
 
         ! --- climate on its configured grid (grid_clim) ---
         ! snapclim reads grid-specific input data, so grid_clim must be a grid whose

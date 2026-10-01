@@ -317,6 +317,14 @@ validated by `tests/test_htopo.f90` against the real ANT-16KM data. A blank
 mask path (e.g. paleo domains without mask files) leaves the mask at `1.0`
 (single region/basin); a blank `z_bed_sd` name leaves it at `0`.
 
+Yelmo is populated from the domain like the other components. Its grid comes
+from `maps/grid_<grid_ice>.txt` (`yelmo_init_grid`, `grid_def="none"`), and the
+hub's `z_bed`/`H_ice`/`z_srf`/`z_bed_sd`, remapped conservatively to `grid_ice`,
+are both its initial topography and its present-day reference (`yelmo_init`
+`topo_init`/`topo_pd`). Yelmo then processes them as it would its own files
+(`[yelmo_init_topo]` keeps `init_topo_state`, `z_bed_f_sd`, smoothing; its
+`grad_lim_zb` applies). Where `grid_ice = grid_hub` the remap is a copy.
+
 ### Buffers
 
 Fields that cross a grid boundary land in **step-local allocatables** (e.g.
