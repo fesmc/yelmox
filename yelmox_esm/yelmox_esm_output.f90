@@ -47,6 +47,9 @@ contains
 
         ! Local variables
         integer  :: ncid, n
+        logical  :: south
+
+        south = (trim(ylmo%par%domain) .eq. "Antarctica")
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -247,7 +250,7 @@ contains
         ! ESM Atmospheric boundary fields            
         call nc_write(filename,"t2m_ann",esm%t2m_ann+SUM(esm%dts, dim=3)/12.0,units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"t2m_sum",esm%t2m_sum+0.333*(esm%dts(:,:,12)+esm%dts(:,:,1)+esm%dts(:,:,2)),units="K",long_name="Near-surface air temperature (sum)", &
+        call nc_write(filename,"t2m_sum",esm%t2m_sum+esm_summer_mean(esm%dts,south),units="K",long_name="Near-surface air temperature (sum)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dts_ann",SUM(esm%dts, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -408,6 +411,9 @@ contains
 
         ! Local variables
         integer  :: ncid, n
+        logical  :: south
+
+        south = (trim(ylmo%par%domain) .eq. "Antarctica")
 
         ! Open the file for writing
         call nc_open(filename,ncid,writable=.TRUE.)
@@ -450,9 +456,9 @@ contains
 
         ! === yelmo forcing ===
         ! ESM Atmospheric boundary fields            
-        call nc_write(filename,"t2m_ann",esm%t2m_ann+esm%dts(:,:,1),units="K",long_name="Near-surface air temperature (ann)", &
+        call nc_write(filename,"t2m_ann",esm%t2m_ann+SUM(esm%dts, dim=3)/12.0,units="K",long_name="Near-surface air temperature (ann)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        call nc_write(filename,"t2m_sum",esm%t2m_sum+esm%dts(:,:,1),units="K",long_name="Near-surface air temperature (sum)", &
+        call nc_write(filename,"t2m_sum",esm%t2m_sum+esm_summer_mean(esm%dts,south),units="K",long_name="Near-surface air temperature (sum)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"dts",SUM(esm%dts, dim=3)/12.0,units="K",long_name="Surface air temperature anomaly", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -601,12 +607,12 @@ contains
     
         ! Atmosphere (averaged over all ice)
         if (npts_tot .gt. 0.0) then
-            t2m_1d     = sum(esm%t2m_ann + esm%dts(:,:,1),      mask=mask_tot) / npts_tot
-            pr_1d      = sum(sum(esm%pr*esm%dpr, dim=3)/12.0_wp, mask=mask_tot) / npts_tot
-            dt_1d      = sum(esm%dts(:,:,1),                     mask=mask_tot) / npts_tot
-            dpr_1d     = sum(100.0_wp * esm%dpr(:,:,1),          mask=mask_tot) / npts_tot
-            dt_var_1d  = sum(esm%dts_var(:,:,1),                 mask=mask_tot) / npts_tot
-            dpr_var_1d = sum(100.0_wp * esm%dpr_var(:,:,1),      mask=mask_tot) / npts_tot
+            t2m_1d     = sum(esm%t2m_ann + sum(esm%dts, dim=3)/12.0_wp,  mask=mask_tot) / npts_tot
+            pr_1d      = sum(sum(esm%pr*esm%dpr, dim=3)/12.0_wp,          mask=mask_tot) / npts_tot
+            dt_1d      = sum(sum(esm%dts, dim=3)/12.0_wp,                 mask=mask_tot) / npts_tot
+            dpr_1d     = sum(100.0_wp * sum(esm%dpr, dim=3)/12.0_wp,      mask=mask_tot) / npts_tot
+            dt_var_1d  = sum(sum(esm%dts_var, dim=3)/12.0_wp,             mask=mask_tot) / npts_tot
+            dpr_var_1d = sum(100.0_wp * sum(esm%dpr_var, dim=3)/12.0_wp,  mask=mask_tot) / npts_tot
         else
             t2m_1d = 0.0_wp; pr_1d = 1.0_wp; dt_1d = 0.0_wp; dpr_1d = 1.0_wp
             dt_var_1d = 0.0_wp; dpr_var_1d = 0.0_wp

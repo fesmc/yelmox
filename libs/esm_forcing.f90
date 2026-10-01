@@ -158,6 +158,7 @@ module esm_forcing
     public :: esm_forcing_update
     public :: esm_variability_update
     public :: esm_clim_update
+    public :: esm_summer_mean
     
     public :: esm_write_init
 
@@ -467,15 +468,29 @@ contains
             esm%pr_ann  = sum(esm%pr,dim=3) / 12.0
         end if
 
-        if(south) then
-            esm%t2m_sum = (esm%t2m(:,:,1)+esm%t2m(:,:,2)+esm%t2m(:,:,12)) / 3.0
-        else
-            esm%t2m_sum = (esm%t2m(:,:,6)+esm%t2m(:,:,7)+esm%t2m(:,:,8)) / 3.0
-        end if      
+        esm%t2m_sum = esm_summer_mean(esm%t2m, south)
 
         return
 
     end subroutine esm_clim_update
+
+    function esm_summer_mean(var, south) result(var_sum)
+        ! Mean of a monthly field over the summer months: DJF in the southern
+        ! hemisphere, JJA in the northern.
+
+        implicit none
+
+        real(wp), intent(IN) :: var(:,:,:)
+        logical,  intent(IN) :: south
+        real(wp) :: var_sum(size(var,1),size(var,2))
+
+        if (south) then
+            var_sum = (var(:,:,1)+var(:,:,2)+var(:,:,12)) / 3.0
+        else
+            var_sum = (var(:,:,6)+var(:,:,7)+var(:,:,8)) / 3.0
+        end if
+
+    end function esm_summer_mean
 
     subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.

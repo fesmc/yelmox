@@ -75,6 +75,11 @@ annotated git tag. Dates are release (tag) dates.
 - `yelmox_esm` output: `pr_ann` (2D) and `pr_1d` (time series) were the
   precipitation in mm/d times 1e-3, labelled m/a, with only the January anomaly
   factor. Now the annual mean of `pr*dpr`, in mm/d.
+- `yelmox_esm` output: the monthly anomalies entered `t2m_ann`/`t2m_sum` (small
+  2D file) and `t2m_1d`, `dt_1d`, `dpr_1d`, `dt_var_1d`, `dpr_var_1d` with January
+  only, and `t2m_sum` (2D file) with the DJF mean (scaled by 0.333) also in the
+  north. Now annual means, and summer means of the hemisphere (DJF south, JJA
+  north; new `esm_summer_mean`, also used for `esm%t2m_sum`).
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
