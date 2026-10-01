@@ -64,6 +64,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `input/esm/esm_ant_ismip7.nml`: the SMB reference (`gcm_smb_ref`, read with
+  `esm.use_smb = True`) is the RACMO2.3 monthly climatology `{grid}_RACMO23-VW23.nc`;
+  the ERA5 1979-2022 file it pointed to has no `smb`.
 - `check_isostasy_reference` compares the two reference bedrocks on the isostasy
   grid, where Yelmo's `z_bed_ref` is remapped exactly as the isostasy reference was
   built: the same bedrock agrees to round-off on any isostasy grid (max |diff| <=
