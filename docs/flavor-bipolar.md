@@ -22,7 +22,9 @@ across both domains plus the OBM.
   (`bsl_startup`) and written to the run-root restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
-  (`obm_masks_init`, `obm_exchange`). The OBM writes its own 1D output and restart.
+  (`obm_masks_init`, `obm_exchange`). The OBM writes its own 1D output; its restart
+  (`obm_restart.nc`) goes into the run-root restart bundle next to `bsl_restart.nc`
+  and is read back from `[ctrl] restart_bsl`.
 
 Climate/SMB per domain is still **snapclim + smbpal**, exactly as in the
 single-domain driver; the OBM's contribution is folded into the ocean forcing —

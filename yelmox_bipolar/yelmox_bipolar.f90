@@ -49,7 +49,7 @@ program yelmox_bipolar
     ! Shared, driver-owned ocean box model + its coupling control (obm_coupling).
     type(obm_class)        :: obox      ! ocean box model state ("obm" is the module name)
     type(obm_coupling_ctl) :: oc
-    character(len=512)     :: obm_file, obm_file_restart
+    character(len=512)     :: obm_file, obm_restart
 
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
     logical             :: do_2D, do_2Dsm, do_1D, do_rst
@@ -74,8 +74,8 @@ program yelmox_bipolar
     call obm_ctl_load(oc, path_par)
 
     ! === Shared, driver-owned barystatic sea level (one per run, common to both
-    !     domains, exactly as in yelmox_bipolar). Restored once from a run-level
-    !     bsl_restart.nc ([ctrl] restart_bsl) when restarting. ===
+    !     domains). Restored once from the run-level restart bundle ([ctrl]
+    !     restart_bsl, which also holds the OBM restart) when restarting. ===
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
     call nml_read(path_par, "ctrl", "restart_bsl", restart_bsl)
@@ -88,11 +88,13 @@ program yelmox_bipolar
     ! Hydrographic masks (Yelmo grid) restricting the freshwater flux per domain.
     call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
 
-    ! === Ocean box model init + output file ===
+    ! === Ocean box model init (from the run-level bundle when restarting) +
+    !     output file ===
     if (oc%active_obm) then
-        obm_file         = trim(oc%obm_name)//".nc"
-        obm_file_restart = trim(oc%obm_name)//"_restart.nc"
-        call obm_init(obox, path_par, oc%obm_name)
+        obm_file    = trim(oc%obm_name)//".nc"
+        obm_restart = "None"
+        if (trim(restart_bsl) /= "None") obm_restart = trim(restart_bsl)//"/obm_restart.nc"
+        call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
     end if
 
@@ -123,11 +125,13 @@ program yelmox_bipolar
         if (active_south) call write_domain_step(dom_south, outfldr_south)
         if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
 
-        ! Shared bsl (+ obm) restart at the run root, next to the domain bundles.
+        ! Run-level restart bundle at the run root (shared bsl + obm), next to
+        ! the per-domain bundles.
         if (do_rst) then
             call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-            if (oc%active_obm) call write_obm_restart(obox, obm_file_restart, ts%time, "years")
+            if (oc%active_obm) call write_obm_restart(obox, &
+                    trim(restart_bundle_dir(ts%time))//"/obm_restart.nc", ts%time, "years")
         end if
 
         if (ts%is_finished) exit

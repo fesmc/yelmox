@@ -20,7 +20,7 @@
 
     active_north    = True              ! Run the Northern-Hemisphere domain?
     active_south    = True              ! Run the Southern-Hemisphere domain?
-    restart_bsl     = "None"            ! Shared bsl restart bundle folder, or "None"
+    restart_bsl     = "None"            ! Run-level restart bundle folder (bsl + obm), or "None"
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
     active_obm       = False            ! Run the shared ocean box model?
@@ -85,10 +85,6 @@
     hyster_forcing_method = "triangular"     ! "linear", "triangular", "sin", "noise"
     hyster_rate = 0.0                        ! rate (amplitude for "sin"/"noise")
     hyster_positive_branch_time = 0.0        ! branch time (period for "sin")
-
-    ! ctrl
-    use_restart = False
-    restart = "none"
 
     ! Constants
     specific_heat_capacity = 4000       ! [Jkg-1C-1] Specific heat capacity of seawater
