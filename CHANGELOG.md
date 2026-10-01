@@ -60,6 +60,12 @@ annotated git tag. Dates are release (tag) dates.
   fesm-utils with `varslice_sub_mean`.
 - `esm_forcing_init`: a transient ocean field whose layout (rank, extent, depth
   levels) differs from its ESM reference stops with an error.
+- `yelmox_esm` Greenland: `dT_shlf` was `T_shlf + dto`, i.e. the absolute shelf
+  temperature (K) plus `dto` again, so with `tf_method=2` (`bmb_method="anom"`)
+  `tf_shlf` was ~274 and shelf melt hundreds of m/yr. `dT_shlf`/`dS_shlf` are
+  now the anomalies `dto + dto_var` / `dso + dso_var` for every domain, and the
+  Greenland-only override of `tf_method` is gone (the par files set it).
+  Antarctica (`tf_method=1`) is unchanged. Greenland ESM spin-ups need re-running.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
