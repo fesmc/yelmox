@@ -25,6 +25,16 @@ annotated git tag. Dates are release (tag) dates.
   (namelist form); `tstep_due` renamed `cadence_due` (only `dt_clim` and the
   esm CMIP output use it).
 
+- `input/`: yelmo input copies re-synced with yelmo:dev (`yelmo_defaults.nml`,
+  `yelmo-variables-{ydyn,ytopo}.md`; added `elsa_defaults.nml`,
+  `tracer_defaults.nml`). Par files drop `ydyn.scale_T` / `ydyn.T_frz`
+  (no longer read by yelmo).
+
+### Fixed
+- `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb
+  and marine-shelf forcing are rebuilt before the first step (as in
+  `yelmox_esm`/`yelmox_rembo`); the bundle does not hold them.
+
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
 

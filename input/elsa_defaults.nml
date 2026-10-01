@@ -1,0 +1,21 @@
+! elsa_defaults.nml
+!
+! Default values (the schema) for the elsa namelist group. Every elsa parameter
+! must appear here. A run's own namelist need only list the entries it overrides;
+! anything omitted falls back to the value below. nml_validate flags any user
+! parameter not declared here (catches typos). The user group may be named
+! anything (e.g. "greenland"); it is aliased onto this canonical "elsa" group.
+!
+! Read by elsa_par_load via nml_read(..., defaults_file="input/elsa_defaults.nml",
+! defaults_group="elsa"). Keep a synchronized copy in any host's input/ directory
+! (e.g. yelmo/input/) so it is found at run time.
+
+&elsa
+    n_layers_init    = 10          ! [1]  initialization layers
+    layer_resolution = 200.0       ! [yr] add an isochrone this often
+    layer_file       = "None"      ! [-]  or an explicit list of isochrone times
+    grid_factor      = 1.0         ! [1]  coarsen the host grid by this factor
+    dt_coupling      = 50.0        ! [yr] elsa update interval
+    cfl              = 0.9         ! [1]  advection sub-step target
+    allow_pos_bmb    = False       ! [-]  let freeze-on thicken the bottom layer
+/
