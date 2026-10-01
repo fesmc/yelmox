@@ -12,6 +12,9 @@
     region_names = "APIS" "WAIS" "EAIS"
     region_mask  = "sectors"
     region_codes = 3.0 1.0 2.0
+    relax_codes_mode = "none"
+    relax_codes  = ""
+    relax_tau    = 0.0
 /
 &domain_nomask
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
@@ -27,6 +30,9 @@
     region_names = ""
     region_mask  = "regions"
     region_codes = ""
+    relax_codes_mode = "none"
+    relax_codes  = ""
+    relax_tau    = 0.0
 /
 &domain_gaps
     topo_path    = "test_htopo_gaps.nc"
@@ -42,4 +48,7 @@
     region_names = ""
     region_mask  = "regions"
     region_codes = ""
+    relax_codes_mode = "none"
+    relax_codes  = ""
+    relax_tau    = 0.0
 /

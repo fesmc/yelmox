@@ -54,11 +54,16 @@ annotated git tag. Dates are release (tag) dates.
   and in Yelmo. Par files: Antarctica `exclude 2.0`, APIS/WAIS/EAIS = sectors
   3/1/2 of `BASINS-nasa mask_regions`; Greenland `include 1.3 1.11 1.0`;
   Laurentide `exclude 1.30`, Hudson = regions 1.12, `yelmo.mask_border = "none"`;
-  North `exclude 1.0`; others `all`. Patagonia configs need `ice_codes_mode =
-  "all"` (its `tau_relax` and the Greenland `till_method = -1` start stay in
-  `domain_regions_init` until region physics becomes configurable). Physics is
+  North `exclude 1.0`; others `all`. Physics is
   unchanged where `grid_ice = grid_hub`; Yelmo's `basins`/`regions` output
   changes where its own files differed (Antarctica `basin_reese` -> `basin`).
+- **Relaxation to the reference from the domain.** `[domain]` gains
+  `relax_codes_mode` (`none`, `all`, `include`, `exclude`), `relax_codes` (codes of
+  `regions`) and `relax_tau`: Yelmo's `tau_relax` is `relax_tau` where selected and
+  -1 (free) elsewhere, used with `ytopo.topo_rel = -1`. It replaces the Patagonia
+  case of `domain_regions_init`, which no config reached since the domain was
+  renamed SRG. `yelmox_SRG.nml`: `exclude 1.0`, 50 yr (the icefield evolves freely,
+  the rest relaxes, as the Patagonia case did); all other par files `none`.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

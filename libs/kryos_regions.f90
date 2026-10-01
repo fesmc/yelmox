@@ -59,14 +59,6 @@ contains
                 if (dom%yelmo%dyn%par%till_method == -1) &
                     dom%yelmo%dyn%now%cb_ref = dom%yelmo%dyn%par%till_cf_ref
 
-            case("Patagonia")
-                ! Relax to obs outside the icefield.
-                where(abs(dom%yelmo%bnd%regions - 1.0) < 1e-3)
-                    dom%yelmo%bnd%tau_relax = -1.0      ! icefield: free evolution
-                elsewhere
-                    dom%yelmo%bnd%tau_relax = 50.0      ! outside: relax to H_ice_ref
-                end where
-
         end select
 
         ! Name the regional 1D files (no grid suffix; grid is recorded in-file):

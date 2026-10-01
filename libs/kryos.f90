@@ -33,7 +33,7 @@ module kryos
     use ice_optimization, only : ice_opt_params, optimize_par_load
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
-    use htopo,        only : htopo_class, htopo_init, htopo_ice_allowed
+    use htopo,        only : htopo_class, htopo_init, htopo_ice_allowed, htopo_relax_tau
     use coupler,      only : coupler_class, coupler_init, coupler_prime, cpl_remap => remap
 
     implicit none
@@ -239,6 +239,9 @@ contains
                         domain=domain, grid_name=dom%ctl%grid_ice, &
                         group="yelmo"//trim(sfx), regions=regions_y, basins=basins_y, &
                         mask_ice=mask_ice_y, topo_init=topo_y, topo_pd=topo_y)
+
+        ! Where the ice relaxes to the reference (ytopo.topo_rel = -1).
+        dom%yelmo%bnd%tau_relax = htopo_relax_tau(dom%topo%par, regions_y)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
         ! Isostasy on its configured grid (grid_isos).

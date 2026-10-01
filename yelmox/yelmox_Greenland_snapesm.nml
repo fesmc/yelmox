@@ -741,6 +741,9 @@
     region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
     region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
     region_codes = ""                ! one code per named region
+    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
+    relax_codes  = ""                ! codes of regions ("" = none)
+    relax_tau    = 0.0               ! [yr] relaxation timescale there
 /
 
 &coupling

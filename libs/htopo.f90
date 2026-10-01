@@ -15,7 +15,8 @@ module htopo
     ! The file paths and variable names come from the domain definition
     ! (&domain); {domain}/{grid_name} in the paths resolve to the domain name
     ! and the hub grid. The domain definition also says where ice is allowed
-    ! (ice_codes of `regions`) and names the regions of interest for 1D output
+    ! (ice_codes of `regions`), where it relaxes to the reference (relax_codes
+    ! of `regions`), and names the regions of interest for 1D output
     ! (region_names/region_codes of one code mask).
 
     use nml
@@ -51,7 +52,11 @@ module htopo
         character(len=56)  :: region_names(n_codes_max)   ! named regions ("" = none)
         character(len=16)  :: region_mask     ! code mask of the named regions: regions | basins | sectors
         real(wp)           :: region_codes(n_codes_max)   ! one code per named region
+        character(len=16)  :: relax_codes_mode ! where ice relaxes to the reference: none | all | include | exclude
+        real(wp)           :: relax_codes(n_codes_max)    ! codes of `regions`
+        real(wp)           :: relax_tau       ! [yr] relaxation timescale there
         integer            :: n_ice_codes     ! number of ice_codes given
+        integer            :: n_relax_codes   ! number of relax_codes given
         integer            :: n_regions       ! number of named regions
     end type
 
@@ -72,7 +77,7 @@ module htopo
     end type
 
     public :: htopo_class, htopo_init
-    public :: htopo_ice_allowed, htopo_region_codes
+    public :: htopo_ice_allowed, htopo_relax_tau, htopo_region_codes
     public :: htopo_write_init, htopo_write_step
 
 contains
@@ -141,24 +146,52 @@ contains
         real(wp),              intent(in) :: regions(:,:)
         logical :: allowed(size(regions,1),size(regions,2))
 
+        allowed = codes_match(par%ice_codes_mode, par%ice_codes(1:par%n_ice_codes), regions)
+
+    end function htopo_ice_allowed
+
+    function htopo_relax_tau(par, regions) result(tau)
+        ! Relaxation timescale of the ice toward the reference (Yelmo tau_relax,
+        ! used with ytopo.topo_rel = -1), from the region codes on any grid:
+        ! relax_tau where relax_codes_mode selects, -1 (free) elsewhere.
+        type(htopo_par_class), intent(in) :: par
+        real(wp),              intent(in) :: regions(:,:)
+        real(wp) :: tau(size(regions,1),size(regions,2))
+
+        tau = -1.0_wp
+        where (codes_match(par%relax_codes_mode, par%relax_codes(1:par%n_relax_codes), regions)) &
+            tau = par%relax_tau
+
+    end function htopo_relax_tau
+
+    function codes_match(mode, codes, mask) result(match)
+        ! Cells of a code mask selected by mode: "none", "all", "include" (only
+        ! on codes) or "exclude" (everywhere but codes).
+        character(len=*), intent(in) :: mode
+        real(wp),         intent(in) :: codes(:)
+        real(wp),         intent(in) :: mask(:,:)
+        logical :: match(size(mask,1),size(mask,2))
+
         integer :: k
 
-        select case(trim(par%ice_codes_mode))
+        select case(trim(mode))
+            case("none")
+                match = .false.
             case("all")
-                allowed = .true.
+                match = .true.
             case("include")
-                allowed = .false.
-                do k = 1, par%n_ice_codes
-                    where (abs(regions - par%ice_codes(k)) < tol_code) allowed = .true.
+                match = .false.
+                do k = 1, size(codes)
+                    where (abs(mask - codes(k)) < tol_code) match = .true.
                 end do
             case("exclude")
-                allowed = .true.
-                do k = 1, par%n_ice_codes
-                    where (abs(regions - par%ice_codes(k)) < tol_code) allowed = .false.
+                match = .true.
+                do k = 1, size(codes)
+                    where (abs(mask - codes(k)) < tol_code) match = .false.
                 end do
         end select
 
-    end function htopo_ice_allowed
+    end function codes_match
 
     function htopo_region_codes(htopo) result(codes)
         ! The code mask the named regions refer to (region_mask), on the hub grid.
@@ -228,6 +261,7 @@ contains
         par%ice_codes    = mv
         par%region_names = ""
         par%region_codes = mv
+        par%relax_codes  = mv
 
         call nml_read(filename, group, "topo_path",      par%topo_path)
         call nml_read(filename, group, "topo_names",     par%topo_names)
@@ -242,6 +276,9 @@ contains
         call nml_read(filename, group, "region_names",   par%region_names)
         call nml_read(filename, group, "region_mask",    par%region_mask)
         call nml_read(filename, group, "region_codes",   par%region_codes)
+        call nml_read(filename, group, "relax_codes_mode", par%relax_codes_mode)
+        call nml_read(filename, group, "relax_codes",    par%relax_codes)
+        call nml_read(filename, group, "relax_tau",      par%relax_tau)
 
         ! Resolve {domain}/{grid_name} against the hub grid.
         call parse_path(par%topo_path,    par%domain, par%grid_name)
@@ -249,8 +286,9 @@ contains
         call parse_path(par%regions_path, par%domain, par%grid_name)
         call parse_path(par%sectors_path, par%domain, par%grid_name)
 
-        par%n_ice_codes = count(par%ice_codes /= mv)
-        par%n_regions   = count(len_trim(par%region_names) > 0)
+        par%n_ice_codes   = count(par%ice_codes /= mv)
+        par%n_relax_codes = count(par%relax_codes /= mv)
+        par%n_regions     = count(len_trim(par%region_names) > 0)
 
         select case(trim(par%ice_codes_mode))
             case("all")
@@ -261,6 +299,20 @@ contains
             case default
                 call htopo_par_error(group, "ice_codes_mode must be all, include or exclude; got "// &
                                      trim(par%ice_codes_mode)//".")
+        end select
+
+        select case(trim(par%relax_codes_mode))
+            case("none")
+                ! relax_codes and relax_tau not used
+            case("all", "include", "exclude")
+                if (trim(par%relax_codes_mode) /= "all" .and. par%n_relax_codes == 0) &
+                    call htopo_par_error(group, "relax_codes_mode = "//trim(par%relax_codes_mode)// &
+                                         " needs relax_codes.")
+                if (par%relax_tau <= 0.0_wp) call htopo_par_error(group, &
+                    "relax_codes_mode = "//trim(par%relax_codes_mode)//" needs relax_tau > 0.")
+            case default
+                call htopo_par_error(group, "relax_codes_mode must be none, all, include or exclude; got "// &
+                                     trim(par%relax_codes_mode)//".")
         end select
 
         select case(trim(par%region_mask))

@@ -309,6 +309,9 @@ masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer set
     region_names = "APIS" "WAIS" "EAIS"   ! named regions for 1D output ("" = none)
     region_mask  = "sectors"        ! regions | basins | sectors
     region_codes = 3.0 1.0 2.0
+    relax_codes_mode = "none"       ! where ice relaxes to the reference: none | all | include | exclude
+    relax_codes  = ""               ! codes of regions ("" = none)
+    relax_tau    = 0.0              ! [yr] relaxation timescale there
 /
 ```
 
@@ -339,7 +342,10 @@ The code masks reach Yelmo the same way (nearest neighbour): `regions` and
 `basins` are Yelmo's (`yelmo_init` `regions`/`basins`), and every component uses
 this one set. Where ice is allowed follows from `ice_codes_mode` and
 `ice_codes` (codes of `regions`; `yelmo_init` `mask_ice`); Yelmo's
-`mask_border` (`[yelmo]`, default `"auto"`) then sets the domain border. The
+`mask_border` (`[yelmo]`, default `"auto"`) then sets the domain border.
+Where the ice relaxes to the reference follows from `relax_codes_mode` and
+`relax_codes` (codes of `regions`): Yelmo's `tau_relax` is `relax_tau` there and
+-1 (free) elsewhere, used with `ytopo.topo_rel = -1`. The
 named regions (`region_names`, one code each of `region_mask`) get their own 1D
 output, `yelmo_ts_<name>.nc`.
 

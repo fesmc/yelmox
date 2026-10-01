@@ -99,6 +99,20 @@ program test_htopo
         write(*,*) "FAIL: include ice_codes"; fails = fails + 1
     end if
 
+    ! Relaxation: none by default; with exclude, relax_tau everywhere but on
+    ! the codes, -1 (free) on them.
+    if (any(htopo_relax_tau(ht%par, ht%regions) /= -1.0)) then
+        write(*,*) "FAIL: relax_codes_mode = none does not leave tau_relax at -1"; fails = fails + 1
+    end if
+    ht_nomask%par%relax_codes_mode = "exclude"
+    ht_nomask%par%relax_codes(1)   = 1.0
+    ht_nomask%par%n_relax_codes    = 1
+    ht_nomask%par%relax_tau        = 50.0
+    if (any(htopo_relax_tau(ht_nomask%par, ht%regions) /= &
+            merge(-1.0, 50.0, ht%regions == 1.0))) then
+        write(*,*) "FAIL: exclude relax_codes"; fails = fails + 1
+    end if
+
     ! Data gaps: a copy of the topography with all fields missing in a band
     ! along the x = min border, and z_srf also missing on some ice cells.
     allocate(gap(ht%nx,ht%ny), gap_srf(ht%nx,ht%ny))
