@@ -286,16 +286,7 @@ contains
         call couple_marine_to_yelmo(dom)
 
         ! Basal-friction optimization cold-start guess (equil_method == "opt").
-        if (trim(dom%ctl%equil_method) == "opt") then
-            dom%yelmo%dyn%par%till_method = -1
-            if (.not. dom%yelmo%par%use_restart) then
-                if (dom%opt%cf_init > 0.0_wp) then
-                    dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
-                else
-                    dom%yelmo%dyn%now%cb_ref = dom%yelmo%dyn%now%cb_tgt
-                end if
-            end if
-        end if
+        if (trim(dom%ctl%equil_method) == "opt") dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
 
         ! Initialize Yelmo state variables (cold base).
         call yelmo_print_bound(dom%yelmo%bnd)

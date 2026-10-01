@@ -462,6 +462,12 @@ contains
         dom%opt%tf_basins = 0
         call optimize_par_load(dom%opt, path_par, "opt"//trim(suffix))
 
+        if (dom%opt%cf_init <= 0.0_wp) then
+            write(*,*) "domain_opt_init:: error: opt"//trim(suffix)//".cf_init must be > 0 &
+                       &(the cold-start cb_ref guess); got ", dom%opt%cf_init
+            stop 1
+        end if
+
         nx = dom%yelmo%grd%G%nx
         ny = dom%yelmo%grd%G%ny
         allocate(dom%opt%cf_min(nx, ny), dom%opt%cf_max(nx, ny))
@@ -620,14 +626,13 @@ contains
         call couple_smb_to_yelmo(dom)
         call couple_marine_to_yelmo(dom)
 
+        ! Cold-start friction guess for the optimization (restart restores cb_ref),
+        ! set before the state init so its first dynamics solve already uses it.
+        if (trim(dom%ctl%equil_method) == "opt") dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+
         ! Initialize state variables (dyn, therm, mat) with a cold base
         call yelmo_print_bound(dom%yelmo%bnd)
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
-
-        ! Cold-start friction guess for the optimization (restart restores cb_ref).
-        if (trim(dom%ctl%equil_method) == "opt") then
-            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
-        end if
 
         ! Domain-specific cold-start setup (equilibration / LGM initialization /
         ! Greenland marine-ice). Cold start only; restart skips it.
