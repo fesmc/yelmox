@@ -439,15 +439,15 @@
     trans_a         =  0.46
     trans_b         =  6e-5
     trans_c         =  0.01
-    itm_c           = -55.0
+    itm_c           = -45.0
     itm_t           =  10.0
-    itm_b           =  3.0
-    itm_lat0        =  -60.0
+    itm_b           =  -2.0
+    itm_lat0        =  65.0
 
     ! ## Surface albedo
     alb_snow_dry       =  0.8
     alb_snow_wet       =  0.65
-    alb_ice            =  0.70
+    alb_ice            =  0.4
     alb_land           =  0.2
     alb_forest         =  0.1
     alb_ocean          =  0.1

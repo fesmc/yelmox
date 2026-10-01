@@ -442,16 +442,17 @@ contains
         ! is produced on the esm grid (grid_clim): interpolate the reference ocean to
         ! shelf depth (marshelf_interp_shelf reads only mshlf%par, so it is
         ! grid-agnostic) and add the esm ocean anomalies from step_climate_esm. The
-        ! resulting T_shlf/S_shlf are remapped to grid_mshlf, where marshelf_update
-        ! runs against the hub geometry, and bmb_shlf/T_shlf are aggregated back to
-        ! the Yelmo grid.
+        ! resulting T_shlf/S_shlf (absolute) and dT_shlf/dS_shlf (anomalies relative
+        ! to the reference state, used by tf_method=2) are remapped to grid_mshlf,
+        ! where marshelf_update runs against the hub geometry, and bmb_shlf/T_shlf
+        ! are aggregated back to the Yelmo grid.
         type(kryos_domain),        intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params),    intent(in)    :: ec
         type(tstep_class),       intent(in)    :: ts
 
         real(wp), allocatable :: H_ice_e(:,:), z_bed_e(:,:), f_grnd_e(:,:), z_sl_e(:,:)
-        real(wp), allocatable :: T_shlf_e(:,:), S_shlf_e(:,:), dT_shlf_e(:,:)
+        real(wp), allocatable :: T_shlf_e(:,:), S_shlf_e(:,:)
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         character(len=256) :: ge, gm, gh
@@ -481,12 +482,8 @@ contains
         ! Send the ocean forcing to the marine-shelf grid (esm grid -> grid_mshlf).
         call remap(dom, T_shlf_e, ge, dom%mshlf%now%T_shlf, gm, "bilin")
         call remap(dom, S_shlf_e, ge, dom%mshlf%now%S_shlf, gm, "bilin")
-
-        if (trim(dom%ctl%domain) == "Greenland") then
-            dT_shlf_e = T_shlf_e + esm%dto
-            call remap(dom, dT_shlf_e, ge, dom%mshlf%now%dT_shlf, gm, "bilin")
-            dom%mshlf%par%tf_method = 2
-        end if
+        call remap(dom, esm%dto + esm%dto_var, ge, dom%mshlf%now%dT_shlf, gm, "bilin")
+        call remap(dom, esm%dso + esm%dso_var, ge, dom%mshlf%now%dS_shlf, gm, "bilin")
 
         ! --- Marine-shelf basal melt on grid_mshlf ---
         ! Geometry + masks: hub -> mshlf grid.

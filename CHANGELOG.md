@@ -122,6 +122,40 @@ annotated git tag. Dates are release (tag) dates.
 - `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb
   and marine-shelf forcing are rebuilt before the first step (as in
   `yelmox_esm`/`yelmox_rembo`); the bundle does not hold them.
+- `esm_forcing`: transient ocean anomalies (`dto`, `dso`) were NaN/garbage for
+  depth-less ocean forcing (Greenland ISMIP7 `tf`/`so`, 2D monthly): the months
+  were averaged over axis 4, which holds them only for 3D fields (out-of-bounds
+  reads; the transient stopped at its first step). The annual mean now uses
+  fesm-utils `varslice_sub_mean`; the hist/proj `to`/`so` blocks share
+  `esm_ocean_anomaly`. Annual 3D ocean (Antarctica) unchanged. Requires
+  fesm-utils with `varslice_sub_mean`.
+- `esm_forcing_init`: a transient ocean field whose layout (rank, extent, depth
+  levels) differs from its ESM reference stops with an error.
+- `yelmox_esm` Greenland: `dT_shlf` was `T_shlf + dto`, i.e. the absolute shelf
+  temperature (K) plus `dto` again, so with `tf_method=2` (`bmb_method="anom"`)
+  `tf_shlf` was ~274 and shelf melt hundreds of m/yr. `dT_shlf`/`dS_shlf` are
+  now the anomalies `dto + dto_var` / `dso + dso_var` for every domain, and the
+  Greenland-only override of `tf_method` is gone (the par files set it).
+  Antarctica (`tf_method=1`) is unchanged. Greenland ESM spin-ups need re-running.
+- `yelmox_esm_Antarctica_ismip7.nml`: `&spinup time_ref` was 1961-1990, outside
+  the 1979-2022 axis of the RACMO2.3 reference climatology, so the reference
+  `t2m`/`pr` were missing values (-9999) and the ice sheet melted away in the
+  first step. Now 1985-2014, as in `&transient`. ISMIP7 Antarctica spin-ups
+  need re-running.
+- `yelmox_esm_Greenland{,_1pctCO2,_tipmip}.nml`: `&itm` had the Antarctic ITM
+  parameters (`itm_c=-55`, `itm_b=3`, `itm_lat0=-60`, `alb_ice=0.70`), so the
+  latitude-adjusted `itm_c` was about +340 W m-2 over Greenland and the SMB was
+  strongly negative everywhere. Now the Greenland values of
+  `yelmox_Greenland.nml` (`-45`, `-2`, `65`, `0.4`). Greenland ESM spin-ups need
+  re-running.
+- `yelmox_esm` output: `pr_ann` (2D) and `pr_1d` (time series) were the
+  precipitation in mm/d times 1e-3, labelled m/a, with only the January anomaly
+  factor. Now the annual mean of `pr*dpr`, in mm/d.
+- `yelmox_esm` output: the monthly anomalies entered `t2m_ann`/`t2m_sum` (small
+  2D file) and `t2m_1d`, `dt_1d`, `dpr_1d`, `dt_var_1d`, `dpr_var_1d` with January
+  only, and `t2m_sum` (2D file) with the DJF mean (scaled by 0.333) also in the
+  north. Now annual means, and summer means of the hemisphere (DJF south, JJA
+  north; new `esm_summer_mean`, also used for `esm%t2m_sum`).
 
 ### Removed
 - `libs/simpleclim.f90` (empty stub) and the unreachable `"const"` branch of
