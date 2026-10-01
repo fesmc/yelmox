@@ -64,6 +64,11 @@ annotated git tag. Dates are release (tag) dates.
   case of `domain_regions_init`, which no config reached since the domain was
   renamed SRG. `yelmox_SRG.nml`: `exclude 1.0`, 50 yr (the icefield evolves freely,
   the rest relaxes, as the Patagonia case did); all other par files `none`.
+- Greenland no longer sets `cb_ref = ytill.cf_ref` at the start when
+  `ytill.method = -1`: an external `cb_ref` is up to the user (optimization or
+  restart). A Greenland cold start with `method = -1` and no optimization (e.g.
+  `yelmox_esm_Greenland*.nml` with `equil_method = "none"`) now starts from
+  Yelmo's `cb_ref = 1` fallback instead of 40.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

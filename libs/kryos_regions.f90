@@ -48,19 +48,6 @@ contains
             end do
         end if
 
-        ! Region physics, by domain name (to become configuration keys).
-        select case(trim(dom%ctl%domain))
-
-            case("Greenland")
-                ! NEGIS cb_ref modification: enabled via [coupling] use_negis, which
-                ! loads the [negis] parameters in domain_init.
-
-                ! With external cb_ref (till_method=-1) start from the reference value.
-                if (dom%yelmo%dyn%par%till_method == -1) &
-                    dom%yelmo%dyn%now%cb_ref = dom%yelmo%dyn%par%till_cf_ref
-
-        end select
-
         ! Name the regional 1D files (no grid suffix; grid is recorded in-file):
         !   global -> yelmo_ts.nc, sub-region k -> yelmo_ts_<name>.nc
         ! Paths derive from dom%yelmo%outfldr (set above).
