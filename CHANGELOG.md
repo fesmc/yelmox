@@ -44,6 +44,12 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `check_isostasy_reference` compares the two reference bedrocks on the isostasy
+  grid, where Yelmo's `z_bed_ref` is remapped exactly as the isostasy reference was
+  built: the same bedrock agrees to round-off on any isostasy grid (max |diff| <=
+  1 m). Before, it remapped back to the Yelmo grid and allowed a 10 m mean
+  difference, which a coarse isostasy grid over rough terrain exceeds (SRG on
+  16 km: -14 m).
 - `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
   `obs_err_name` and `f_stdev` (startup stopped on the nml read).
 - `yelmox_esm_Antarctica.nml`: topography and geothermal heat flux read from
