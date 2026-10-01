@@ -19,8 +19,8 @@ module kryos_startup
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
     use kryos_coupling, only : refresh_hub, step_climate, step_smb, step_marine_shelf, &
-                               couple_isostasy_to_yelmo, couple_smb_to_yelmo, &
-                               couple_marine_to_yelmo, check_isostasy_reference
+                               couple_to_yelmo, couple_isostasy_to_yelmo, &
+                               couple_smb_to_yelmo, check_isostasy_reference
     use kryos_forcing,  only : tsforcing_class, tsforcing_restart_write
 
     implicit none
@@ -149,10 +149,8 @@ contains
         ! Marine shelf through the (already refreshed) hub.
         call step_marine_shelf(dom, ts)
 
-        ! Assemble the Yelmo boundary state from the freshly produced module
-        ! outputs (smb + marine_shelf; isostasy already coupled above).
-        call couple_smb_to_yelmo(dom)
-        call couple_marine_to_yelmo(dom)
+        ! Assemble the Yelmo boundary state from the freshly produced outputs.
+        call couple_to_yelmo(dom)
 
         ! Cold-start friction guess for the optimization (restart restores cb_ref),
         ! set before the state init so its first dynamics solve already uses it.

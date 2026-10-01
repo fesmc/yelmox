@@ -24,8 +24,7 @@ program yelmox_rembo
     use kryos,          only : kryos_domain, domain_init, remap
     use kryos_regions,  only : domain_regions_init, domain_init_marine_ice
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
-                               refresh_hub, step_marine_shelf, couple_smb_to_yelmo, &
-                               couple_marine_to_yelmo
+                               refresh_hub, step_marine_shelf, couple_to_yelmo
     use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write, &
                                restart_bundle_dir
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
@@ -159,7 +158,8 @@ program yelmox_rembo
         ! Coupling sequence (REMBO replaces the generic climate step).
         call step_spinup_tuning(dom, ts)
         call step_isostasy(dom, ts, bsl)
-        call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
+        call couple_to_yelmo(dom)
+        call step_icesheet(dom, ts)
         call refresh_hub(dom)
         call step_rembo(dom, ts, tsf, dT_summer, dT_ocn)  ! REMBO atmosphere/smb + snapclim ocean
         call step_marine_shelf(dom, ts)
@@ -212,7 +212,7 @@ contains
         ! forcing from snapclim (with the optional hysteresis ocean anomaly). REMBO
         ! runs on grid_clim (== the Yelmo grid for the single-grid Greenland setup);
         ! couple_smb_to_yelmo applies the we->ie scaling + lim_pd_ice, on the Yelmo
-        ! grid, inside step_icesheet. init=.true. equilibrates REMBO before the first
+        ! grid, in couple_to_yelmo. init=.true. equilibrates REMBO before the first
         ! update (cold start only).
         type(kryos_domain),      intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
@@ -276,8 +276,7 @@ contains
         call step_marine_shelf(dom, ts)
 
         ! Assemble the Yelmo boundary state from the freshly produced outputs.
-        call couple_smb_to_yelmo(dom)
-        call couple_marine_to_yelmo(dom)
+        call couple_to_yelmo(dom)
 
         ! Basal-friction optimization cold-start guess (equil_method == "opt").
         if (trim(dom%ctl%equil_method) == "opt") dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init

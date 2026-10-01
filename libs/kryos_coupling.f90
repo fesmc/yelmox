@@ -21,6 +21,7 @@ module kryos_coupling
     public :: yelmox_step
     public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
     public :: step_smb, refresh_hub
+    public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
     public :: check_isostasy_reference
 
@@ -44,6 +45,7 @@ contains
 
         call step_spinup_tuning(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
         call step_isostasy(dom, ts, bsl)
+        call couple_to_yelmo(dom)
         call step_icesheet(dom, ts)
         call refresh_hub(dom)          ! hi-res geometry mirror, from the models
         call step_climate(dom, ts, dTa=dTa, dTo=dTo, dSo=dSo)  ! climate/smb read geometry from the hub
@@ -144,10 +146,21 @@ contains
     ! --- Yelmo-input couplers -------------------------------------------------
     ! Each coupler remaps one module's output onto the Yelmo grid and assigns it
     ! into yelmo%bnd, i.e. "remap what Yelmo needs, before Yelmo runs". They are
-    ! called from step_icesheet (before yelmo_update) and from the init/restart
-    ! paths (before yelmo_init_state), so the Yelmo boundary assembly lives in one
-    ! place. Each is a no-op when its component is inactive. At identity grids the
-    ! remaps are copies.
+    ! called together by couple_to_yelmo (in the per-step sequence, before
+    ! step_icesheet) and from the init/restart paths (before yelmo_init_state),
+    ! so the Yelmo boundary assembly lives in one place. Each is a no-op when its
+    ! component is inactive. At identity grids the remaps are copies.
+
+    subroutine couple_to_yelmo(dom)
+        ! Assemble the Yelmo boundary state from every coupled component. In the
+        ! time loop isostasy was produced this step; smb and marine shelf were
+        ! produced last step (the one-step coupling lag).
+        type(kryos_domain), intent(inout) :: dom
+
+        call couple_isostasy_to_yelmo(dom)
+        call couple_smb_to_yelmo(dom)
+        call couple_marine_to_yelmo(dom)
+    end subroutine couple_to_yelmo
 
     subroutine couple_isostasy_to_yelmo(dom)
         ! Bedrock + sea surface from isostasy (grid_isos -> Yelmo). Only the
@@ -319,19 +332,14 @@ contains
     end subroutine couple_marine_to_yelmo
 
     subroutine step_icesheet(dom, ts)
+        ! Advance Yelmo one coupling step on the boundary state assembled by
+        ! couple_to_yelmo.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
         ! Greenland NEGIS: update cb_ref from bed properties + NEGIS scaling.
         if (trim(dom%ctl%domain) == "Greenland" .and. dom%ngs%use_negis_par) &
             call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time)
-
-        ! Assemble the Yelmo boundary state: remap every coupled module's output
-        ! onto the Yelmo grid, before Yelmo runs. isostasy was produced this step;
-        ! smb / marine_shelf were produced last step (the one-step coupling lag).
-        call couple_isostasy_to_yelmo(dom)
-        call couple_smb_to_yelmo(dom)
-        call couple_marine_to_yelmo(dom)
 
         if (.not. dom%ctl%with_ice_sheet) return
         if (ts%n == 0 .and. dom%yelmo%par%use_restart) return

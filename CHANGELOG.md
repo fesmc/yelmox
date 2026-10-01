@@ -16,6 +16,10 @@ annotated git tag. Dates are release (tag) dates.
 - Renamed coupling primitives: `step_optimize` -> `step_spinup_tuning` (it also
   ramps the relaxation timescale), `refresh_htopo` -> `refresh_hub`,
   `domain_update_smb` -> `step_smb`.
+- `couple_to_yelmo` assembles the Yelmo boundary state as its own step, called
+  by the drivers before `step_icesheet` (which no longer runs the couplers).
+  The Greenland NEGIS friction update now sees the bedrock of the current step
+  (`use_negis = True` only; no config sets it).
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

@@ -38,8 +38,7 @@ program yelmox_esm
     use kryos,          only : kryos_domain, domain_init, remap, cadence_due
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
-                               refresh_hub, couple_smb_to_yelmo, &
-                               couple_marine_to_yelmo
+                               refresh_hub, couple_to_yelmo
     use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write
     use yelmox_esm_output
 
@@ -222,10 +221,11 @@ program yelmox_esm
         call bsl_update(bsl, ts%time_rel)
 
         ! Shared multigrid primitives (isostasy / ice sheet / hub / optimization).
-        ! The ESM-owned Yelmo input (Qd) is landed just before the ice sheet runs,
-        ! alongside the shared couplers invoked inside step_icesheet.
+        ! The ESM-owned Yelmo input (Qd) is landed with the shared couplers, just
+        ! before the ice sheet runs.
         call step_spinup_tuning(dom, ts)
         call step_isostasy(dom, ts, bsl)
+        call couple_to_yelmo(dom)
         call couple_esm_extras_to_yelmo(dom, esm)
         call step_icesheet(dom, ts)
         call refresh_hub(dom)
@@ -306,8 +306,7 @@ contains
         call step_marine_shelf_esm(dom, esm, ec, ts)
 
         ! Assemble the Yelmo boundary state from the freshly produced outputs.
-        call couple_smb_to_yelmo(dom)
-        call couple_marine_to_yelmo(dom)
+        call couple_to_yelmo(dom)
         call couple_esm_extras_to_yelmo(dom, esm)
 
         ! Cold-start friction guess for the optimization.
@@ -433,7 +432,7 @@ contains
 
         ! smb / tsrf now live on grid_smb in dom%smb%ann; couple_smb_to_yelmo lands
         ! them on the Yelmo grid. Subglacial discharge (esm%Qd_ann) is landed by
-        ! couple_esm_extras_to_yelmo. Both run in the ice-sheet coupling step.
+        ! couple_esm_extras_to_yelmo. Both run before the ice-sheet step.
 
     end subroutine step_climate_esm
 
@@ -502,7 +501,7 @@ contains
                              z_sl_m, dx=dom%ctl%dx_mshlf)
 
         ! bmb_shlf / T_shlf now live on grid_mshlf in dom%mshlf%now;
-        ! couple_marine_to_yelmo lands them on the Yelmo grid in the ice-sheet step.
+        ! couple_marine_to_yelmo lands them on the Yelmo grid before the ice-sheet step.
 
     end subroutine step_marine_shelf_esm
 
