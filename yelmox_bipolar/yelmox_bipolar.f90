@@ -47,7 +47,7 @@ program yelmox_bipolar
     logical            :: active_north, active_south
 
     ! Shared, driver-owned ocean box model + its coupling control (obm_coupling).
-    type(obm_class)        :: obm
+    type(obm_class)        :: obox      ! ocean box model state ("obm" is the module name)
     type(obm_coupling_ctl) :: oc
     character(len=512)     :: obm_file, obm_file_restart
 
@@ -92,7 +92,7 @@ program yelmox_bipolar
     if (oc%active_obm) then
         obm_file         = trim(oc%obm_name)//".nc"
         obm_file_restart = trim(oc%obm_name)//"_restart.nc"
-        call obm_init(obm, path_par, oc%obm_name)
+        call obm_init(obox, path_par, oc%obm_name)
         call write_obm_init(obm_file, ts%time, "years")
     end if
 
@@ -121,13 +121,13 @@ program yelmox_bipolar
 
         if (active_north) call write_domain_step(dom_north, outfldr_north)
         if (active_south) call write_domain_step(dom_south, outfldr_south)
-        if (oc%active_obm .and. do_1D) call write_obm_update(obm, obm_file, oc%obm_name, ts%time)
+        if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
 
         ! Shared bsl (+ obm) restart at the run root, next to the domain bundles.
         if (do_rst) then
             call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-            if (oc%active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
+            if (oc%active_obm) call write_obm_restart(obox, obm_file_restart, ts%time, "years")
         end if
 
         if (ts%is_finished) exit
@@ -143,7 +143,7 @@ program yelmox_bipolar
         if (active_south) call advance_isostasy(dom_south)
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
-        if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
+        if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
 
         ! Ice sheet + hi-res hub refresh + climate/smb (both domains).
         if (active_north) call advance_dynamics(dom_north)
@@ -151,7 +151,7 @@ program yelmox_bipolar
 
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
         ! flux, hysteresis forcing, obm->ism ocean temperature.
-        call obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
+        call obm_exchange(oc, obox, dom_north, dom_south, active_north, active_south, &
                           ts%time, ts%time_init, dtt)
 
         ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.

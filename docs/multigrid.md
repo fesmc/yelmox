@@ -393,7 +393,7 @@ program yelmox_bipolar
     use obm_coupling
     type(ice_domain)       :: dom_north, dom_south
     type(bsl_class)        :: bsl      ! shared, driver-owned
-    type(obm_class)        :: obm      ! shared, driver-owned
+    type(obm_class)        :: obox     ! shared, driver-owned
     type(obm_coupling_ctl) :: oc       ! obm_coupling's own control
 
     call tstep_init(ts, path_par, "ctrl", dtt)             ! shared timeline
@@ -408,9 +408,9 @@ program yelmox_bipolar
         call tstep_update(ts, dtt)
         call bsl_update(bsl, ts%time_rel)                  ! once, shared
         call advance_isostasy(dom_north); call advance_isostasy(dom_south)
-        if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
+        if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
         call advance_dynamics(dom_north); call advance_dynamics(dom_south)
-        call obm_exchange(oc, obm, dom_north, dom_south, ...)   ! atm2obm, fwf, hyster, obm2ism
+        call obm_exchange(oc, obox, dom_north, dom_south, ...)   ! atm2obm, fwf, hyster, obm2ism
         call step_marine_shelf(dom_north, ...); call step_marine_shelf(dom_south, ...)
     end do
 end program
