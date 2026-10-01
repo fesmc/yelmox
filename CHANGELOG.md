@@ -66,6 +66,11 @@ annotated git tag. Dates are release (tag) dates.
   now the anomalies `dto + dto_var` / `dso + dso_var` for every domain, and the
   Greenland-only override of `tf_method` is gone (the par files set it).
   Antarctica (`tf_method=1`) is unchanged. Greenland ESM spin-ups need re-running.
+- `yelmox_esm_Antarctica_ismip7.nml`: `&spinup time_ref` was 1961-1990, outside
+  the 1979-2022 axis of the RACMO2.3 reference climatology, so the reference
+  `t2m`/`pr` were missing values (-9999) and the ice sheet melted away in the
+  first step. Now 1985-2014, as in `&transient`. ISMIP7 Antarctica spin-ups
+  need re-running.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
