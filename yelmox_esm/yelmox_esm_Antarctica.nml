@@ -548,6 +548,8 @@
     use_obs   = True
     obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M17.nc"
     obs_name  = "ghf"
+    obs_err_name = "None"     ! Uncertainty field ("None": not used)
+    f_stdev   = 0.0            ! Number of standard deviations added to obs
     ghf_const = 50.0           ! [mW/m^2]
 
 /
