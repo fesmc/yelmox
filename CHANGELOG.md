@@ -32,6 +32,11 @@ annotated git tag. Dates are release (tag) dates.
   bipolar south: Yelmo 32 km, hub 16 km) Yelmo starts from the remapped 16 km
   topography instead of its own 32 km files. `f_grnd_pin` (diagnostic) changes
   where `z_bed_sd` was read from a non-roughness field. Requires yelmo kryos-init.
+- The hub fills the gaps of its topography file (missing values, e.g. outside
+  the coverage of the ISMIP7 obs files): `H_ice = 0`, `z_bed` from the nearest
+  valid cell (fesm-utils `fill_nearest`), `z_srf` from `z_bed` and `H_ice` at sea
+  level 0, and `z_bed_sd = 0`. The counts are logged. Before, the raw fill
+  values (-9e33) reached the remaps; Yelmo's own reads set them to -9999.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

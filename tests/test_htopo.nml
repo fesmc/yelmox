@@ -14,3 +14,11 @@
     basins_path  = ""
     basins_var   = "basin"
 /
+&domain_gaps
+    topo_path    = "test_htopo_gaps.nc"
+    topo_names   = "z_bed" "H_ice" "z_srf" ""
+    regions_path = ""
+    regions_var  = "mask"
+    basins_path  = ""
+    basins_var   = "basin"
+/

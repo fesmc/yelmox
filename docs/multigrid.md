@@ -315,7 +315,10 @@ resolve to `name`/`grid_hub`. `htopo_init` resolves the grid from
 `grid_<name>.txt` (the disk grid table) and reads the fields onto it —
 validated by `tests/test_htopo.f90` against the real ANT-16KM data. A blank
 mask path (e.g. paleo domains without mask files) leaves the mask at `1.0`
-(single region/basin); a blank `z_bed_sd` name leaves it at `0`.
+(single region/basin); a blank `z_bed_sd` name leaves it at `0`. Gaps in the
+topography file (missing values, e.g. outside the coverage of the source
+dataset) are filled: no ice, the bed from the nearest valid cell, the surface
+from the bed and the ice thickness (sea level 0), and no bed roughness.
 
 Yelmo is populated from the domain like the other components. Its grid comes
 from `maps/grid_<grid_ice>.txt` (`yelmo_init_grid`, `grid_def="none"`), and the

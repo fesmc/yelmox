@@ -18,12 +18,17 @@ module htopo
 
     use nml
     use ncio
-    use coords, only : grid_class, grid_cdo_read_desc
+    use coords,   only : grid_class, grid_cdo_read_desc
+    use interp2D, only : fill_nearest
 
     implicit none
     private
 
     integer, parameter :: wp = kind(1.0)     ! single precision (matches yelmox libs)
+
+    real(wp), parameter :: mv      = -9999.0_wp   ! missing value of the topography reads
+    real(wp), parameter :: rho_ice =   910.0_wp   ! [kg/m3] ice density (surface of gap cells)
+    real(wp), parameter :: rho_sw  =  1028.0_wp   ! [kg/m3] seawater density
 
     type htopo_par_class
         character(len=256) :: domain
@@ -87,13 +92,16 @@ contains
         allocate(htopo%f_grnd(htopo%nx,htopo%ny)); htopo%f_grnd = 0.0_wp
         allocate(htopo%z_sl(htopo%nx,htopo%ny));   htopo%z_sl   = 0.0_wp
 
-        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(1), htopo%z_bed)
-        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(2), htopo%H_ice)
-        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(3), htopo%z_srf)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(1), htopo%z_bed, missing_value=mv)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(2), htopo%H_ice, missing_value=mv)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(3), htopo%z_srf, missing_value=mv)
+        call htopo_fill_missing(htopo)
 
         htopo%z_bed_sd = 0.0_wp
-        if (len_trim(htopo%par%topo_names(4)) > 0) &
-            call nc_read(htopo%par%topo_path, htopo%par%topo_names(4), htopo%z_bed_sd)
+        if (len_trim(htopo%par%topo_names(4)) > 0) then
+            call nc_read(htopo%par%topo_path, htopo%par%topo_names(4), htopo%z_bed_sd, missing_value=mv)
+            where (htopo%z_bed_sd == mv) htopo%z_bed_sd = 0.0_wp
+        end if
 
         ! Static masks: load from file when a path is given, else default to a
         ! single region/basin (1.0), so paleo domains without mask files run.
@@ -105,6 +113,41 @@ contains
             call nc_read(htopo%par%basins_path,  htopo%par%basins_var,  htopo%basins)
 
     end subroutine htopo_init
+
+    subroutine htopo_fill_missing(htopo)
+        ! Fill the gaps of the reference geometry (e.g. outside the coverage of
+        ! the source dataset): no ice, the bed from the nearest valid cell, and
+        ! the surface from the bed and the ice thickness, with sea level at 0.
+        type(htopo_class), intent(inout) :: htopo
+
+        integer :: n_bed, n_ice, n_srf
+
+        n_bed = count(htopo%z_bed == mv)
+        n_ice = count(htopo%H_ice == mv)
+        n_srf = count(htopo%z_srf == mv)
+        if (n_bed + n_ice + n_srf == 0) return
+
+        where (htopo%H_ice == mv) htopo%H_ice = 0.0_wp
+
+        if (n_bed > 0) then
+            if (n_bed < size(htopo%z_bed)) call fill_nearest(htopo%z_bed, mv)
+            if (any(htopo%z_bed == mv)) then
+                write(*,*) ""
+                write(*,*) "htopo_fill_missing:: error: missing bedrock elevations could not be filled."
+                write(*,*) "  topo_path: ", trim(htopo%par%topo_path)
+                write(*,*) "  z_bed:     ", trim(htopo%par%topo_names(1))
+                write(*,*) "  missing:   ", count(htopo%z_bed == mv), " of ", size(htopo%z_bed)
+                stop
+            end if
+        end if
+
+        where (htopo%z_srf == mv) &
+            htopo%z_srf = max(htopo%z_bed + htopo%H_ice, (1.0_wp - rho_ice/rho_sw)*htopo%H_ice)
+
+        write(*,*) "htopo_init:: filled missing values: z_bed ", n_bed, ", H_ice ", n_ice, &
+                   ", z_srf ", n_srf, " of ", size(htopo%z_bed)
+
+    end subroutine htopo_fill_missing
 
     subroutine htopo_par_load(par, filename, group, domain, grid_name)
         type(htopo_par_class), intent(out) :: par
