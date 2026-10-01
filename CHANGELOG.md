@@ -37,6 +37,10 @@ annotated git tag. Dates are release (tag) dates.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
+- Legacy single-grid programs (`<flavor>/legacy/`, `make <flavor>-legacy`) and
+  retired flavors (`retired/`: `yelmox_ismip6`, `yelmox_nahosmip`,
+  `yelmox_rtip`), with their par files, make targets, runme aliases and
+  `scripts/ismip6-2300.md`. They no longer ran against yelmo:dev.
 
 ## [v2.3] - 2026-07-15
 

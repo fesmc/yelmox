@@ -21,14 +21,6 @@ core that these drivers reuse.
 | [`yelmox_esm`](flavor-esm.md) | `make yelmox_esm` | ESM forcing (`libs/esm.f90`) | ESM | Earth-System-Model forcing replaces snapclim; calendar timeline. |
 | [`yelmox_rembo`](flavor-rembo.md) | `make yelmox_rembo` | REMBOv1 | snapclim | REMBO energy/moisture-balance atmosphere + SMB. |
 
-Legacy single-grid originals live under each flavor's `legacy/` folder and build
-with `make <flavor>-legacy`.
-
-Retired flavors (`yelmox_ismip6`, `yelmox_nahosmip`, `yelmox_rtip`) live under
-`retired/` and are no longer maintained. They still compile via `make
-yelmox_ismip6` / `make yelmox_nahosmip` / `make yelmox_rtip` (each prints a
-retirement notice); prefer `yelmox` or `yelmox_esm` for new work.
-
 ## Shared coupling primitives
 
 Every modern flavor advances the model by calling these primitives (from

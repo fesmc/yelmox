@@ -99,9 +99,7 @@ rembo-static: fesmutils-static
 	$(MAKE) -C $(REMBOROOT) rembo-static
 
 # ---------------------------------------------------------------------------
-# Default programs: the new multigrid drivers, one per flavor folder.
-# Legacy single-grid originals live under <flavor>/legacy/ and build via the
-# `<name>-legacy` targets below. Flavors not yet ported print a stub.
+# Default programs: the multigrid drivers, one per flavor folder.
 # ---------------------------------------------------------------------------
 
 yelmox : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
@@ -136,70 +134,6 @@ yelmox_rembo : fesmutils-static yelmo-static rembo-static isostasy-static $(yelm
 	@echo "    yelmox_rembo.x is ready."
 	@echo " "
 
-# ---------------------------------------------------------------------------
-# Retired flavors (single-grid originals under retired/<flavor>/).
-# Still compilable, but no longer maintained -- prefer yelmox or yelmox_esm.
-# ---------------------------------------------------------------------------
-
-yelmox_ismip6 : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_ismip6.x retired/yelmox_ismip6/yelmox_ismip6.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    *** yelmox_ismip6 is RETIRED and no longer maintained."
-	@echo "        Prefer 'make yelmox' or 'make yelmox_esm' for new work."
-	@echo "    yelmox_ismip6.x is ready."
-	@echo " "
-
-yelmox_nahosmip : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_nahosmip.x retired/yelmox_nahosmip/yelmox_nahosmip.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    *** yelmox_nahosmip is RETIRED and no longer maintained."
-	@echo "        Prefer 'make yelmox' or 'make yelmox_esm' for new work."
-	@echo "    yelmox_nahosmip.x is ready."
-	@echo " "
-
-yelmox_rtip : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_rtip.x retired/yelmox_rtip/yelmox_rtip.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    *** yelmox_rtip is RETIRED and no longer maintained."
-	@echo "        Prefer 'make yelmox' or 'make yelmox_esm' for new work."
-	@echo "    yelmox_rtip.x is ready."
-	@echo " "
-
-# ---------------------------------------------------------------------------
-# Legacy programs (single-grid originals under <flavor>/legacy/).
-# ---------------------------------------------------------------------------
-
-yelmox-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox-legacy.x yelmox/legacy/yelmox.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox-legacy.x is ready."
-	@echo " "
-
-yelmox_bipolar-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs) $(obm_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_bipolar-legacy.x yelmox_bipolar/legacy/yelmox_bipolar.f90 \
-		$(yelmox_libs) $(obm_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_bipolar-legacy.x is ready."
-	@echo " "
-
-yelmox_esm-legacy : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_esm-legacy.x yelmox_esm/legacy/yelmox_esm.f90 \
-		$(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_esm-legacy.x is ready."
-	@echo " "
-
-yelmox_rembo-legacy : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -o $(bindir)/yelmox_rembo-legacy.x yelmox_rembo/legacy/yelmox_rembo.f90 \
-		$(yelmox_libs) $(LIB_REMBO) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_rembo-legacy.x is ready."
-	@echo " "
-
 
 test_timestepping : fesmutils-static yelmo-static
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -o ./libyelmox/bin/test_timestepping.x tests/test_timestepping.f90 \
@@ -223,10 +157,6 @@ usage:
 	@echo ""
 	@echo " Default (multigrid) drivers, one per flavor folder:"
 	@echo "   make yelmox | yelmox_bipolar | yelmox_esm | yelmox_rembo"
-	@echo " Retired flavors (single-grid, unmaintained; in retired/<flavor>/):"
-	@echo "   make yelmox_ismip6 | yelmox_nahosmip | yelmox_rtip"
-	@echo " Legacy single-grid originals (in <flavor>/legacy/):"
-	@echo "   make <name>-legacy   e.g. make yelmox-legacy, make yelmox_rembo-legacy"
 	@echo " make clean      : cleans object files"
 	@echo ""
 
