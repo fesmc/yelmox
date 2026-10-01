@@ -13,3 +13,6 @@
 |  9 | hyd_N             | xc, yc            | Pa           | Effective pressure at the bed                 |
 | 10 | hyd_kappa         | xc, yc            | -            | K24 hydraulic transmissivity field            |
 | 11 | hyd_q             | xc, yc            | m^2/s        | K24 distributed flux magnitude (Picard warm-start state) |
+| 12 | hyd_C_frz         | xc, yc            | m/s          | Freeze-on capacity at the bed (ice equivalent) |
+| 13 | hyd_Q_diss        | xc, yc            | W/m^2        | Heat dissipated by basal water flow           |
+| 14 | hyd_Q_sens        | xc, yc            | W/m^2        | Sensible heat of basal water flow             |

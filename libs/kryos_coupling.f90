@@ -191,47 +191,38 @@ contains
         ! topography. Nothing else would catch that: the run would proceed with a
         ! displacement field measured against one bedrock and applied to another.
         !
-        ! isos' reference, recovered on the Yelmo grid, is out%z_bed - (w + we).
-        ! When grid_isos == grid_ice the remap is an exact copy, so this must
-        ! agree to round-off. On a coarser isostasy grid it cannot: the pointwise
-        ! difference is precisely the smoothing this coupling now avoids, so only
-        ! the domain mean is comparable there. Both tolerances are set to admit
-        ! that smoothing while still catching a wholly different reference field,
-        ! which differs by hundreds of metres.
+        ! The comparison is made on the isostasy grid: Yelmo's z_bed_ref is remapped
+        ! there exactly as the reference was built (domain_init_isostasy), and
+        ! isostasy's reference is out%z_bed - (w + we). The same bedrock then agrees
+        ! to round-off on any isostasy grid; a different one differs by metres or more.
         type(kryos_domain), intent(inout) :: dom
 
-        real(wp), parameter :: tol_copy  = 1e-3_wp   ! [m] identical grids: round-off only
-        real(wp), parameter :: tol_remap = 10.0_wp   ! [m] mean offset left by remapping
+        real(wp), parameter :: tol = 1.0_wp   ! [m] max |difference|: round-off only
 
         real(wp), allocatable :: z_bed_ref_i(:,:)
         character(len=256) :: gi, gy
         character(len=32)  :: mth
-        real(wp) :: dmean, dmax, tol
-        logical  :: same_grid
+        real(wp) :: dmean, dmax
 
         if (.not. dom%ctl%with_isostasy) return
 
         gi  = trim(dom%ctl%grid_isos)
         gy  = trim(dom%ctl%grid_ice)
-        mth = remap_method_smooth(dom%ctl%dx_isos, real(dom%yelmo%grd%G%dx, wp))
+        mth = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_isos)
 
-        call remap(dom, dom%isos%out%z_bed - dom%isos%out%w - dom%isos%out%we, &
-                   gi, z_bed_ref_i, gy, mth)
+        call remap(dom, dom%yelmo%bnd%z_bed_ref, gy, z_bed_ref_i, gi, mth)
 
-        same_grid = (trim(gi) == trim(gy))
-        tol       = tol_remap
-        if (same_grid) tol = tol_copy
+        dmean = sum(dom%isos%out%z_bed - dom%isos%out%w - dom%isos%out%we - z_bed_ref_i) &
+                / real(size(z_bed_ref_i), wp)
+        dmax  = maxval(abs(dom%isos%out%z_bed - dom%isos%out%w - dom%isos%out%we - z_bed_ref_i))
 
-        dmean = sum(z_bed_ref_i - dom%yelmo%bnd%z_bed_ref) / real(size(z_bed_ref_i), wp)
-        dmax  = maxval(abs(z_bed_ref_i - dom%yelmo%bnd%z_bed_ref))
-
-        write(*,*) "check_isostasy_reference:: z_bed_ref (isos - yelmo) [m]"
-        write(*,*) "    grids:      ", trim(gi), " -> ", trim(gy), " (", trim(mth), ")"
+        write(*,*) "check_isostasy_reference:: z_bed_ref (isos - yelmo), on the isostasy grid [m]"
+        write(*,*) "    grids:      ", trim(gy), " -> ", trim(gi), " (", trim(mth), ")"
         write(*,*) "    mean diff:  ", dmean
         write(*,*) "    max |diff|: ", dmax
         write(*,*) "    tolerance:  ", tol
 
-        if (abs(dmean) > tol) then
+        if (dmax > tol) then
             write(*,*) ""
             write(*,*) "check_isostasy_reference:: error: the isostasy reference bedrock does &
                        &not match yelmo%bnd%z_bed_ref."

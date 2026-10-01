@@ -39,7 +39,8 @@ program yelmox_esm
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
                                refresh_hub, couple_to_yelmo
-    use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, run_restart_write
+    use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, &
+                               domain_opt_init_cb_ref, run_restart_write
     use yelmox_esm_output
 
     implicit none
@@ -310,8 +311,7 @@ contains
         call couple_esm_extras_to_yelmo(dom, esm)
 
         ! Cold-start friction guess for the optimization.
-        if (trim(dom%ctl%equil_method) == "opt") &
-            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        call domain_opt_init_cb_ref(dom)
 
         ! Initialize Yelmo state variables (cold base).
         call yelmo_print_bound(dom%yelmo%bnd)

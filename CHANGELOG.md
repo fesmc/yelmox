@@ -5,7 +5,29 @@ annotated git tag. Dates are release (tag) dates.
 
 ## [Unreleased]
 
+### Added
+- Antarctic paleo setup (32 km): `yelmox/yelmox_Antarctica_paleo_spinup.nml`
+  (15 kyr optimization spin-up) and `yelmox_Antarctica_paleo_lgp.nml` (-130 kyr to
+  +10 kyr, climate from the glacial index `input/alpha_combined_125kyr_interp.dat`,
+  sea level from `sealevel_rohling_450kyr.dat`, ages traced with elsa), with run
+  scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files kept
+  in `scripts/ant-paleo/legacy/`; the transient now runs on relative time so that
+  sea level follows the record (it stayed at present day before).
+- `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
+  and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`;
+  the originals are in `scripts/ismip7/legacy/`.
+
 ### Changed
+- Builds use OpenMP by default (`openmp ?= 1` in `config/Makefile`); `make <driver>
+  openmp=0` builds serial. Regenerate the Makefile with configme to pick it up.
+- `input/yelmo_defaults.nml` re-synced with yelmo dev (`ytrc.elsa_restart`).
+- Follows yelmo dev: `input/` yelmo copies re-synced (`yelmo.mask_border`, `"auto"`:
+  the domain border as before; the capacity basal BC keys of `ytherm`, now the
+  default, so results change; the K24 options of `yhyd`). Par files rename
+  `yhyd.k24_long_coupling_water = 5` to `k24_coupling_length_kamb86 = 10` (yelmo's
+  rename, twice the old value) and set `yhyd.k24_flux_solver = 3` (the taped solver,
+  which FastHydrology's default routing scheme now requires; K24 transport is off
+  in all par files, so results do not change). Requires that yelmo dev.
 - Follows yelmo dev with the renumbered `ytherm.qb_method` (1: faces, 2: faces to
   quadrature nodes, 3: simple stagger, 4: quadrature). The par files keep
   `qb_method = 2`, which now selects the energy-consistent "faces to quadrature
@@ -112,10 +134,9 @@ annotated git tag. Dates are release (tag) dates.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's
-  `cb_ref = cf_init` guess is set before `yelmo_init_state` in every driver
-  (was after it in `yelmox`/`yelmox_bipolar`), so results of `opt` cold starts
-  change slightly. `opt.cf_init` must be > 0; the "negative uses cb_tgt" rule
-  (only implemented in `yelmox_rembo`) is gone.
+  cold-start `cb_ref` (`domain_opt_init_cb_ref`) is set before
+  `yelmo_init_state` in every driver (was after it in `yelmox`/`yelmox_bipolar`),
+  so results of `opt` cold starts change slightly.
 - `yelmox_rembo`: `greenland_init_marine_H` applies the shared rule (H = 800 m
   where H < 600 m and z_bed > -500 m) instead of H×1.2, and the driver no longer
   shrinks `dtt`/`dtime_emb` during a tsgen ramp.
@@ -155,6 +176,30 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `input/esm/esm_ant_ismip7.nml`: the SMB reference (`gcm_smb_ref`, read with
+  `esm.use_smb = True`) is the RACMO2.3 monthly climatology `{grid}_RACMO23-VW23.nc`;
+  the ERA5 1979-2022 file it pointed to has no `smb`.
+- `opt.cf_init <= 0` starts the optimization from the till friction of the bed
+  again (`cb_ref = cb_tgt`, from the `ytill` parameters), in every driver
+  (`domain_opt_init_cb_ref`). Only `yelmox_rembo` still did; `yelmox`,
+  `yelmox_bipolar` and `yelmox_esm` set `cb_ref = cf_init`, a negative friction.
+  `cf_init > 0` is unchanged (uniform `cb_ref`).
+- A restart from a bundle initializes Yelmo's passive-tracer backends (elsa,
+  tracer): `domain_startup` loads Yelmo with `yelmo_restart_init` instead of
+  `yelmo_restart_read`. Before, a restart with `ytrc.use_elsa` or `use_tracer`
+  crashed in the first step. Requires a yelmo with `yelmo_restart_init`.
+- `check_isostasy_reference` compares the two reference bedrocks on the isostasy
+  grid, where Yelmo's `z_bed_ref` is remapped exactly as the isostasy reference was
+  built: the same bedrock agrees to round-off on any isostasy grid (max |diff| <=
+  1 m). Before, it remapped back to the Yelmo grid and allowed a 10 m mean
+  difference, which a coarse isostasy grid over rough terrain exceeds (SRG on
+  16 km: -14 m).
+- SRG (Patagonia) runs again: `maps/grid_SRG-250M.txt` describes its grid (UTM
+  zone 18S, 250 m), which the multigrid setup needs. Isostasy is off by
+  default; when on, it runs on the new `SRG-16KM` grid (5x3 cells over the
+  domain; at 250 m the padded FFT domain did not fit in memory). Requires
+  fesm-utils with the transverse Mercator projection, and the
+  `ice_data/SRG/SRG-250M` files with ascending `yc` (flipped on 2026-10-01).
 - `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
   `obs_err_name` and `f_stdev` (startup stopped on the nml read).
 - `yelmox_esm_Antarctica.nml`: topography and geothermal heat flux read from

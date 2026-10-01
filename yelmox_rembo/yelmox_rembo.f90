@@ -26,7 +26,7 @@ program yelmox_rembo
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
                                refresh_hub, step_marine_shelf, couple_to_yelmo
     use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, &
-                               run_restart_write, restart_bundle_dir
+                               domain_opt_init_cb_ref, run_restart_write, restart_bundle_dir
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_read
     use kryos_output,   only : domain_write_init, domain_write_step, &
@@ -279,7 +279,7 @@ contains
         call couple_to_yelmo(dom)
 
         ! Basal-friction optimization cold-start guess (equil_method == "opt").
-        if (trim(dom%ctl%equil_method) == "opt") dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        call domain_opt_init_cb_ref(dom)
 
         ! Initialize Yelmo state variables (cold base).
         call yelmo_print_bound(dom%yelmo%bnd)

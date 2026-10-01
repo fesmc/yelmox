@@ -38,7 +38,7 @@
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 5e-3              ! Initial value of cf_ref everywhere (> 0; cold start only)
+    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
@@ -71,7 +71,7 @@
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 5e-3              ! Initial value of cf_ref everywhere (> 0; cold start only)
+    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
@@ -277,7 +277,7 @@
 
     ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
-    k24_flux_solver                  = 0
+    k24_flux_solver                  = 3
     k24_manning_exponent             = 3.0
     k24_latent_heat_water            = 3.35e5
     k24_bed_thickness                = 0.1
@@ -288,7 +288,7 @@
     k24_critical_discharge           = 1.0
     k24_initial_cavity_height        = 0.1
     k24_coupling_length              = 1.0e4
-    k24_long_coupling_water          = 5.0
+    k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
     k24_eta_w                        = 1.8e-3
     k24_W_min                        = 1.0e-8

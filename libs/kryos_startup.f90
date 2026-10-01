@@ -6,9 +6,10 @@ module kryos_startup
     use ncio
     use timestepping, only : tstep_class
     use yelmo,        only : wp, yelmo_update_equil, yelmo_init_state, yelmo_init_topo, &
-                             yelmo_print_bound, yelmo_restart_write, yelmo_restart_read, &
+                             yelmo_print_bound, yelmo_restart_write, yelmo_restart_init, &
                              yelmo_regions_update
     use yelmo_tools,  only : smooth_gauss_2D
+    use basal_dragging,   only : calc_cb_ref
     use yelmo_topography, only : calc_ytopo_diagnostic
     use yelmo_io,         only : yelmo_restart_read_topo_bnd
     use marine_shelf, only : marshelf_restart_write, marshelf_restart_read
@@ -26,6 +27,7 @@ module kryos_startup
     private
 
     public :: domain_startup, domain_init_state, domain_init_isostasy, domain_init_ice
+    public :: domain_opt_init_cb_ref
     public :: bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read
     public :: restart_bundle_dir, restart_bundle_mkdir
@@ -147,7 +149,7 @@ contains
 
         ! Cold-start friction guess for the optimization (restart restores cb_ref),
         ! set before the state init so its first dynamics solve already uses it.
-        if (trim(dom%ctl%equil_method) == "opt") dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        call domain_opt_init_cb_ref(dom)
 
         ! Initialize state variables (dyn, therm, mat) with a cold base
         call yelmo_print_bound(dom%yelmo%bnd)
@@ -158,6 +160,27 @@ contains
         call domain_init_ice(dom, ts)
 
     end subroutine domain_init_state
+
+    subroutine domain_opt_init_cb_ref(dom)
+        ! Cold-start basal friction of the optimization (equil_method == "opt"; a
+        ! restart restores cb_ref instead): opt.cf_init > 0 sets a uniform cb_ref,
+        ! cf_init <= 0 starts from the till friction of the bed (cb_tgt, from the
+        ! ytill parameters).
+        type(kryos_domain), intent(inout) :: dom
+
+        if (trim(dom%ctl%equil_method) /= "opt") return
+
+        if (dom%opt%cf_init > 0.0_wp) then
+            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        else
+            call calc_cb_ref(dom%yelmo%dyn%now%cb_ref, dom%yelmo%bnd%z_bed, dom%yelmo%bnd%z_bed_sd, &
+                    dom%yelmo%bnd%z_sl, dom%yelmo%bnd%H_sed, dom%yelmo%dyn%par%till_f_sed, &
+                    dom%yelmo%dyn%par%till_sed_min, dom%yelmo%dyn%par%till_sed_max, &
+                    dom%yelmo%dyn%par%till_cf_ref, dom%yelmo%dyn%par%till_cf_min, &
+                    dom%yelmo%dyn%par%till_z0, dom%yelmo%dyn%par%till_z1, dom%yelmo%dyn%par%till_n_sd, &
+                    dom%yelmo%dyn%par%till_scale_zb, dom%yelmo%dyn%par%till_scale_sed)
+        end if
+    end subroutine domain_opt_init_cb_ref
 
     subroutine domain_init_isostasy(dom, ts, bsl)
         ! Cold-start isostasy: reference and initial state on grid_isos from the
@@ -363,12 +386,13 @@ contains
         gy = trim(dom%ctl%grid_ice)
 
         ! Restore Yelmo first: it provides the current H_ice/z_bed for isostasy.
-        ! Two reads are needed, mirroring yelmo's native init-from-restart:
+        ! Two steps, mirroring yelmo's native init-from-restart:
         !   - yelmo_restart_read_topo_bnd loads the geometry [tpo]+[bnd]
-        !     (H_ice, z_bed, ...); the standalone yelmo_restart_read does NOT.
-        !   - yelmo_restart_read loads [dyn,therm,mat] + mask_bed.
-        ! use_restart/pc_active are flags the native path sets; the topo
-        ! diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
+        !     (H_ice, z_bed, ...);
+        !   - yelmo_restart_init loads [dyn,therm,mat] + mask_bed, activates the
+        !     predictor-corrector and initializes the passive-tracer backends
+        !     (elsa, tracer) from their sidecar files.
+        ! The topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
         !
         ! Only when the ice sheet is active. With with_ice_sheet=False the spin-up
         ! wrote no yelmo_restart.nc (see the matching guard in domain_restart_write),
@@ -379,9 +403,8 @@ contains
             call yelmo_restart_read_topo_bnd(dom%yelmo%tpo, dom%yelmo%bnd, dom%yelmo%time, &
                     dom%yelmo%par%restart_interpolated, dom%yelmo%grd, dom%yelmo%par%domain, &
                     dom%yelmo%par%grid_name, trim(fldr)//"/yelmo_restart.nc", ts%time)
-            call yelmo_restart_read(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
+            call yelmo_restart_init(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
             dom%yelmo%par%use_restart = .true.
-            dom%yelmo%time%pc_active  = .true.
         end if
 
         ! Restore isostasy via isos_init_state (reads state + reference from the

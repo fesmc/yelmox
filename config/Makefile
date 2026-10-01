@@ -9,7 +9,7 @@ libdir = libs
 
 # Command-line options at make call
 debug  ?= 0
-openmp ?= 0 
+openmp ?= 1
 
 ## COMPILER CONFIGURATION ##
 # Loaded from a config/<host> fragment by `python config.py --file <host>`,
@@ -96,7 +96,7 @@ isostasy-static: fesmutils-static
 # rembo1 builds against fesm-utils (which provides the coord/grid modules), so
 # fesmutils-static must run first.
 rembo-static: fesmutils-static
-	$(MAKE) -C $(REMBOROOT) rembo-static
+	$(MAKE) -C $(REMBOROOT) rembo-static openmp=$(openmp)
 
 # ---------------------------------------------------------------------------
 # Default programs: the multigrid drivers, one per flavor folder.

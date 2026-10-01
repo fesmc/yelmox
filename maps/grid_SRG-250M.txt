@@ -1,0 +1,25 @@
+# fesmutils grid description
+# mtype  = transverse_mercator
+# units  = kilometers
+# planet = WGS84
+# lon180 = T
+# lambda = -75.00000000000000
+# phi    = .000000000000000
+# alpha  = .000000000000000
+# x_e    = 500000.0000000000
+# y_n    = 10000000.00000000
+# k0     = .9996000000000000
+gridtype = projection
+gridsize =      24960
+xsize    =        208
+ysize    =        120
+xname    = xc
+xunits   = km
+yname    = yc
+yunits   = km
+xfirst   = 583.087171469987
+xinc     = .250000000000
+yfirst   = 4811.102314639904
+yinc     = .250000000000
+grid_mapping = crs
+proj_params = "+proj=tmerc +lon_0=-75.000000000 +lat_0=.000000000 +k=.999600000 +x_0=500000.000000 +y_0=10000000.000000 +a=6378137.000 +rf=298.257223563 +units=m"

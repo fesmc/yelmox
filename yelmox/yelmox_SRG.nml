@@ -8,9 +8,9 @@
 /
 
 &coupling
-    ! SRG is single-grid (SRG-250M): every component runs on the Yelmo grid.
+    ! SRG runs on the Yelmo grid (SRG-250M), isostasy on SRG-16KM.
     with_ice_sheet    = True   ! Is the ice sheet active?
-    with_isostasy     = True   ! Is isostasy active?
+    with_isostasy     = False  ! Is isostasy active? (SRG-16KM grid when on)
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = False  ! Ocean forcing off for now (imposed constant / none)
     equil_method    = "none"   ! "none", "relax", "opt"
@@ -43,7 +43,7 @@
     name         = "SRG"
     grid_hub     = "SRG-250M"         ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
-    grid_isos    = "SRG-250M"         ! isostasy [grid_ice]
+    grid_isos    = "SRG-16KM"         ! isostasy [grid_ice] (coarse: the glacier grid is not needed)
     grid_clim    = "SRG-250M"         ! reference climate + transient forcing [grid_ice]
     grid_smb     = "SRG-250M"         ! surface mass balance [grid_clim]
     grid_mshlf   = "SRG-250M"         ! marine shelf [grid_hub]
@@ -99,7 +99,7 @@
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 8e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 0.2               ! Initial value of cf_ref everywhere (> 0; cold start only)
+    cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
     
@@ -306,7 +306,7 @@
 
     ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
-    k24_flux_solver                  = 0
+    k24_flux_solver                  = 3
     k24_manning_exponent             = 3.0
     k24_latent_heat_water            = 3.35e5
     k24_bed_thickness                = 0.1
@@ -317,7 +317,7 @@
     k24_critical_discharge           = 1.0
     k24_initial_cavity_height        = 0.1
     k24_coupling_length              = 1.0e4
-    k24_long_coupling_water          = 5.0
+    k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
     k24_eta_w                        = 1.8e-3
     k24_W_min                        = 1.0e-8

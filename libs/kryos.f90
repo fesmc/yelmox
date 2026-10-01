@@ -379,8 +379,8 @@ contains
         ! Load optimization parameters and prepare Yelmo for external cb_ref:
         ! allocate/seed the friction bounds (cf_min/cf_max) on the Yelmo grid and
         ! switch till_method to external (-1) so yelmo_update uses the optimized
-        ! cb_ref. The initial cb_ref guess (cold start) is set in domain_init_state
-        ! after yelmo_init_state; on restart cb_ref is restored from the bundle.
+        ! cb_ref. The initial cb_ref guess (cold start) is set by
+        ! domain_opt_init_cb_ref; on restart cb_ref is restored from the bundle.
         ! No-op unless equil_method == "opt".
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
@@ -392,12 +392,6 @@ contains
 
         dom%opt%tf_basins = 0
         call optimize_par_load(dom%opt, path_par, "opt"//trim(suffix))
-
-        if (dom%opt%cf_init <= 0.0_wp) then
-            write(*,*) "domain_opt_init:: error: opt"//trim(suffix)//".cf_init must be > 0 &
-                       &(the cold-start cb_ref guess); got ", dom%opt%cf_init
-            stop 1
-        end if
 
         nx = dom%yelmo%grd%G%nx
         ny = dom%yelmo%grd%G%ny

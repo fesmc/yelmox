@@ -104,7 +104,7 @@
     opt_cf           = True              ! Should basal friction be optimized?
     cf_time_init     = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end      = 15e3              ! [yr] When should optimization of basal friction stop?
-    cf_init          = 0.1               ! Initial value of cf_ref everywhere (> 0; cold start only)
+    cf_init          = 0.1               ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
     tau_c            = 500.0             ! [yr] L21: Optimization relaxation timescale
     H0               = 100.0             ! [m]  L21: Optimization ice-thickness error scaling
 
@@ -254,6 +254,7 @@
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim
     beta_min            = 100            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    slide_T             = True            ! Reduce sliding below pressure melting point (sub-temperate sliding)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_solver           = "energy"       ! "residual" | "energy"
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
@@ -309,7 +310,7 @@
 
     ! ---- k24 (k24_) ----  unused under method_transport=0
     k24_substrate_type               = 0
-    k24_flux_solver                  = 0
+    k24_flux_solver                  = 3
     k24_manning_exponent             = 3.0
     k24_latent_heat_water            = 3.35e5
     k24_bed_thickness                = 0.1
@@ -320,7 +321,7 @@
     k24_critical_discharge           = 1.0
     k24_initial_cavity_height        = 0.1
     k24_coupling_length              = 1.0e4
-    k24_long_coupling_water          = 5.0
+    k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
     k24_eta_w                        = 1.8e-3
     k24_W_min                        = 1.0e-8

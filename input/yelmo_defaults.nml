@@ -214,12 +214,21 @@
 
     ! -- mode selectors --
     k24_substrate_type               = 2        ! 0=HARD 1=SOFT 2=MIXED (Fortran-only; builds kappa)
-    k24_flux_solver                  = 0        ! psi_out_algorithm: 0=RECURSIVE 1=ITERATIVE 2=TOPOSORT
+    k24_flux_solver                  = 3        ! 0=RECURSIVE 1=ITERATIVE 2=TOPOSORT (GDS_WARNER only) 3=TAPED (default)
+    k24_routing_scheme               = 0        ! 0=WARNER 1=GDS_WARNER (original K24) 2=QUINN 3=TARBOTON 4=MODIFIED_TARBOTON 5=GDS_TARBOTON
+    k24_quinn_original               = False    ! QUINN only: Quinn et al.'s own slope x contour-length weights
+    k24_fill_algorithm               = -1       ! -1=AUTO (JACOBI for GDS schemes, else PRIORITY_FLOOD) 0=JACOBI 1=LOWEST_NEIGHBOUR 2=PRIORITY_FLOOD
+    k24_priority_flood_epsilon       = 1.0      ! [Pa] potential step across a filled pit/flat
+    k24_q_conversion                 = -1       ! -1=AUTO (FACE_AVERAGE for WARNER, else OUTFLOW) 0=OUTFLOW 1=FACE_AVERAGE
+    k24_dissipation_discretization   = -1       ! -1=AUTO (FACE for WARNER, else CELL) 0=CELL 1=FACE
+    k24_friction_discretization      = 0        ! 0=CELL (tau_b*|u_b|) 1=STAGGERED (C-grid velocities)
+    k24_friction_quadrature          = False    ! STAGGERED only: Yelmo's qb_method=2 Gauss-point heat
+    k24_friction_u_floor             = 3.168808781402895e-11 ! [m/s] = 1e-3 m/yr, STAGGERED beta floor
     k24_toposort_allow_cycles        = False    ! TopologicalPsiOut(allow_cycles=...)
     k24_drainage_mode                = 0        ! 0=BOTH 1=EFFICIENT_ONLY 2=INEFFICIENT_ONLY
     k24_water_thickness_algorithm    = 0        ! 0=DARCY_WEISBACH 1=LAMINAR 2=AREAL_CONDUIT
     k24_gradient_convention          = 0        ! 0=MEAN 1=LOCAL (Darcy-Weisbach / laminar closures only)
-    k24_sliding_law                  = 0        ! 0=NONE 1=WEERTMAN 2=POWER_PLASTIC 3=REG_COULOMB
+    k24_sliding_law                  = 0        ! 0=NO_FRICTION 1=WEERTMAN 2=POWER_PLASTIC 3=REG_COULOMB 4=PRESCRIBED_FIELD 5=REG_COULOMB_FIELD 6=SHAKTI_REG_COULOMB
 
     ! -- physical constants --
     k24_manning_exponent             = 3.0      ! n, Glen's flow-law exponent
@@ -232,7 +241,7 @@
     k24_critical_discharge           = 1.0      ! Q_c [m3/s]
     k24_initial_cavity_height        = 0.1      ! H_0 [m]
     k24_coupling_length              = 1.0e4    ! l_c, conduit spacing [m]
-    k24_long_coupling_water          = 5.0      ! longcoupwater; 0 disables the smoothing entirely
+    k24_coupling_length_kamb86       = 10.0     ! Kamb & Echelmeyer (1986) coupling length / ice thickness; 0 disables the smoothing entirely
     k24_eta_w                        = 5.703855806525211e-11 ! eta_w [Pa s] = 1.8e-3 per year
 
     ! -- clamps. Julia's constructor leaves all of these OFF; KORI-ULB's own
@@ -245,7 +254,7 @@
 
     ! -- solver configuration --
     k24_fill_iters                   = 10       ! fill_iters
-    k24_max_psi_out_calls            = 50000    ! max_psi_out_calls
+    k24_max_psi_out_calls            = 100000   ! max_psi_out_calls
     k24_dissipation_melt             = True     ! add |q*grad(phi0)|/(L_w*rho_w) to the source
     k24_max_dissipation_iters        = 20       ! max_dissipation_iters
     k24_dissipation_rtol             = 1.0e-12  ! dissipation_rtol
@@ -253,7 +262,6 @@
     k24_max_coupling_iters           = 20       ! max_coupling_iters  (N-dependent sliding laws)
     k24_coupling_rtol                = 1.0e-8   ! coupling_rtol
     k24_coupling_verbose             = True     ! coupling_verbose
-    k24_mdot_includes_friction        = False    ! mdot_includes_friction: mdot already includes friction estimate
 
     ! -- sliding-law parameters. Only the set belonging to k24_sliding_law is
     !    read; C / c_till are mandatory keywords in Julia and default to 0 here,
@@ -266,6 +274,9 @@
     k24_reg_coulomb_c_till           = 0.0                    ! RegularizedCoulombSlidingLaw.c_till
     k24_reg_coulomb_q                = 0.3333333333333333     ! RegularizedCoulombSlidingLaw.q
     k24_reg_coulomb_u0               = 3.168808781402895e-06  ! RegularizedCoulombSlidingLaw.u0 [m/s] = 100 m/yr
+    k24_shakti_C                     = 0.0                    ! ShaktiRegularizedCoulombSlidingLaw.C
+    k24_shakti_n                     = 3.0                    ! ShaktiRegularizedCoulombSlidingLaw.n
+    k24_shakti_lambda_coeff          = 1.5                    ! lambda = coeff * A_glen
 /
 
 &ymat
@@ -294,6 +305,7 @@
     use_euler               = False         ! Run the in-tree Eulerian age tracer?
     use_tracer              = False         ! Run the Lagrangian particle backend (tracer)?
     use_elsa                = False         ! Run the Lagrangian layer backend (elsa)?
+    elsa_restart            = True          ! On a restart, restore elsa's layers (False: start them fresh)
     t_dep_source            = "euler"       ! "euler", "trc", "elsa": authoritative deposition-time source
     time_end                = 0.0           ! [yr] simulation end time for use_elsa (sizes elsa's layer stack; 0.0 = present day)
 
@@ -328,6 +340,10 @@
     omega_max       = 0.01              ! [--] Maximum allowed water content fraction
     H_ice_thin      = 10.0              ! [m] Skip column solver below this thickness (linear profile imposed)
     enth_cp_method  = "integral"        ! Enthalpy heat capacity: "const" (cp_ref) or "integral" (int cp(T) dT)
+    basal_bc_method = "capacity"        ! Grounded basal BC: "capacity" (bmb_grnd* vs freeze-on capacity C) or "wtil" (till-water predictor, deprecated)
+    cap_source      = "auto"            ! [capacity] C from: "auto" ("hyd" with water transport, else "till"), "hyd" (hydrology model), "till" (bucket W_til), "water" (water thickness W), "none" (C=0)
+    cap_W_floor     = 0.0               ! [m] [capacity, "till"/"water"] floor subtracted from the water thickness
+    cap_eps         = 1e-4              ! [m/a ice equiv.] [capacity] C below this counts as a dry bed
     ! Basal water bucket (till_rate, H_w_max) moved to &yhyd.
 
     rock_method     = "equil"           ! "equil" (not active bedrock), "active", or "fixed"

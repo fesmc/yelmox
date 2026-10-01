@@ -18,11 +18,13 @@
 /
 
 &gcm_smb_ref
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    ! RACMO2.3 monthly climatology (van Wessem et al.): the ERA5 1979-2022 file
+    ! above has no smb.
+    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_RACMO23-VW23.nc"
     name        = "smb"
-    units       = "kg m-2 month-1" "mm yr-1"
-    scaling     = 12.0 0.0
-    time        = 1, 1979.0, 2022.0, 1.0, 12.0
+    units       = "kg m-2 d-1" "mm yr-1"
+    scaling     = 365.0 0.0
+    time        = 0, 1979.0, 2022.0, 0, 12.0
 /
 
 &gcm_zs_ref
