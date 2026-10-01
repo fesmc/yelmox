@@ -5,6 +5,13 @@
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
     basins_var   = "basin"
+    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
+    sectors_var  = "mask_regions"
+    ice_codes_mode = "exclude"
+    ice_codes    = 2.0
+    region_names = "APIS" "WAIS" "EAIS"
+    region_mask  = "sectors"
+    region_codes = 3.0 1.0 2.0
 /
 &domain_nomask
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
@@ -13,6 +20,13 @@
     regions_var  = "mask"
     basins_path  = ""
     basins_var   = "basin"
+    sectors_path = ""
+    sectors_var  = ""
+    ice_codes_mode = "all"
+    ice_codes    = ""
+    region_names = ""
+    region_mask  = "regions"
+    region_codes = ""
 /
 &domain_gaps
     topo_path    = "test_htopo_gaps.nc"
@@ -21,4 +35,11 @@
     regions_var  = "mask"
     basins_path  = ""
     basins_var   = "basin"
+    sectors_path = ""
+    sectors_var  = ""
+    ice_codes_mode = "all"
+    ice_codes    = ""
+    region_names = ""
+    region_mask  = "regions"
+    region_codes = ""
 /

@@ -421,12 +421,7 @@
 /
 
 &yelmo_masks_south
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin_reese" "basin_mask"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+    ! regions and basins come from the hub ([domain_south])
 /
 
 &yelmo_init_topo_south
@@ -808,6 +803,13 @@
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
     basins_var   = "basin"
+    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" ! "" = none (sectors = 1)
+    sectors_var  = "mask_regions"
+    ice_codes_mode = "exclude"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
+    ice_codes    = 2.0               ! codes of regions ("" = none)
+    region_names = "APIS" "WAIS" "EAIS" ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
+    region_mask  = "sectors"         ! code mask of the named regions: regions, basins or sectors
+    region_codes = 3.0 1.0 2.0       ! one code per named region
 /
 
 &coupling_south
@@ -905,12 +907,7 @@
 /
 
 &yelmo_masks_north
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin" "basin_mask"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+    ! regions and basins come from the hub ([domain_north])
 /
 
 &yelmo_init_topo_north
@@ -1283,6 +1280,13 @@
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
     basins_var   = "basin"
+    sectors_path = ""                ! "" = none (sectors = 1)
+    sectors_var  = ""
+    ice_codes_mode = "include"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
+    ice_codes    = 1.3 1.11 1.0      ! codes of regions ("" = none)
+    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
+    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
+    region_codes = ""                ! one code per named region
 /
 
 &coupling_north

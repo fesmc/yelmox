@@ -80,7 +80,7 @@ $(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 $(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o \
-						$(objdir)/ice_sub_regions.o
+						$(objdir)/htopo.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 $(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
@@ -163,9 +163,6 @@ $(objdir)/pico_physics.o: $(libdir)/pico/pico_physics.f90
 $(objdir)/pico.o: $(libdir)/pico/pico.f90 $(objdir)/pico_geometry.o $(objdir)/pico_physics.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/ice_sub_regions.o: $(libdir)/ice_sub_regions.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $^
-
 # oceanic models for bipolar mode
 $(objdir)/obm_defs.o: $(libdir)/obm/obm_defs.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -213,7 +210,6 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/yelmox_climate.o \
 					    $(climate_backend_obj) \
 						$(objdir)/htopo.o \
-						$(objdir)/ice_sub_regions.o \
 						$(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o \
 						$(objdir)/kryos_coupling.o \

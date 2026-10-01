@@ -53,6 +53,13 @@
     ! off here); no file, so basins default to 1.0.
     basins_path  = ""                 ! "" = none (basins = 1)
     basins_var   = "basin"
+    sectors_path = ""                ! "" = none (sectors = 1)
+    sectors_var  = ""
+    ice_codes_mode = "all"           ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
+    ice_codes    = ""                ! codes of regions ("" = none)
+    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
+    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
+    region_codes = ""                ! one code per named region
 /
 
 &tm_1D
@@ -359,12 +366,7 @@
 /
 
 &yelmo_masks
-    basins_load     = False 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc" 
-    basins_nms      = "mask" "regions"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+    ! regions and basins come from the hub ([domain])
 /
 
 &yelmo_init_topo

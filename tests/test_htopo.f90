@@ -45,6 +45,26 @@ program test_htopo
         write(*,*) "FAIL: z_bed_sd looks empty"; fails = fails + 1
     end if
 
+    ! Sectors and the named regions (APIS/WAIS/EAIS = sectors 3/1/2).
+    if (minval(ht%sectors) /= 0.0 .or. maxval(ht%sectors) /= 3.0) then
+        write(*,*) "FAIL: sectors range is not 0..3"; fails = fails + 1
+    end if
+    if (ht%par%n_regions /= 3 .or. trim(ht%par%region_names(2)) /= "WAIS" .or. &
+        ht%par%region_codes(2) /= 1.0) then
+        write(*,*) "FAIL: named regions not read"; fails = fails + 1
+    end if
+    if (any(htopo_region_codes(ht) /= ht%sectors)) then
+        write(*,*) "FAIL: region_mask = sectors does not give the sectors"; fails = fails + 1
+    end if
+
+    ! Ice allowed everywhere except the open ocean (regions code 2.0).
+    if (any(htopo_ice_allowed(ht%par, ht%regions) .neqv. (ht%regions /= 2.0))) then
+        write(*,*) "FAIL: exclude ice_codes"; fails = fails + 1
+    end if
+    if (count(.not. htopo_ice_allowed(ht%par, ht%regions)) == 0) then
+        write(*,*) "FAIL: no open ocean in the regions"; fails = fails + 1
+    end if
+
     ! Blank mask paths and z_bed_sd name: nothing is read and the masks
     ! default to 1, z_bed_sd to 0.
     call htopo_init(ht_nomask, "tests/test_htopo.nml", "domain_nomask", "Antarctica", "ANT-16KM", &
@@ -59,6 +79,24 @@ program test_htopo
     end if
     if (maxval(abs(ht_nomask%z_bed - ht%z_bed)) /= 0.0) then
         write(*,*) "FAIL: blank mask paths changed the topography"; fails = fails + 1
+    end if
+    if (minval(ht_nomask%sectors) /= 1.0 .or. maxval(ht_nomask%sectors) /= 1.0) then
+        write(*,*) "FAIL: blank sectors path did not give sectors of 1"; fails = fails + 1
+    end if
+    if (ht_nomask%par%n_regions /= 0 .or. ht_nomask%par%n_ice_codes /= 0) then
+        write(*,*) "FAIL: blank code lists are not empty"; fails = fails + 1
+    end if
+    if (.not. all(htopo_ice_allowed(ht_nomask%par, ht%regions))) then
+        write(*,*) "FAIL: ice_codes_mode = all does not allow ice everywhere"; fails = fails + 1
+    end if
+
+    ! Include: ice only on the given codes.
+    ht_nomask%par%ice_codes_mode = "include"
+    ht_nomask%par%ice_codes(1:2) = [1.0, 3.0]
+    ht_nomask%par%n_ice_codes    = 2
+    if (any(htopo_ice_allowed(ht_nomask%par, ht%regions) .neqv. &
+            (ht%regions == 1.0 .or. ht%regions == 3.0))) then
+        write(*,*) "FAIL: include ice_codes"; fails = fails + 1
     end if
 
     ! Data gaps: a copy of the topography with all fields missing in a band

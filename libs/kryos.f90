@@ -23,6 +23,7 @@ module kryos
     use nml,          only : nml_read
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_init_grid, ytopo_input_class
+    use yelmo_defs,   only : MASK_ICE_NONE, MASK_ICE_DYNAMIC
     use marine_shelf, only : marshelf_class, marshelf_init
     use fastisostasy, only : isos_class, isos_init
     use climate_out,    only : climate_out_class
@@ -32,7 +33,7 @@ module kryos
     use ice_optimization, only : ice_opt_params, optimize_par_load
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
-    use htopo,        only : htopo_class, htopo_init
+    use htopo,        only : htopo_class, htopo_init, htopo_ice_allowed
     use coupler,      only : coupler_class, coupler_init, coupler_prime, cpl_remap => remap
 
     implicit none
@@ -188,6 +189,8 @@ contains
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
+        real(wp), allocatable :: regions_y(:,:), basins_y(:,:)
+        integer,  allocatable :: mask_ice_y(:,:)
         real(wp), allocatable :: xs(:), ys(:), lats_s(:,:), Href_s(:,:)
         type(ytopo_input_class) :: topo_y
 
@@ -211,10 +214,13 @@ contains
         call coupler_init(dom%cpl)
         call coupler_prime(dom%cpl, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
         call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
+        call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "nn")     ! hub -> Yelmo (masks)
 
-        ! --- ice sheet on grid_ice, with the hub's topography ---
+        ! --- ice sheet on grid_ice, with the hub's topography and masks ---
         ! The hub topography is both Yelmo's initial state and its present-day
-        ! reference (H_ice_ref, z_bed_ref, optimization target).
+        ! reference (H_ice_ref, z_bed_ref, optimization target). The code masks
+        ! come from the hub too, and the domain says where ice is allowed
+        ! (Yelmo's mask_border then sets the border).
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         call yelmo_init_grid(dom%yelmo%grd, grid_y)
 
@@ -223,9 +229,16 @@ contains
         call remap(dom, dom%topo%z_srf,    dom%ctl%grid_hub, topo_y%z_srf,    dom%ctl%grid_ice, "con")
         call remap(dom, dom%topo%z_bed_sd, dom%ctl%grid_hub, topo_y%z_bed_sd, dom%ctl%grid_ice, "con")
 
+        call remap(dom, dom%topo%regions,  dom%ctl%grid_hub, regions_y,       dom%ctl%grid_ice, "nn")
+        call remap(dom, dom%topo%basins,   dom%ctl%grid_hub, basins_y,        dom%ctl%grid_ice, "nn")
+        allocate(mask_ice_y(size(regions_y,1), size(regions_y,2)))
+        mask_ice_y = MASK_ICE_NONE
+        where (htopo_ice_allowed(dom%topo%par, regions_y)) mask_ice_y = MASK_ICE_DYNAMIC
+
         call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
-                        group="yelmo"//trim(sfx), topo_init=topo_y, topo_pd=topo_y)
+                        group="yelmo"//trim(sfx), regions=regions_y, basins=basins_y, &
+                        mask_ice=mask_ice_y, topo_init=topo_y, topo_pd=topo_y)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
         ! Isostasy on its configured grid (grid_isos).

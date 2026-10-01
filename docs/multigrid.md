@@ -302,20 +302,27 @@ masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer set
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
     basins_var   = "basin"
+    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"   ! "" = none (1)
+    sectors_var  = "mask_regions"
+    ice_codes_mode = "exclude"      ! where ice is allowed: all | include | exclude (ice_codes)
+    ice_codes    = 2.0              ! codes of regions ("" = none)
+    region_names = "APIS" "WAIS" "EAIS"   ! named regions for 1D output ("" = none)
+    region_mask  = "sectors"        ! regions | basins | sectors
+    region_codes = 3.0 1.0 2.0
 /
 ```
 
 `htopo` holds the hub. It sits *above* every physics module (including Yelmo):
 its grid (`grid_hub`) is the finest resolution in the setup, and it is the
 reference geometry the coupler remaps *from*. On the hub grid it holds static
-fields (the code masks `regions`/`basins` and the bed roughness `z_bed_sd`,
-loaded once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later
+fields (the code masks `regions`/`basins`/`sectors` and the bed roughness
+`z_bed_sd`, loaded once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later
 refreshed each step from Yelmo/isostasy). `{domain}/{grid_name}` in the paths
 resolve to `name`/`grid_hub`. `htopo_init` resolves the grid from
 `grid_<name>.txt` (the disk grid table) and reads the fields onto it —
 validated by `tests/test_htopo.f90` against the real ANT-16KM data. A blank
 mask path (e.g. paleo domains without mask files) leaves the mask at `1.0`
-(single region/basin); a blank `z_bed_sd` name leaves it at `0`. Gaps in the
+(single region/basin/sector); a blank `z_bed_sd` name leaves it at `0`. Gaps in the
 topography file (missing values, e.g. outside the coverage of the source
 dataset) are filled: no ice, the bed from the nearest valid cell, the surface
 from the bed and the ice thickness (sea level 0), and no bed roughness.
@@ -327,6 +334,14 @@ are both its initial topography and its present-day reference (`yelmo_init`
 `topo_init`/`topo_pd`). Yelmo then processes them as it would its own files
 (`[yelmo_init_topo]` keeps `init_topo_state`, `z_bed_f_sd`, smoothing; its
 `grad_lim_zb` applies). Where `grid_ice = grid_hub` the remap is a copy.
+
+The code masks reach Yelmo the same way (nearest neighbour): `regions` and
+`basins` are Yelmo's (`yelmo_init` `regions`/`basins`), and every component uses
+this one set. Where ice is allowed follows from `ice_codes_mode` and
+`ice_codes` (codes of `regions`; `yelmo_init` `mask_ice`); Yelmo's
+`mask_border` (`[yelmo]`, default `"auto"`) then sets the domain border. The
+named regions (`region_names`, one code each of `region_mask`) get their own 1D
+output, `yelmo_ts_<name>.nc`.
 
 ### Buffers
 

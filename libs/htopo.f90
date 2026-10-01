@@ -7,14 +7,16 @@ module htopo
     ! z_bed/H_ice/z_srf/masks.
     !
     ! Two provenance classes of field live here:
-    !   * regions, basins, z_bed_sd -- static (code masks and bed roughness),
-    !     loaded once from file;
+    !   * regions, basins, sectors, z_bed_sd -- static (code masks and bed
+    !     roughness), loaded once from file;
     !   * z_bed, H_ice, z_srf -- dynamic geometry, loaded here as the initial
     !     reference and refreshed each step from the models (refresh_hub).
     !
     ! The file paths and variable names come from the domain definition
     ! (&domain); {domain}/{grid_name} in the paths resolve to the domain name
-    ! and the hub grid.
+    ! and the hub grid. The domain definition also says where ice is allowed
+    ! (ice_codes of `regions`) and names the regions of interest for 1D output
+    ! (region_names/region_codes of one code mask).
 
     use nml
     use ncio
@@ -29,6 +31,9 @@ module htopo
     real(wp), parameter :: mv      = -9999.0_wp   ! missing value of the topography reads
     real(wp), parameter :: rho_ice =   910.0_wp   ! [kg/m3] ice density (surface of gap cells)
     real(wp), parameter :: rho_sw  =  1028.0_wp   ! [kg/m3] seawater density
+    real(wp), parameter :: tol_code = 1e-3_wp     ! tolerance to match a mask code
+
+    integer, parameter :: n_codes_max = 20        ! max entries of the code lists
 
     type htopo_par_class
         character(len=256) :: domain
@@ -39,6 +44,15 @@ module htopo
         character(len=56)  :: regions_var
         character(len=512) :: basins_path     ! "" = no file (basins = 1)
         character(len=56)  :: basins_var
+        character(len=512) :: sectors_path    ! "" = no file (sectors = 1)
+        character(len=56)  :: sectors_var
+        character(len=16)  :: ice_codes_mode  ! where ice is allowed: all | include | exclude
+        real(wp)           :: ice_codes(n_codes_max)      ! codes of `regions`
+        character(len=56)  :: region_names(n_codes_max)   ! named regions ("" = none)
+        character(len=16)  :: region_mask     ! code mask of the named regions: regions | basins | sectors
+        real(wp)           :: region_codes(n_codes_max)   ! one code per named region
+        integer            :: n_ice_codes     ! number of ice_codes given
+        integer            :: n_regions       ! number of named regions
     end type
 
     type htopo_class
@@ -51,12 +65,14 @@ module htopo
         real(wp), allocatable :: z_bed_sd(:,:) ! [m] standard deviation of z_bed (static)
         real(wp), allocatable :: regions(:,:) ! region mask
         real(wp), allocatable :: basins(:,:)  ! basin mask
+        real(wp), allocatable :: sectors(:,:) ! sector mask (e.g. Antarctic APIS/WAIS/EAIS)
         ! Dynamic geometry refreshed from the models each step (not file-loaded).
         real(wp), allocatable :: f_grnd(:,:)  ! [1] grounded-ice fraction
         real(wp), allocatable :: z_sl(:,:)    ! [m] sea-surface / sea-level height
     end type
 
     public :: htopo_class, htopo_init
+    public :: htopo_ice_allowed, htopo_region_codes
     public :: htopo_write_init, htopo_write_step
 
 contains
@@ -89,6 +105,7 @@ contains
         allocate(htopo%z_bed_sd(htopo%nx,htopo%ny))
         allocate(htopo%regions(htopo%nx,htopo%ny))
         allocate(htopo%basins(htopo%nx,htopo%ny))
+        allocate(htopo%sectors(htopo%nx,htopo%ny))
         allocate(htopo%f_grnd(htopo%nx,htopo%ny)); htopo%f_grnd = 0.0_wp
         allocate(htopo%z_sl(htopo%nx,htopo%ny));   htopo%z_sl   = 0.0_wp
 
@@ -104,15 +121,60 @@ contains
         end if
 
         ! Static masks: load from file when a path is given, else default to a
-        ! single region/basin (1.0), so paleo domains without mask files run.
+        ! single region/basin/sector (1.0), so paleo domains without mask files run.
         htopo%regions = 1.0_wp
         htopo%basins  = 1.0_wp
+        htopo%sectors = 1.0_wp
         if (len_trim(htopo%par%regions_path) > 0) &
             call nc_read(htopo%par%regions_path, htopo%par%regions_var, htopo%regions)
         if (len_trim(htopo%par%basins_path) > 0) &
             call nc_read(htopo%par%basins_path,  htopo%par%basins_var,  htopo%basins)
+        if (len_trim(htopo%par%sectors_path) > 0) &
+            call nc_read(htopo%par%sectors_path, htopo%par%sectors_var, htopo%sectors)
 
     end subroutine htopo_init
+
+    function htopo_ice_allowed(par, regions) result(allowed)
+        ! Where ice is allowed, from the region codes on any grid (ice_codes_mode:
+        ! "all", "include" = only on ice_codes, "exclude" = everywhere but ice_codes).
+        type(htopo_par_class), intent(in) :: par
+        real(wp),              intent(in) :: regions(:,:)
+        logical :: allowed(size(regions,1),size(regions,2))
+
+        integer :: k
+
+        select case(trim(par%ice_codes_mode))
+            case("all")
+                allowed = .true.
+            case("include")
+                allowed = .false.
+                do k = 1, par%n_ice_codes
+                    where (abs(regions - par%ice_codes(k)) < tol_code) allowed = .true.
+                end do
+            case("exclude")
+                allowed = .true.
+                do k = 1, par%n_ice_codes
+                    where (abs(regions - par%ice_codes(k)) < tol_code) allowed = .false.
+                end do
+        end select
+
+    end function htopo_ice_allowed
+
+    function htopo_region_codes(htopo) result(codes)
+        ! The code mask the named regions refer to (region_mask), on the hub grid.
+        type(htopo_class), intent(in) :: htopo
+        real(wp) :: codes(htopo%nx,htopo%ny)
+
+        select case(trim(htopo%par%region_mask))
+            case("regions")
+                codes = htopo%regions
+            case("basins")
+                codes = htopo%basins
+            case("sectors")
+                codes = htopo%sectors
+        end select
+
+    end function htopo_region_codes
 
     subroutine htopo_fill_missing(htopo)
         ! Fill the gaps of the reference geometry (e.g. outside the coverage of
@@ -157,24 +219,68 @@ contains
         par%domain    = trim(domain)
         par%grid_name = trim(grid_name)
 
-        ! Blank entries read as "" (nml_read leaves the value untouched)
+        ! Blank entries read as "" (nml_read leaves the value untouched); list
+        ! entries not given keep mv / "".
         par%topo_names   = ""
         par%regions_path = ""
         par%basins_path  = ""
+        par%sectors_path = ""
+        par%ice_codes    = mv
+        par%region_names = ""
+        par%region_codes = mv
 
-        call nml_read(filename, group, "topo_path",    par%topo_path)
-        call nml_read(filename, group, "topo_names",   par%topo_names)
-        call nml_read(filename, group, "regions_path", par%regions_path)
-        call nml_read(filename, group, "regions_var",  par%regions_var)
-        call nml_read(filename, group, "basins_path",  par%basins_path)
-        call nml_read(filename, group, "basins_var",   par%basins_var)
+        call nml_read(filename, group, "topo_path",      par%topo_path)
+        call nml_read(filename, group, "topo_names",     par%topo_names)
+        call nml_read(filename, group, "regions_path",   par%regions_path)
+        call nml_read(filename, group, "regions_var",    par%regions_var)
+        call nml_read(filename, group, "basins_path",    par%basins_path)
+        call nml_read(filename, group, "basins_var",     par%basins_var)
+        call nml_read(filename, group, "sectors_path",   par%sectors_path)
+        call nml_read(filename, group, "sectors_var",    par%sectors_var)
+        call nml_read(filename, group, "ice_codes_mode", par%ice_codes_mode)
+        call nml_read(filename, group, "ice_codes",      par%ice_codes)
+        call nml_read(filename, group, "region_names",   par%region_names)
+        call nml_read(filename, group, "region_mask",    par%region_mask)
+        call nml_read(filename, group, "region_codes",   par%region_codes)
 
         ! Resolve {domain}/{grid_name} against the hub grid.
         call parse_path(par%topo_path,    par%domain, par%grid_name)
         call parse_path(par%basins_path,  par%domain, par%grid_name)
         call parse_path(par%regions_path, par%domain, par%grid_name)
+        call parse_path(par%sectors_path, par%domain, par%grid_name)
+
+        par%n_ice_codes = count(par%ice_codes /= mv)
+        par%n_regions   = count(len_trim(par%region_names) > 0)
+
+        select case(trim(par%ice_codes_mode))
+            case("all")
+                ! ice_codes not used
+            case("include", "exclude")
+                if (par%n_ice_codes == 0) call htopo_par_error(group, &
+                    "ice_codes_mode = "//trim(par%ice_codes_mode)//" needs ice_codes.")
+            case default
+                call htopo_par_error(group, "ice_codes_mode must be all, include or exclude; got "// &
+                                     trim(par%ice_codes_mode)//".")
+        end select
+
+        select case(trim(par%region_mask))
+            case("regions", "basins", "sectors")
+            case default
+                call htopo_par_error(group, "region_mask must be regions, basins or sectors; got "// &
+                                     trim(par%region_mask)//".")
+        end select
+
+        if (any(par%region_codes(1:par%n_regions) == mv)) call htopo_par_error(group, &
+            "region_codes needs one code per entry of region_names.")
 
     end subroutine htopo_par_load
+
+    subroutine htopo_par_error(group, msg)
+        character(len=*), intent(in) :: group, msg
+        write(*,*) ""
+        write(*,*) "htopo_par_load:: error in ["//trim(group)//"]: "//trim(msg)
+        stop
+    end subroutine htopo_par_error
 
     subroutine htopo_write_init(htopo, filename, time_init)
         ! Create a 2D output file on the topo grid, with the static masks.
@@ -192,6 +298,8 @@ contains
                       start=[1,1], long_name="Region mask", units="")
         call nc_write(filename, "basins", htopo%basins, dim1="xc", dim2="yc", &
                       start=[1,1], long_name="Basin mask", units="")
+        call nc_write(filename, "sectors", htopo%sectors, dim1="xc", dim2="yc", &
+                      start=[1,1], long_name="Sector mask", units="")
     end subroutine htopo_write_init
 
     subroutine htopo_write_step(htopo, filename, time)

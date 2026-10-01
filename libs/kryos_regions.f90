@@ -1,13 +1,13 @@
 module kryos_regions
-    ! Region-specific setup and physics of a kryos_domain: ice masks and the
-    ! sub-regions for 1D output, the LGM-like marine-ice initial state, the
-    ! Greenland NEGIS basal-friction modification and the glacial SMB scaling.
+    ! Region-specific setup and physics of a kryos_domain: the named regions
+    ! for 1D output, the LGM-like marine-ice initial state, the Greenland NEGIS
+    ! basal-friction modification and the glacial SMB scaling.
 
     use yelmo,        only : yelmo_class, wp, yelmo_regions_init, yelmo_region_init
-    use yelmo_defs,   only : MASK_ICE_NONE, MASK_ICE_FIXED, MASK_ICE_DYNAMIC
+    use yelmo_defs,   only : MASK_ICE_NONE
     use basal_dragging, only : calc_cb_ref
-    use ice_sub_regions, only : get_ice_sub_region
-    use kryos,        only : kryos_domain, negis_params
+    use htopo,        only : htopo_region_codes
+    use kryos,        only : kryos_domain, negis_params, remap
 
     implicit none
     private
@@ -18,64 +18,40 @@ module kryos_regions
 contains
 
     subroutine domain_regions_init(dom, outfldr)
-        ! Define the domain's regions of interest for 1D regional output. Masks are
-        ! resolved on the Yelmo grid (get_ice_sub_region); regional files land in
-        ! outfldr. Domains without defined sub-regions get n=0 (global region only).
+        ! Define the domain's named regions for 1D regional output ([domain]
+        ! region_names, region_mask, region_codes; the code mask is remapped from
+        ! the hub to the Yelmo grid). Regional files land in outfldr. Without
+        ! named regions only the global region is written.
         ! Must be called after domain_init and before the first yelmo_update.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
-        logical, allocatable :: tmp_mask(:,:)
-        character(len=256)   :: domain, grid_name
-        integer              :: i, nx, ny
-
-        domain    = trim(dom%ctl%domain)
-        grid_name = trim(dom%ctl%grid_ice)
-        nx = dom%yelmo%grd%G%nx
-        ny = dom%yelmo%grd%G%ny
-        allocate(tmp_mask(nx, ny))
+        logical, allocatable  :: tmp_mask(:,:)
+        real(wp), allocatable :: codes_y(:,:)
+        integer               :: i, k, n
 
         ! Hand yelmo its output folder: the single source for all files yelmo
         ! writes internally (regional 1D files below, and yelmo_metrics.nc).
         dom%yelmo%outfldr = trim(outfldr)
 
-        select case(trim(domain))
+        n = dom%topo%par%n_regions
+        call yelmo_regions_init(dom%yelmo, n=n)
 
-            case("Antarctica")
-                call yelmo_regions_init(dom%yelmo, n=3)
+        if (n > 0) then
+            call remap(dom, htopo_region_codes(dom%topo), dom%ctl%grid_hub, codes_y, &
+                       dom%ctl%grid_ice, "nn")
+            allocate(tmp_mask(size(codes_y,1), size(codes_y,2)))
+            do k = 1, n
+                tmp_mask = abs(codes_y - dom%topo%par%region_codes(k)) < 1e-3_wp
+                call yelmo_region_init(dom%yelmo%regs(k), trim(dom%topo%par%region_names(k)), &
+                                       mask=tmp_mask, write_to_file=.true., outfldr=outfldr)
+            end do
+        end if
 
-                call get_ice_sub_region(tmp_mask, "APIS", domain, grid_name)
-                call yelmo_region_init(dom%yelmo%regs(1), "APIS", mask=tmp_mask, &
-                                       write_to_file=.true., outfldr=outfldr)
-
-                call get_ice_sub_region(tmp_mask, "WAIS", domain, grid_name)
-                call yelmo_region_init(dom%yelmo%regs(2), "WAIS", mask=tmp_mask, &
-                                       write_to_file=.true., outfldr=outfldr)
-
-                call get_ice_sub_region(tmp_mask, "EAIS", domain, grid_name)
-                call yelmo_region_init(dom%yelmo%regs(3), "EAIS", mask=tmp_mask, &
-                                       write_to_file=.true., outfldr=outfldr)
-
-            case("Laurentide")
-                ! Prevent ice growth in Greenland (region 1.30) and on grid borders.
-                where(abs(dom%yelmo%bnd%regions - 1.30) < 1e-3) &
-                    dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
-                dom%yelmo%bnd%mask_ice(1,:)  = MASK_ICE_NONE
-                dom%yelmo%bnd%mask_ice(nx,:) = MASK_ICE_NONE
-                dom%yelmo%bnd%mask_ice(:,1)  = MASK_ICE_NONE
-                dom%yelmo%bnd%mask_ice(:,ny) = MASK_ICE_NONE
-
-                call yelmo_regions_init(dom%yelmo, n=1)
-                call get_ice_sub_region(tmp_mask, "Hudson", domain, grid_name)
-                call yelmo_region_init(dom%yelmo%regs(1), "Hudson", mask=tmp_mask, &
-                                       write_to_file=.true., outfldr=outfldr)
+        ! Region physics, by domain name (to become configuration keys).
+        select case(trim(dom%ctl%domain))
 
             case("Greenland")
-                ! Prevent ice in Iceland/Svalbard (regions 1.20/1.23/1.31, grid borders).
-                where(abs(dom%yelmo%bnd%regions - 1.20) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
-                where(abs(dom%yelmo%bnd%regions - 1.23) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
-                where(abs(dom%yelmo%bnd%regions - 1.31) < 1e-3) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
-
                 ! NEGIS cb_ref modification: enabled via [coupling] use_negis, which
                 ! loads the [negis] parameters in domain_init.
 
@@ -83,25 +59,13 @@ contains
                 if (dom%yelmo%dyn%par%till_method == -1) &
                     dom%yelmo%dyn%now%cb_ref = dom%yelmo%dyn%par%till_cf_ref
 
-                call yelmo_regions_init(dom%yelmo, n=0)
-
             case("Patagonia")
-                ! Fix ice on the domain borders, relax to obs outside the icefield.
-                dom%yelmo%bnd%mask_ice        = MASK_ICE_DYNAMIC
-                dom%yelmo%bnd%mask_ice(1,:)   = MASK_ICE_FIXED
-                dom%yelmo%bnd%mask_ice(nx,:)  = MASK_ICE_FIXED
-                dom%yelmo%bnd%mask_ice(:,1)   = MASK_ICE_FIXED
-                dom%yelmo%bnd%mask_ice(:,ny)  = MASK_ICE_FIXED
+                ! Relax to obs outside the icefield.
                 where(abs(dom%yelmo%bnd%regions - 1.0) < 1e-3)
                     dom%yelmo%bnd%tau_relax = -1.0      ! icefield: free evolution
                 elsewhere
                     dom%yelmo%bnd%tau_relax = 50.0      ! outside: relax to H_ice_ref
                 end where
-                call yelmo_regions_init(dom%yelmo, n=0)
-
-            case default
-                ! No sub-regions defined for this domain; global region only.
-                call yelmo_regions_init(dom%yelmo, n=0)
 
         end select
 

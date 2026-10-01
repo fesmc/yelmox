@@ -37,6 +37,22 @@ annotated git tag. Dates are release (tag) dates.
   valid cell (fesm-utils `fill_nearest`), `z_srf` from `z_bed` and `H_ice` at sea
   level 0, and `z_bed_sd = 0`. The counts are logged. Before, the raw fill
   values (-9e33) reached the remaps; Yelmo's own reads set them to -9999.
+- **Ice mask and named regions from the domain.** `[domain]` gains
+  `sectors_path`/`_var` (a third code mask), `ice_codes_mode` (`all`, `include`,
+  `exclude`) with `ice_codes` (codes of `regions`: where ice is allowed), and
+  `region_names`/`region_mask`/`region_codes` (named regions for 1D output,
+  `yelmo_ts_<name>.nc`). The hub's `regions` and `basins` (nearest neighbour to
+  `grid_ice`) are now Yelmo's too, one set for every component, and the ice mask
+  is passed to `yelmo_init`; `[yelmo_masks]` keeps no keys. This replaces
+  `libs/ice_sub_regions.f90` and the per-domain masks in `domain_regions_init`
+  and in Yelmo. Par files: Antarctica `exclude 2.0`, APIS/WAIS/EAIS = sectors
+  3/1/2 of `BASINS-nasa mask_regions`; Greenland `include 1.3 1.11 1.0`;
+  Laurentide `exclude 1.30`, Hudson = regions 1.12, `yelmo.mask_border = "none"`;
+  North `exclude 1.0`; others `all`. Patagonia configs need `ice_codes_mode =
+  "all"` (its `tau_relax` and the Greenland `till_method = -1` start stay in
+  `domain_regions_init` until region physics becomes configurable). Physics is
+  unchanged where `grid_ice = grid_hub`; Yelmo's `basins`/`regions` output
+  changes where its own files differed (Antarctica `basin_reese` -> `basin`).
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

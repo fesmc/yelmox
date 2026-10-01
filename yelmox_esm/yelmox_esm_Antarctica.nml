@@ -372,12 +372,7 @@
 /
 
 &yelmo_masks
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_IMBIE2_MASK.nc" ! IMBIE 
-    basins_nms      = "SubBasins_extrap" "Basins_extrap"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+    ! regions and basins come from the hub ([domain])
 /
 
 &yelmo_init_topo
@@ -646,6 +641,13 @@
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
     basins_var   = "basin"
+    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" ! "" = none (sectors = 1)
+    sectors_var  = "mask_regions"
+    ice_codes_mode = "exclude"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
+    ice_codes    = 2.0               ! codes of regions ("" = none)
+    region_names = "APIS" "WAIS" "EAIS" ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
+    region_mask  = "sectors"         ! code mask of the named regions: regions, basins or sectors
+    region_codes = 3.0 1.0 2.0       ! one code per named region
 /
 
 &coupling
