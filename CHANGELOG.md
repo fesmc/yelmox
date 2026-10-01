@@ -6,6 +6,20 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
+  now set up isostasy through the shared `domain_init_isostasy` (conservative
+  ice-load coarsening + isostasy reference check). The optimisation's
+  `cb_ref = cf_init` guess is set before `yelmo_init_state` in every driver
+  (was after it in `yelmox`/`yelmox_bipolar`), so results of `opt` cold starts
+  change slightly. `opt.cf_init` must be > 0; the "negative uses cb_tgt" rule
+  (only implemented in `yelmox_rembo`) is gone.
+- `yelmox_rembo`: `greenland_init_marine_H` applies the shared rule (H = 800 m
+  where H < 600 m and z_bed > -500 m) instead of H×1.2, and the driver no longer
+  shrinks `dtt`/`dtime_emb` during a tsgen ramp.
+- `yelmox_bipolar`: the OBM restart (`obm_restart.nc`) is written into the
+  run-root restart bundle and read back from `[ctrl] restart_bsl`;
+  `&nautilus use_restart/restart` removed.
+
 - Driver time loops (`yelmox`, `yelmox_bipolar`, `yelmox_esm`, `yelmox_rembo`):
   output and restarts are written at the top of the loop for the current time
   (`time_init` on the first pass), then the loop exits once finished, else
@@ -53,6 +67,8 @@ annotated git tag. Dates are release (tag) dates.
   `yelmox_esm`/`yelmox_rembo`); the bundle does not hold them.
 
 ### Removed
+- `libs/simpleclim.f90` (empty stub) and the unreachable `"const"` branch of
+  the LGM-north cold start.
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
 - Legacy single-grid programs (`<flavor>/legacy/`, `make <flavor>-legacy`) and
   retired flavors (`retired/`: `yelmox_ismip6`, `yelmox_nahosmip`,
