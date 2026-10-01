@@ -39,12 +39,12 @@ call bsl_update(bsl, ts%time_rel)              ! shared sea level, once
 if (active_north) call advance_isostasy(dom_north)   ! step_optimize + step_isostasy
 if (active_south) call advance_isostasy(dom_south)
 
-if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)   ! ocean box model, one step
+if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)   ! ocean box model, one step
 
 if (active_north) call advance_dynamics(dom_north)   ! step_icesheet + refresh_htopo + step_climate
 if (active_south) call advance_dynamics(dom_south)
 
-call obm_exchange(oc, obm, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
+call obm_exchange(oc, obox, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
                                                        ! hysteresis forcing, obm->ism ocean temp
 
 if (active_north) call step_marine_shelf(dom_north, ts)  ! reads the obm-updated to_ann

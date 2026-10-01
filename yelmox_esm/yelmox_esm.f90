@@ -49,10 +49,10 @@ program yelmox_esm
     type(ice_domain)    :: dom
     type(bsl_class)     :: bsl          ! shared, driver-owned barystatic sea level
     type(esm_forcing_class) :: esm      ! driver-owned climate forcing (replaces snapclim)
-    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm
+    type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm, tm_rst
 
     ! ESM run control (esm-specific config; the shared domain_ctl carries the
-    ! rest, and the timeline is driver-owned via timeline_init)
+    ! rest, and the timeline is driver-owned via tstep_init)
     type esm_ctl_params
         character(len=56) :: run_step
         real(wp) :: dtt, time_equil
@@ -78,7 +78,7 @@ program yelmox_esm
     ! ESM run control: [ctrl] run_step selects the run phase, [esm] holds the
     ! experiment identity + physics parameters, and the [run_step] group the
     ! phase's esm timing (the timeline keys of the same group are read by
-    ! timeline_init / domain_init below).
+    ! tstep_init / domain_init below).
     call esm_ctl_load(ec, esm, path_par)
 
     ! Seed the RNG for climate-variability reproducibility.
@@ -100,8 +100,8 @@ program yelmox_esm
 
     ! Timestepping (driver-owned; the [run_step] group holds this run phase's
     ! timeline, with tstep_const applied as a calendar constant).
-    call timeline_init(ts, ec%dtt, path_par, trim(ec%run_step), &
-                       time_ref=2000.0_wp, cal=.true.)
+    call tstep_init(ts, path_par, trim(ec%run_step), ec%dtt, &
+                    time_ref=2000.0_wp, cal=.true.)
 
     write(*,*)
     write(*,*) "yelmox_esm: run_step = "//trim(ec%run_step)
@@ -157,9 +157,11 @@ program yelmox_esm
 
     ! ================= OUTPUT SETUP ==========================================
 
-    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ts%time_init, ts%time_end)
-    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ts%time_init, ts%time_end)
-    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
+    ! Output + restart schedules (a restart bundle is always written at time_end).
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",   ts%time_init, ts%time_end)
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",   ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium",  ts%time_init, ts%time_end)
+    call timeout_init(tm_rst,  path_par, "tm_rst",  "restart", ts%time_init, ts%time_end)
 
     call yelmo_write_init(dom%yelmo, file2D,   time_init=ts%time, units="years")
     call yelmo_write_init(dom%yelmo, file2Dsm, time_init=ts%time, units="years")
@@ -175,8 +177,38 @@ program yelmox_esm
 
     ! ================= MAIN TIME LOOP ========================================
 
+    ! Output and restarts are written at the top of the loop for the current
+    ! time (time_init on the first pass), then the loop exits once the run is
+    ! finished, else the time is advanced and the domain stepped. The final 2D
+    ! and 1D state and a final restart bundle are always written.
     call tstep_print_header(ts)
-    do while (.not. ts%is_finished)
+    do
+
+        ! === Model output ===
+        if (timeout_check(tm_2Dsm, ts%time)) &
+            call write_step_2D_small(dom%yelmo, dom%isos, esm, dom%mshlf, dom%smb, &
+                                     ec%use_smb, file2Dsm, ts%time)
+        if (timeout_check(tm_2D, ts%time) .or. ts%is_finished) &
+            call write_step_2D_combined(dom%yelmo, dom%isos, esm, dom%mshlf, dom%smb, &
+                                        ec%use_smb, file2D, ts%time)
+        if (timeout_check(tm_1D, ts%time) .or. ts%is_finished) then
+            call yelmo_regions_write(dom%yelmo, ts%time)
+            if (tm_1D%active) call write_1D_esm(dom%yelmo, esm, dom%mshlf, file1D_esm, ts%time)
+        end if
+
+        if (ec%write_formatted) then
+            if (cadence_due(ts%time_elapsed, ec%dt_formatted)) then
+                call write_step_2D_cmip(dom%yelmo, dom%mshlf, file2D_cmip, ts%time)
+                call write_step_1D_cmip(dom%yelmo, dom%mshlf, file1D_cmip, ts%time)
+            end if
+        end if
+
+        ! === Restart bundle (domain + shared bsl) ===
+        if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then
+            call run_restart_write(dom, bsl, ts%time)
+        end if
+
+        if (ts%is_finished) exit
 
         call tstep_update(ts, dom%ctl%dtt)
         call tstep_print(ts)
@@ -197,37 +229,7 @@ program yelmox_esm
         call step_climate_esm(dom, esm, ec, ts)
         call step_marine_shelf_esm(dom, esm, ec, ts)
 
-        ! === Model output ===
-        if (timeout_check(tm_2Dsm, ts%time)) &
-            call write_step_2D_small(dom%yelmo, dom%isos, esm, dom%mshlf, dom%smb, &
-                                     ec%use_smb, file2Dsm, ts%time)
-        if (timeout_check(tm_2D, ts%time)) &
-            call write_step_2D_combined(dom%yelmo, dom%isos, esm, dom%mshlf, dom%smb, &
-                                        ec%use_smb, file2D, ts%time)
-        if (timeout_check(tm_1D, ts%time)) then
-            call yelmo_regions_write(dom%yelmo, ts%time)
-            call write_1D_esm(dom%yelmo, esm, dom%mshlf, file1D_esm, ts%time)
-        end if
-
-        if (ec%write_formatted) then
-            if (tstep_due(ts%time_elapsed, ec%dt_formatted)) then
-                call write_step_2D_cmip(dom%yelmo, dom%mshlf, file2D_cmip, ts%time)
-                call write_step_1D_cmip(dom%yelmo, dom%mshlf, file1D_cmip, ts%time)
-            end if
-        end if
-
-        ! === Restart bundle (domain + shared bsl) ===
-        if (tstep_due(ts%time, dom%ctl%dt_restart)) then
-            call run_restart_write(dom, bsl, ts%time)
-        end if
-
     end do
-
-    ! Final state + restart bundle (incl. shared bsl).
-    call write_step_2D_combined(dom%yelmo, dom%isos, esm, dom%mshlf, dom%smb, &
-                                ec%use_smb, file2D, ts%time)
-    call yelmo_regions_write(dom%yelmo, ts%time)
-    call run_restart_write(dom, bsl, ts%time)
 
     write(*,*)
     write(*,*) "yelmox_esm: run complete at time =", ts%time

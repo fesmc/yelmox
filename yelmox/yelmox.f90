@@ -20,7 +20,7 @@ program yelmox
     type(tstep_class)  :: ts
     type(ice_domain)   :: dom
     type(bsl_class)    :: bsl        ! shared, driver-owned barystatic sea level
-    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
+    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
 
     character(len=512) :: outfldr
     real(wp)           :: dtt
@@ -37,7 +37,7 @@ program yelmox
     call yelmo_load_command_line_args(path_par)
 
     ! Timestepping (driver-owned; the [ctrl] group holds the shared timeline).
-    call timeline_init(ts, dtt, path_par, "ctrl")
+    call tstep_init(ts, path_par, "ctrl", dtt)
 
     ! Single-domain runs write to the run dir.
     outfldr = "./"
@@ -61,13 +61,26 @@ program yelmox
     if (trim(dom%ctl%restart) /= "None") call tsforcing_restart_read(tsf, trim(dom%ctl%restart))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
-    ! (incl. the shared bsl) and rebuild the hi-res hub from the restored models.
-    ! Pass the forcing anomalies only when active, so snapclim keeps its own index
-    ! when there is no transient forcing.
-    if (tsf%active) then
-        call domain_startup(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+    ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
+    ! then re-establish the climate/smb and marine-shelf forcing from the
+    ! restored state (the bundle does not hold them), so the first step and the
+    ! first output see a valid boundary state. Pass the forcing anomalies only
+    ! when active, so snapclim keeps its own index when there is no transient
+    ! forcing.
+    if (trim(dom%ctl%restart) == "None") then
+        if (tsf%active) then
+            call domain_startup(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+        else
+            call domain_startup(dom, ts, bsl)
+        end if
     else
         call domain_startup(dom, ts, bsl)
+        if (tsf%active) then
+            call step_climate(dom, ts, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+        else
+            call step_climate(dom, ts)
+        end if
+        call step_marine_shelf(dom, ts)
     end if
 
     write(*,*)
@@ -78,30 +91,47 @@ program yelmox
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)
 
-    ! === output setup (2D; one file per module, on its own grid) ===
-    call timeout_init(tm_2D, path_par, "tm_2D", "heavy", ts%time_init, ts%time_end)
-    if (tm_2D%active) then
-        call domain_write_init(dom, trim(outfldr), ts%time)
-        call domain_write_step(dom, trim(outfldr), ts%time)
-    end if
+    ! === output + restart schedules (a restart bundle is always written at time_end) ===
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",   ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium",  ts%time_init, ts%time_end)
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",   ts%time_init, ts%time_end)
+    call timeout_init(tm_rst,  path_par, "tm_rst",  "restart", ts%time_init, ts%time_end)
 
-    ! === output setup (2D small; reduced field set, more frequent cadence) ===
-    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
-    if (tm_2Dsm%active) then
-        call domain_write_init_sm(dom, trim(outfldr), ts%time)
-        call domain_write_step_sm(dom, trim(outfldr), ts%time)
-    end if
-
-    ! === output setup (1D timeseries) ===
-    call timeout_init(tm_1D, path_par, "tm_1D", "small", ts%time_init, ts%time_end)
-    if (tm_1D%active) then
-        call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
-        call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
-    end if
+    ! Output files: 2D (one file per module, on its own grid), 2D small (reduced
+    ! field set) and 1D timeseries.
+    if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
+    if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
+    if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
 
     ! === main time loop ===
+    ! Output and restarts are written at the top of the loop for the current
+    ! time (time_init on the first pass), then the loop exits once the run is
+    ! finished (time_end reached, or the kill switch tripped), else the time is
+    ! advanced and the domain stepped. The final state and a final restart
+    ! bundle are always written.
     call tstep_print_header(ts)
-    do while (.not. ts%is_finished)
+    do
+
+        if (tm_2D%active .and. (timeout_check(tm_2D, ts%time) .or. ts%is_finished)) then
+            call domain_write_step(dom, trim(outfldr), ts%time)
+        end if
+
+        if (tm_2Dsm%active .and. (timeout_check(tm_2Dsm, ts%time) .or. ts%is_finished)) then
+            call domain_write_step_sm(dom, trim(outfldr), ts%time)
+        end if
+
+        if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
+            call domain_write_1D(dom, trim(outfldr), ts%time)
+            call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
+        end if
+
+        ! Restart bundle (domain + shared bsl + tsforcing state).
+        if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then
+            call run_restart_write(dom, bsl, ts%time, tsf=tsf)
+        end if
+
+        if (ts%is_finished) exit
+
         call tstep_update(ts, dtt)
         call tstep_print(ts)
 
@@ -118,47 +148,21 @@ program yelmox
             call yelmox_step(dom, ts, bsl)
         end if
 
-        if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
-            call domain_write_step(dom, trim(outfldr), ts%time)
-        end if
-
-        if (tm_2Dsm%active .and. timeout_check(tm_2Dsm, ts%time)) then
-            call domain_write_step_sm(dom, trim(outfldr), ts%time)
-        end if
-
-        if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
-            call domain_write_1D(dom, trim(outfldr), ts%time)
-            call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
-        end if
-
-        ! Time-based restart cadence (dt_restart) and, independently, a
-        ! forcing-increment restart each |Δf| > restart_every_df (folders
+        ! Forcing-increment restart each |Δf| > restart_every_df (folders
         ! restart-<n>), so a ramp can be branched at fixed forcing levels.
-        if (tstep_due(ts%time, dom%ctl%dt_restart)) then
-            call run_restart_write(dom, bsl, ts%time, tsf=tsf)
-        end if
-
         if (tsforcing_restart_due(tsf)) then
             write(*,*) "yelmox: forcing-increment restart at f =", tsf%tsg%f_now
             call run_restart_write(dom, bsl, ts%time, tsf=tsf, &
                                    fldr=trim(tsforcing_restart_fldr(tsf)))
         end if
 
-        ! Kill switch: stop once the response has equilibrated at a forcing bound.
+        ! Kill switch: stop once the response has equilibrated at a forcing
+        ! bound. The top of the loop then writes the final state and exits.
         if (tsforcing_kill(tsf)) then
             write(*,*) "yelmox: tsgen kill switch tripped at time =", ts%time
-            exit
+            ts%is_finished = .TRUE.
         end if
     end do
-
-    ! Always capture the final state + a final restart bundle (incl. shared bsl).
-    if (tm_2D%active)   call domain_write_step(dom, trim(outfldr), ts%time)
-    if (tm_2Dsm%active) call domain_write_step_sm(dom, trim(outfldr), ts%time)
-    if (tm_1D%active) then
-        call domain_write_1D(dom, trim(outfldr), ts%time)
-        call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
-    end if
-    call run_restart_write(dom, bsl, ts%time, tsf=tsf)
 
     write(*,*)
     write(*,*) "yelmox: run complete at time =", ts%time

@@ -91,6 +91,13 @@
     times           = 1020
 /
 
+&tm_rst
+    method          = "const"           ! "none", "const", "file", "times" (+ always at time_end)
+    dt              = 20e3
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
 &opt
     opt_cf          = True              ! Should basal friction be optimized?
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
@@ -251,8 +258,6 @@
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim
     beta_min            = 100            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
-    scale_T             = 1               ! 0: no scaling of c_bed with T, 1: linearly increase c_bed to c_bed_frozen=cf_ref*N_eff for cold ice
-    T_frz               = -3.0            ! Temperature below which ice considered fully frozen (linear increase in friction )
     ssa_solver           = "energy"       ! "residual" | "energy"
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_lis_opt_energy   = "-i cg -p jacobi -maxiter 200 -tol 1.0e-4 -initx_zeros false"       ! SPD => CG (matches Yelmo.jl default)
@@ -661,7 +666,6 @@
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
-    dt_restart      = 20e3     ! [yr] Frequency of writing restart files
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates (unused: esm forcing)
     grid_clim  = ""            ! esm grid (esm's own working grid); default = grid_yelmo
     grid_smb   = ""            ! smb grid; default = grid_clim

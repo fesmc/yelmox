@@ -31,12 +31,18 @@ program test_timestepping
 
     call tstep_print_header(ts)
 
-    ! Advance timesteps
-    do while (.not. ts%is_finished)
+    ! Advance timesteps: output for the current time at the top of the loop
+    ! (time_init on the first pass), exit once finished, then advance (every
+    ! tstep_update call advances the time).
+    do
+
+        ! Model output here...
+        call tstep_print(ts)
+
+        if (ts%is_finished) exit
 
         ! Update timestep
         call tstep_update(ts,dtt)
-        call tstep_print(ts)
 
         ! Perform model updates here...
 

@@ -32,7 +32,7 @@ program yelmox_rembo
     type(ice_domain)    :: dom
     type(bsl_class)     :: bsl          ! shared, driver-owned barystatic sea level
     type(tsforcing_class) :: tsf        ! driver-owned transient forcing (tsgen)
-    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
+    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
 
     character(len=512)  :: outfldr, file_rembo2D, file_rembo1D
     real(wp) :: time_equil, dtt, dtt_now, deltat_tot
@@ -43,7 +43,7 @@ program yelmox_rembo
     call yelmo_load_command_line_args(path_par)
 
     ! --- run control ([ctrl]: shared timeline + REMBO-flavor switches) ---
-    call timeline_init(ts, dtt, path_par, "ctrl")
+    call tstep_init(ts, path_par, "ctrl", dtt)
     call nml_read(path_par, "ctrl", "time_equil",   time_equil)
     call nml_read(path_par, "ctrl", "write_restart", write_restart)
 
@@ -92,32 +92,50 @@ program yelmox_rembo
     ! Standard per-module files (yelmo.nc / yelmo_sm.nc / yelmo_ts.nc / isos.nc /
     ! mshlf.nc / htopo.nc) via the shared routines, exactly as the other flavors;
     ! REMBO-specific fields go to rembo.nc (2D) and rembo_ts.nc (1D).
-    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ts%time_init, ts%time_end)
-    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
-    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ts%time_init, ts%time_end)
+    ! Output + restart schedules (a restart bundle is always written at time_end).
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",   ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium",  ts%time_init, ts%time_end)
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",   ts%time_init, ts%time_end)
+    call timeout_init(tm_rst,  path_par, "tm_rst",  "restart", ts%time_init, ts%time_end)
 
     if (tm_2D%active) then
         call domain_write_init(dom, trim(outfldr), ts%time)
-        call domain_write_step(dom, trim(outfldr), ts%time)
         call rembo_write_2D_init(dom%yelmo, file_rembo2D, ts%time, "years")
-        call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
     end if
-    if (tm_2Dsm%active) then
-        call domain_write_init_sm(dom, trim(outfldr), ts%time)
-        call domain_write_step_sm(dom, trim(outfldr), ts%time)
-    end if
+    if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
     if (tm_1D%active) then
         call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
         call rembo_write_1D_init(file_rembo1D, ts%time, "years", tsf%tsg)
-        call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
     end if
 
-    ! Initial restart bundle.
-    if (write_restart) call write_rembo_restart(dom, bsl, ts, tsf)
-
     ! === main time loop ===
+    ! Output and restarts are written at the top of the loop for the current
+    ! time (time_init on the first pass), then the loop exits once the run is
+    ! finished (time_end reached, or the kill switch tripped), else the time is
+    ! advanced and the domain stepped. The final state is always written; with
+    ! write_restart, so are an initial and a final restart bundle.
     call tstep_print_header(ts)
-    do while (.not. ts%is_finished)
+    do
+
+        ! === output ===
+        if (tm_2D%active .and. (timeout_check(tm_2D, ts%time) .or. ts%is_finished)) then
+            call domain_write_step(dom, trim(outfldr), ts%time)
+            call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
+        end if
+        if (tm_2Dsm%active .and. (timeout_check(tm_2Dsm, ts%time) .or. ts%is_finished)) &
+            call domain_write_step_sm(dom, trim(outfldr), ts%time)
+        if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
+            call domain_write_1D(dom, trim(outfldr), ts%time)
+            call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
+        end if
+
+        ! === restart bundle (initial, on the [tm_rst] schedule, and final) ===
+        if (write_restart .and. (ts%n == 0 .or. timeout_check(tm_rst, ts%time) &
+                                 .or. ts%is_finished)) then
+            call write_rembo_restart(dom, bsl, ts, tsf)
+        end if
+
+        if (ts%is_finished) exit
 
         ! Transient experiments: shrink dtt (and REMBO's emb cadence) during the
         ! hysteresis ramp, restore afterwards.
@@ -153,42 +171,14 @@ program yelmox_rembo
         call step_rembo(dom, ts, tsf, dT_summer, dT_ocn)  ! REMBO atmosphere/smb + snapclim ocean
         call step_marine_shelf(dom, ts)
 
-        ! === output ===
-        if (tm_2D%active .and. timeout_check(tm_2D, ts%time)) then
-            call domain_write_step(dom, trim(outfldr), ts%time)
-            call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
-        end if
-        if (tm_2Dsm%active .and. timeout_check(tm_2Dsm, ts%time)) &
-            call domain_write_step_sm(dom, trim(outfldr), ts%time)
-        if (tm_1D%active .and. timeout_check(tm_1D, ts%time)) then
-            call domain_write_1D(dom, trim(outfldr), ts%time)
-            call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
-        end if
-
-        ! === restart bundle ===
-        if (write_restart .and. tstep_due(ts%time, dom%ctl%dt_restart)) then
-            call write_rembo_restart(dom, bsl, ts, tsf)
-        end if
-
-        ! tsgen kill switch (response equilibrated at a forcing bound).
+        ! tsgen kill switch (response equilibrated at a forcing bound). The top
+        ! of the loop then writes the final state and exits.
         if (tsforcing_kill(tsf)) then
             write(*,"(a,f12.3,a,f12.3)") "tsgen:: kill switch activated. [time, f_now] = ", &
                     ts%time, ", ", tsf%tsg%f_now
-            exit
+            ts%is_finished = .TRUE.
         end if
     end do
-
-    ! Final state + restart bundle.
-    if (tm_2D%active) then
-        call domain_write_step(dom, trim(outfldr), ts%time)
-        call rembo_write_2D_step(rembo_ann, file_rembo2D, ts%time)
-    end if
-    if (tm_2Dsm%active) call domain_write_step_sm(dom, trim(outfldr), ts%time)
-    if (tm_1D%active) then
-        call domain_write_1D(dom, trim(outfldr), ts%time)
-        call rembo_write_1D_step(dom%yelmo, tsf%tsg, rembo_ann, file_rembo1D, ts%time, dT_ann, dT_ocn)
-    end if
-    if (write_restart) call write_rembo_restart(dom, bsl, ts, tsf)
 
     write(*,*)
     write(*,*) "yelmox_rembo: run complete at time =", ts%time

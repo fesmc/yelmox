@@ -47,13 +47,12 @@ program yelmox_bipolar
     logical            :: active_north, active_south
 
     ! Shared, driver-owned ocean box model + its coupling control (obm_coupling).
-    type(obm_class)        :: obm
+    type(obm_class)        :: obox      ! ocean box model state ("obm" is the module name)
     type(obm_coupling_ctl) :: oc
     character(len=512)     :: obm_file, obm_file_restart
 
-    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D
-    logical             :: do_2D, do_2Dsm, do_1D, do_restart
-    logical             :: wrote_restart_north, wrote_restart_south
+    type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
+    logical             :: do_2D, do_2Dsm, do_1D, do_rst
 
     real(wp) :: dtt
 
@@ -61,7 +60,7 @@ program yelmox_bipolar
     call yelmo_load_command_line_args(path_par)
 
     ! Shared timestepping (driver-owned) from the [ctrl] group.
-    call timeline_init(ts, dtt, path_par, "ctrl")
+    call tstep_init(ts, path_par, "ctrl", dtt)
 
     ! Which hemispheres are active ([ctrl]).
     call nml_read(path_par, "ctrl", "active_north", active_north)
@@ -89,25 +88,50 @@ program yelmox_bipolar
     ! Hydrographic masks (Yelmo grid) restricting the freshwater flux per domain.
     call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
 
-    ! === Ocean box model init + first output record ===
+    ! === Ocean box model init + output file ===
     if (oc%active_obm) then
         obm_file         = trim(oc%obm_name)//".nc"
         obm_file_restart = trim(oc%obm_name)//"_restart.nc"
-        call obm_init(obm, path_par, oc%obm_name)
+        call obm_init(obox, path_par, oc%obm_name)
         call write_obm_init(obm_file, ts%time, "years")
-        call write_obm_update(obm, obm_file, oc%obm_name, ts%time)
     end if
 
-    ! === Output setup (shared cadence, from [tm_2D]/[tm_2Dsm]/[tm_1D]) ===
-    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",  ts%time_init, ts%time_end)
-    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium", ts%time_init, ts%time_end)
-    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",  ts%time_init, ts%time_end)
+    ! === Output + restart schedules (shared cadence, from [tm_2D]/[tm_2Dsm]/
+    !     [tm_1D]/[tm_rst]; a restart bundle is always written at time_end) ===
+    call timeout_init(tm_2D,   path_par, "tm_2D",   "heavy",   ts%time_init, ts%time_end)
+    call timeout_init(tm_2Dsm, path_par, "tm_2Dsm", "medium",  ts%time_init, ts%time_end)
+    call timeout_init(tm_1D,   path_par, "tm_1D",   "small",   ts%time_init, ts%time_end)
+    call timeout_init(tm_rst,  path_par, "tm_rst",  "restart", ts%time_init, ts%time_end)
     if (active_north) call write_domain_init(dom_north, outfldr_north)
     if (active_south) call write_domain_init(dom_south, outfldr_south)
 
     ! === Main time loop (shared timeline + dtt) ===
+    ! Output and restarts are written at the top of the loop for the current
+    ! time (time_init on the first pass), then the loop exits once the run is
+    ! finished, else the time is advanced and both domains stepped. The final
+    ! state and a final restart bundle are always written.
     call tstep_print_header(ts)
-    do while (.not. ts%is_finished)
+    do
+
+        ! === Output + restarts (shared cadence) ===
+        do_2D   = tm_2D%active   .and. (timeout_check(tm_2D,   ts%time) .or. ts%is_finished)
+        do_2Dsm = tm_2Dsm%active .and. (timeout_check(tm_2Dsm, ts%time) .or. ts%is_finished)
+        do_1D   = tm_1D%active   .and. (timeout_check(tm_1D,   ts%time) .or. ts%is_finished)
+        do_rst  = timeout_check(tm_rst, ts%time) .or. ts%is_finished
+
+        if (active_north) call write_domain_step(dom_north, outfldr_north)
+        if (active_south) call write_domain_step(dom_south, outfldr_south)
+        if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
+
+        ! Shared bsl (+ obm) restart at the run root, next to the domain bundles.
+        if (do_rst) then
+            call restart_bundle_mkdir(ts%time)
+            call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
+            if (oc%active_obm) call write_obm_restart(obox, obm_file_restart, ts%time, "years")
+        end if
+
+        if (ts%is_finished) exit
+
         call tstep_update(ts, dtt)
         call tstep_print(ts)
 
@@ -119,7 +143,7 @@ program yelmox_bipolar
         if (active_south) call advance_isostasy(dom_south)
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
-        if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
+        if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
 
         ! Ice sheet + hi-res hub refresh + climate/smb (both domains).
         if (active_north) call advance_dynamics(dom_north)
@@ -127,39 +151,13 @@ program yelmox_bipolar
 
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
         ! flux, hysteresis forcing, obm->ism ocean temperature.
-        call obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
+        call obm_exchange(oc, obox, dom_north, dom_south, active_north, active_south, &
                           ts%time, ts%time_init, dtt)
 
         ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.
         if (active_north) call step_marine_shelf(dom_north, ts)
         if (active_south) call step_marine_shelf(dom_south, ts)
-
-        ! === Output (shared cadence; timeout_check advances state, call once) ===
-        do_2D   = tm_2D%active   .and. timeout_check(tm_2D, ts%time)
-        do_2Dsm = tm_2Dsm%active .and. timeout_check(tm_2Dsm, ts%time)
-        do_1D   = tm_1D%active   .and. timeout_check(tm_1D, ts%time)
-
-        wrote_restart_north = .false.
-        wrote_restart_south = .false.
-        if (active_north) call write_domain_step(dom_north, outfldr_north, wrote_restart_north)
-        if (active_south) call write_domain_step(dom_south, outfldr_south, wrote_restart_south)
-        if (oc%active_obm .and. do_1D) call write_obm_update(obm, obm_file, oc%obm_name, ts%time)
-
-        ! Shared bsl (+ obm) restart at the run root when either domain wrote one.
-        do_restart = wrote_restart_north .or. wrote_restart_south
-        if (do_restart) then
-            call restart_bundle_mkdir(ts%time)
-            call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-            if (oc%active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
-        end if
     end do
-
-    ! === Finalize: capture the final state + a final restart bundle per domain ===
-    if (active_north) call write_domain_step(dom_north, outfldr_north, wrote_restart_north, force=.true.)
-    if (active_south) call write_domain_step(dom_south, outfldr_south, wrote_restart_south, force=.true.)
-    call restart_bundle_mkdir(ts%time)
-    call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-    if (oc%active_obm) call write_obm_restart(obm, obm_file_restart, ts%time, "years")
 
     write(*,*)
     write(*,*) "yelmox_bipolar: run complete at time =", ts%time
@@ -190,8 +188,15 @@ contains
         call domain_regions_init(dom, trim(outfldr))
 
         ! Cold start or per-domain restart; the shared bsl was already
-        ! initialized/restored once by the driver (bsl_startup above).
+        ! initialized/restored once by the driver (bsl_startup above). On a
+        ! restart, re-establish the climate/smb and marine-shelf forcing from the
+        ! restored state (the bundle does not hold them), so the first step and
+        ! the first output see a valid boundary state.
         call domain_startup(dom, ts, bsl, restore_bsl=.false.)
+        if (trim(dom%ctl%restart) /= "None") then
+            call step_climate(dom, ts)
+            call step_marine_shelf(dom, ts)
+        end if
 
         write(*,*)
         write(*,*) "yelmox_bipolar: domain initialized ("//trim(adjustl(suffix))//")"
@@ -221,49 +226,26 @@ contains
     end subroutine advance_dynamics
 
     subroutine write_domain_init(dom, outfldr)
-        ! Create output files and write the initial 2D + 1D records.
+        ! Create the 2D + 1D output files.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
-        if (tm_2D%active) then
-            call domain_write_init(dom, trim(outfldr), ts%time)
-            call domain_write_step(dom, trim(outfldr), ts%time)
-        end if
-        if (tm_2Dsm%active) then
-            call domain_write_init_sm(dom, trim(outfldr), ts%time)
-            call domain_write_step_sm(dom, trim(outfldr), ts%time)
-        end if
-        if (tm_1D%active) call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+        if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
+        if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
+        if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
     end subroutine write_domain_init
 
-    subroutine write_domain_step(dom, outfldr, wrote_restart, force)
-        ! Append 2D/1D records on the shared cadence (do_2D/do_1D), and write a
-        ! restart bundle on the domain's dt_restart cadence -- reporting it via
-        ! wrote_restart so the driver writes the single shared bsl (+ obm)
-        ! restart. force=.true. writes everything unconditionally (final step).
+    subroutine write_domain_step(dom, outfldr)
+        ! Append 2D/1D records and write the domain restart bundle on the shared
+        ! cadence (do_2D/do_2Dsm/do_1D/do_rst, set by the driver at the top of
+        ! the loop); the driver writes the single shared bsl (+ obm) restart.
         type(ice_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
-        logical,          intent(out)   :: wrote_restart
-        logical, intent(in), optional   :: force
 
-        logical :: do_force
-        do_force = .false.
-        if (present(force)) do_force = force
-
-        if (do_2D .or. (do_force .and. tm_2D%active)) &
-            call domain_write_step(dom, trim(outfldr), ts%time)
-        if (do_2Dsm .or. (do_force .and. tm_2Dsm%active)) &
-            call domain_write_step_sm(dom, trim(outfldr), ts%time)
-        if (do_1D .or. (do_force .and. tm_1D%active)) &
-            call domain_write_1D(dom, trim(outfldr), ts%time)
-
-        wrote_restart = .false.
-        if (do_force) then
-            call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
-        else if (tstep_due(ts%time, dom%ctl%dt_restart)) then
-            call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
-            wrote_restart = .true.
-        end if
+        if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)
+        if (do_2Dsm) call domain_write_step_sm(dom, trim(outfldr), ts%time)
+        if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time)
+        if (do_rst)  call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
     end subroutine write_domain_step
 
 end program yelmox_bipolar

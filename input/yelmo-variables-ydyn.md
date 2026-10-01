@@ -50,21 +50,22 @@
 | 46 | cb_tgt            | xc, yc           | Pa          | Target basal parameter                        |
 | 47 | cb_ref            | xc, yc           | --          | Reference basal parameter                     |
 | 48 | c_bed             | xc, yc           | Pa          | Basal drag coefficient                        |
-| 49 | beta_acx          | xc, yc           | Pa yr m^-1  | Basal stress factor (x)                       |
-| 50 | beta_acy          | xc, yc           | Pa yr m^-1  | Basal stress factor (y)                       |
-| 51 | beta              | xc, yc           | Pa yr m^-1  | Basal stress factor mag.                      |
-| 52 | beta_eff          | xc, yc           | Pa yr m^-1  | Effective basal factor                        |
-| 53 | f_vbvs            | xc, yc           | -           | Vertical basal stress                         |
-| 54 | ssa_mask_acx      | xc, yc           | -           | SSA mask (x-dir)                              |
-| 55 | ssa_mask_acy      | xc, yc           | -           | SSA mask (y-dir)                              |
-| 56 | ssa_err_acx       | xc, yc           | m/yr        | SSA error (x-dir)                             |
-| 57 | ssa_err_acy       | xc, yc           | m/yr        | SSA error (y-dir)                             |
-| 58 | jvel_dxx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duxdx             |
-| 59 | jvel_dxy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duxdy             |
-| 60 | jvel_dxz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duxdz             |
-| 61 | jvel_dyx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydx             |
-| 62 | jvel_dyy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydy             |
-| 63 | jvel_dyz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydz             |
-| 64 | jvel_dzx          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdx             |
-| 65 | jvel_dzy          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdy             |
-| 66 | jvel_dzz          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdz             |
+| 49 | f_slide           | xc, yc           | -           | Sub-temperate sliding factor                  |
+| 50 | beta_acx          | xc, yc           | Pa yr m^-1  | Basal stress factor (x)                       |
+| 51 | beta_acy          | xc, yc           | Pa yr m^-1  | Basal stress factor (y)                       |
+| 52 | beta              | xc, yc           | Pa yr m^-1  | Basal stress factor mag.                      |
+| 53 | beta_eff          | xc, yc           | Pa yr m^-1  | Effective basal factor                        |
+| 54 | f_vbvs            | xc, yc           | -           | Vertical basal stress                         |
+| 55 | ssa_mask_acx      | xc, yc           | -           | SSA mask (x-dir)                              |
+| 56 | ssa_mask_acy      | xc, yc           | -           | SSA mask (y-dir)                              |
+| 57 | ssa_err_acx       | xc, yc           | m/yr        | SSA error (x-dir)                             |
+| 58 | ssa_err_acy       | xc, yc           | m/yr        | SSA error (y-dir)                             |
+| 59 | jvel_dxx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duxdx             |
+| 60 | jvel_dxy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duxdy             |
+| 61 | jvel_dxz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duxdz             |
+| 62 | jvel_dyx          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydx             |
+| 63 | jvel_dyy          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydy             |
+| 64 | jvel_dyz          | xc, yc, zeta     | 1/yr        | Velocity Jacobian component duydz             |
+| 65 | jvel_dzx          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdx             |
+| 66 | jvel_dzy          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdy             |
+| 67 | jvel_dzz          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdz             |
