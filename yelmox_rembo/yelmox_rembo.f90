@@ -302,13 +302,7 @@ contains
         ! Basal-friction optimization cold-start guess (equil_method == "opt").
         if (trim(dom%ctl%equil_method) == "opt") then
             dom%yelmo%dyn%par%till_method = -1
-            if (.not. dom%yelmo%par%use_restart) then
-                if (dom%opt%cf_init > 0.0_wp) then
-                    dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
-                else
-                    dom%yelmo%dyn%now%cb_ref = dom%yelmo%dyn%now%cb_tgt
-                end if
-            end if
+            if (.not. dom%yelmo%par%use_restart) call domain_opt_init_cb_ref(dom)
         end if
 
         ! Initialize Yelmo state variables (cold base).
