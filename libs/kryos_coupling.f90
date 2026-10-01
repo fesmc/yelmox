@@ -14,12 +14,13 @@ module kryos_coupling
     use ice_optimization, only : optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
+    use kryos_forcing, only : tsforcing_class
 
     implicit none
     private
 
     public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
-    public :: step_smb, refresh_hub
+    public :: step_smb, refresh_hub, update_climate
     public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
     public :: check_isostasy_reference
@@ -321,18 +322,14 @@ contains
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, dTa, dTo, dSo)
+    subroutine step_climate(dom, ts, tsf)
         ! Run climate on grid_clim, on the dt_clim cadence: geometry (z_srf) from
         ! the hub, atmosphere/ocean forcing produced by the climate backend into
-        ! dom%clim (read by step_smb and step_marine_shelf). The optional
-        ! dTa/dTo/dSo are spatially-homogeneous atmosphere/ocean anomalies (e.g. a
-        ! transient forcing series owned by the driver); when absent, snapclim
-        ! uses its own index.
+        ! dom%clim (read by step_smb and step_marine_shelf). tsf (optional) is the
+        ! driver-owned transient forcing; see update_climate.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
-        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
-        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
-        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
+        type(tsforcing_class), intent(in), optional :: tsf
 
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
         character(len=256) :: gc, gn
@@ -346,11 +343,31 @@ contains
         if (cadence_due(ts%time_elapsed, dom%ctl%dt_clim)) then
             call remap(dom, dom%topo%z_srf,   gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins,  gn, basins_c, gc, "nn")
-            call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time, &
-                                 domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
-                                 dx=dom%ctl%dx_clim, basins=basins_c)
+            call update_climate(dom, z_srf_c, basins_c, ts%time, tsf)
         end if
     end subroutine step_climate
+
+    subroutine update_climate(dom, z_srf, basins, time, tsf)
+        ! One climate-backend update on grid_clim. With an active transient
+        ! forcing (tsf) its spatially-homogeneous anomalies dTa/dTo/dSo are
+        ! applied; otherwise snapclim uses its own index.
+        type(kryos_domain),    intent(inout) :: dom
+        real(wp),              intent(in)    :: z_srf(:,:), basins(:,:)
+        real(wp),              intent(in)    :: time
+        type(tsforcing_class), intent(in), optional :: tsf
+
+        if (present(tsf)) then
+            if (tsf%active) then
+                call climate_update(dom%cl, dom%clim, z_srf=z_srf, time=time, &
+                                    domain=dom%ctl%domain, dTa=tsf%dTa, dTo=tsf%dTo, &
+                                    dSo=tsf%dSo, dx=dom%ctl%dx_clim, basins=basins)
+                return
+            end if
+        end if
+
+        call climate_update(dom%cl, dom%clim, z_srf=z_srf, time=time, &
+                            domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins)
+    end subroutine update_climate
 
     subroutine step_smb(dom, ts, init)
         ! Surface mass balance on grid_smb. Two methods: smbpal (default; monthly,

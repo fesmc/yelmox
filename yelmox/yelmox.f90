@@ -76,22 +76,10 @@ program yelmox
     ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
     ! then re-establish the climate/smb and marine-shelf forcing from the
     ! restored state (the bundle does not hold them), so the first step and the
-    ! first output see a valid boundary state. Pass the forcing anomalies only
-    ! when active, so snapclim keeps its own index when there is no transient
-    ! forcing.
-    if (trim(dom%ctl%restart) == "None") then
-        if (tsf%active) then
-            call domain_startup(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call domain_startup(dom, ts, bsl)
-        end if
-    else
-        call domain_startup(dom, ts, bsl)
-        if (tsf%active) then
-            call step_climate(dom, ts, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call step_climate(dom, ts)
-        end if
+    ! first output see a valid boundary state.
+    call domain_startup(dom, ts, bsl, tsf=tsf)
+    if (trim(dom%ctl%restart) /= "None") then
+        call step_climate(dom, ts, tsf)
         call step_smb(dom, ts)
         call step_marine_shelf(dom, ts)
     end if
@@ -164,11 +152,7 @@ program yelmox
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
         call step_icesheet(dom, ts)       ! yelmo_update
         call refresh_hub(dom)             ! hi-res geometry from the models
-        if (tsf%active) then              ! climate (dt_clim cadence)
-            call step_climate(dom, ts, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call step_climate(dom, ts)
-        end if
+        call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
         call step_smb(dom, ts)            ! surface mass balance
         call step_marine_shelf(dom, ts)   ! shelf melt
 

@@ -25,6 +25,9 @@ annotated git tag. Dates are release (tag) dates.
 - `yelmox` and `yelmox_bipolar` write the per-step coupling sequence out in the
   time loop; `yelmox_step` and the bipolar `advance_isostasy`/`advance_dynamics`
   wrappers are gone.
+- `step_climate` and `domain_startup` take the transient forcing object (`tsf`)
+  as one optional argument instead of `dTa`/`dTo`/`dSo`; `update_climate` applies
+  its anomalies only when it is active.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

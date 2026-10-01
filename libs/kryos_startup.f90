@@ -14,12 +14,11 @@ module kryos_startup
     use marine_shelf, only : marshelf_restart_write, marshelf_restart_read
     use fastisostasy, only : isos_init_ref, isos_init_state, isos_restart_write, &
                              bsl_class, bsl_update, bsl_restart_read, bsl_restart_write
-    use yelmox_climate, only : climate_update
     use smbpal,       only : smbpal_restart_write, smbpal_restart_read
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
-    use kryos_coupling, only : refresh_hub, step_climate, step_smb, step_marine_shelf, &
-                               couple_to_yelmo, couple_isostasy_to_yelmo, &
+    use kryos_coupling, only : refresh_hub, step_climate, update_climate, step_smb, &
+                               step_marine_shelf, couple_to_yelmo, couple_isostasy_to_yelmo, &
                                couple_smb_to_yelmo, check_isostasy_reference
     use kryos_forcing,  only : tsforcing_class, tsforcing_restart_write
 
@@ -48,7 +47,7 @@ contains
         call bsl_update(bsl, ts%time_rel)
     end subroutine bsl_startup
 
-    subroutine domain_startup(dom, ts, bsl, restore_bsl, dTa, dTo, dSo)
+    subroutine domain_startup(dom, ts, bsl, restore_bsl, tsf)
         ! Establish the domain state after domain_init: cold start (ctl%restart
         ! == "None") builds the initial boundary state; otherwise the restart
         ! bundle is restored and the hi-res hub rebuilt from the restored models.
@@ -65,9 +64,7 @@ contains
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         logical, intent(in), optional    :: restore_bsl
-        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
-        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
-        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
+        type(tsforcing_class), intent(in), optional :: tsf   ! transient forcing (cold start)
 
         logical :: do_bsl
 
@@ -75,7 +72,7 @@ contains
         if (present(restore_bsl)) do_bsl = restore_bsl
 
         if (trim(dom%ctl%restart) == "None") then
-            call domain_init_state(dom, ts, bsl, dTa=dTa, dTo=dTo, dSo=dSo)
+            call domain_init_state(dom, ts, bsl, tsf=tsf)
         else
             if (do_bsl) call bsl_startup(bsl, ts, trim(dom%ctl%restart))
             call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
@@ -108,19 +105,17 @@ contains
         if (present(tsf)) call tsforcing_restart_write(tsf, trim(bundle), time)
     end subroutine run_restart_write
 
-    subroutine domain_init_state(dom, ts, bsl, dTa, dTo, dSo)
+    subroutine domain_init_state(dom, ts, bsl, tsf)
         ! Build the initial boundary state and initialize the Yelmo state
         ! variables, then run the domain-specific cold-start setup.
         ! bsl is the shared, driver-owned sea level; the driver has already called
         ! bsl_update for the initial time, so this routine only consumes it. The
-        ! optional dTa/dTo/dSo apply the initial transient-forcing anomalies to the
+        ! optional transient forcing (tsf) applies its initial anomalies to the
         ! startup climate, keeping the cold-start state consistent with the loop.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
-        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
-        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
-        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
+        type(tsforcing_class), intent(in), optional :: tsf
 
         real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
         character(len=256) :: gc, gn
@@ -140,9 +135,7 @@ contains
         if (dom%ctl%with_climate) then
             call remap(dom, dom%topo%z_srf,  gn, z_srf_c,  gc, "bilin")
             call remap(dom, dom%topo%basins, gn, basins_c, gc, "nn")
-            call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time_rel, &
-                                 domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
-                                 dx=dom%ctl%dx_clim, basins=basins_c)
+            call update_climate(dom, z_srf_c, basins_c, ts%time_rel, tsf)
             call step_smb(dom, ts, init=.true.)
         end if
 

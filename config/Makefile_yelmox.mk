@@ -84,7 +84,7 @@ $(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o \
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 $(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
-						$(objdir)/kryos_regions.o
+						$(objdir)/kryos_regions.o $(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 $(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90

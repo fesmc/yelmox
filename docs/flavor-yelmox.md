@@ -36,7 +36,7 @@ call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
 call refresh_hub(dom)             ! hi-res geometry from the models
-call step_climate(dom, ts, ...)   ! climate (dt_clim cadence)
+call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
 call step_smb(dom, ts)            ! surface mass balance
 call step_marine_shelf(dom, ts)   ! shelf melt
 ```
@@ -52,8 +52,8 @@ snapclim is refreshed on the `coupling.dt_clim` cadence; smbpal every step.
 `yelmox` can drive a spatially-homogeneous, time-varying anomaly into snapclim
 (atmosphere and/or ocean) from the `tsgen` time-series generator (the modern
 replacement for the legacy `hyster` module). It is **driver-owned**: the program
-holds a `tsgen_class`, advances it each step, and passes the result into
-`step_climate` as `dTa` / `dTo` / `dSo`.
+holds a `tsforcing_class` (`tsf`), advances it each step, and passes it to
+`step_climate` (and the cold start), which apply its `dTa` / `dTo` / `dSo`.
 
 Two namelist groups control it:
 
@@ -89,8 +89,8 @@ The anomalies are only consumed when `snap.atm_type = "anom"` (for `dTa`) and
 the legacy `hyster` contract.
 :::
 
-With `active = False` (the default in the shipped configs) the driver calls
-`step_climate` without anomalies and snapclim behaves exactly as before.
+With `active = False` (the default in the shipped configs) `step_climate`
+applies no anomalies and snapclim behaves exactly as before.
 
 ## Also built from this driver
 
