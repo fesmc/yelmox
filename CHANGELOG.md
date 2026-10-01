@@ -6,6 +6,12 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Follows yelmo dev with the renumbered `ytherm.qb_method` (1: faces, 2: faces to
+  quadrature nodes, 3: simple stagger, 4: quadrature). The par files keep
+  `qb_method = 2`, which now selects the energy-consistent "faces to quadrature
+  nodes" method (was quadrature), so results change. Par files drop
+  `ytopo.surf_gl_method`, `ytopo.margin2nd` and `ydyn.ssa_beta_max` (removed in
+  yelmo); `input/` yelmo copies re-synced. Requires that yelmo dev.
 - Driver time loops (`yelmox`, `yelmox_bipolar`, `yelmox_esm`, `yelmox_rembo`):
   output and restarts are written at the top of the loop for the current time
   (`time_init` on the first pass), then the loop exits once finished, else

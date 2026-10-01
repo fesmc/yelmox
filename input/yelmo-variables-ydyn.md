@@ -69,3 +69,6 @@
 | 65 | jvel_dzx          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdx             |
 | 66 | jvel_dzy          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdy             |
 | 67 | jvel_dzz          | xc, yc, zeta_ac  | 1/yr        | Velocity Jacobian component duzdz             |
+| 68 | H_ice_solv        | xc, yc           | m           | Ice thickness of the last velocity solution   |
+| 69 | f_ice_solv        | xc, yc           | 1           | Ice fraction of the last velocity solution    |
+| 70 | uz_srf_err        | xc, yc           | m/yr        | Surface uz_star + smb (kinematic mismatch)    |
