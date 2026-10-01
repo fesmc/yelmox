@@ -34,7 +34,7 @@ program yelmox_rembo
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
 
     character(len=512)  :: outfldr, file_rembo2D, file_rembo1D
-    real(wp) :: time_equil, dtt, dtt_now, deltat_tot
+    real(wp) :: time_equil, dtt
     logical  :: write_restart
     real(wp) :: dT_summer, dT_ann, dT_ocn
 
@@ -136,24 +136,7 @@ program yelmox_rembo
 
         if (ts%is_finished) exit
 
-        ! Transient experiments: shrink dtt (and REMBO's emb cadence) during the
-        ! hysteresis ramp, restore afterwards.
-        dtt_now = dtt
-        if (tsf%active) then
-            select case(trim(tsf%tsg%par%method))
-                case("ramp-time","ramp-time-step")
-                    deltat_tot = tsf%tsg%par%dt_init + tsf%tsg%par%dt_ramp + tsf%tsg%par%dt_conv + 100.0_wp
-                    if (ts%time_elapsed < deltat_tot) then
-                        dtt_now = min(5.0_wp, dtt)
-                        rembo_ann%par%dtime_emb = real(dtt_now, dp)
-                    else
-                        dtt_now = dtt
-                        rembo_ann%par%dtime_emb = 100.0_dp
-                    end if
-            end select
-        end if
-
-        call tstep_update(ts, dtt_now)
+        call tstep_update(ts, dtt)
         call tstep_print(ts)
 
         ! Transient forcing for this step (from the tsgen series).

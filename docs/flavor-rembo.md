@@ -46,8 +46,7 @@ call step_marine_shelf(dom, ts)
 Like the other multigrid flavors, this inlines the `step_*` primitives and
 substitutes `step_rembo` for the generic `step_climate`. REMBO and marine run
 *after* `step_icesheet`/`yelmo_update`, so their output is consumed on the next
-step (the standard one-step coupling lag). During a hysteresis ramp the driver also
-shrinks the main timestep and REMBO's internal `dtime_emb` for stability.
+step (the standard one-step coupling lag).
 
 ## Forcing
 
