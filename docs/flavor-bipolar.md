@@ -38,13 +38,22 @@ Main loop (per timestep):
 ```fortran
 call bsl_update(bsl, ts%time_rel)              ! shared sea level, once
 
-if (active_north) call advance_isostasy(dom_north)   ! step_spinup_tuning + step_isostasy
-if (active_south) call advance_isostasy(dom_south)
+if (active_north) then                         ! spin-up tuning + isostasy, per domain
+    call step_spinup_tuning(dom_north, ts)
+    call step_isostasy(dom_north, ts, bsl)
+end if
+(same for dom_south)
 
 if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)   ! ocean box model, one step
 
-if (active_north) call advance_dynamics(dom_north)   ! step_icesheet + refresh_hub + step_climate
-if (active_south) call advance_dynamics(dom_south)
+if (active_north) then                         ! ice sheet, hub, climate + smb, per domain
+    call couple_to_yelmo(dom_north)
+    call step_icesheet(dom_north, ts)
+    call refresh_hub(dom_north)
+    call step_climate(dom_north, ts)
+    call step_smb(dom_north, ts)
+end if
+(same for dom_south)
 
 call obm_exchange(oc, obox, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
                                                        ! hysteresis forcing, obm->ism ocean temp
@@ -60,9 +69,8 @@ Key ordering points:
 - **`obm_update` uses the previous step's** atmospheric/freshwater forcing (a
   one-step lag), then `obm_exchange` distributes the fresh OBM state back to the
   domains before the marine-shelf melt is computed.
-- `advance_dynamics` = `step_icesheet` → `refresh_hub` → `step_climate` (the same
-  three primitives the single-domain `yelmox_step` runs, minus optimize/isostasy
-  which happen in `advance_isostasy` earlier).
+- The per-domain primitives are the same as in the single-domain `yelmox`; only
+  the spin-up tuning + isostasy part is split off so it runs before the OBM step.
 
 ## Forcing
 

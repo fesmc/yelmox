@@ -18,7 +18,6 @@ module kryos_coupling
     implicit none
     private
 
-    public :: yelmox_step
     public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
     public :: step_smb, refresh_hub
     public :: couple_to_yelmo
@@ -26,32 +25,6 @@ module kryos_coupling
     public :: check_isostasy_reference
 
 contains
-
-    subroutine yelmox_step(dom, ts, bsl, dTa, dTo, dSo)
-        ! Advance one domain by one coupling step. Component order is fixed here;
-        ! each step_* is a no-op when its ctl flag is off. bsl is the shared,
-        ! driver-owned sea level (the driver calls bsl_update once per step before
-        ! this call); step_isostasy consumes it. The optional dTa/dTo/dSo are
-        ! driver-owned climate anomalies forwarded to step_climate (e.g. a transient
-        ! forcing series); when absent, snapclim uses its own index. Used by the
-        ! single-domain driver; the multi-domain driver interleaves the step_*
-        ! primitives itself.
-        type(kryos_domain),  intent(inout) :: dom
-        type(tstep_class), intent(in)    :: ts
-        type(bsl_class),   intent(inout) :: bsl
-        real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
-        real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
-        real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
-
-        call step_spinup_tuning(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
-        call step_isostasy(dom, ts, bsl)
-        call couple_to_yelmo(dom)
-        call step_icesheet(dom, ts)
-        call refresh_hub(dom)          ! hi-res geometry mirror, from the models
-        call step_climate(dom, ts, dTa=dTa, dTo=dTo, dSo=dSo)  ! climate reads geometry from the hub
-        call step_smb(dom, ts)
-        call step_marine_shelf(dom, ts)
-    end subroutine yelmox_step
 
     subroutine step_spinup_tuning(dom, ts)
         ! Spin-up tuning (equil_method == "opt"): ramp the topography relaxation

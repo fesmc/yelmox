@@ -14,7 +14,9 @@ program yelmox
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : yelmox_step, step_climate, step_smb, step_marine_shelf
+    use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
+                               step_icesheet, refresh_hub, step_climate, step_smb, &
+                               step_marine_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_due, &
@@ -149,15 +151,26 @@ program yelmox
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
 
+        ! Transient forcing: advance the series every step (feedback methods need
+        ! the response-derivative window); response variable = ice volume [Gt].
         if (tsf%active) then
-            ! Advance the forcing series every step (feedback methods need the
-            ! response-derivative window); response variable = ice volume [Gt].
             fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
             call tsforcing_update(tsf, ts%time, var=fvar)
-            call yelmox_step(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call yelmox_step(dom, ts, bsl)
         end if
+
+        ! === coupling sequence ===
+        call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+        call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
+        call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+        call step_icesheet(dom, ts)       ! yelmo_update
+        call refresh_hub(dom)             ! hi-res geometry from the models
+        if (tsf%active) then              ! climate (dt_clim cadence)
+            call step_climate(dom, ts, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+        else
+            call step_climate(dom, ts)
+        end if
+        call step_smb(dom, ts)            ! surface mass balance
+        call step_marine_shelf(dom, ts)   ! shelf melt
 
         ! Forcing-increment restart each |Δf| > restart_every_df (folders
         ! restart-<n>), so a ramp can be branched at fixed forcing levels.

@@ -28,14 +28,16 @@ Every modern flavor advances the model by calling these primitives (from
 
 - `step_spinup_tuning` — spinup relaxation + basal-friction / thermal-forcing tuning.
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
-- `step_icesheet` — assemble the Yelmo boundary state (couplers) and run `yelmo_update`.
+- `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs.
+- `step_icesheet` — run `yelmo_update`.
 - `refresh_hub` — mirror the prognostic geometry into the hi-res reference hub.
-- `step_climate` — climate on `grid_clim` + SMB on `grid_smb` (snapclim/smbpal).
+- `step_climate` — climate on `grid_clim` (snapclim/snapesm), on the `dt_clim` cadence.
+- `step_smb` — surface mass balance on `grid_smb` (smbpal or smb_simple).
 - `step_marine_shelf` — sub-shelf melt on `grid_mshlf`.
 
-The single-domain [`yelmox`](flavor-yelmox.md) wraps these in `yelmox_step`; the
-other drivers call the primitives directly so they can interleave extra steps
-(a second domain, an ocean box model, an ESM/REMBO climate step).
+Every driver writes the sequence out in its time loop, so the coupling order can
+be read directly from the program; drivers with extra steps (a second domain, an
+ocean box model, an ESM/REMBO climate step) interleave them there.
 
 ## Initialization ordering (applies to all flavors)
 

@@ -15,12 +15,12 @@ program yelmox_bipolar
     ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
-    ! Per-step coupling order: shared sea level, then per
-    ! domain spinup + isostasy, then one OBM step, then per domain ice sheet +
-    ! climate, then the ocean exchanges (atm->obm, ism->obm freshwater flux,
-    ! hysteresis forcing, obm->ism ocean temperature), then per domain marine
-    ! shelf (which reads the obm-updated ocean temperature). Per-domain physics
-    ! live in libs/yelmox_domain.f90; the ocean coupling lives in
+    ! Per-step coupling order: shared sea level, then per domain spin-up tuning +
+    ! isostasy, then one OBM step, then per domain ice sheet + climate + smb,
+    ! then the ocean exchanges (atm->obm, ism->obm freshwater flux, hysteresis
+    ! forcing, obm->ism ocean temperature), then per domain marine shelf (which
+    ! reads the obm-updated ocean temperature). Per-domain physics live in the
+    ! kryos modules (libs/kryos*.f90); the ocean coupling lives in
     ! yelmox_bipolar/obm_coupling.f90. See docs/multigrid.md.
 
     use nml
@@ -151,16 +151,34 @@ program yelmox_bipolar
         ! Shared sea level: update once per step, before either domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        ! Spinup relaxation + isostasy (both domains) -- before the OBM step.
-        if (active_north) call advance_isostasy(dom_north)
-        if (active_south) call advance_isostasy(dom_south)
+        ! Spin-up tuning + isostasy (each domain), before the OBM step.
+        if (active_north) then
+            call step_spinup_tuning(dom_north, ts)
+            call step_isostasy(dom_north, ts, bsl)
+        end if
+        if (active_south) then
+            call step_spinup_tuning(dom_south, ts)
+            call step_isostasy(dom_south, ts, bsl)
+        end if
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
         if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
 
-        ! Ice sheet + hi-res hub refresh + climate/smb (both domains).
-        if (active_north) call advance_dynamics(dom_north)
-        if (active_south) call advance_dynamics(dom_south)
+        ! Ice sheet, hub refresh, climate + surface mass balance (each domain).
+        if (active_north) then
+            call couple_to_yelmo(dom_north)   ! bedrock now; smb + shelf melt lag one step
+            call step_icesheet(dom_north, ts)
+            call refresh_hub(dom_north)
+            call step_climate(dom_north, ts)
+            call step_smb(dom_north, ts)
+        end if
+        if (active_south) then
+            call couple_to_yelmo(dom_south)
+            call step_icesheet(dom_south, ts)
+            call refresh_hub(dom_south)
+            call step_climate(dom_south, ts)
+            call step_smb(dom_south, ts)
+        end if
 
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
         ! flux, hysteresis forcing, obm->ism ocean temperature.
@@ -221,25 +239,6 @@ contains
         write(*,*) "  output dir  : "//trim(outfldr)
         write(*,*)
     end subroutine setup_domain
-
-    subroutine advance_isostasy(dom)
-        ! Per-domain part that precedes the OBM step: spinup relaxation +
-        ! cb_ref/tf_corr tuning, then isostasy against the shared sea level.
-        type(kryos_domain), intent(inout) :: dom
-        call step_spinup_tuning(dom, ts)
-        call step_isostasy(dom, ts, bsl)
-    end subroutine advance_isostasy
-
-    subroutine advance_dynamics(dom)
-        ! Per-domain part after the OBM step and before the ocean coupling: ice
-        ! sheet update, hi-res hub refresh, then climate + surface mass balance.
-        type(kryos_domain), intent(inout) :: dom
-        call couple_to_yelmo(dom)
-        call step_icesheet(dom, ts)
-        call refresh_hub(dom)
-        call step_climate(dom, ts)
-        call step_smb(dom, ts)
-    end subroutine advance_dynamics
 
     subroutine write_domain_init(dom, outfldr)
         ! Create the 2D + 1D output files.

@@ -22,6 +22,9 @@ annotated git tag. Dates are release (tag) dates.
   (`use_negis = True` only; no config sets it).
 - `step_climate` no longer runs the surface mass balance; drivers call
   `step_smb` right after it.
+- `yelmox` and `yelmox_bipolar` write the per-step coupling sequence out in the
+  time loop; `yelmox_step` and the bipolar `advance_isostasy`/`advance_dynamics`
+  wrappers are gone.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

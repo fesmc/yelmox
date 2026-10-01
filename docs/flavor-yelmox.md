@@ -28,20 +28,23 @@ grids at the moment of coupling. See [Multigrid coupling](multigrid.md).
 ## Stepping order
 
 The driver owns the timeline (`ts`) and the shared sea level (`bsl`), and advances
-the domain once per step with `yelmox_step`, which fixes the coupling order:
+the domain once per step with the coupling sequence written out in the time loop:
 
 ```fortran
-call step_spinup_tuning(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
-call step_isostasy(dom, ts, bsl)
-call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
-call refresh_hub(dom)          ! hi-res geometry mirror, from the models
-call step_climate(dom, ts, dTa, dTo, dSo)   ! climate/smb read geometry from the hub
-call step_marine_shelf(dom, ts)
+call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
+call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+call step_icesheet(dom, ts)       ! yelmo_update
+call refresh_hub(dom)             ! hi-res geometry from the models
+call step_climate(dom, ts, ...)   ! climate (dt_clim cadence)
+call step_smb(dom, ts)            ! surface mass balance
+call step_marine_shelf(dom, ts)   ! shelf melt
 ```
 
-`step_icesheet` assembles the Yelmo boundary state from the module outputs of the
-**previous** step (a one-step coupling lag) and runs `yelmo_update`; `step_climate`
-and `step_marine_shelf` then produce the forcing consumed on the next step.
+`couple_to_yelmo` assembles the Yelmo boundary state: isostasy from this step,
+smb and shelf melt from the **previous** step (a one-step coupling lag);
+`step_climate`, `step_smb` and `step_marine_shelf` then produce the forcing
+consumed on the next step.
 snapclim is refreshed on the `coupling.dt_clim` cadence; smbpal every step.
 
 ## Transient time-series forcing (`tsgen`)
@@ -50,7 +53,7 @@ snapclim is refreshed on the `coupling.dt_clim` cadence; smbpal every step.
 (atmosphere and/or ocean) from the `tsgen` time-series generator (the modern
 replacement for the legacy `hyster` module). It is **driver-owned**: the program
 holds a `tsgen_class`, advances it each step, and passes the result into
-`yelmox_step` as `dTa` / `dTo` / `dSo`.
+`step_climate` as `dTa` / `dTo` / `dSo`.
 
 Two namelist groups control it:
 
@@ -87,7 +90,7 @@ the legacy `hyster` contract.
 :::
 
 With `active = False` (the default in the shipped configs) the driver calls
-`yelmox_step` without anomalies and snapclim behaves exactly as before.
+`step_climate` without anomalies and snapclim behaves exactly as before.
 
 ## Also built from this driver
 
