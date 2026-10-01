@@ -67,6 +67,11 @@ annotated git tag. Dates are release (tag) dates.
 - `input/esm/esm_ant_ismip7.nml`: the SMB reference (`gcm_smb_ref`, read with
   `esm.use_smb = True`) is the RACMO2.3 monthly climatology `{grid}_RACMO23-VW23.nc`;
   the ERA5 1979-2022 file it pointed to has no `smb`.
+- `opt.cf_init <= 0` starts the optimization from the till friction of the bed
+  again (`cb_ref = cb_tgt`, from the `ytill` parameters), in every driver
+  (`domain_opt_init_cb_ref`). Only `yelmox_rembo` still did; `yelmox`,
+  `yelmox_bipolar` and `yelmox_esm` set `cb_ref = cf_init`, a negative friction.
+  `cf_init > 0` is unchanged (uniform `cb_ref`).
 - `check_isostasy_reference` compares the two reference bedrocks on the isostasy
   grid, where Yelmo's `z_bed_ref` is remapped exactly as the isostasy reference was
   built: the same bedrock agrees to round-off on any isostasy grid (max |diff| <=

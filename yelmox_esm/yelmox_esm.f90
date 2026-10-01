@@ -319,8 +319,7 @@ contains
         call couple_esm_extras_to_yelmo(dom, esm)
 
         ! Cold-start friction guess for the optimization.
-        if (trim(dom%ctl%equil_method) == "opt") &
-            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        call domain_opt_init_cb_ref(dom)
 
         ! Initialize Yelmo state variables (cold base).
         call yelmo_print_bound(dom%yelmo%bnd)

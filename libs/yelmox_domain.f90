@@ -172,6 +172,7 @@ module yelmox_domain
     public :: tsforcing_restart_write, tsforcing_restart_read, tsforcing_write_step
     public :: cadence_due
     public :: domain_init, domain_regions_init, domain_init_state, yelmox_step
+    public :: domain_opt_init_cb_ref
     public :: domain_startup, bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
@@ -637,15 +638,34 @@ contains
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
         ! Cold-start friction guess for the optimization (restart restores cb_ref).
-        if (trim(dom%ctl%equil_method) == "opt") then
-            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
-        end if
+        call domain_opt_init_cb_ref(dom)
 
         ! Domain-specific cold-start setup (equilibration / LGM initialization /
         ! Greenland marine-ice). Cold start only; restart skips it.
         call domain_init_special(dom, ts)
 
     end subroutine domain_init_state
+
+    subroutine domain_opt_init_cb_ref(dom)
+        ! Cold-start basal friction of the optimization (equil_method == "opt"; a
+        ! restart restores cb_ref instead): opt.cf_init > 0 sets a uniform cb_ref,
+        ! cf_init <= 0 starts from the till friction of the bed (cb_tgt, from the
+        ! ytill parameters).
+        type(ice_domain), intent(inout) :: dom
+
+        if (trim(dom%ctl%equil_method) /= "opt") return
+
+        if (dom%opt%cf_init > 0.0_wp) then
+            dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
+        else
+            call calc_cb_ref(dom%yelmo%dyn%now%cb_ref, dom%yelmo%bnd%z_bed, dom%yelmo%bnd%z_bed_sd, &
+                    dom%yelmo%bnd%z_sl, dom%yelmo%bnd%H_sed, dom%yelmo%dyn%par%till_f_sed, &
+                    dom%yelmo%dyn%par%till_sed_min, dom%yelmo%dyn%par%till_sed_max, &
+                    dom%yelmo%dyn%par%till_cf_ref, dom%yelmo%dyn%par%till_cf_min, &
+                    dom%yelmo%dyn%par%till_z0, dom%yelmo%dyn%par%till_z1, dom%yelmo%dyn%par%till_n_sd, &
+                    dom%yelmo%dyn%par%till_scale_zb, dom%yelmo%dyn%par%till_scale_sed)
+        end if
+    end subroutine domain_opt_init_cb_ref
 
     subroutine domain_init_special(dom, ts)
         ! Domain-specific cold-start startup, dispatched on domain name. Mirrors
