@@ -9,7 +9,7 @@ libdir = libs
 
 # Command-line options at make call
 debug  ?= 0
-openmp ?= 0 
+openmp ?= 1
 
 ## COMPILER CONFIGURATION ##
 # Loaded from a config/<host> fragment by `python config.py --file <host>`,

@@ -18,6 +18,8 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- Builds use OpenMP by default (`openmp ?= 1` in `config/Makefile`); `make <driver>
+  openmp=0` builds serial. Regenerate the Makefile with configme to pick it up.
 - `input/yelmo_defaults.nml` re-synced with yelmo dev (`ytrc.elsa_restart`).
 - Follows yelmo dev: `input/` yelmo copies re-synced (`yelmo.mask_border`, `"auto"`:
   the domain border as before; the capacity basal BC keys of `ytherm`, now the
