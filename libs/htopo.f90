@@ -7,7 +7,8 @@ module htopo
     ! z_bed/H_ice/z_srf/masks.
     !
     ! Two provenance classes of field live here:
-    !   * regions, basins   -- static hi-res code masks, loaded once from file;
+    !   * regions, basins, z_bed_sd -- static (code masks and bed roughness),
+    !     loaded once from file;
     !   * z_bed, H_ice, z_srf -- dynamic geometry, loaded here as the initial
     !     reference and refreshed each step from the models (refresh_hub).
     !
@@ -28,7 +29,7 @@ module htopo
         character(len=256) :: domain
         character(len=256) :: grid_name       ! hub grid (grid_hub), e.g. "ANT-16KM"
         character(len=512) :: topo_path
-        character(len=56)  :: topo_names(3)   ! z_bed, H_ice, z_srf
+        character(len=56)  :: topo_names(4)   ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
         character(len=512) :: regions_path    ! "" = no file (regions = 1)
         character(len=56)  :: regions_var
         character(len=512) :: basins_path     ! "" = no file (basins = 1)
@@ -42,6 +43,7 @@ module htopo
         real(wp), allocatable :: z_bed(:,:)   ! [m] bedrock elevation
         real(wp), allocatable :: H_ice(:,:)   ! [m] ice thickness
         real(wp), allocatable :: z_srf(:,:)   ! [m] surface elevation
+        real(wp), allocatable :: z_bed_sd(:,:) ! [m] standard deviation of z_bed (static)
         real(wp), allocatable :: regions(:,:) ! region mask
         real(wp), allocatable :: basins(:,:)  ! basin mask
         ! Dynamic geometry refreshed from the models each step (not file-loaded).
@@ -79,6 +81,7 @@ contains
         allocate(htopo%z_bed(htopo%nx,htopo%ny))
         allocate(htopo%H_ice(htopo%nx,htopo%ny))
         allocate(htopo%z_srf(htopo%nx,htopo%ny))
+        allocate(htopo%z_bed_sd(htopo%nx,htopo%ny))
         allocate(htopo%regions(htopo%nx,htopo%ny))
         allocate(htopo%basins(htopo%nx,htopo%ny))
         allocate(htopo%f_grnd(htopo%nx,htopo%ny)); htopo%f_grnd = 0.0_wp
@@ -87,6 +90,10 @@ contains
         call nc_read(htopo%par%topo_path,    htopo%par%topo_names(1), htopo%z_bed)
         call nc_read(htopo%par%topo_path,    htopo%par%topo_names(2), htopo%H_ice)
         call nc_read(htopo%par%topo_path,    htopo%par%topo_names(3), htopo%z_srf)
+
+        htopo%z_bed_sd = 0.0_wp
+        if (len_trim(htopo%par%topo_names(4)) > 0) &
+            call nc_read(htopo%par%topo_path, htopo%par%topo_names(4), htopo%z_bed_sd)
 
         ! Static masks: load from file when a path is given, else default to a
         ! single region/basin (1.0), so paleo domains without mask files run.
@@ -107,7 +114,8 @@ contains
         par%domain    = trim(domain)
         par%grid_name = trim(grid_name)
 
-        ! Blank paths read as "" (nml_read leaves the value untouched)
+        ! Blank entries read as "" (nml_read leaves the value untouched)
+        par%topo_names   = ""
         par%regions_path = ""
         par%basins_path  = ""
 

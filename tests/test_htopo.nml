@@ -1,6 +1,6 @@
 &domain
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf"
+    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
@@ -8,7 +8,7 @@
 /
 &domain_nomask
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf"
+    topo_names   = "z_bed" "H_ice" "z_srf" ""
     regions_path = ""
     regions_var  = "mask"
     basins_path  = ""

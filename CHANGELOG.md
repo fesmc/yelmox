@@ -19,6 +19,10 @@ annotated git tag. Dates are release (tag) dates.
   migrated (`yelmo.grid_name`/`htopo.grid_name` -> `domain.grid_ice`/`grid_hub`,
   `coupling.grid_*` -> `domain.grid_*`); results are unchanged. The hub grid
   no longer tracks the Yelmo grid: `grid_ice = ""` tracks the hub instead.
+- The hub also reads the bed roughness `z_bed_sd` (4th `[domain] topo_names`
+  entry; `""` = none, 0). Par files take the name from `yelmo_init_topo`, except
+  where that was not a bed-roughness field (`bed`, `bed_bedmap3`, `H_ice`,
+  `none`), which become `""`. SRG keeps `z_bed_err`.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

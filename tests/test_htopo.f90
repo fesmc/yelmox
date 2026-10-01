@@ -33,14 +33,21 @@ program test_htopo
     if (maxval(ht%basins) < 1.0) then
         write(*,*) "FAIL: basins look empty"; fails = fails + 1
     end if
+    if (maxval(ht%z_bed_sd) <= 0.0) then
+        write(*,*) "FAIL: z_bed_sd looks empty"; fails = fails + 1
+    end if
 
-    ! Blank mask paths: no mask files are read and the masks default to 1.
+    ! Blank mask paths and z_bed_sd name: nothing is read and the masks
+    ! default to 1, z_bed_sd to 0.
     call htopo_init(ht_nomask, "tests/test_htopo.nml", "domain_nomask", "Antarctica", "ANT-16KM", &
                     map_fldr="maps")
 
     if (minval(ht_nomask%regions) /= 1.0 .or. maxval(ht_nomask%regions) /= 1.0 .or. &
         minval(ht_nomask%basins)  /= 1.0 .or. maxval(ht_nomask%basins)  /= 1.0) then
         write(*,*) "FAIL: blank mask paths did not give masks of 1"; fails = fails + 1
+    end if
+    if (maxval(abs(ht_nomask%z_bed_sd)) /= 0.0) then
+        write(*,*) "FAIL: blank z_bed_sd name did not give z_bed_sd = 0"; fails = fails + 1
     end if
     if (maxval(abs(ht_nomask%z_bed - ht%z_bed)) /= 0.0) then
         write(*,*) "FAIL: blank mask paths changed the topography"; fails = fails + 1

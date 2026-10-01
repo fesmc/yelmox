@@ -297,7 +297,7 @@ masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer set
     grid_smb     = ""           ! surface mass balance                 [grid_clim]
     grid_mshlf   = ""           ! marine shelf                         [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf"
+    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
     regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
@@ -308,13 +308,14 @@ masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer set
 `htopo` holds the hub. It sits *above* every physics module (including Yelmo):
 its grid (`grid_hub`) is the finest resolution in the setup, and it is the
 reference geometry the coupler remaps *from*. On the hub grid it holds static
-code masks `regions`/`basins` (loaded once) and geometry `z_bed`/`H_ice`/`z_srf`
-(initial reference, later refreshed each step from Yelmo/isostasy).
-`{domain}/{grid_name}` in the paths resolve to `name`/`grid_hub`. `htopo_init`
-resolves the grid from `grid_<name>.txt` (the disk grid table) and reads the
-fields onto it — validated by `tests/test_htopo.f90` against the real ANT-16KM
-data. A blank mask path (e.g. paleo domains without mask files) leaves the mask
-at `1.0` (single region/basin).
+fields (the code masks `regions`/`basins` and the bed roughness `z_bed_sd`,
+loaded once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later
+refreshed each step from Yelmo/isostasy). `{domain}/{grid_name}` in the paths
+resolve to `name`/`grid_hub`. `htopo_init` resolves the grid from
+`grid_<name>.txt` (the disk grid table) and reads the fields onto it —
+validated by `tests/test_htopo.f90` against the real ANT-16KM data. A blank
+mask path (e.g. paleo domains without mask files) leaves the mask at `1.0`
+(single region/basin); a blank `z_bed_sd` name leaves it at `0`.
 
 ### Buffers
 

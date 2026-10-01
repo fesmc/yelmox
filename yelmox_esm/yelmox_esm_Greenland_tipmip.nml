@@ -658,7 +658,7 @@
     grid_smb     = ""                 ! surface mass balance [grid_clim]
     grid_mshlf   = ""                 ! marine shelf [grid_hub]
     topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    topo_names   = "bed" "thickness" "surface_grimp"  ! z_bed, H_ice, z_srf
+    topo_names   = "bed" "thickness" "surface_grimp" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
     regions_var  = "mask"
     basins_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"  ! "" = none (basins = 1)
