@@ -827,7 +827,9 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_south] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis_south] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
+    init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_equil_time         = 10.0      ! [yr] equil: equilibration time
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
 /
 
 &output_south
@@ -1306,7 +1308,8 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_north] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
+    init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
 /
 
 &output_north

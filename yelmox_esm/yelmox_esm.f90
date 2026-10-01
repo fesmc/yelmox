@@ -39,7 +39,7 @@ program yelmox_esm
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
                                refresh_hub, couple_to_yelmo
-    use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write
+    use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, run_restart_write
     use yelmox_esm_output
 
     implicit none
@@ -323,10 +323,12 @@ contains
                 dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
         end if
 
-        ! Spinup ("opt") equilibration passes (cold start only).
-        if (trim(ec%run_step) == "spinup" .and. dom%ctl%with_ice_sheet) then
-            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=1.0_wp, dt=1.0_wp, topo_fixed=.false.)
-            if (trim(dom%ctl%equil_method) == "opt" .and. ec%time_equil > 0.0_wp) &
+        ! Spinup cold start: the ice state ([coupling] init_method), then the
+        ! optimization's fixed-topography equilibration.
+        if (trim(ec%run_step) == "spinup") then
+            call domain_init_ice(dom, ts)
+            if (dom%ctl%with_ice_sheet .and. trim(dom%ctl%equil_method) == "opt" &
+                                       .and. ec%time_equil > 0.0_wp) &
                 call yelmo_update_equil(dom%yelmo, ts%time, time_tot=ec%time_equil, &
                                         dt=ec%dtt, topo_fixed=.true.)
         end if

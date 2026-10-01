@@ -62,7 +62,7 @@ contains
     end subroutine domain_regions_init
 
     subroutine domain_init_marine_ice(dom)
-        ! LGM-like marine ice at the cold start (greenland_init_marine_H): thin
+        ! LGM-like marine ice at the cold start (init_marine_H): thin
         ! ice (< 600 m) over shallow bed (> -500 m) is thickened to 800 m wherever
         ! ice is allowed.
         type(kryos_domain), intent(inout) :: dom

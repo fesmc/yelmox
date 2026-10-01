@@ -22,11 +22,11 @@ program yelmox_rembo
                                rembo_ann, rembo_restart_write
     use tsgen, only : tsgen_class
     use kryos,          only : kryos_domain, domain_init, remap
-    use kryos_regions,  only : domain_regions_init, domain_init_marine_ice
+    use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
                                refresh_hub, step_marine_shelf, couple_to_yelmo
-    use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write, &
-                               restart_bundle_dir
+    use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, &
+                               run_restart_write, restart_bundle_dir
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_read
     use kryos_output,   only : domain_write_init, domain_write_step, &
@@ -285,14 +285,11 @@ contains
         call yelmo_print_bound(dom%yelmo%bnd)
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
-        ! Optional LGM-like marine ice at the start.
-        if (dom%ctl%greenland_init_marine_H) call domain_init_marine_ice(dom)
-
-        ! Equilibrate thermodynamics/dynamics (cold start only).
-        if (.not. dom%yelmo%par%use_restart .and. dom%ctl%with_ice_sheet) then
-            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, dt=1.0_wp, topo_fixed=.FALSE.)
+        ! Cold-start ice state ([coupling] init_marine_H, init_method), then
+        ! equilibrate thermodynamics/dynamics with fixed topography.
+        call domain_init_ice(dom, ts)
+        if (dom%ctl%with_ice_sheet) &
             call yelmo_update_equil(dom%yelmo, ts%time, time_tot=time_equil, dt=dtt, topo_fixed=.TRUE.)
-        end if
     end subroutine rembo_cold_start
 
     subroutine write_rembo_restart(dom, bsl, ts, tsf)

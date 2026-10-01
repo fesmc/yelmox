@@ -74,6 +74,17 @@ annotated git tag. Dates are release (tag) dates.
   `lat_lim`, `fac_lim`; were fixed at -8 K, 55°N, 0.9); `[negis]` gains
   `basin_centre`/`basin_south`/`basin_north` (were fixed at 9.1/9.2/9.3). No par
   file sets either switch.
+- **Cold-start ice state from `[coupling]`**, the same in every driver
+  (`domain_init_ice`): `init_marine_H` (was `greenland_init_marine_H`), then
+  `init_method` = `none`, `equil` (`init_equil_time`), `recon` or `recon_ref`
+  (`recon_path`, `recon_var`, `recon_codes`). It replaces the startup chosen by
+  domain name (and, for Laurentide/North, by `tstep_method`) and the own
+  equilibrations of `yelmox_esm` (1 yr, spin-up only) and `yelmox_rembo` (10 yr).
+  Par files keep their behaviour: Antarctica, SRG, Pyrenees, bipolar south and
+  REMBO `equil` 10 yr; ESM `equil` 1 yr; Greenland and bipolar north `none`;
+  Laurentide and North `recon` (ICE-6G_C, regions 1.1/1.11/1.12). A transient
+  Laurentide run (was "grow from zero ice") now sets `init_method = "recon_ref"`;
+  a transient North run, `none`.
 - The domain type `ice_domain` is renamed `kryos_domain`, in line with the
   Kryos naming of the cryosphere-component framework.
 - `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,

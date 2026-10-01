@@ -380,6 +380,13 @@ same handful of calls:
   restore it once via **`bsl_startup(bsl, ts, fldr)`** and pass
   `restore_bsl=.false.`. Flavors with their own cold start (esm, rembo) keep
   their cold branch and call this on the restart branch only.
+- **`domain_init_ice(dom, ts)`** — the cold-start ice state after
+  `yelmo_init_state`, in every flavor: `[coupling] init_marine_H` (LGM-like
+  marine ice), then `init_method`: `none`, `equil` (`init_equil_time` years with
+  constant boundaries), `recon` (the ice reconstruction `recon_path`/`recon_var`
+  as initial ice on the `recon_codes` regions, then a 200-yr stabilization) or
+  `recon_ref` (the reconstruction as reference ice only). esm calls it only for
+  the spin-up.
 - **`run_restart_write(dom, bsl, time)`** — the single-domain restart bundle
   (domain sub-models + run-level `bsl_restart.nc`, one auto-named folder).
 - **`cadence_due(time, dt)`** — the cadence predicate for `dt_clim` and the

@@ -1,6 +1,6 @@
 module kryos_startup
     ! Initial state of a kryos_domain: the cold start (boundary state, Yelmo
-    ! state init, domain-specific startup) and restart bundles (one folder per
+    ! state init, cold-start ice state) and restart bundles (one folder per
     ! time holding one restart file per stateful component).
 
     use ncio
@@ -25,7 +25,7 @@ module kryos_startup
     implicit none
     private
 
-    public :: domain_startup, domain_init_state, domain_init_isostasy
+    public :: domain_startup, domain_init_state, domain_init_isostasy, domain_init_ice
     public :: bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read
     public :: restart_bundle_dir, restart_bundle_mkdir
@@ -153,9 +153,9 @@ contains
         call yelmo_print_bound(dom%yelmo%bnd)
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
-        ! Domain-specific cold-start setup (equilibration / LGM initialization /
-        ! Greenland marine-ice). Cold start only; restart skips it.
-        call domain_init_special(dom, ts)
+        ! Cold-start ice state ([coupling] init_marine_H, init_method). Cold
+        ! start only; restart skips it.
+        call domain_init_ice(dom, ts)
 
     end subroutine domain_init_state
 
@@ -187,86 +187,62 @@ contains
         call couple_isostasy_to_yelmo(dom)
     end subroutine domain_init_isostasy
 
-    subroutine domain_init_special(dom, ts)
-        ! Domain-specific cold-start startup, dispatched on domain name. The
-        ! DEFAULT (incl. Antarctica) path runs a short equilibration to synchronize the model fields.
-        type(kryos_domain),  intent(inout) :: dom
-        type(tstep_class), intent(in)    :: ts
+    subroutine domain_init_ice(dom, ts)
+        ! Cold-start ice state, after yelmo_init_state ([coupling]): LGM-like
+        ! marine ice first (init_marine_H), then init_method -- none, a short
+        ! equilibration with constant boundaries (equil), or the ice
+        ! reconstruction recon_path as the initial ice (recon) or only as the
+        ! reference ice (recon_ref).
+        type(kryos_domain), intent(inout) :: dom
+        type(tstep_class),  intent(in)    :: ts
 
-        select case(trim(dom%ctl%domain))
+        if (dom%ctl%init_marine_H) call domain_init_marine_ice(dom)
 
-            case("Laurentide")
-                ! Steady-state: LGM reconstruction; transient: grow from zero ice.
-                if (trim(dom%ctl%tstep_method) == "const") then
-                    call domain_init_lgm_north(dom, ts, "Laurentide", "ref_lgm")
-                else
-                    call domain_init_lgm_north(dom, ts, "Laurentide", "zero")
-                end if
-
-            case("North")
-                ! Steady-state only: whole-NH LGM reconstruction (ICE-6G_C).
-                if (trim(dom%ctl%tstep_method) == "const") then
-                    call domain_init_lgm_north(dom, ts, "North", "ref_lgm")
-                end if
-
-            case("Greenland")
-                ! Optionally impose LGM-like marine ice; otherwise no startup equil.
-                if (dom%ctl%greenland_init_marine_H) then
-                    call domain_init_marine_ice(dom)
-                    if (dom%ctl%with_ice_sheet) &
-                        call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, &
-                                                dt=1.0_wp, topo_fixed=.FALSE.)
-                end if
-
-            case default
-                ! Antarctica etc.: short equilibration with constant boundaries.
+        select case(trim(dom%ctl%init_method))
+            case("none")
+                ! Keep the initial state.
+            case("equil")
                 if (dom%ctl%with_ice_sheet) &
-                    call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, &
+                    call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%init_equil_time, &
                                             dt=1.0_wp, topo_fixed=.FALSE.)
-
+            case("recon", "recon_ref")
+                call domain_init_recon(dom, ts)
         end select
 
-    end subroutine domain_init_special
+    end subroutine domain_init_ice
 
-    subroutine domain_init_lgm_north(dom, ts, region, method)
-        ! Initialize a Northern-Hemisphere domain (Laurentide or whole "North")
-        ! from the ICE-6G_C LGM reconstruction. Sets the reconstructed grounded
-        ! ice as the initial thickness (method-dependent), refreshes the surface
-        ! and (via the hub) the climate/smb, and stabilizes the dynamic fields.
-        type(kryos_domain),  intent(inout) :: dom
-        type(tstep_class), intent(in)    :: ts
-        character(len=*),  intent(in)    :: region   ! "Laurentide" or "North"
-        character(len=*),  intent(in)    :: method   ! "ref_lgm", else zero
+    subroutine domain_init_recon(dom, ts)
+        ! Start from an ice reconstruction (recon_path, e.g. ICE-6G_C at the LGM):
+        ! it becomes the reference ice thickness and, with recon, the initial ice
+        ! on the recon_codes regions (bed > -500 m). Then refresh the surface
+        ! and (via the hub) the climate/smb, and stabilize the dynamic fields.
+        type(kryos_domain), intent(inout) :: dom
+        type(tstep_class),  intent(in)    :: ts
 
-        character(len=1024) :: path_lgm, grid_name
-        integer  :: nx, ny
+        integer  :: nx, ny, k
+        logical, allocatable :: on_codes(:,:)
         real(wp) :: beta_min_save
 
         nx = dom%yelmo%tpo%par%nx
         ny = dom%yelmo%tpo%par%ny
-        grid_name = trim(dom%yelmo%par%grid_name)
 
-        ! Load LGM reconstruction (slice 1) into the reference ice thickness.
-        path_lgm = "ice_data/"//trim(region)//"/"//trim(grid_name)//"/"// &
-                   trim(grid_name)//"_TOPO-ICE-6G_C.nc"
-        call nc_read(path_lgm, "dz", dom%yelmo%bnd%H_ice_ref, start=[1,1,1], &
-                     count=[nx,ny,1])
+        ! Load the reconstruction (slice 1) into the reference ice thickness.
+        call nc_read(dom%ctl%recon_path, dom%ctl%recon_var, dom%yelmo%bnd%H_ice_ref, &
+                     start=[1,1,1], count=[nx,ny,1])
 
-        ! Determine the initial ice thickness.
-        select case(trim(method))
-            case("ref_lgm")
-                where ( dom%yelmo%bnd%z_bed > -500.0_wp .and. &
-                        (dom%yelmo%bnd%regions == 1.1_wp  .or. &
-                         dom%yelmo%bnd%regions == 1.11_wp .or. &
-                         dom%yelmo%bnd%regions == 1.12_wp) )
-                    dom%yelmo%tpo%now%H_ice = dom%yelmo%bnd%H_ice_ref
-                end where
-                call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=real(dom%yelmo%grd%G%dx,wp), f_sigma=2.0_wp)
-                call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
-                                     dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
-            case default
-                ! Zero ice thickness (transient start): do nothing.
-        end select
+        if (trim(dom%ctl%init_method) == "recon") then
+            ! Initial ice from the reconstruction on the given regions.
+            allocate(on_codes(nx,ny))
+            on_codes = .false.
+            do k = 1, dom%ctl%n_recon_codes
+                where (abs(dom%yelmo%bnd%regions - dom%ctl%recon_codes(k)) < 1e-3_wp) on_codes = .true.
+            end do
+            where (dom%yelmo%bnd%z_bed > -500.0_wp .and. on_codes) &
+                dom%yelmo%tpo%now%H_ice = dom%yelmo%bnd%H_ice_ref
+            call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=real(dom%yelmo%grd%G%dx,wp), f_sigma=2.0_wp)
+            call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &
+                                 dom%yelmo%par%nml_init_topo, ts%time, load_topo=.FALSE.)
+        end if
 
         ! Update surface topography fields (fixed H), then remove thin floating ice.
         call yelmo_update_equil(dom%yelmo, ts%time, time_tot=1.0_wp, dt=1.0_wp, topo_fixed=.TRUE.)
@@ -274,7 +250,7 @@ contains
             dom%yelmo%tpo%now%H_ice = 0.0_wp
         call yelmo_update_equil(dom%yelmo, ts%time, time_tot=1.0_wp, dt=1.0_wp, topo_fixed=.TRUE.)
 
-        if (trim(method) == "ref_lgm") then
+        if (trim(dom%ctl%init_method) == "recon") then
             ! Store the clean thickness as the reference state (drives smb masks).
             dom%yelmo%bnd%H_ice_ref = dom%yelmo%tpo%now%H_ice
         end if
@@ -295,7 +271,7 @@ contains
             dom%yelmo%dyn%par%beta_min = beta_min_save
         end if
 
-    end subroutine domain_init_lgm_north
+    end subroutine domain_init_recon
 
     function restart_bundle_dir(time, outfldr) result(bundle)
         ! Auto-named per-time restart bundle folder: "<outfldr>restart-<kyr>-kyr".

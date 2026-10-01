@@ -711,7 +711,11 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
+    init_method             = "recon"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    recon_path              = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-ICE-6G_C.nc"   ! {grid_name} = grid_ice
+    recon_var               = "dz"      ! ice thickness in recon_path
+    recon_codes             = 1.1 1.11 1.12   ! recon: regions where the reconstructed ice is imposed
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
 /
 
 &output

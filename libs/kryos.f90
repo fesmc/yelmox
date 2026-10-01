@@ -20,7 +20,7 @@ module kryos
     !   kryos_output    per-module 2D/1D output
     !   kryos_forcing   driver-owned transient forcing (tsgen)
 
-    use nml,          only : nml_read
+    use nml,          only : nml_read, nml_replace
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_init_grid, ytopo_input_class
     use yelmo_defs,   only : MASK_ICE_NONE, MASK_ICE_DYNAMIC
@@ -53,8 +53,16 @@ module kryos
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"
 
-        ! Optional startup / physics switches ([coupling]).
-        logical :: greenland_init_marine_H = .false.   ! impose LGM-like marine ice at start
+        ! Cold-start ice state ([coupling]): init_marine_H first, then init_method.
+        character(len=56)  :: init_method     = "equil"   ! none | equil | recon | recon_ref
+        logical            :: init_marine_H   = .false.   ! impose LGM-like marine ice
+        real(wp)           :: init_equil_time = 10.0_wp   ! [yr] equil: equilibration time
+        character(len=512) :: recon_path = ""             ! recon*: ice reconstruction file
+        character(len=56)  :: recon_var  = ""             ! recon*: its ice-thickness variable
+        real(wp)           :: recon_codes(20)             ! recon: regions where its ice is imposed
+        integer            :: n_recon_codes = 0
+
+        ! Optional physics switches ([coupling]).
         logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb ([glacial_smb] group)
         logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent
         logical :: use_negis               = .false.   ! NEGIS cb_ref modification ([negis] group)
@@ -457,12 +465,39 @@ contains
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
 
-        ! Optional startup / physics switches. use_negis and scale_glacial_smb
+        ! Optional physics switches. use_negis and scale_glacial_smb
         ! additionally require a [negis<suffix>] / [glacial_smb<suffix>] group.
         call nml_read(path_par, gc, "scale_glacial_smb",       ctl%scale_glacial_smb)
         call nml_read(path_par, gc, "lim_pd_ice",              ctl%lim_pd_ice)
         call nml_read(path_par, gc, "use_negis",               ctl%use_negis)
-        call nml_read(path_par, gc, "greenland_init_marine_H", ctl%greenland_init_marine_H)
+
+        ! Cold-start ice state. The keys of the selected init_method are required.
+        call nml_read(path_par, gc, "init_method",   ctl%init_method)
+        call nml_read(path_par, gc, "init_marine_H", ctl%init_marine_H)
+        select case(trim(ctl%init_method))
+            case("none")
+            case("equil")
+                call nml_read(path_par, gc, "init_equil_time", ctl%init_equil_time)
+            case("recon", "recon_ref")
+                call nml_read(path_par, gc, "recon_path", ctl%recon_path)
+                call nml_read(path_par, gc, "recon_var",  ctl%recon_var)
+                ! {domain}/{grid_name} resolve to the domain name and grid_ice.
+                call nml_replace(ctl%recon_path, "{domain}",    trim(ctl%domain))
+                call nml_replace(ctl%recon_path, "{grid_name}", trim(ctl%grid_ice))
+                if (trim(ctl%init_method) == "recon") then
+                    ctl%recon_codes = -9999.0_wp
+                    call nml_read(path_par, gc, "recon_codes", ctl%recon_codes)
+                    ctl%n_recon_codes = count(ctl%recon_codes /= -9999.0_wp)
+                    if (ctl%n_recon_codes == 0) then
+                        write(*,*) "domain_ctl_load:: error: "//trim(gc)//".init_method = recon needs recon_codes."
+                        stop 1
+                    end if
+                end if
+            case default
+                write(*,*) "domain_ctl_load:: error: "//trim(gc)//".init_method must be none, equil, &
+                           &recon or recon_ref; got "//trim(ctl%init_method)
+                stop 1
+        end select
 
         ctl%restart = "None"
         call nml_read(path_par, gc, "restart",        ctl%restart)

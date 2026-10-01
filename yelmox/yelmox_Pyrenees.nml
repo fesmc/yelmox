@@ -25,7 +25,9 @@
     scale_glacial_smb       = False
     lim_pd_ice              = False
     use_negis               = False
-    greenland_init_marine_H = False
+    init_method             = "equil"
+    init_equil_time         = 10.0
+    init_marine_H           = False
 /
 
 &output
