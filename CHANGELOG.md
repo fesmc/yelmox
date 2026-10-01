@@ -51,6 +51,10 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- A restart from a bundle initializes Yelmo's passive-tracer backends (elsa,
+  tracer): `domain_startup` loads Yelmo with `yelmo_restart_init` instead of
+  `yelmo_restart_read`. Before, a restart with `ytrc.use_elsa` or `use_tracer`
+  crashed in the first step. Requires a yelmo with `yelmo_restart_init`.
 - `check_isostasy_reference` compares the two reference bedrocks on the isostasy
   grid, where Yelmo's `z_bed_ref` is remapped exactly as the isostasy reference was
   built: the same bedrock agrees to round-off on any isostasy grid (max |diff| <=
