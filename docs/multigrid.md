@@ -491,6 +491,12 @@ end program
 5. **FastIsostasy hi-res output** — deferred. Lean toward the coupler upscaling
    the 16KM isostasy output rather than making the solver grid-aware. Not in the
    first skeleton.
+6. **One grid for reference climate and transient forcing.** `grid_clim` sets
+   the grid of both the reference climatology (often from a high-resolution
+   regional model) and the transient forcing (often from a coarser climate
+   model). A coarse `grid_clim` matches the forcing but loses the detail of the
+   high-res reference. Giving the two their own grids is a candidate for future
+   work; until then, set `grid_clim` to the highest-resolution climate input.
 
 ## Commit order
 

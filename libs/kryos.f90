@@ -73,6 +73,11 @@ module kryos
         character(len=256) :: grid_isos = ""    ! isostasy grid ([coupling]; default = grid_yelmo)
         real(wp) :: dx_isos = 0.0_wp            ! isostasy grid spacing in x (Yelmo dx units)
         real(wp) :: dy_isos = 0.0_wp            ! isostasy grid spacing in y (Yelmo dy units)
+        ! grid_clim sets the grid of BOTH the reference climatology (often from a
+        ! high-resolution regional model) and the transient forcing (often from
+        ! a coarser climate model). A coarse grid_clim matches the forcing but
+        ! loses detail of the high-res reference. Until the two get separate
+        ! grids, set grid_clim to the highest-resolution climate input.
         character(len=256) :: grid_clim = ""    ! climate grid ([coupling]; default = grid_yelmo)
         real(wp) :: dx_clim = 0.0_wp            ! climate grid spacing (Yelmo dx units)
         character(len=256) :: grid_smb = ""     ! smb grid ([coupling]; default = grid_clim)
