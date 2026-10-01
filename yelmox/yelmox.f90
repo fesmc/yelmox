@@ -14,7 +14,7 @@ program yelmox
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : yelmox_step, step_climate, step_marine_shelf
+    use kryos_coupling, only : yelmox_step, step_climate, step_smb, step_marine_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_due, &
@@ -90,6 +90,7 @@ program yelmox
         else
             call step_climate(dom, ts)
         end if
+        call step_smb(dom, ts)
         call step_marine_shelf(dom, ts)
     end if
 

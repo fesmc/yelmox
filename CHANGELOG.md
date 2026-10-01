@@ -20,6 +20,8 @@ annotated git tag. Dates are release (tag) dates.
   by the drivers before `step_icesheet` (which no longer runs the couplers).
   The Greenland NEGIS friction update now sees the bedrock of the current step
   (`use_negis = True` only; no config sets it).
+- `step_climate` no longer runs the surface mass balance; drivers call
+  `step_smb` right after it.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

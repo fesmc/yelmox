@@ -48,7 +48,8 @@ contains
         call couple_to_yelmo(dom)
         call step_icesheet(dom, ts)
         call refresh_hub(dom)          ! hi-res geometry mirror, from the models
-        call step_climate(dom, ts, dTa=dTa, dTo=dTo, dSo=dSo)  ! climate/smb read geometry from the hub
+        call step_climate(dom, ts, dTa=dTa, dTo=dTo, dSo=dSo)  ! climate reads geometry from the hub
+        call step_smb(dom, ts)
         call step_marine_shelf(dom, ts)
     end subroutine yelmox_step
 
@@ -348,11 +349,12 @@ contains
     end subroutine step_icesheet
 
     subroutine step_climate(dom, ts, dTa, dTo, dSo)
-        ! Run climate on grid_clim and smb on grid_smb: geometry (z_srf/H_ice) from
-        ! the hub, ocean/atmosphere forcing produced by snapclim, smb aggregated
-        ! back to the Yelmo grid (conservative). The optional dTa/dTo/dSo are
-        ! spatially-homogeneous atmosphere/ocean anomalies (e.g. a transient forcing
-        ! series owned by the driver); when absent, snapclim uses its own index.
+        ! Run climate on grid_clim, on the dt_clim cadence: geometry (z_srf) from
+        ! the hub, atmosphere/ocean forcing produced by the climate backend into
+        ! dom%clim (read by step_smb and step_marine_shelf). The optional
+        ! dTa/dTo/dSo are spatially-homogeneous atmosphere/ocean anomalies (e.g. a
+        ! transient forcing series owned by the driver); when absent, snapclim
+        ! uses its own index.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
@@ -375,9 +377,6 @@ contains
                                  domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
                                  dx=dom%ctl%dx_clim, basins=basins_c)
         end if
-
-        ! surface mass balance (smbpal or smb_simple), aggregated to the Yelmo grid
-        call step_smb(dom, ts)
     end subroutine step_climate
 
     subroutine step_smb(dom, ts, init)
@@ -395,6 +394,8 @@ contains
         real(wp), allocatable :: tsl_s(:,:), Href_s(:,:)
         character(len=256) :: gc, gs, gn, gy
         logical :: is_init
+
+        if (.not. dom%ctl%with_climate) return
 
         is_init = .false.
         if (present(init)) is_init = init

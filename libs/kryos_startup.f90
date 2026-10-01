@@ -290,6 +290,7 @@ contains
         ! the smb on the Yelmo grid for the stabilization below.
         call refresh_hub(dom)
         call step_climate(dom, ts)
+        call step_smb(dom, ts)
         call couple_smb_to_yelmo(dom)
 
         ! Stabilize the dynamic fields with a raised beta_min.
