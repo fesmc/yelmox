@@ -88,7 +88,6 @@
 
 &opt_L21
     cf_init         = 0.2               ! Initial value of cf_ref everywhere
-    cf_min          = 1e-4              ! [--] Minimum allowed cf value
     cf_max          = 1.0               ! [--] Maximum allowed cf value
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 

@@ -5,9 +5,7 @@
 #
 # Reruns the three Yelmo-32KM spin-ups from run_mg_resolution.sh (the ones that
 # completed) with the optimization's basal-friction lower bound reduced from the
-# default 0.01 to 1e-4. That bound is set by [ytill] cf_min, because [opt]
-# use_yelmo_cf_min=.true. routes the opt lower bound to Yelmo's till cf_min (the
-# [opt] cf_min / opt_cf_min are bypassed while that switch is on). A floor of
+# default 0.01 to 1e-4. That bound is set by [ytill] cf_min. A floor of
 # 0.01 was too high -- it prevented the optimizer from making ice-stream beds
 # slippery enough, leaving the spun-up ice too thick. cf_min is passed as a
 # parameter override, so the shared namelist is left untouched.

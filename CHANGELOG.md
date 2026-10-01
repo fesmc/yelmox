@@ -29,6 +29,13 @@ annotated git tag. Dates are release (tag) dates.
   `yelmo-variables-{ydyn,ytopo}.md`; added `elsa_defaults.nml`,
   `tracer_defaults.nml`). Par files drop `ydyn.scale_T` / `ydyn.T_frz`
   (no longer read by yelmo).
+- `&opt`: `use_yelmo_cf_min`, `opt_cf_min` and `cf_min` removed from all par
+  files (removed from yelmo's optimizer; the `cf_ref` floor is `ytill.cf_min`).
+- `scripts/1pctCO2/opt_ant.sh`, `scripts/ismip7/opt_{ant,grl}.sh` ported from
+  `esm-legacy` to `esm` (par files `yelmox_esm_Antarctica_1pctCO2.nml`,
+  `yelmox_esm_Antarctica_ismip7.nml`, `yelmox_esm_Greenland.nml`; keys mapped:
+  `coupling.equil_method`, `ytill.cf_min`, `ycalv.tau_ice_flt`,
+  `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
 - `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb
