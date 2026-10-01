@@ -31,10 +31,10 @@ The driver owns the timeline (`ts`) and the shared sea level (`bsl`), and advanc
 the domain once per step with `yelmox_step`, which fixes the coupling order:
 
 ```fortran
-call step_optimize(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
+call step_spinup_tuning(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
 call step_isostasy(dom, ts, bsl)
 call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
-call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
+call refresh_hub(dom)          ! hi-res geometry mirror, from the models
 call step_climate(dom, ts, dTa, dTo, dSo)   ! climate/smb read geometry from the hub
 call step_marine_shelf(dom, ts)
 ```

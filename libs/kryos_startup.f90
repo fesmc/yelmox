@@ -18,7 +18,7 @@ module kryos_startup
     use smbpal,       only : smbpal_restart_write, smbpal_restart_read
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
-    use kryos_coupling, only : refresh_htopo, step_climate, domain_update_smb, step_marine_shelf, &
+    use kryos_coupling, only : refresh_hub, step_climate, step_smb, step_marine_shelf, &
                                couple_isostasy_to_yelmo, couple_smb_to_yelmo, &
                                couple_marine_to_yelmo, check_isostasy_reference
     use kryos_forcing,  only : tsforcing_class, tsforcing_restart_write
@@ -79,7 +79,7 @@ contains
         else
             if (do_bsl) call bsl_startup(bsl, ts, trim(dom%ctl%restart))
             call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
-            call refresh_htopo(dom)
+            call refresh_hub(dom)
         end if
     end subroutine domain_startup
 
@@ -132,7 +132,7 @@ contains
         call domain_init_isostasy(dom, ts, bsl)
 
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
 
         ! Climate on grid_clim (note: init uses time_rel for snapclim), then the
         ! surface mass balance on grid_smb (smbpal or smb_simple; init=.true.
@@ -143,7 +143,7 @@ contains
             call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time_rel, &
                                  domain=dom%ctl%domain, dTa=dTa, dTo=dTo, dSo=dSo, &
                                  dx=dom%ctl%dx_clim, basins=basins_c)
-            call domain_update_smb(dom, ts, init=.true.)
+            call step_smb(dom, ts, init=.true.)
         end if
 
         ! Marine shelf through the (already refreshed) hub.
@@ -290,7 +290,7 @@ contains
 
         ! Refresh the hub and climate/smb to reflect the new geometry, then land
         ! the smb on the Yelmo grid for the stabilization below.
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
         call step_climate(dom, ts)
         call couple_smb_to_yelmo(dom)
 
@@ -336,7 +336,7 @@ contains
     subroutine domain_restart_write(dom, time, fldr, outfldr)
         ! Write a restart bundle: a folder (per time, or `fldr`) holding one
         ! restart file per stateful sub-model with fixed names. The hi-res hub is
-        ! not written -- it is rebuilt by refresh_htopo from the restored models.
+        ! not written -- it is rebuilt by refresh_hub from the restored models.
         ! The shared barystatic sea level is NOT written here -- the driver owns it
         ! and writes a single bsl_restart.nc for the whole run.
         ! `outfldr` (optional) prefixes the auto-named per-time folder, so each

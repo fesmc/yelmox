@@ -13,6 +13,9 @@ annotated git tag. Dates are release (tag) dates.
   physics), `kryos_coupling` (`step_*`, `couple_*_to_yelmo`), `kryos_startup`
   (cold start, restart bundles), `kryos_output` and `kryos_forcing` (`tsforcing`).
   Code is moved unchanged; drivers import each name explicitly.
+- Renamed coupling primitives: `step_optimize` -> `step_spinup_tuning` (it also
+  ramps the relaxation timescale), `refresh_htopo` -> `refresh_hub`,
+  `domain_update_smb` -> `step_smb`.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's

@@ -26,10 +26,10 @@ core that these drivers reuse.
 Every modern flavor advances the model by calling these primitives (from
 `kryos_coupling`), in a flavor-specific order:
 
-- `step_optimize` — spinup relaxation + basal-friction / thermal-forcing tuning.
+- `step_spinup_tuning` — spinup relaxation + basal-friction / thermal-forcing tuning.
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
 - `step_icesheet` — assemble the Yelmo boundary state (couplers) and run `yelmo_update`.
-- `refresh_htopo` — mirror the prognostic geometry into the hi-res reference hub.
+- `refresh_hub` — mirror the prognostic geometry into the hi-res reference hub.
 - `step_climate` — climate on `grid_clim` + SMB on `grid_smb` (snapclim/smbpal).
 - `step_marine_shelf` — sub-shelf melt on `grid_mshlf`.
 

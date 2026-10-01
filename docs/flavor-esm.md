@@ -41,11 +41,11 @@ Main loop (per timestep):
 ```fortran
 call bsl_update(bsl, ts%time_rel)          ! shared sea level, once
 
-call step_optimize(dom, ts)
+call step_spinup_tuning(dom, ts)
 call step_isostasy(dom, ts, bsl)
 call couple_esm_extras_to_yelmo(dom, esm)  ! land ESM-owned Yelmo input (Qd)
 call step_icesheet(dom, ts)                ! shared couplers + yelmo_update
-call refresh_htopo(dom)
+call refresh_hub(dom)
 
 call step_climate_esm(dom, esm, ec, ts)    ! ESM climate + SMB (replaces step_climate)
 call step_marine_shelf_esm(dom, esm, ec, ts)

@@ -420,8 +420,8 @@ end program
 
 - **`yelmox_esm`** (single domain, in `yelmox_esm/`) — ESM climatic forcing in
   place of snapclim. Reuses `domain_init` (with `init_climate=.false.`, so
-  snapclim is skipped) plus the shared `step_optimize/step_isostasy/step_icesheet/
-  refresh_htopo` primitives and the restart bundle, but the driver owns an
+  snapclim is skipped) plus the shared `step_spinup_tuning/step_isostasy/step_icesheet/
+  refresh_hub` primitives and the restart bundle, but the driver owns an
   `esm_forcing_class` and calls its own `step_climate_esm` / `step_marine_shelf_esm`
   (contained in the program) instead of the snapclim-based steps. esm is a
   first-class multigrid component: it runs entirely on its own grid (*esm grid* =
@@ -464,8 +464,8 @@ program yelmox_esm
         if (ts%is_finished) exit
         call tstep_update(ts, dom%ctl%dtt)
         call bsl_update(bsl, ...)                       ! once, shared
-        call step_optimize(dom, ts); call step_isostasy(dom, ts, bsl)
-        call step_icesheet(dom, ts); call refresh_htopo(dom)
+        call step_spinup_tuning(dom, ts); call step_isostasy(dom, ts, bsl)
+        call step_icesheet(dom, ts); call refresh_hub(dom)
         call step_climate_esm(dom, esm, ec, ts)         ! esm + smbpal (contained)
         call step_marine_shelf_esm(dom, esm, ec, ts)    ! esm ocean BCs (contained)
     end do
@@ -512,6 +512,6 @@ end program
 8. Enable `nd=2` bipolar. *(Done: driver takes one par file per domain; AIS+GRL runs on a shared timeline to per-domain subfolders.)*
 
 Also ported from `yelmox.f90`: `equil_method="opt"` (basal-friction + thermal-forcing
-optimization, `step_optimize`), `smb_method="smb_simple"` + `calc_glacial_smb`, and
+optimization, `step_spinup_tuning`), `smb_method="smb_simple"` + `calc_glacial_smb`, and
 domain-specific cold-start setup (Antarctica equilibration, Greenland masks/marine-ice/
 NEGIS, Laurentide/North LGM initialization).

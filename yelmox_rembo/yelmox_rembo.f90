@@ -23,8 +23,8 @@ program yelmox_rembo
     use tsgen, only : tsgen_class
     use kryos,          only : kryos_domain, domain_init, remap
     use kryos_regions,  only : domain_regions_init, domain_init_marine_ice
-    use kryos_coupling, only : step_optimize, step_isostasy, step_icesheet, &
-                               refresh_htopo, step_marine_shelf, couple_smb_to_yelmo, &
+    use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
+                               refresh_hub, step_marine_shelf, couple_smb_to_yelmo, &
                                couple_marine_to_yelmo
     use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write, &
                                restart_bundle_dir
@@ -157,10 +157,10 @@ program yelmox_rembo
         call bsl_update(bsl, ts%time_rel)
 
         ! Coupling sequence (REMBO replaces the generic climate step).
-        call step_optimize(dom, ts)
+        call step_spinup_tuning(dom, ts)
         call step_isostasy(dom, ts, bsl)
         call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
         call step_rembo(dom, ts, tsf, dT_summer, dT_ocn)  ! REMBO atmosphere/smb + snapclim ocean
         call step_marine_shelf(dom, ts)
 
@@ -271,7 +271,7 @@ contains
         call domain_init_isostasy(dom, ts, bsl)
 
         ! Hub mirror + first REMBO / ocean / marine forcing.
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
         call step_rembo(dom, ts, tsf, dT_summer, dT_ocn, init=.true.)
         call step_marine_shelf(dom, ts)
 

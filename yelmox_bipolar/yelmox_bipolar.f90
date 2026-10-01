@@ -30,8 +30,8 @@ program yelmox_bipolar
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : step_optimize, step_isostasy, step_icesheet, &
-                               refresh_htopo, step_climate, step_marine_shelf
+    use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
+                               refresh_hub, step_climate, step_marine_shelf
     use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
                                restart_bundle_dir, restart_bundle_mkdir
     use kryos_output,   only : domain_write_init, domain_write_step, &
@@ -224,7 +224,7 @@ contains
         ! Per-domain part that precedes the OBM step: spinup relaxation +
         ! cb_ref/tf_corr tuning, then isostasy against the shared sea level.
         type(kryos_domain), intent(inout) :: dom
-        call step_optimize(dom, ts)
+        call step_spinup_tuning(dom, ts)
         call step_isostasy(dom, ts, bsl)
     end subroutine advance_isostasy
 
@@ -233,7 +233,7 @@ contains
         ! sheet update, hi-res hub refresh, then climate + surface mass balance.
         type(kryos_domain), intent(inout) :: dom
         call step_icesheet(dom, ts)
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
         call step_climate(dom, ts)
     end subroutine advance_dynamics
 

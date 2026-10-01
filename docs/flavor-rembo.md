@@ -35,10 +35,10 @@ Main loop (per timestep):
 call update_hyster_forcing()     ! dT_summer / dT_ann / dT_ocn from the hyster module
 call bsl_update(bsl, ts%time_rel)
 
-call step_optimize(dom, ts)
+call step_spinup_tuning(dom, ts)
 call step_isostasy(dom, ts, bsl)
 call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
-call refresh_htopo(dom)
+call refresh_hub(dom)
 call step_rembo()                ! REMBO atmosphere/SMB (-> dom%smb%ann) + snapclim ocean
 call step_marine_shelf(dom, ts)
 ```

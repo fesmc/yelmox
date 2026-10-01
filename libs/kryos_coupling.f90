@@ -19,8 +19,8 @@ module kryos_coupling
     private
 
     public :: yelmox_step
-    public :: step_optimize, step_isostasy, step_icesheet, step_climate, step_marine_shelf
-    public :: domain_update_smb, refresh_htopo
+    public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
+    public :: step_smb, refresh_hub
     public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
     public :: check_isostasy_reference
 
@@ -42,15 +42,15 @@ contains
         real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
         real(wp), intent(in), optional   :: dSo   ! [psu] ocean salinity anomaly
 
-        call step_optimize(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
+        call step_spinup_tuning(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning
         call step_isostasy(dom, ts, bsl)
         call step_icesheet(dom, ts)
-        call refresh_htopo(dom)          ! hi-res geometry mirror, from the models
+        call refresh_hub(dom)          ! hi-res geometry mirror, from the models
         call step_climate(dom, ts, dTa=dTa, dTo=dTo, dSo=dSo)  ! climate/smb read geometry from the hub
         call step_marine_shelf(dom, ts)
     end subroutine yelmox_step
 
-    subroutine step_optimize(dom, ts)
+    subroutine step_spinup_tuning(dom, ts)
         ! Spin-up tuning (equil_method == "opt"): ramp the topography relaxation
         ! timescale, then nudge the basal-friction field cb_ref and the marine
         ! thermal-forcing correction tf_corr toward present-day observations.
@@ -109,7 +109,7 @@ contains
             call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
             dom%mshlf%now%tf_corr = tf_corr_m
         end if
-    end subroutine step_optimize
+    end subroutine step_spinup_tuning
 
     subroutine step_isostasy(dom, ts, bsl)
         ! Run isostasy on its own grid: ice load from Yelmo (bilin). The bedrock /
@@ -258,7 +258,7 @@ contains
     subroutine couple_smb_to_yelmo(dom)
         ! Surface mass balance + surface temperature from the active SMB model
         ! (grid_smb -> Yelmo, conservative), with the we->ie unit scaling and the
-        ! optional Greenland modifications. The producing step (domain_update_smb,
+        ! optional Greenland modifications. The producing step (step_smb,
         ! or a flavor climate step) leaves smb/tsrf on grid_smb in the SMB model's
         ! own fields; this coupler is the single place that lands them on Yelmo.
         type(kryos_domain), intent(inout) :: dom
@@ -369,10 +369,10 @@ contains
         end if
 
         ! surface mass balance (smbpal or smb_simple), aggregated to the Yelmo grid
-        call domain_update_smb(dom, ts)
+        call step_smb(dom, ts)
     end subroutine step_climate
 
-    subroutine domain_update_smb(dom, ts, init)
+    subroutine step_smb(dom, ts, init)
         ! Surface mass balance on grid_smb. Two methods: smbpal (default; monthly,
         ! needs tas/pr + geometry) or smb_simple (needs z_srf + sea-level
         ! temperature). Geometry comes from the hi-res hub, atmospheric forcing from
@@ -416,9 +416,9 @@ contains
             end if
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if
-    end subroutine domain_update_smb
+    end subroutine step_smb
 
-    subroutine refresh_htopo(dom)
+    subroutine refresh_hub(dom)
         ! Refresh the hi-res geometry hub from the prognostic models (Yelmo grid
         ! -> hub grid, bilinear). The hub is then the geometry source for the
         ! coupling steps. Static masks (regions/basins) are not refreshed.
@@ -434,7 +434,7 @@ contains
                               dom%topo%z_sl,   dom%ctl%grid_name, "bilin")
         call remap(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_yelmo, &
                               dom%topo%z_srf,  dom%ctl%grid_name, "bilin")
-    end subroutine refresh_htopo
+    end subroutine refresh_hub
 
     subroutine step_marine_shelf(dom, ts)
         ! Run marine_shelf on its own grid: geometry/masks from the hub, ocean

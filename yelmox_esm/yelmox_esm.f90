@@ -37,8 +37,8 @@ program yelmox_esm
 
     use kryos,          only : kryos_domain, domain_init, remap, cadence_due
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : step_optimize, step_isostasy, step_icesheet, &
-                               refresh_htopo, couple_smb_to_yelmo, &
+    use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
+                               refresh_hub, couple_smb_to_yelmo, &
                                couple_marine_to_yelmo
     use kryos_startup,  only : domain_startup, domain_init_isostasy, run_restart_write
     use yelmox_esm_output
@@ -224,11 +224,11 @@ program yelmox_esm
         ! Shared multigrid primitives (isostasy / ice sheet / hub / optimization).
         ! The ESM-owned Yelmo input (Qd) is landed just before the ice sheet runs,
         ! alongside the shared couplers invoked inside step_icesheet.
-        call step_optimize(dom, ts)
+        call step_spinup_tuning(dom, ts)
         call step_isostasy(dom, ts, bsl)
         call couple_esm_extras_to_yelmo(dom, esm)
         call step_icesheet(dom, ts)
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
 
         ! ESM climate + ocean forcing (driver-owned, replaces snapclim steps).
         call step_climate_esm(dom, esm, ec, ts)
@@ -301,7 +301,7 @@ contains
         call domain_init_isostasy(dom, ts, bsl)
 
         ! Hub mirror + first ESM forcing (init=.true. runs the smbpal ITM equil).
-        call refresh_htopo(dom)
+        call refresh_hub(dom)
         call step_climate_esm(dom, esm, ec, ts, init=.true.)
         call step_marine_shelf_esm(dom, esm, ec, ts)
 
