@@ -96,7 +96,7 @@ isostasy-static: fesmutils-static
 # rembo1 builds against fesm-utils (which provides the coord/grid modules), so
 # fesmutils-static must run first.
 rembo-static: fesmutils-static
-	$(MAKE) -C $(REMBOROOT) rembo-static
+	$(MAKE) -C $(REMBOROOT) rembo-static openmp=$(openmp)
 
 # ---------------------------------------------------------------------------
 # Default programs: the multigrid drivers, one per flavor folder.
