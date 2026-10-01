@@ -66,6 +66,12 @@ annotated git tag. Dates are release (tag) dates.
   now the anomalies `dto + dto_var` / `dso + dso_var` for every domain, and the
   Greenland-only override of `tf_method` is gone (the par files set it).
   Antarctica (`tf_method=1`) is unchanged. Greenland ESM spin-ups need re-running.
+- `yelmox_esm_Greenland{,_1pctCO2,_tipmip}.nml`: `&itm` had the Antarctic ITM
+  parameters (`itm_c=-55`, `itm_b=3`, `itm_lat0=-60`, `alb_ice=0.70`), so the
+  latitude-adjusted `itm_c` was about +340 W m-2 over Greenland and the SMB was
+  strongly negative everywhere. Now the Greenland values of
+  `yelmox_Greenland.nml` (`-45`, `-2`, `65`, `0.4`). Greenland ESM spin-ups need
+  re-running.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
