@@ -296,8 +296,7 @@ program yelmox_esm
 
     ! Initialize surface mass balance model (bnd%smb, bnd%T_srf)
     call smbpal_init(smbpal1,path_par,x=yelmo1%grd%xc,y=yelmo1%grd%yc,lats=yelmo1%grd%lat)
-    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%smb = 0.0_wp
-    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%tsrf = 0.0_wp
+
     ! Initialize marine melt model (bnd%bmb_shlf)
     call marshelf_init(mshlf1,path_par,"marine_shelf",yelmo1%grd%nx,yelmo1%grd%ny,domain,grid_name,yelmo1%bnd%regions,yelmo1%bnd%basins)
     
@@ -334,8 +333,7 @@ program yelmox_esm
         call smbpal_update_monthly_equil(smbpal1,esm1%t2m+esm1%dts,esm1%pr*esm1%dpr, &
             yelmo1%tpo%now%z_srf,yelmo1%tpo%now%H_ice,ts%time_rel,time_equil=100.0)
     end if 
-    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%smb = 0.0_wp
-    where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%tsrf = 0.0_wp
+
     ! Update Yelmo boundary fields
     yelmo1%bnd%smb      = smbpal1%ann%smb*yelmo1%bnd%c%conv_we_ie*1e-3   ! [mm we/a] => [m ie/a]
     yelmo1%bnd%T_srf    = smbpal1%ann%tsrf 
@@ -345,6 +343,12 @@ program yelmox_esm
     yelmo1%bnd%tf_shlf  = mshlf1%now%tf_shlf 
     yelmo1%bnd%Qd       = esm1%Qd_ann           ! subglacial dscharge needed for frontal melt lucgut check
     ! yelmo1%bnd%Qd     = esm1%Qd_sum
+
+    ! Remove ice out of the domain appling the mean smb at lower z 
+    if (ctl%esm_use_smb) then
+        where((yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE)) yelmo1%bnd%smb = -4.99_wp
+        where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) smbpal1%now%tsrf = 0.0_wp
+    end if
 
     call yelmo_print_bound(yelmo1%bnd)
 
@@ -540,6 +544,12 @@ program yelmox_esm
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf  
 
+            ! Remove ice out of the domain appling the mean smb at lower z 
+            if (ctl%esm_use_smb) then
+                where((yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE)) yelmo1%bnd%smb = -4.99_wp
+                where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) yelmo1%bnd%T_srf = 0.0_wp
+            end if
+
             call timer_step(tmrs,comp=3,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="climate") 
 
             ! == MODEL OUTPUT ===================================
@@ -641,9 +651,12 @@ program yelmox_esm
 
             yelmo1%bnd%bmb_shlf = mshlf1%now%bmb_shlf  
             yelmo1%bnd%T_shlf   = mshlf1%now%T_shlf   
-
-            where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) yelmo1%bnd%smb = 0.0_wp
-            where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) yelmo1%bnd%T_srf = 0.0_wp
+            
+            ! Remove ice out of the domain appling the mean smb at lower z 
+            if (ctl%esm_use_smb) then
+                where((yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE)) yelmo1%bnd%smb = -4.99_wp
+                where(yelmo1%bnd%mask_ice .eq. MASK_ICE_NONE) yelmo1%bnd%T_srf = 0.0_wp
+            end if
 
             call timer_step(tmrs,comp=3,time_mod=[ts%time-ctl%dtt,ts%time]*1e-3,label="climate") 
 
@@ -775,8 +788,15 @@ contains
         ! === Atmospheric boundary conditions ===
         ! Calculate SMB fields
         if (ctl%esm_use_smb) then
-            ! compute SMB
-            smbp%ann%smb = esm%smb_ann + sum(esm%dsmb,dim=3)/12.0 - esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf) 
+            ! To avoind high values of smb due to different mask domains between smb_esm_ref and smb_esm
+            where( spread( (ylmo%tpo%now%mask_bed .eq. 0) .or. (ylmo%tpo%now%mask_bed .eq. 1) .or. &
+               ((ylmo%tpo%now%mask_bed .eq. 4) .and. (ylmo%tpo%now%H_ice .eq. 0.0)), &
+               dim=3, ncopies=size(esm%dsmb,3) ) ) &
+                esm%dsmb = -4.99_wp / (ylmo%bnd%c%conv_we_ie*1e-3_wp)
+            where(esm%dsmb .gt. 5.0/(ylmo%bnd%c%conv_we_ie*1e-3_wp)) esm%dsmb = -4.99_wp / (ylmo%bnd%c%conv_we_ie*1e-3_wp)
+
+            smbp%ann%smb = esm%smb_ann + sum(esm%dsmb,dim=3)/12.0
+            smbp%ann%smb = smbp%ann%smb - esm%dsmbdz*(ylmo%dta%pd%z_srf-ylmo%tpo%now%z_srf) 
             ! assign surface temp from model as boundary
             smbp%ann%tsrf = sum(esm%t2m+esm%dts+esm%dts_var,dim=3)/12.0
             where(ylmo%tpo%now%H_ice .gt. 0.0 .and.&
@@ -969,7 +989,9 @@ contains
 
         call nc_write(filename,"T_prime_b",ylmo%thrm%now%T_prime_b,units="deg C",long_name="Homologous basal ice temperature", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        
+
+        call yelmo_write_var(filename,"Q_ice_b",ylmo,n,ncid)
+
         call nc_write(filename,"uz",ylmo%dyn%now%uz,units="m/a",long_name="Vertical velocity (z)", &
                        dim1="xc",dim2="yc",dim3="zeta_ac",dim4="time",start=[1,1,1,n],ncid=ncid)
 
@@ -1103,7 +1125,7 @@ contains
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"A_box",mshlf%pico%now%A_box*1e-6,units="km2",long_name="Box area of ice shelf", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-        end if
+        end if 
 
         call nc_write(filename,"PDDs",srf%ann%PDDs,units="degC days",long_name="Positive degree days (annual total)", &
                       dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -1140,7 +1162,24 @@ contains
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         call nc_write(filename,"uy_s",ylmo%dyn%now%uy_s,units="m/a",long_name="Surface velocity (y)", &
                         dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
-                        
+        ! call yelmo_write_var(filename,"ssa_mask_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ssa_mask_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"dzsdx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"dzsdy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"f_grnd_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"f_grnd_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taub_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taub_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taud_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taud_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ux_s",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"uy_s",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ux_b",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"uy_b",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ux_bar",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)
         ! Strain-rate and stress tensors 
         if (.FALSE.) then
 
@@ -1621,7 +1660,7 @@ contains
         
         ! Temperature fields
         where (ylmo%tpo%now%H_ice .gt. 0.0_wp) T_top_ice = ylmo%thrm%now%T_ice(:,:,nz)
-        where (ylmo%tpo%now%f_grnd .gt. 0.0_wp) T_base_grnd = ylmo%thrm%now%T_ice(:,:,1)
+        where (ylmo%tpo%now%f_grnd .gt. 0.0_wp .and. ylmo%tpo%now%H_ice .gt. 0.0_wp) T_base_grnd = ylmo%thrm%now%T_ice(:,:,1)
         where (ylmo%tpo%now%H_ice .gt. 0.0_wp .and. ylmo%tpo%now%f_grnd .eq. 0.0_wp) T_base_flt = ylmo%thrm%now%T_ice(:,:,1)
         
         ! Depth-averaged temperature
@@ -1693,7 +1732,12 @@ contains
             standard_name="land_ice_thickness", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-        call nc_write(filename, "orog", ylmo%tpo%now%z_srf - ylmo%bnd%z_sl, &
+        ! call nc_write(filename, "orog", ylmo%tpo%now%z_srf - ylmo%bnd%z_sl, &
+        !     units="m", long_name="Surface elevation", &
+        !     standard_name="surface_altitude", &
+        !     dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+
+        call nc_write(filename, "orog", z_base+ylmo%tpo%now%H_ice, &
             units="m", long_name="Surface elevation", &
             standard_name="surface_altitude", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
@@ -1788,7 +1832,7 @@ contains
             standard_name="land_ice_area_fraction", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-        call nc_write(filename, "sftgrf", ylmo%tpo%now%f_grnd, &
+        call nc_write(filename, "sftgrf", (ylmo%tpo%now%f_grnd * ylmo%tpo%now%f_ice), & 
             units="1", long_name="Grounded ice sheet area fraction", &
             standard_name="grounded_ice_sheet_area_fraction", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
@@ -1828,7 +1872,24 @@ contains
             standard_name="tendency_of_land_ice_thickness", &
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
-        ! Kinematic flux through ice-front cells (mask_frnt==1, floating).
+        ! Kinematic flux through ice-front cells (mask_frnt==1, float        ! call yelmo_write_var(filename,"ssa_mask_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ssa_mask_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"dzsdx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"dzsdy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"f_grnd_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"f_grnd_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taub_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taub_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taud_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"taud_acy",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ux_s",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"uy_s",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ux_b",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"uy_b",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"ux_bar",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"uy_bar",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"beta_acx",ylmo,n,ncid)
+        ! call yelmo_write_var(filename,"beta_acy",ylmo,n,ncid)ing).
         ! Uses same formula as CalvingMIP
         call nc_write(filename, "licalvf", flux_clv_2d, &
             units="kg m-2 s-1", long_name="Calving flux", &
@@ -1848,10 +1909,10 @@ contains
             dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
         ! tfbase : Thermal forcing at ice base, floating           [optional]
-        call nc_write(filename, "tfbase", tfbase, &
-            units="K", long_name="Thermal forcing at the ice base", &
-            standard_name="", &
-            dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
+        ! call nc_write(filename, "tfbase", tfbase, &
+        !     units="K", long_name="Thermal forcing at the ice base", &
+        !     standard_name="", &
+        !     dim1="xc", dim2="yc", dim3="time", start=[1,1,n], ncid=ncid)
         
         ! ---- close ----------------------------------------------------------
         call nc_close(ncid)
