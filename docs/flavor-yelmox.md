@@ -5,7 +5,7 @@ title: "yelmox (single-domain)"
 The canonical driver: a single ice-sheet domain forced by **snapclim** (climate +
 ocean) and **smbpal** (surface mass balance), with FastIsostasy bedrock and a
 shared barystatic sea level. It is the reference implementation of the multigrid
-`ice_domain` and the template the other flavors specialize.
+`kryos_domain` and the template the other flavors specialize.
 
 - **Program:** `yelmox/yelmox.f90` (thin driver) + `libs/yelmox_domain.f90` (all coupling).
 - **Build:** `make yelmox`

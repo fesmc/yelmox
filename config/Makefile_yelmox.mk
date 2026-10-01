@@ -69,7 +69,7 @@ $(objdir)/yelmox_climate.o: $(yelmox_climate_src) $(objdir)/climate_out.o $(clim
 $(objdir)/htopo.o: $(libdir)/htopo.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# Multigrid coupling driver support (ice_domain + step_* primitives)
+# Multigrid coupling driver support (kryos_domain + step_* primitives)
 $(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o \
 						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
@@ -78,7 +78,7 @@ $(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o 
 						$(objdir)/ice_sub_regions.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
-# Bipolar ocean coupling: bridge over ice_domain (yelmox_domain) + the obm box
+# Bipolar ocean coupling: bridge over kryos_domain (yelmox_domain) + the obm box
 # model. Lives alongside the bipolar driver in yelmox_bipolar/ -- it is only
 # pertinent to that flavor -- and is linked via obm_libs (bipolar targets only).
 $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/yelmox_domain.o \
@@ -196,7 +196,7 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 						$(objdir)/yelmox_domain.o \
 						$(objdir)/ice_sub_regions.o
 
-# Ocean box model stack + its ice_domain coupling bridge: bipolar-only, linked
+# Ocean box model stack + its kryos_domain coupling bridge: bipolar-only, linked
 # on top of yelmox_libs by the yelmox_bipolar targets.
 obm_libs = 				$(objdir)/obm_defs.o\
 						$(objdir)/ice2ocean.o\

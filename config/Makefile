@@ -124,7 +124,7 @@ yelmox_esm : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
 	@echo "    yelmox_esm.x is ready."
 	@echo " "
 
-# REMBO-coupled driver: reuses the multigrid ice_domain, with REMBO as the
+# REMBO-coupled driver: reuses the multigrid kryos_domain, with REMBO as the
 # atmosphere/SMB (step_rembo) and its own combined output module.
 yelmox_rembo : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -c -o $(objdir)/yelmox_rembo_output.o yelmox_rembo/yelmox_rembo_output.f90

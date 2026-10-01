@@ -2,7 +2,7 @@ program yelmox_esm
     ! Multigrid yelmox driver with ESM climatic forcing (single domain).
     !
     ! Reuses the shared multigrid domain machinery (libs/yelmox_domain.f90) for
-    ! everything except climate: one ice_domain with each sub-model on its own
+    ! everything except climate: one kryos_domain with each sub-model on its own
     ! configurable grid, the hi-res topography hub, and the coupler maps. The
     ! climate/ocean forcing comes from the ESM module (libs/esm_forcing.f90) rather than
     ! snapclim, so the driver owns an esm_forcing_class and calls its own
@@ -46,7 +46,7 @@ program yelmox_esm
     character(len=512) :: file_isos, file_bsl
 
     type(tstep_class)   :: ts
-    type(ice_domain)    :: dom
+    type(kryos_domain)    :: dom
     type(bsl_class)     :: bsl          ! shared, driver-owned barystatic sea level
     type(esm_forcing_class) :: esm      ! driver-owned climate forcing (replaces snapclim)
     type(timeout_class) :: tm_1D, tm_2D, tm_2Dsm, tm_rst
@@ -286,7 +286,7 @@ contains
         ! reference/state, first climate forcing, snowpack equilibration, Yelmo
         ! state init, optional shelf kill, and (for the "opt" spinup) the Yelmo
         ! equilibration passes.
-        type(ice_domain),     intent(inout) :: dom
+        type(kryos_domain),     intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params), intent(in)    :: ec
         type(tstep_class),    intent(in)    :: ts
@@ -338,7 +338,7 @@ contains
         ! path), with smb / T_srf aggregated back to the Yelmo grid. The ocean
         ! anomalies (esm%dto/dso, esm%to_ref/so_ref) stay on grid_clim for
         ! step_marine_shelf_esm.
-        type(ice_domain),        intent(inout) :: dom
+        type(kryos_domain),        intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params),    intent(in)    :: ec
         type(tstep_class),       intent(in)    :: ts
@@ -441,7 +441,7 @@ contains
         ! resulting T_shlf/S_shlf are remapped to grid_mshlf, where marshelf_update
         ! runs against the hub geometry, and bmb_shlf/T_shlf are aggregated back to
         ! the Yelmo grid.
-        type(ice_domain),        intent(inout) :: dom
+        type(kryos_domain),        intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
         type(esm_ctl_params),    intent(in)    :: ec
         type(tstep_class),       intent(in)    :: ts
@@ -507,7 +507,7 @@ contains
         ! Currently just subglacial discharge (Qd, Greenland frontal melt), remapped
         ! from the esm grid onto the Yelmo grid. Called before step_icesheet so Qd
         ! is in place when Yelmo runs, matching the paradigm used by every module.
-        type(ice_domain),        intent(inout) :: dom
+        type(kryos_domain),        intent(inout) :: dom
         type(esm_forcing_class), intent(inout) :: esm
 
         real(wp), allocatable :: Qd_y(:,:)

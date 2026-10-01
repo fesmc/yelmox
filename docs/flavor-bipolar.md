@@ -5,7 +5,7 @@ title: "yelmox_bipolar"
 A **two-domain** driver that runs a northern and a southern ice-sheet domain
 together, coupled through a **shared barystatic sea level** and a **shared Ocean
 Box Model (OBM)** that exchanges freshwater flux and ocean temperature between the
-hemispheres. Each domain is a full `ice_domain` (the same one the single-domain
+hemispheres. Each domain is a full `kryos_domain` (the same one the single-domain
 [`yelmox`](flavor-yelmox.md) uses); the driver interleaves the `step_*` primitives
 across both domains plus the OBM.
 
@@ -15,7 +15,7 @@ across both domains plus the OBM.
 
 ## What's distinct
 
-- **Two `ice_domain`s** (`dom_north`, `dom_south`), each set up via `setup_domain`
+- **Two `kryos_domain`s** (`dom_north`, `dom_south`), each set up via `setup_domain`
   → `domain_startup`. Either can be individually deactivated (`active_north` /
   `active_south`).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup

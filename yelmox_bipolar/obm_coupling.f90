@@ -1,7 +1,7 @@
 module obm_coupling
-    ! Bipolar ocean coupling: exchanges scalars between an ice_domain (Yelmo +
+    ! Bipolar ocean coupling: exchanges scalars between a kryos_domain (Yelmo +
     ! snapclim) and the shared Ocean Box Model (OBM). This is a bridge module -- it sits above both
-    ! yelmox_domain (ice_domain) and the libs/obm ocean box model. It is only
+    ! yelmox_domain (kryos_domain) and the libs/obm ocean box model. It is only
     ! pertinent to the bipolar flavor, so it lives here next to its driver.
     !
     ! The whole obm stack is single precision (obm_defs preci = kind(1.0)), which
@@ -21,7 +21,7 @@ module obm_coupling
     use nml,           only : nml_read
     use ncio,          only : nc_read
     use yelmo,         only : wp
-    use yelmox_domain, only : ice_domain
+    use yelmox_domain, only : kryos_domain
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
     use ocean2ice,     only : calc_ocean_temperature_field
@@ -94,7 +94,7 @@ contains
         ! flux per hemisphere. Only touches a domain when it is active and its
         ! fwf coupling is on, so an inactive domain may be uninitialized.
         type(obm_coupling_ctl), intent(inout) :: oc
-        type(ice_domain),       intent(in)    :: dom_north, dom_south
+        type(kryos_domain),       intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
 
         if (.not. oc%ism2obm) return
@@ -118,7 +118,7 @@ contains
         ! their marine-shelf steps.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(obm_class),        intent(inout) :: obm
-        type(ice_domain),       intent(inout) :: dom_north, dom_south
+        type(kryos_domain),       intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         real(wp),               intent(in)    :: time, time_init, dtt
 
@@ -152,7 +152,7 @@ contains
         ! Both hemispheres also set the shared tropical box temperature thetat; if
         ! both are active the south value overwrites the north one, exactly as in
         ! yelmox_bipolar (the original flagged this as redundant).
-        type(ice_domain), intent(in)    :: dom
+        type(kryos_domain), intent(in)    :: dom
         type(obm_class),  intent(inout) :: obm
         character(len=*), intent(in)    :: hemisphere
         real(wp),         intent(in)    :: time
@@ -186,7 +186,7 @@ contains
         ! the box model's northern (fn) or southern (fs) input flux.
         ! dom is intent(inout) because calc_fwf takes its mass-balance fields as
         ! non-intent (modifiable) allocatable dummies.
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         type(obm_class),       intent(inout) :: obm
         real(wp), allocatable, intent(inout) :: mask(:,:)
         character(len=*),      intent(in)    :: hemisphere
@@ -216,7 +216,7 @@ contains
         ! OBM -> ice sheet: broadcast the box-model ocean temperature (northern box
         ! tn / southern box ts) into the domain's snapclim ocean-temperature field
         ! to_ann, which marine_shelf then reads as its ocean forcing.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         type(obm_class),  intent(in)    :: obm
         character(len=*), intent(in)    :: obm_name
         character(len=*), intent(in)    :: hemisphere

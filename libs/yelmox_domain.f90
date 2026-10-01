@@ -1,5 +1,5 @@
 module yelmox_domain
-    ! Multigrid yelmox: one region's full model state bundled as an ice_domain,
+    ! Multigrid yelmox: one region's full model state bundled as a kryos_domain,
     ! advanced by composable step_* primitives.
     !
     ! The hi-res topography hub (dom%topo) is the geometry source of truth: it is
@@ -127,7 +127,7 @@ module yelmox_domain
         real(wp) :: cf_x    = 1.0_wp
     end type negis_params
 
-    type ice_domain
+    type kryos_domain
         type(yelmo_class)      :: yelmo
         type(marshelf_class)   :: mshlf
         type(isos_class)       :: isos
@@ -142,7 +142,7 @@ module yelmox_domain
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
         type(negis_params)     :: ngs     ! Greenland NEGIS cb_ref modification
         type(domain_ctl)       :: ctl
-    end type ice_domain
+    end type kryos_domain
 
     ! Driver-owned transient forcing: a tsgen series whose scalar output f_now is
     ! mapped onto snapclim's homogeneous anomalies via the [tsforcing] gains
@@ -150,7 +150,7 @@ module yelmox_domain
     ! in "anom" mode). Also holds the forcing-increment restart bookkeeping (write
     ! a bundle each |Δf_now| > restart_every_df, folders named restart-<n>) and
     ! surfaces the tsgen kill flag. One instance per run, held by the driver like
-    ! bsl -- deliberately NOT part of ice_domain, so multi-domain drivers choose
+    ! bsl -- deliberately NOT part of kryos_domain, so multi-domain drivers choose
     ! shared vs per-domain forcing.
     type tsforcing_class
         logical  :: active           = .false.
@@ -166,7 +166,7 @@ module yelmox_domain
         integer  :: counter_restart = 0          ! number of forcing-triggered restarts written
     end type tsforcing_class
 
-    public :: domain_ctl, ice_domain
+    public :: domain_ctl, kryos_domain
     public :: tsforcing_class, tsforcing_init, tsforcing_update
     public :: tsforcing_restart_due, tsforcing_restart_fldr, tsforcing_kill
     public :: tsforcing_restart_write, tsforcing_restart_read, tsforcing_write_step
@@ -229,7 +229,7 @@ contains
         ! The restart branch does not rebuild the climate/smb or marine-shelf
         ! forcing (not held in the bundle): every driver re-establishes it
         ! after this call with its own climate step + marine-shelf step.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         logical, intent(in), optional    :: restore_bsl
@@ -257,7 +257,7 @@ contains
         ! folder. By default the auto-named per-time folder; `fldr` overrides it
         ! (e.g. the forcing-increment "restart-<n>" folders). Multi-domain drivers
         ! write per-domain bundles + one run-root bsl bundle themselves.
-        type(ice_domain),      intent(inout)        :: dom
+        type(kryos_domain),      intent(inout)        :: dom
         type(bsl_class),       intent(inout)        :: bsl
         real(wp),              intent(in)           :: time
         type(tsforcing_class), intent(in), optional :: tsf
@@ -299,7 +299,7 @@ contains
         ! timeline_group (optional, default "ctrl") names the group holding the
         ! run's shared timeline -- the same group the driver passes to
         ! tstep_init -- from which the domain reads tstep_method/dtt itself.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
         character(len=*), intent(in), optional :: group_suffix
@@ -451,7 +451,7 @@ contains
         ! cb_ref. The initial cb_ref guess (cold start) is set in domain_init_state
         ! after yelmo_init_state; on restart cb_ref is restored from the bundle.
         ! No-op unless equil_method == "opt".
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         character(len=*), intent(in)    :: suffix
 
@@ -483,7 +483,7 @@ contains
         ! resolved on the Yelmo grid (get_ice_sub_region); regional files land in
         ! outfldr. Domains without defined sub-regions get n=0 (global region only).
         ! Must be called after domain_init and before the first yelmo_update.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         logical, allocatable :: tmp_mask(:,:)
@@ -586,7 +586,7 @@ contains
         ! bsl_update for the initial time, so this routine only consumes it. The
         ! optional dTa/dTo/dSo apply the initial transient-forcing anomalies to the
         ! startup climate, keeping the cold-start state consistent with the loop.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
@@ -644,7 +644,7 @@ contains
         ! Yelmo geometry, checked against Yelmo's own reference bedrock, then the
         ! bedrock / sea surface landed on the Yelmo grid. The ice load is
         ! coarsened conservatively (refined bilinearly), as in step_isostasy.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
 
@@ -670,7 +670,7 @@ contains
     subroutine domain_init_special(dom, ts)
         ! Domain-specific cold-start startup, dispatched on domain name. The
         ! DEFAULT (incl. Antarctica) path runs a short equilibration to synchronize the model fields.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
         select case(trim(dom%ctl%domain))
@@ -712,7 +712,7 @@ contains
         ! LGM-like marine ice at the cold start (greenland_init_marine_H): thin
         ! ice (< 600 m) over shallow bed (> -500 m) is thickened to 800 m wherever
         ! ice is allowed.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
 
         where(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE .and. &
               dom%yelmo%tpo%now%H_ice < 600.0_wp .and. &
@@ -726,7 +726,7 @@ contains
         ! from the ICE-6G_C LGM reconstruction. Sets the reconstructed grounded
         ! ice as the initial thickness (method-dependent), refreshes the surface
         ! and (via the hub) the climate/smb, and stabilizes the dynamic fields.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         character(len=*),  intent(in)    :: region   ! "Laurentide" or "North"
         character(len=*),  intent(in)    :: method   ! "ref_lgm", else zero
@@ -825,7 +825,7 @@ contains
         ! and writes a single bsl_restart.nc for the whole run.
         ! `outfldr` (optional) prefixes the auto-named per-time folder, so each
         ! domain of a multi-domain run writes into its own subfolder.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         real(wp),         intent(in)    :: time
         character(len=*), intent(in), optional :: fldr
         character(len=*), intent(in), optional :: outfldr
@@ -866,7 +866,7 @@ contains
         ! isos_init_state performs (ODE state = now%w, calc_z_ss / calc_Haf /
         ! calc_masks, time_prognostics), without which the isostasy ODE solver
         ! restarts from an uninitialized state and the run is discontinuous.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         character(len=*),  intent(in)    :: fldr
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
@@ -998,7 +998,7 @@ contains
         ! forcing series); when absent, snapclim uses its own index. Used by the
         ! single-domain driver; the multi-domain driver interleaves the step_*
         ! primitives itself.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
@@ -1023,7 +1023,7 @@ contains
         ! Yelmo grid, so the correction is lifted to the Yelmo grid (tf_corr_y),
         ! optimized there, and remapped back to the shelf grid. At identity grids
         ! both remaps are copies.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
         real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
@@ -1083,7 +1083,7 @@ contains
         ! updated for this step by the driver); isos_update reads it and, under
         ! fastiso/mixed, writes back the prognostic bsl_now -- so with several
         ! domains sharing one bsl the sea level integrates every domain's ice load.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
 
@@ -1136,7 +1136,7 @@ contains
         ! For z_sl the reference is the scalar bsl, which is uniform and so needs no
         ! remapping; the spatial part z_ss - bsl (= isos ref%z_ss + dz_ss) is what
         ! crosses grids.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
 
         real(wp), allocatable :: dz_bed_y(:,:), dz_ss_y(:,:)
         character(len=256) :: gi, gy
@@ -1173,7 +1173,7 @@ contains
         ! the domain mean is comparable there. Both tolerances are set to admit
         ! that smoothing while still catching a wholly different reference field,
         ! which differs by hundreds of metres.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
 
         real(wp), parameter :: tol_copy  = 1e-3_wp   ! [m] identical grids: round-off only
         real(wp), parameter :: tol_remap = 10.0_wp   ! [m] mean offset left by remapping
@@ -1224,7 +1224,7 @@ contains
         ! optional Greenland modifications. The producing step (domain_update_smb,
         ! or a flavor climate step) leaves smb/tsrf on grid_smb in the SMB model's
         ! own fields; this coupler is the single place that lands them on Yelmo.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
 
         real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:), ta_y(:,:), ta_pd_y(:,:)
         character(len=256) :: gs, gc, gy
@@ -1265,7 +1265,7 @@ contains
     subroutine couple_marine_to_yelmo(dom)
         ! Basal mass balance + shelf temperature from marine_shelf (grid_mshlf ->
         ! Yelmo, conservative).
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
 
         real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
         character(len=256) :: gm, gy
@@ -1282,7 +1282,7 @@ contains
     end subroutine couple_marine_to_yelmo
 
     subroutine step_icesheet(dom, ts)
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
         ! Greenland NEGIS: update cb_ref from bed properties + NEGIS scaling.
@@ -1351,7 +1351,7 @@ contains
         ! back to the Yelmo grid (conservative). The optional dTa/dTo/dSo are
         ! spatially-homogeneous atmosphere/ocean anomalies (e.g. a transient forcing
         ! series owned by the driver); when absent, snapclim uses its own index.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         real(wp), intent(in), optional   :: dTa   ! [K] atmospheric temperature anomaly
         real(wp), intent(in), optional   :: dTo   ! [K] ocean temperature anomaly
@@ -1385,7 +1385,7 @@ contains
         ! snapclim (grid_clim). init=.true. runs the smbpal ITM equilibration before
         ! the first update. The result stays on grid_smb in the SMB model's fields
         ! (dom%smb%ann or dom%smbs); couple_smb_to_yelmo lands it on the Yelmo grid.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         logical, intent(in), optional    :: init
 
@@ -1462,7 +1462,7 @@ contains
         ! Refresh the hi-res geometry hub from the prognostic models (Yelmo grid
         ! -> hub grid, bilinear). The hub is then the geometry source for the
         ! coupling steps. Static masks (regions/basins) are not refreshed.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
 
         call remap(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_yelmo, &
                               dom%topo%H_ice,  dom%ctl%grid_name, "bilin")
@@ -1480,7 +1480,7 @@ contains
         ! Run marine_shelf on its own grid: geometry/masks from the hub, ocean
         ! forcing from snapclim. The outputs stay on grid_mshlf (in dom%mshlf%now);
         ! couple_marine_to_yelmo lands bmb_shlf / T_shlf on the Yelmo grid.
-        type(ice_domain),  intent(inout) :: dom
+        type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
@@ -1529,7 +1529,7 @@ contains
 
     subroutine domain_write_init(dom, outfldr, time)
         ! Create the enabled per-module 2D output files (dims + static fields).
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
 
@@ -1552,7 +1552,7 @@ contains
         ! Append one time record to each enabled per-module 2D output file. The
         ! Yelmo 2D variable set defaults to YELMO_VARS_2D; pass `nms` to override
         ! or extend it for a specific context (see YELMO_VARS_2D above).
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
         character(len=*), intent(in), optional :: nms(:)
@@ -1584,7 +1584,7 @@ contains
         ! Create the small Yelmo 2D output file (yelmo_sm.nc): a reduced field set
         ! for frequent monitoring, written on the sm cadence (tm_2Dsm). Same grid
         ! and file conventions as the heavy yelmo.nc.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
 
@@ -1598,7 +1598,7 @@ contains
         ! hydrology and temperature -- the minimal set needed to watch a run at a
         ! higher cadence than the heavy yelmo.nc. The variable set defaults to
         ! YELMO_VARS_2D_SM; pass `nms` to override or extend it for a context.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
         character(len=*), intent(in), optional :: nms(:)
@@ -1618,7 +1618,7 @@ contains
 
     subroutine domain_write_1D(dom, outfldr, time, init)
         ! Write 1D timeseries: Yelmo regional aggregates + isostasy diagnostics.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(wp),         intent(in)    :: time
         logical, intent(in), optional   :: init
@@ -1776,7 +1776,7 @@ contains
     end function remap_method_smooth
 
     subroutine remap_2D(dom, var_src, src, var_dst, dst, method)
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         real(wp),              intent(in)    :: var_src(:,:)
         character(len=*),      intent(in)    :: src, dst, method
         real(wp), allocatable, intent(inout) :: var_dst(:,:)
@@ -1794,7 +1794,7 @@ contains
     end subroutine remap_2D
 
     subroutine remap_3D(dom, var_src, src, var_dst, dst, method)
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         real(wp),              intent(in)    :: var_src(:,:,:)
         character(len=*),      intent(in)    :: src, dst, method
         real(wp), allocatable, intent(inout) :: var_dst(:,:,:)

@@ -1,7 +1,7 @@
 program yelmox_rembo
     ! REMBO-coupled yelmox driver (Greenland, single grid).
     !
-    ! Reuses the multigrid ice_domain (yelmox_domain) for the ice sheet, isostasy,
+    ! Reuses the multigrid kryos_domain (yelmox_domain) for the ice sheet, isostasy,
     ! ocean (snapclim), marine_shelf, sediments, geothermal, the hi-res hub and the
     ! shared barystatic sea level, and drives them with the shared step_* / coupler
     ! primitives. REMBO replaces the snapclim+smbpal atmosphere/SMB: step_rembo runs
@@ -28,7 +28,7 @@ program yelmox_rembo
 
     character(len=512)  :: path_par
     type(tstep_class)   :: ts
-    type(ice_domain)    :: dom
+    type(kryos_domain)    :: dom
     type(bsl_class)     :: bsl          ! shared, driver-owned barystatic sea level
     type(tsforcing_class) :: tsf        ! driver-owned transient forcing (tsgen)
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
@@ -59,7 +59,7 @@ program yelmox_rembo
     ! reads the timeline values it needs from the same [ctrl] group.
     call domain_init(dom, path_par, ts%time)
 
-    ! REMBO climate + hysteresis (driver-owned; not part of ice_domain). REMBO keeps
+    ! REMBO climate + hysteresis (driver-owned; not part of kryos_domain). REMBO keeps
     ! its module-global state in rembo_ann and loads its own parameters (options_rembo).
     call rembo_init(real(ts%time, dp))
     call tsforcing_init(tsf, path_par, ts%time)
@@ -176,7 +176,7 @@ contains
         ! drives dT_summer, and dT_ann uses the REMBO winter factor (T_wintfac=1.6):
         !   dT_ann = 0.5*((1.6)*dT_summer + (1.0)*dT_summer) = 1.3*dT_summer.
         type(tsforcing_class), intent(inout) :: tsf
-        type(ice_domain),      intent(in)    :: dom
+        type(kryos_domain),      intent(in)    :: dom
         type(tstep_class),     intent(in)    :: ts
         real(wp),              intent(out)   :: dT_summer, dT_ann, dT_ocn
 
@@ -203,7 +203,7 @@ contains
         ! couple_smb_to_yelmo applies the we->ie scaling + lim_pd_ice, on the Yelmo
         ! grid, inside step_icesheet. init=.true. equilibrates REMBO before the first
         ! update (cold start only).
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
         type(tsforcing_class), intent(in)    :: tsf
         real(wp),              intent(in)    :: dT_summer, dT_ocn
@@ -249,7 +249,7 @@ contains
         ! Build the initial boundary state for a cold start (no restart bundle):
         ! isostasy reference/state, the first REMBO + ocean + marine forcing, the
         ! Yelmo state init, and the thermodynamic/dynamic equilibration passes.
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
         type(bsl_class),       intent(inout) :: bsl
         type(tsforcing_class), intent(in)    :: tsf
@@ -288,7 +288,7 @@ contains
     subroutine write_rembo_restart(dom, bsl, ts, tsf)
         ! Restart bundle: the shared domain sub-models + shared bsl
         ! (run_restart_write) plus REMBO's own restart, all in one folder.
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         type(bsl_class),       intent(inout) :: bsl
         type(tstep_class),     intent(in)    :: ts
         type(tsforcing_class), intent(inout) :: tsf

@@ -67,14 +67,14 @@ hi-res target map is both expensive to build and large in memory.
 fesm-utils/utils/src/coords/coupler.f90    coupler_class + remap
         │  use coords  (grid_class, grid_init, map_class, map_init, map_field)
         ▼
-yelmox/libs/yelmox_domain.f90              ice_domain + step_* + yelmox_step
+yelmox/libs/yelmox_domain.f90              kryos_domain + step_* + yelmox_step
         │  use coupler, yelmo, marine_shelf, fastisostasy, snapclim, smbpal, bsl
         ▼
 yelmox/yelmox.f90                        thin driver: init → time loop → I/O
 ```
 
 Dependency flow is one-directional. The coupler is pure grid/map machinery and
-knows nothing about yelmox. `step_*` and `ice_domain` know the physics modules
+knows nothing about yelmox. `step_*` and `kryos_domain` know the physics modules
 but stay flavor-agnostic, so other yelmox variants can reuse them.
 
 ## Coupler (in fesm-utils, `coords` library)
@@ -182,13 +182,13 @@ spelling). `stat` is optional and forwarded to `map_field`.
 
 ## Domain + coupling steps (in `yelmox/libs`)
 
-The whole state of one region is bundled into `ice_domain`. This makes the two
+The whole state of one region is bundled into `kryos_domain`. This makes the two
 awkward requirements fall out naturally:
 
 - **Coupling strategies** (which components are on/off): each component update is
   a reusable `step_*` primitive guarded internally by its `ctl` flag; the
   sequence is thin composition in `yelmox_step`.
-- **Bipolar** (north + south): two explicit `type(ice_domain) :: dom_north,
+- **Bipolar** (north + south): two explicit `type(kryos_domain) :: dom_north,
   dom_south`. Each domain carries its own coupler/grids, so north and south never
   collide. Buffers are step-local allocatables (see below), inherently reentrant
   across domains. The single-domain driver runs the whole `yelmox_step`; the
@@ -218,7 +218,7 @@ module yelmox_domain
         ! ... time control, output config
     end type
 
-    type ice_domain
+    type kryos_domain
         type(yelmo_class)    :: yelmo
         type(marshelf_class) :: mshlf
         type(isos_class)     :: isos
@@ -361,7 +361,7 @@ every `domain_ctl` switch is a required key there (`with_ice_sheet`,
 per-component grids, restart, and the Greenland-specific startup switches --
 `use_negis=True` additionally loads a `[negis<suffix>]` group).
 
-- **`yelmox`** (single domain) — argument is one domain nml; one `ice_domain`,
+- **`yelmox`** (single domain) — argument is one domain nml; one `kryos_domain`,
   output to the run dir.
 - **`yelmox_bipolar`** (bipolar, in `yelmox_bipolar/`) — argument is a single parameter
   file holding both hemispheres, in the original `yelmox_bipolar` convention: each
@@ -391,7 +391,7 @@ program yelmox_bipolar
     use yelmox_domain
     use obm, only : obm_update
     use obm_coupling
-    type(ice_domain)       :: dom_north, dom_south
+    type(kryos_domain)       :: dom_north, dom_south
     type(bsl_class)        :: bsl      ! shared, driver-owned
     type(obm_class)        :: obox     ! shared, driver-owned
     type(obm_coupling_ctl) :: oc       ! obm_coupling's own control
@@ -445,7 +445,7 @@ program yelmox_esm
     use yelmox_domain
     use esm
     use yelmox_esm_output
-    type(ice_domain)        :: dom
+    type(kryos_domain)        :: dom
     type(bsl_class)         :: bsl    ! shared, driver-owned
     type(esm_forcing_class) :: esm    ! driver-owned climate (replaces snapclim)
 
@@ -496,7 +496,7 @@ end program
    `con` conservation, cache/prime, disk-driven resolution). *(Done.)*
 2. `grid_cdo_read_desc` cdo-native CF-key parsing + `test_grid_cf_read`;
    coupler disk resolution of `grid_<name>.txt`. *(Done.)*
-3. `yelmox_domain.f90` skeleton: `ice_domain`, `domain_ctl`, empty `step_*`. *(Done.)*
+3. `yelmox_domain.f90` skeleton: `kryos_domain`, `domain_ctl`, empty `step_*`. *(Done.)*
 4. `htopo.f90` hi-res reference hub + `test_htopo` (load ANT-16KM fields). *(Done.)*
 5. `domain_init` (sub-model init on their grids + htopo + map priming). *(Done.)*
 6. Fill `step_*` one module at a time (marine_shelf first); diff vs `yelmox.f90`. *(Done: isostasy, ice sheet, climate, smb, marine_shelf, optimization.)*

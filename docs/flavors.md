@@ -4,12 +4,12 @@ title: "Program flavors"
 
 YelmoX ships several **driver programs** ("flavors"), each a `program` that wires
 Yelmo together with a different set of forcing/coupling components. All of the
-modern (multigrid) flavors are built on the shared `ice_domain` type and the
+modern (multigrid) flavors are built on the shared `kryos_domain` type and the
 `step_*` coupling primitives in [`libs/yelmox_domain.f90`](https://github.com/fesmc/yelmox/blob/main/libs/yelmox_domain.f90);
 they differ in **which components are active** and in **how the per-step coupling
 sequence is assembled**.
 
-See [Multigrid coupling](multigrid.md) for the design of the shared `ice_domain`
+See [Multigrid coupling](multigrid.md) for the design of the shared `kryos_domain`
 core that these drivers reuse.
 
 ## The flavors

@@ -1,7 +1,7 @@
 program yelmox_bipolar
     ! Multigrid yelmox driver -- bipolar (two hemispheric domains + ocean box model).
     !
-    ! Advances a Northern- and a Southern-Hemisphere ice_domain on a shared
+    ! Advances a Northern- and a Southern-Hemisphere kryos_domain on a shared
     ! timeline, coupled through a shared Ocean Box Model (OBM), following the
     ! original yelmox_bipolar convention: one parameter file holds both domains,
     ! each domain's groups carry a hemisphere suffix (yelmo_north, coupling_south,
@@ -12,7 +12,7 @@ program yelmox_bipolar
     !
     ! [ctrl] active_north / active_south select which hemispheres run; a bipolar
     ! run is never more than these two domains, so they are held as two explicit
-    ! ice_domain variables (not an array) -- the inter-domain ocean coupling is
+    ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
     ! Per-step coupling order: shared sea level, then per
@@ -42,7 +42,7 @@ program yelmox_bipolar
     character(len=512) :: restart_bsl
 
     ! Two explicit hemispheric domains (bipolar: never more than north + south).
-    type(ice_domain)   :: dom_north, dom_south
+    type(kryos_domain)   :: dom_north, dom_south
     character(len=512) :: outfldr_north, outfldr_south
     logical            :: active_north, active_south
 
@@ -179,7 +179,7 @@ contains
         ! Initialize one hemisphere: sub-models + hi-res hub + coupler maps, its
         ! output folder + regions, and the initial (cold) or restored state. The
         ! shared bsl was already initialized/restored by the driver above.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(out)   :: outfldr
 
@@ -215,7 +215,7 @@ contains
     subroutine advance_isostasy(dom)
         ! Per-domain part that precedes the OBM step: spinup relaxation +
         ! cb_ref/tf_corr tuning, then isostasy against the shared sea level.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         call step_optimize(dom, ts)
         call step_isostasy(dom, ts, bsl)
     end subroutine advance_isostasy
@@ -223,7 +223,7 @@ contains
     subroutine advance_dynamics(dom)
         ! Per-domain part after the OBM step and before the ocean coupling: ice
         ! sheet update, hi-res hub refresh, then climate + surface mass balance.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         call step_icesheet(dom, ts)
         call refresh_htopo(dom)
         call step_climate(dom, ts)
@@ -231,7 +231,7 @@ contains
 
     subroutine write_domain_init(dom, outfldr)
         ! Create the 2D + 1D output files.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
@@ -243,7 +243,7 @@ contains
         ! Append 2D/1D records and write the domain restart bundle on the shared
         ! cadence (do_2D/do_2Dsm/do_1D/do_rst, set by the driver at the top of
         ! the loop); the driver writes the single shared bsl (+ obm) restart.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)

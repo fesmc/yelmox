@@ -1,7 +1,7 @@
 program yelmox
     ! Multigrid yelmox driver (single domain).
     !
-    ! Initializes one ice_domain (each sub-model on its own configurable grid)
+    ! Initializes one kryos_domain (each sub-model on its own configurable grid)
     ! plus the hi-res topography reference hub and the coupler maps, builds the
     ! initial boundary state (or restores a restart bundle), and runs the coupling
     ! time loop with per-module output. The multi-domain (bipolar) variant lives
@@ -18,7 +18,7 @@ program yelmox
 
     character(len=512) :: path_par
     type(tstep_class)  :: ts
-    type(ice_domain)   :: dom
+    type(kryos_domain)   :: dom
     type(bsl_class)    :: bsl        ! shared, driver-owned barystatic sea level
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
 

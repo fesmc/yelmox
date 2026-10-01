@@ -6,6 +6,8 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- The domain type `ice_domain` is renamed `kryos_domain`, in line with the
+  Kryos naming of the cryosphere-component framework.
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
   now set up isostasy through the shared `domain_init_isostasy` (conservative
   ice-load coarsening + isostasy reference check). The optimisation's
