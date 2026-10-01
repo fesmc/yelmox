@@ -72,6 +72,9 @@ annotated git tag. Dates are release (tag) dates.
   strongly negative everywhere. Now the Greenland values of
   `yelmox_Greenland.nml` (`-45`, `-2`, `65`, `0.4`). Greenland ESM spin-ups need
   re-running.
+- `yelmox_esm` output: `pr_ann` (2D) and `pr_1d` (time series) were the
+  precipitation in mm/d times 1e-3, labelled m/a, with only the January anomaly
+  factor. Now the annual mean of `pr*dpr`, in mm/d.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.

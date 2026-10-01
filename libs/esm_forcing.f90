@@ -125,7 +125,7 @@ module esm_forcing
         ! === Mean fields ===
         real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:)     ! Annual surface temperature [K]
-        real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/yr]
+        real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/d]
         real(wp), allocatable :: smb_ann(:,:)     ! Annual SMB [mm/yr]
 
     end type

@@ -255,7 +255,7 @@ contains
             call nc_write(filename,"dsmb_ann",1e-3*SUM(esm%dsmb, dim=3)/12.0,units="m/a water equiv.",long_name="SMB anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         else
-            call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
+            call nc_write(filename,"pr_ann",SUM(esm%pr*esm%dpr, dim=3)/12.0,units="mm/d water equiv.",long_name="Precipitation (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"dpr_ann",SUM(esm%dpr, dim=3)/12.0,units="%",long_name="Precipitation anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -466,7 +466,7 @@ contains
             call nc_write(filename,"dsmbdz",1e-3*esm%dsmbdz,units="m/a m-1 water equiv.",long_name="SMB lapse rate", &
                 dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
         else
-            call nc_write(filename,"pr_ann",esm%pr_ann*1e-3*esm%dpr(:,:,1),units="m/a water equiv.",long_name="Precipitation (ann)", &
+            call nc_write(filename,"pr_ann",SUM(esm%pr*esm%dpr, dim=3)/12.0,units="mm/d water equiv.",long_name="Precipitation (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
             call nc_write(filename,"dpr_ann",SUM(esm%dpr, dim=3)/12.0,units="%",long_name="Precipitation anomaly (ann)", &
                             dim1="xc",dim2="yc",dim3="time",start=[1,1,n],ncid=ncid)
@@ -602,7 +602,7 @@ contains
         ! Atmosphere (averaged over all ice)
         if (npts_tot .gt. 0.0) then
             t2m_1d     = sum(esm%t2m_ann + esm%dts(:,:,1),      mask=mask_tot) / npts_tot
-            pr_1d      = sum(esm%pr_ann * 1e-3_wp * esm%dpr(:,:,1), mask=mask_tot) / npts_tot
+            pr_1d      = sum(sum(esm%pr*esm%dpr, dim=3)/12.0_wp, mask=mask_tot) / npts_tot
             dt_1d      = sum(esm%dts(:,:,1),                     mask=mask_tot) / npts_tot
             dpr_1d     = sum(100.0_wp * esm%dpr(:,:,1),          mask=mask_tot) / npts_tot
             dt_var_1d  = sum(esm%dts_var(:,:,1),                 mask=mask_tot) / npts_tot
@@ -656,7 +656,7 @@ contains
             long_name="Mean ice surf. Temp.",                          &
             standard_name="Mean ice surf. Temp.",                      &
             dim1="time", start=[n], ncid=ncid)
-        call nc_write(filename, "pr_1d",   pr_1d,   units="m yr-1",  &
+        call nc_write(filename, "pr_1d",   pr_1d,   units="mm d-1",  &
             long_name="Mean ice surf. Pr.",                            &
             standard_name="Mean ice surf. Pr.",                        &
             dim1="time", start=[n], ncid=ncid)
