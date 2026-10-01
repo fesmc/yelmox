@@ -21,7 +21,7 @@
 
     ! Climatic variables
     lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
-    f_p             = 0.05              ! Claus-Cl. term
+    f_p             = 0.08              ! Claus-Cl. term
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
     f_polar         = 1.8               ! Polar amplification
     dT_threshold    = 0.0               ! Temperature threshold. After this, constant climate.
@@ -42,12 +42,12 @@
     time_ref        = 1961.0, 1990.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization
     time_esm_ref    = 1960.0, 1989.0    ! [yr] Year interval used as Reference of ESM
-    time_hist       = 1850.0, 2014.0    ! [yr] Year interval used as Historical period
+    time_hist       = 1800.0, 1849.0    ! [yr] Year interval used as Historical period
     time_proj       = 2015.0, 2300.0    ! [yr] Year interval used as Projection period
 
     clim_var        = False             ! include climate variability
     clim_seed       = 10                ! Randomnes seed
-    kill_shelves    = True             ! Kill ice shelves beyond PD.
+    kill_shelves    = False             ! Kill ice shelves beyond PD.
     with_ice_sheet  = True              ! Is the ice sheet active?
     equil_method    = "opt"             ! "none", "relax", "opt"
     with_isostasy   = True              ! Is isostasy active?
@@ -56,17 +56,17 @@
 &transient
     tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2015.0            ! Assumed time for "const" method
-    time_init       = 2015.0            ! [yr] Starting time (years CE)
-    time_end        = 2300.0            ! [yr] Ending time (years CE)
+    time_init       = 1850.0            ! [yr] Starting time (years CE)
+    time_end        = 2081.0            ! [yr] Ending time (years CE)
     time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 1.0               ! [yr] Main loop timestep 
 
     ! Time intervals (check with ESM forcings)
     time_ref        = 1961.0, 1990.0    ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization
-    time_esm_ref    = 1960.0, 1989.0    ! [yr] Year interval used as Reference of ESM
-    time_hist       = 1850.0, 2014.0    ! [yr] Year interval used as Historical period
-    time_proj       = 2015.0, 2300.0    ! [yr] Year interval used as Projection period
+    time_esm_ref    = 1850, 2081    ! [yr] Year interval used as Reference of ESM
+    time_hist       = 1800, 1849    ! [yr] Year interval used as Historical period
+    time_proj       = 1850, 2081    ! [yr] Year interval used as Projection period
    
     clim_var        = False             ! include climate variability
     clim_seed       = 1                 ! Randomnes seed
@@ -124,7 +124,7 @@
     tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0              ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -1.0              ! [degC] Minimum allowed tf_corr value 
+    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  1              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False    
@@ -205,10 +205,10 @@
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
 
     ! === frontal mass melt ===
-    fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
                                             ! 3: Calculate followinr Rignot et al (2016)
-    fmb_scale           = 10                ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
-    fmb_lambda          = 1.64              ! Scaling factor for fmb_method=3
+    fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
+    fmb_lambda           = 1.64              ! Scaling factor for fmb_method=3
 /
 
 &ycalv
@@ -415,11 +415,11 @@
     pd_topo_names     = "thickness" "bed" "bed" "surface_gimp" "mask"        ! Ice thickness, bedrock elevation, surface elevation has two options: 
                                                                 ! surface elevation can be: "surface_grimp" (BedMachine) or "surface_grimp" (GrIMP)
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr_masked.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
     pd_tsrf_name      = "tas"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = True
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr_masked.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = True 
@@ -460,15 +460,15 @@
     trans_a         =  0.46 
     trans_b         =  6e-5
     trans_c         =  0.01
-    itm_c           = -55.0
+    itm_c           = -30.4856 !sergio tiene -26.2396 
     itm_t           =  10.0
-    itm_b           =  3.0 
-    itm_lat0        =  -60.0 
+    itm_b           =  -2.2982 !sergio tiene -2.7618 
+    itm_lat0        =  65.0 
 
     ! ## Surface albedo
     alb_snow_dry       =  0.8
     alb_snow_wet       =  0.65
-    alb_ice            =  0.70
+    alb_ice            =  0.40 !ilaria tenia 0.4 aqui
     alb_land           =  0.2
     alb_forest         =  0.1
     alb_ocean          =  0.1
@@ -659,12 +659,11 @@
     restart    = "None"
 /
 
-
-! Files for ismip7
-! ======== Reference period ========
+! =========== ATMOSPHERE ===========
+! ======== Reference period ======== IGUAL que ismip7
 
 &gcm_ts_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr_masked.nc"
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
     name        = "tas"
     units_in    = "degrees C"
     units_out   = "K"
@@ -675,7 +674,7 @@
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr_masked.nc"
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
     name        = "pr" 
     units_in    = "mm d-1"
     units_out   = "mm d-1"
@@ -685,19 +684,8 @@
     time_par    =  1961, 1990, 0, 12.0
 /
 
-&gcm_smb_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr_masked.nc"
-    name        = "smb"
-    units_in    = "mm d-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 365.25         
-    unit_offset = 0.0 
-    with_time   = False
-    time_par    = 1961, 1990, 0, 12.0
-/
-
 &gcm_zs_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr_masked.nc"
+    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
     name        = "z_srf"
     units_in    = "m"
     units_out   = "m"
@@ -714,8 +702,8 @@
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 273.15 
-    with_time   = True
-    time_par    = 1981, 2010, 0, 12 
+    with_time   = False
+    time_par    = 1981, 2010, 0, 1 
 /
 
 &gcm_so_ref
@@ -726,41 +714,30 @@
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True
-    time_par    = 1981, 2010, 0, 12 
+    time_par    = 1981, 2010, 0, 1
 /
 
-! ======== ESM Reference period ========
+! ======== ESM Reference period ======== igual que en projection pero multiplicando por 0
 &gcm_ts_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
-    name        = "tas"
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_232yrs_tas_anomaly.nc"
+    name        = "tas_anomaly"
     units_in    = "K"
     units_out   = "K"
-    unit_scale  = 1.0 
+    unit_scale  = 1e-8
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 1850, 2014, 1, 12
+    time_par    = 1850, 2081, 1, 12
 /
 
 &gcm_pr_esm_ref 
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
-    name        = "pr"
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_232yrs_pr_ratio.nc"
+    name        = "pr_ratio"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
+    unit_scale  = 1e-8        ! CMIP standard sec_to_year   
+    unit_offset = 1.0 
     with_time   = True 
-    time_par    = 1850, 2014, 1, 12
-/
-
-&gcm_smb_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_acabf.nc"
-    name        = "acabf"
-    units_in    = "kg m-2 s-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 12
+    time_par    = 1850, 2081, 1, 12
 /
 
 &gcm_zs_esm_ref
@@ -775,182 +752,46 @@
 /
 
 &gcm_to_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
-    name        = "tf"
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_232yrs_TF_anomaly.nc"
+    name        = "TF_anomaly"
     units_in    = "degrees C"
     units_out   = "K"
-    unit_scale  = 1.0
+    unit_scale  = 1e-8
     unit_offset = 273.15 
     with_time   = True
-    time_par    = 1850, 2014, 1, 12
-/
-
-! loaded but not used so far
-&gcm_so_esm_ref
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
-    name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 12
-/
-
-! ======= Historical period =======
-&gcm_ts_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/tas/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tas.nc"
-    name        = "tas"
-    units_in    = "K"
-    units_out   = "K"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 12
-/
-
-&gcm_pr_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/pr/v2/{grid_name}_{gcm}_historical_v2_1850-2014_pr.nc"
-    name        = "pr"
-    units_in    = "kg m-2 s-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 12
-/
-
-&gcm_smb_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/acabf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_acabf.nc"
-    name        = "acabf"
-    units_in    = "kg m-2 s-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 12
-/
-
-&gcm_dsmbdz_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_historical_v2_1850-2014_dacabfdz.nc"
-    name        = "dacabfdz"
-    units_in    = "kg m-2 s-1 m-1"
-    units_out   = "mm yr-1 m-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 1
-/
-
-&gcm_to_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/tf/v2/{grid_name}_{gcm}_historical_v2_1850-2014_tf.nc"
-    name        = "tf"
-    units_in    = "degrees C"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 273.15 
-    with_time   = True
-    time_par    = 1850, 2014, 1, 12
-/
-
-&gcm_sgd_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/v2/{grid_name}_{gcm}_historical_v2_1850-2014_sgd.nc"
-    name        = "sgd"
-    units_in    = "m3 s-1"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 1 
-    with_time   = True
-    time_par    = 1850, 2014, 1, 12
-/
-
-! loaded but not used so far
-&gcm_so_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/ocean/so/v2/{grid_name}_{gcm}_historical_v2_1850-2014_so.nc"
-    name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 1850, 2014, 1, 12
+    time_par    = 1850, 2081, 1, 12
 /
 
 ! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/tas/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_tas.nc"
-    name        = "tas"
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_232yrs_tas_anomaly.nc"
+    name        = "tas_anomaly"
     units_in    = "K"
     units_out   = "K"
     unit_scale  = 1.0 
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 2015, 2300, 1, 12
+    time_par    = 1850, 2081, 1, 12
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/pr/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_pr.nc"
-    name        = "pr"
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_232yrs_pr_ratio.nc"
+    name        = "pr_ratio"
     units_in    = "kg m-2 s-1"
     units_out   = "mm yr-1"
     unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
     unit_offset = 0.0 
     with_time   = True 
-    time_par    = 2015, 2300, 1, 12
-/
-
-&gcm_smb_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/acabf/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_acabf.nc"
-    name        = "acabf"
-    units_in    = "kg m-2 s-1"
-    units_out   = "mm yr-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 2015, 2300, 1, 12
-/
-
-&gcm_dsmbdz_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/dacabfdz/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_dacabfdz.nc"
-    name        = "dacabfdz"
-    units_in    = "kg m-2 s-1 m-1"
-    units_out   = "mm yr-1 m-1"
-    unit_scale  = 31556926.25        ! CMIP standard sec_to_year  
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 2015, 2300, 1, 1
+    time_par    = 1850, 2081, 1, 12
 /
 
 &gcm_to_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/tf/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_tf.nc"
-    name        = "tf"
+    filename    = "ice_data/TIPMIP/{domain}/{grid_name}/{gcm}/{experiment}/{grid_name}_{gcm}_{experiment}_232yrs_TF_anomaly.nc"
+    name        = "TF_anomaly"
     units_in    = "degrees C"
     units_out   = "K"
     unit_scale  = 1.0
     unit_offset = 273.15 
     with_time   = True
-    time_par    = 2015, 2300, 1, 12
-/
-
-&gcm_sgd_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/SDBN1/sgd/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_sgd.nc"
-    name        = "sgd"
-    units_in    = "m3 s-1"
-    units_out   = "K"
-    unit_scale  = 1.0
-    unit_offset = 1 
-    with_time   = True
-    time_par    = 2015, 2300, 1, 12
-/
-
-! Loaded but not used
-&gcm_so_proj
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/so/v2/{grid_name}_{gcm}_{experiment}_v2_2015-2300_so.nc"
-    name        = "so"
-    units_in    = "PSU"
-    units_out   = "PSU"
-    unit_scale  = 1.0 
-    unit_offset = 0.0 
-    with_time   = True 
-    time_par    = 2015, 2300, 1, 12
+    time_par    = 1850, 2081, 1, 12
 /
