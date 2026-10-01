@@ -18,7 +18,7 @@ module yelmox_domain
     use coords,       only : grid_class, grid_cdo_read_desc
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_update, yelmo_update_equil, &
                              yelmo_init_state, yelmo_init_topo, yelmo_print_bound, &
-                             yelmo_restart_write, yelmo_restart_read, &
+                             yelmo_restart_write, yelmo_restart_init, &
                              yelmo_regions_init, yelmo_region_init, yelmo_regions_update, &
                              yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use yelmo_defs,   only : MASK_ICE_NONE, MASK_ICE_FIXED, MASK_ICE_DYNAMIC
@@ -890,12 +890,13 @@ contains
         gy = trim(dom%ctl%grid_yelmo)
 
         ! Restore Yelmo first: it provides the current H_ice/z_bed for isostasy.
-        ! Two reads are needed, mirroring yelmo's native init-from-restart:
+        ! Two steps, mirroring yelmo's native init-from-restart:
         !   - yelmo_restart_read_topo_bnd loads the geometry [tpo]+[bnd]
-        !     (H_ice, z_bed, ...); the standalone yelmo_restart_read does NOT.
-        !   - yelmo_restart_read loads [dyn,therm,mat] + mask_bed.
-        ! use_restart/pc_active are flags the native path sets; the topo
-        ! diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
+        !     (H_ice, z_bed, ...);
+        !   - yelmo_restart_init loads [dyn,therm,mat] + mask_bed, activates the
+        !     predictor-corrector and initializes the passive-tracer backends
+        !     (elsa, tracer) from their sidecar files.
+        ! The topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
         !
         ! Only when the ice sheet is active. With with_ice_sheet=False the spin-up
         ! wrote no yelmo_restart.nc (see the matching guard in domain_restart_write),
@@ -906,9 +907,8 @@ contains
             call yelmo_restart_read_topo_bnd(dom%yelmo%tpo, dom%yelmo%bnd, dom%yelmo%time, &
                     dom%yelmo%par%restart_interpolated, dom%yelmo%grd, dom%yelmo%par%domain, &
                     dom%yelmo%par%grid_name, trim(fldr)//"/yelmo_restart.nc", ts%time)
-            call yelmo_restart_read(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
+            call yelmo_restart_init(dom%yelmo, trim(fldr)//"/yelmo_restart.nc", ts%time)
             dom%yelmo%par%use_restart = .true.
-            dom%yelmo%time%pc_active  = .true.
         end if
 
         ! Restore isostasy via isos_init_state (reads state + reference from the
