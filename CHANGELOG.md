@@ -51,6 +51,15 @@ annotated git tag. Dates are release (tag) dates.
 - `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb
   and marine-shelf forcing are rebuilt before the first step (as in
   `yelmox_esm`/`yelmox_rembo`); the bundle does not hold them.
+- `esm_forcing`: transient ocean anomalies (`dto`, `dso`) were NaN/garbage for
+  depth-less ocean forcing (Greenland ISMIP7 `tf`/`so`, 2D monthly): the months
+  were averaged over axis 4, which holds them only for 3D fields (out-of-bounds
+  reads; the transient stopped at its first step). The annual mean now uses
+  fesm-utils `varslice_sub_mean`; the hist/proj `to`/`so` blocks share
+  `esm_ocean_anomaly`. Annual 3D ocean (Antarctica) unchanged. Requires
+  fesm-utils with `varslice_sub_mean`.
+- `esm_forcing_init`: a transient ocean field whose layout (rank, extent, depth
+  levels) differs from its ESM reference stops with an error.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
