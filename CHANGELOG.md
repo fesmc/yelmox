@@ -6,6 +6,12 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Follows yelmo dev with the renumbered `ytherm.qb_method` (1: faces, 2: faces to
+  quadrature nodes, 3: simple stagger, 4: quadrature). The par files keep
+  `qb_method = 2`, which now selects the energy-consistent "faces to quadrature
+  nodes" method (was quadrature), so results change. Par files drop
+  `ytopo.surf_gl_method`, `ytopo.margin2nd` and `ydyn.ssa_beta_max` (removed in
+  yelmo); `input/` yelmo copies re-synced. Requires that yelmo dev.
 - `input/`: yelmo input copies re-synced with yelmo kryos-init (`yelmo_defaults.nml`:
   `yelmo.mask_border`; `yelmo-variables-ydyn.md`: `H_ice_solv`, `f_ice_solv`).
   Requires a yelmo with these keys.
@@ -123,8 +129,6 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
-- smbpal: the state is zeroed on allocation; `alb_s` (only set with ITM
-  ablation) was written uninitialised to `smbpal_restart.nc`.
 - `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
   `obs_err_name` and `f_stdev` (startup stopped on the nml read).
 - `yelmox_esm_Antarctica.nml`: topography and geothermal heat flux read from
@@ -172,6 +176,9 @@ annotated git tag. Dates are release (tag) dates.
   only, and `t2m_sum` (2D file) with the DJF mean (scaled by 0.333) also in the
   north. Now annual means, and summer means of the hemisphere (DJF south, JJA
   north; new `esm_summer_mean`, also used for `esm%t2m_sum`).
+- `smbpal`: the state fields are zeroed at allocation. With `abl_method="pdd"`
+  the albedo `alb_s` was never set, so `smbpal_restart.nc` held uninitialized
+  memory (differing between builds). Results are unchanged.
 
 ### Removed
 - `libs/simpleclim.f90` (empty stub) and the unreachable `"const"` branch of

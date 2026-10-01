@@ -895,8 +895,8 @@ contains
 
         allocate(now%melt_net(nx,ny))
 
-        ! Zero the state: not every field is set by every method (e.g. alb_s
-        ! only with ITM ablation), and the restart writes them all.
+        ! Define every field: some are only set by one ablation method (e.g.
+        ! alb_s by itm), but all are written to output and restart files.
         now%t2m      = 0.0
         now%pr       = 0.0
         now%sf       = 0.0
