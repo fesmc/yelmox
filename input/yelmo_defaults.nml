@@ -305,6 +305,7 @@
     use_euler               = False         ! Run the in-tree Eulerian age tracer?
     use_tracer              = False         ! Run the Lagrangian particle backend (tracer)?
     use_elsa                = False         ! Run the Lagrangian layer backend (elsa)?
+    elsa_restart            = True          ! On a restart, restore elsa's layers (False: start them fresh)
     t_dep_source            = "euler"       ! "euler", "trc", "elsa": authoritative deposition-time source
     time_end                = 0.0           ! [yr] simulation end time for use_elsa (sizes elsa's layer stack; 0.0 = present day)
 

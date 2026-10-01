@@ -5,7 +5,20 @@ annotated git tag. Dates are release (tag) dates.
 
 ## [Unreleased]
 
+### Added
+- Antarctic paleo setup (32 km): `yelmox/yelmox_Antarctica_paleo_spinup.nml`
+  (15 kyr optimization spin-up) and `yelmox_Antarctica_paleo_lgp.nml` (-130 kyr to
+  +10 kyr, climate from the glacial index `input/alpha_combined_125kyr_interp.dat`,
+  sea level from `sealevel_rohling_450kyr.dat`, ages traced with elsa), with run
+  scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files kept
+  in `scripts/ant-paleo/legacy/`; the transient now runs on relative time so that
+  sea level follows the record (it stayed at present day before).
+- `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
+  and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`;
+  the originals are in `scripts/ismip7/legacy/`.
+
 ### Changed
+- `input/yelmo_defaults.nml` re-synced with yelmo dev (`ytrc.elsa_restart`).
 - Follows yelmo dev: `input/` yelmo copies re-synced (`yelmo.mask_border`, `"auto"`:
   the domain border as before; the capacity basal BC keys of `ytherm`, now the
   default, so results change; the K24 options of `yhyd`). Par files rename
@@ -51,6 +64,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `input/esm/esm_ant_ismip7.nml`: the SMB reference (`gcm_smb_ref`, read with
+  `esm.use_smb = True`) is the RACMO2.3 monthly climatology `{grid}_RACMO23-VW23.nc`;
+  the ERA5 1979-2022 file it pointed to has no `smb`.
 - `check_isostasy_reference` compares the two reference bedrocks on the isostasy
   grid, where Yelmo's `z_bed_ref` is remapped exactly as the isostasy reference was
   built: the same bedrock agrees to round-off on any isostasy grid (max |diff| <=

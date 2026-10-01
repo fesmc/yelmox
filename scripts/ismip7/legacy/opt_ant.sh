@@ -1,8 +1,4 @@
 #!/bin/bash
-#
-# ISMIP7 Antarctica optimization spin-up. Same as legacy/opt_ant.sh: all its
-# overrides are valid for the current yelmox_esm driver. opt.cf_init=-1 starts
-# cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
 
 resolution=ANT-16KM
 output_path=output_albedo/ismip7/${resolution}/opt-l21-bedmap3
@@ -56,8 +52,8 @@ calv_params=(
 dyn_params=(
     "ydyn.beta_min=10.0"
     "ydyn.solver=diva"
-    "ydyn.ssa_solver=energy"
-    "ydyn.ssa_lat_bc=all"
+	"ydyn.ssa_solver=energy"
+	"ydyn.ssa_lat_bc=all"
 )
 
 mat_params=(
