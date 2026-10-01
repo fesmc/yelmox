@@ -320,7 +320,7 @@
     k24_critical_discharge           = 1.0
     k24_initial_cavity_height        = 0.1
     k24_coupling_length              = 1.0e4
-    k24_long_coupling_water          = 5.0
+    k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
     k24_eta_w                        = 1.8e-3
     k24_W_min                        = 1.0e-8
