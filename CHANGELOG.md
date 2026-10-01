@@ -71,6 +71,20 @@ annotated git tag. Dates are release (tag) dates.
   `t2m`/`pr` were missing values (-9999) and the ice sheet melted away in the
   first step. Now 1985-2014, as in `&transient`. ISMIP7 Antarctica spin-ups
   need re-running.
+- `yelmox_esm_Greenland{,_1pctCO2,_tipmip}.nml`: `&itm` had the Antarctic ITM
+  parameters (`itm_c=-55`, `itm_b=3`, `itm_lat0=-60`, `alb_ice=0.70`), so the
+  latitude-adjusted `itm_c` was about +340 W m-2 over Greenland and the SMB was
+  strongly negative everywhere. Now the Greenland values of
+  `yelmox_Greenland.nml` (`-45`, `-2`, `65`, `0.4`). Greenland ESM spin-ups need
+  re-running.
+- `yelmox_esm` output: `pr_ann` (2D) and `pr_1d` (time series) were the
+  precipitation in mm/d times 1e-3, labelled m/a, with only the January anomaly
+  factor. Now the annual mean of `pr*dpr`, in mm/d.
+- `yelmox_esm` output: the monthly anomalies entered `t2m_ann`/`t2m_sum` (small
+  2D file) and `t2m_1d`, `dt_1d`, `dpr_1d`, `dt_var_1d`, `dpr_var_1d` with January
+  only, and `t2m_sum` (2D file) with the DJF mean (scaled by 0.333) also in the
+  north. Now annual means, and summer means of the hemisphere (DJF south, JJA
+  north; new `esm_summer_mean`, also used for `esm%t2m_sum`).
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
