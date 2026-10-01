@@ -171,7 +171,8 @@ module yelmox_domain
     public :: tsforcing_restart_due, tsforcing_restart_fldr, tsforcing_kill
     public :: tsforcing_restart_write, tsforcing_restart_read, tsforcing_write_step
     public :: cadence_due
-    public :: domain_init, domain_regions_init, domain_init_state, domain_init_isostasy, yelmox_step
+    public :: domain_init, domain_regions_init, domain_init_state, domain_init_isostasy
+    public :: domain_init_marine_ice, yelmox_step
     public :: domain_startup, bsl_startup, run_restart_write
     public :: domain_restart_write, domain_restart_read, restart_bundle_dir, restart_bundle_mkdir
     public :: domain_write_init, domain_write_step, domain_write_1D
@@ -688,11 +689,7 @@ contains
             case("Greenland")
                 ! Optionally impose LGM-like marine ice; otherwise no startup equil.
                 if (dom%ctl%greenland_init_marine_H) then
-                    where(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE .and. &
-                          dom%yelmo%tpo%now%H_ice < 600.0_wp .and. &
-                          dom%yelmo%bnd%z_bed > -500.0_wp)
-                        dom%yelmo%tpo%now%H_ice = 800.0_wp
-                    end where
+                    call domain_init_marine_ice(dom)
                     if (dom%ctl%with_ice_sheet) &
                         call yelmo_update_equil(dom%yelmo, ts%time, time_tot=10.0_wp, &
                                                 dt=1.0_wp, topo_fixed=.FALSE.)
@@ -707,6 +704,19 @@ contains
         end select
 
     end subroutine domain_init_special
+
+    subroutine domain_init_marine_ice(dom)
+        ! LGM-like marine ice at the cold start (greenland_init_marine_H): thin
+        ! ice (< 600 m) over shallow bed (> -500 m) is thickened to 800 m wherever
+        ! ice is allowed.
+        type(ice_domain), intent(inout) :: dom
+
+        where(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE .and. &
+              dom%yelmo%tpo%now%H_ice < 600.0_wp .and. &
+              dom%yelmo%bnd%z_bed > -500.0_wp)
+            dom%yelmo%tpo%now%H_ice = 800.0_wp
+        end where
+    end subroutine domain_init_marine_ice
 
     subroutine domain_init_lgm_north(dom, ts, region, method)
         ! Initialize a Northern-Hemisphere domain (Laurentide or whole "North")

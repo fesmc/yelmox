@@ -302,8 +302,7 @@ contains
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
         ! Optional LGM-like marine ice at the start.
-        if (dom%ctl%greenland_init_marine_H) &
-            dom%yelmo%tpo%now%H_ice = dom%yelmo%tpo%now%H_ice * 1.2_wp
+        if (dom%ctl%greenland_init_marine_H) call domain_init_marine_ice(dom)
 
         ! Equilibrate thermodynamics/dynamics (cold start only).
         if (.not. dom%yelmo%par%use_restart .and. dom%ctl%with_ice_sheet) then
