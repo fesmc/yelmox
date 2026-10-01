@@ -85,6 +85,9 @@ annotated git tag. Dates are release (tag) dates.
   only, and `t2m_sum` (2D file) with the DJF mean (scaled by 0.333) also in the
   north. Now annual means, and summer means of the hemisphere (DJF south, JJA
   north; new `esm_summer_mean`, also used for `esm%t2m_sum`).
+- `smbpal`: the state fields are zeroed at allocation. With `abl_method="pdd"`
+  the albedo `alb_s` was never set, so `smbpal_restart.nc` held uninitialized
+  memory (differing between builds). Results are unchanged.
 
 ### Removed
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.

@@ -895,6 +895,24 @@ contains
 
         allocate(now%melt_net(nx,ny))
 
+        ! Define every field: some are only set by one ablation method (e.g.
+        ! alb_s by itm), but all are written to output and restart files.
+        now%t2m      = 0.0
+        now%pr       = 0.0
+        now%sf       = 0.0
+        now%S        = 0.0
+        now%sigma    = 0.0
+        now%PDDs     = 0.0
+        now%tsrf     = 0.0
+        now%H_snow   = 0.0
+        now%alb_s    = 0.0
+        now%smbi     = 0.0
+        now%smb      = 0.0
+        now%melt     = 0.0
+        now%runoff   = 0.0
+        now%refrz    = 0.0
+        now%melt_net = 0.0
+
         return
 
     end subroutine smbpal_allocate
