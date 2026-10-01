@@ -188,8 +188,15 @@ contains
         call domain_regions_init(dom, trim(outfldr))
 
         ! Cold start or per-domain restart; the shared bsl was already
-        ! initialized/restored once by the driver (bsl_startup above).
+        ! initialized/restored once by the driver (bsl_startup above). On a
+        ! restart, re-establish the climate/smb and marine-shelf forcing from the
+        ! restored state (the bundle does not hold them), so the first step and
+        ! the first output see a valid boundary state.
         call domain_startup(dom, ts, bsl, restore_bsl=.false.)
+        if (trim(dom%ctl%restart) /= "None") then
+            call step_climate(dom, ts)
+            call step_marine_shelf(dom, ts)
+        end if
 
         write(*,*)
         write(*,*) "yelmox_bipolar: domain initialized ("//trim(adjustl(suffix))//")"

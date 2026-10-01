@@ -61,13 +61,26 @@ program yelmox
     if (trim(dom%ctl%restart) /= "None") call tsforcing_restart_read(tsf, trim(dom%ctl%restart))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
-    ! (incl. the shared bsl) and rebuild the hi-res hub from the restored models.
-    ! Pass the forcing anomalies only when active, so snapclim keeps its own index
-    ! when there is no transient forcing.
-    if (tsf%active) then
-        call domain_startup(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+    ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
+    ! then re-establish the climate/smb and marine-shelf forcing from the
+    ! restored state (the bundle does not hold them), so the first step and the
+    ! first output see a valid boundary state. Pass the forcing anomalies only
+    ! when active, so snapclim keeps its own index when there is no transient
+    ! forcing.
+    if (trim(dom%ctl%restart) == "None") then
+        if (tsf%active) then
+            call domain_startup(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+        else
+            call domain_startup(dom, ts, bsl)
+        end if
     else
         call domain_startup(dom, ts, bsl)
+        if (tsf%active) then
+            call step_climate(dom, ts, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
+        else
+            call step_climate(dom, ts)
+        end if
+        call step_marine_shelf(dom, ts)
     end if
 
     write(*,*)
