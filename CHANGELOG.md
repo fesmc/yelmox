@@ -38,6 +38,10 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`: `&ghf` lacked
+  `obs_err_name` and `f_stdev` (startup stopped on the nml read).
+- `scripts/1pctCO2/opt_ant.sh`: `resolution` now sets `yelmo.grid_name`
+  (it only named the output folder).
 - `yelmox`, `yelmox_bipolar`: after restoring a restart bundle the climate/smb
   and marine-shelf forcing are rebuilt before the first step (as in
   `yelmox_esm`/`yelmox_rembo`); the bundle does not hold them.
