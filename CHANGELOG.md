@@ -66,6 +66,15 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `esm_forcing`: in the historical period the direct-SMB anomaly is the ESM's SMB
+  minus its own reference-period mean (`smb_esm_ref`), as for temperature,
+  precipitation and the projection period. It subtracted the observed reference
+  (`smb_ref`). Only transients with `use_esm`, `use_hist` and `use_smb` are
+  affected; no current configuration runs that way.
+- `yelmox_esm`: with `marine_shelf.extrap_shlf = True`, the reference ocean is
+  extrapolated into the ice shelves on its own depth axis (`to_ref`/`so_ref`).
+  It used the axis of the variability fields, which are loaded only with
+  `use_var = True` (e.g. `scripts/1pctCO2/opt_ant.sh` sets `extrap_shlf` without it).
 - `input/esm/esm_ant_ismip7.nml`: the SMB reference (`gcm_smb_ref`, read with
   `esm.use_smb = True`) is the RACMO2.3 monthly climatology `{grid}_RACMO23-VW23.nc`;
   the ERA5 1979-2022 file it pointed to has no `smb`.
