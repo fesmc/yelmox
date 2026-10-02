@@ -18,6 +18,16 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- ESM forcing is a climate backend: `[coupling] climate = "esm"` runs
+  `esm_forcing` (unchanged) inside `yelmox`, reading `[esm]` and its periods from
+  the `run_step` group. The climate products grow: the ocean at the shelf base
+  (`T_shlf`/`S_shlf`, used by `step_marine_shelf` in place of depth profiles), the
+  surface mass balance (`smb_method = "climate"`: reference smb + anomaly,
+  corrected from the present-day surface with the smb gradient; replaces
+  `[esm] use_smb`) and subglacial discharge (`Qd`, landed by `couple_to_yelmo`).
+  `climate_update` takes the domain geometry on `grid_clim`, the marine-shelf
+  parameters and `dtt`. The ESM par files set `dt_clim = 1` (every step) and gain
+  `[tsforcing]`/`[tsgen]` (inactive).
 - Run control in `[ctrl]`: `run_step` names the group holding the timeline
   (`"ctrl"` = `[ctrl]` itself; ESM `"spinup"`/`"transient"`), `calendar` /
   `calendar_ref` set calendar years and their reference (ESM `True`/`2000`, before

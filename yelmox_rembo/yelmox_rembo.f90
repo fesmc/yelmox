@@ -17,14 +17,14 @@ program yelmox_rembo
     use yelmo, only : yelmo_load_command_line_args, wp, dp, yelmo_end, &
                       yelmo_init_state, yelmo_update_equil, yelmo_print_bound
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
-    use yelmox_climate, only : climate_update, climate_ocean_const
+    use yelmox_climate, only : climate_ocean_const
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
                                rembo_ann, rembo_restart_write
     use tsgen, only : tsgen_class
     use kryos,          only : kryos_domain, domain_init, remap
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, step_icesheet, &
-                               refresh_hub, step_marine_shelf, couple_to_yelmo
+                               refresh_hub, step_marine_shelf, couple_to_yelmo, update_climate
     use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, &
                                domain_opt_init_cb_ref, run_restart_write, restart_bundle_dir
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
@@ -220,7 +220,7 @@ contains
         real(wp),              intent(in)    :: dT_summer, dT_ocn
         logical, intent(in), optional :: init
 
-        real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_sl_c(:,:), basins_c(:,:)
+        real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_sl_c(:,:)
         character(len=256) :: gc, gh
         logical :: is_init
 
@@ -234,7 +234,6 @@ contains
         call remap(dom, dom%topo%z_srf,  gh, z_srf_c,  gc, "bilin")
         call remap(dom, dom%topo%H_ice,  gh, H_ice_c,  gc, "bilin")
         call remap(dom, dom%topo%z_sl,   gh, z_sl_c,   gc, "bilin")
-        call remap(dom, dom%topo%basins, gh, basins_c, gc, "nn")
 
         ! REMBO atmosphere + surface mass balance (double precision internally).
         if (is_init .and. .not. dom%yelmo%par%use_restart) then
@@ -250,8 +249,7 @@ contains
         dom%smb%ann%tsrf = real(rembo_ann%T_srf, wp)
 
         ! Ocean forcing via the climate backend (grid_clim); optional hysteresis anomaly.
-        call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time, &
-                            domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
+        call update_climate(dom, ts)
         if (tsf%active .and. climate_ocean_const(dom%cl)) &
             dom%clim%now%to_ann = dom%clim%now%to_ann + dT_ocn
     end subroutine step_rembo

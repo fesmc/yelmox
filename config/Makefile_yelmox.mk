@@ -48,10 +48,11 @@ $(objdir)/snapesm.o: $(libdir)/snapesm.f90
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# The climate backend of a domain ([coupling] climate = snapclim | snapesm),
+# The climate backend of a domain ([coupling] climate = snapclim | snapesm | esm),
 # chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
 $(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o \
-						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/kryos_forcing.o
+						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/esm_forcing.o \
+						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
 # Hi-res topography reference hub for multigrid yelmox

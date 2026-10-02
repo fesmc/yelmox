@@ -246,7 +246,8 @@ contains
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
         call io_var2D(filename, "t2m_ann", clim%now%ta_ann, n, ncid, "K", "Annual mean air temperature")
-        call io_var2D(filename, "pr_ann",  clim%now%pr_ann, n, ncid, "mm/a", "Annual mean precipitation")
+        if (allocated(clim%now%pr_ann)) &
+            call io_var2D(filename, "pr_ann",  clim%now%pr_ann, n, ncid, "mm/a", "Annual mean precipitation")
         call nc_close(ncid)
     end subroutine snap_write_step
 

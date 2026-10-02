@@ -120,25 +120,17 @@ contains
         type(bsl_class),   intent(inout) :: bsl
         type(tsforcing_class), intent(in), optional :: tsf
 
-        real(wp), allocatable :: z_srf_c(:,:), basins_c(:,:)
-        character(len=256) :: gc, gh
-
-        gc = trim(dom%ctl%grid_clim)
-        gh = trim(dom%ctl%grid_hub)
-
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call domain_init_isostasy(dom, ts, bsl)
 
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call refresh_hub(dom)
 
-        ! Climate on grid_clim (note: init uses time_rel for snapclim), then the
-        ! surface mass balance on grid_smb (smbpal or smb_simple; init=.true.
-        ! runs the smbpal ITM equilibration before the first update).
+        ! Climate on grid_clim (init: snapclim/snapesm at time_rel), then the
+        ! surface mass balance on grid_smb (init=.true. runs the smbpal ITM
+        ! equilibration before the first update).
         if (dom%ctl%with_climate) then
-            call remap(dom, dom%topo%z_srf,  gh, z_srf_c,  gc, "bilin")
-            call remap(dom, dom%topo%basins, gh, basins_c, gc, "nn")
-            call update_climate(dom, z_srf_c, basins_c, ts%time_rel, tsf)
+            call update_climate(dom, ts, tsf=tsf, init=.true.)
             call step_smb(dom, ts, init=.true.)
         end if
 

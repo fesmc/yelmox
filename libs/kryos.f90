@@ -55,8 +55,8 @@ module kryos
         ! Cadences + methods ([coupling]).
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
         character(len=56) :: equil_method = "none"
-        character(len=56) :: smb_method   = "smbpal"
-        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm
+        character(len=56) :: smb_method   = "smbpal"      ! smbpal | smb_simple | climate (from the backend)
+        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm | esm
 
         ! Cold-start ice state ([coupling]): init_marine_H first, then init_method.
         character(len=56)  :: init_method     = "equil"   ! none | equil | recon | recon_ref
@@ -304,7 +304,8 @@ contains
         if (do_climate) then
             call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
             call climate_init(dom%cl, dom%ctl%climate, path_par, domain, trim(dom%ctl%grid_clim), &
-                              nx_c, ny_c, time, basins_c, group="snap"//trim(sfx))
+                              nx_c, ny_c, time, basins_c, sfx=trim(sfx), timeline_group=trim(tgroup), &
+                              smb_direct=(trim(dom%ctl%smb_method) == "climate"))
         end if
 
         ! --- smb on its configured grid (grid_smb) ---
@@ -471,6 +472,19 @@ contains
         call nml_read(path_par, gc, "climate",        ctl%climate)
         ctl%smb_method = "smbpal"
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
+        select case(trim(ctl%smb_method))
+            case("smbpal", "climate")
+            case("smb_simple")
+                if (trim(ctl%climate) == "esm") then
+                    write(*,*) "domain_ctl_load:: error: "//trim(gc)//".smb_method = smb_simple needs &
+                               &a sea-level air temperature (climate = snapclim or snapesm)."
+                    stop 1
+                end if
+            case default
+                write(*,*) "domain_ctl_load:: error: "//trim(gc)//".smb_method must be smbpal, &
+                           &smb_simple or climate; got "//trim(ctl%smb_method)
+                stop 1
+        end select
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
 
         ! Optional physics switches. use_negis and scale_glacial_smb

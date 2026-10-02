@@ -70,6 +70,30 @@
     clim_seed       = 1                 ! Randomnes seed
 /
 
+&tsforcing
+    active = False    ! Apply transient tsgen forcing? (yelmox; unused by the esm climate)
+    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
+    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
+    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
+/
+
+&tsgen
+    method     = "const"    ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
+    with_kill  = False      ! stop the run once the response equilibrates at a bound
+    dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
+    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
+    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
+    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
+    df_sign    = 1          ! +1/-1 direction of forcing change
+    tol        = 1.0        ! response-rate tolerance (feedback/kill)
+    df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
+    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
+    f_min      = 0.0        ! [f]   lower forcing bound
+    f_max      = 5.0        ! [f]   upper forcing bound
+    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+/
+
 &tm_1D
     method          = "const"           ! "const", "file", "times"
     dt              = 1.0
@@ -666,8 +690,8 @@
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)
     climate         = "esm"      ! climate backend: the ESM forcing of yelmox_esm
-    smb_method      = "smbpal" ! "smbpal" or "smb_simple"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates (unused: esm forcing)
+    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
+    dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
     ! Optional switches.
