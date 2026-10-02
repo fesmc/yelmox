@@ -16,9 +16,8 @@ core that these drivers reuse.
 
 | Flavor | Build | Climate / SMB | Ocean | Distinctive feature |
 |---|---|---|---|---|
-| [`yelmox`](flavor-yelmox.md) | `make yelmox` | `[coupling] climate`: snapclim, snapesm or [esm](flavor-esm.md); smbpal, smb_simple or the climate's smb | the climate (profiles or shelf base) | Single domain; canonical driver. Transient time-series forcing (`tsgen`). |
+| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | `[coupling] climate`: snapclim, snapesm, [esm](flavor-esm.md) or [rembo](flavor-rembo.md); smbpal, smb_simple or the climate's smb | the climate (profiles or shelf base) | Single domain; canonical driver. Transient time-series forcing (`tsgen`). |
 | [`yelmox_bipolar`](flavor-bipolar.md) | `make yelmox_bipolar` | snapclim + smbpal (×2) | snapclim + shared OBM | Two hemispheres, shared sea level + Ocean Box Model. |
-| [`yelmox_rembo`](flavor-rembo.md) | `make yelmox_rembo` | REMBOv1 | snapclim | REMBO energy/moisture-balance atmosphere + SMB. |
 
 ## Shared coupling primitives
 
@@ -30,13 +29,13 @@ Every modern flavor advances the model by calling these primitives (from
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
 - `refresh_hub` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
-- `step_climate` — climate on `grid_clim` from the backend chosen by `[coupling] climate` (`snapclim`, `snapesm` or `esm`), with the transient forcing, on the `dt_clim` cadence.
+- `step_climate` — climate on `grid_clim` from the backend chosen by `[coupling] climate` (`snapclim`, `snapesm`, `esm` or `rembo`), with the transient forcing, on the `dt_clim` cadence.
 - `step_smb` — surface mass balance on `grid_smb` (`smb_method`: smbpal, smb_simple, or the climate's own, `climate`).
 - `step_marine_shelf` — sub-shelf melt on `grid_mshlf`, from the climate's ocean as depth profiles or at the shelf base.
 
 Every driver writes the sequence out in its time loop, so the coupling order can
 be read directly from the program; drivers with extra steps (a second domain, an
-ocean box model, an ESM/REMBO climate step) interleave them there.
+ocean box model) interleave them there.
 
 ## Initialization ordering (applies to all flavors)
 

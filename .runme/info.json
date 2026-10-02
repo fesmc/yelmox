@@ -6,8 +6,7 @@
 
     "exe_aliases" :
         {   "yelmox"           : "libyelmox/bin/yelmox.x",
-            "bipolar"          : "libyelmox/bin/yelmox_bipolar.x",
-            "rembo"            : "libyelmox/bin/yelmox_rembo.x"
+            "bipolar"          : "libyelmox/bin/yelmox_bipolar.x"
         },
 
     "grp_aliases" :
@@ -17,7 +16,7 @@
 
     "par_paths" :
         {
-            "rembo"        : "yelmox_rembo/rembo_Greenland.nml"
+            "rembo"        : "yelmox/rembo_Greenland.nml"
         },
 
     "files" : ["git_yelmo.txt"],

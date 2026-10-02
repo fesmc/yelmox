@@ -59,8 +59,6 @@ contains
         ! bundle folder -- the single-domain convention, where the run-level
         ! bsl_restart.nc lives in the domain's bundle. Multi-domain drivers
         ! restore the bsl once themselves (bsl_startup) and pass .false..
-        ! Flavor drivers with their own cold start (esm, rembo) keep their own
-        ! cold branch and call this for the restart branch only.
         ! The restart branch does not rebuild the climate/smb or marine-shelf
         ! forcing (not held in the bundle): every driver re-establishes it
         ! after this call with its own climate step + marine-shelf step.

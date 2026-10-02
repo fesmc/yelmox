@@ -1,66 +1,43 @@
 ---
-title: "yelmox_rembo"
+title: "REMBO climate"
 ---
 
-A single-domain (Greenland) driver in which **REMBOv1** — an energy/moisture-balance
-regional atmosphere with an integrated surface-mass-balance scheme — **replaces the
-snapclim + smbpal atmosphere/SMB**. The ocean forcing still comes from snapclim.
-REMBO's SMB is staged into the shared SMB carrier so the generic
-`couple_smb_to_yelmo` lands it on the Yelmo grid like any other SMB module.
+Runs with **REMBOv1**, an energy/moisture-balance regional atmosphere with an
+integrated surface-mass-balance scheme, use the `yelmox` program with the REMBO
+climate backend: `[coupling] climate = "rembo"`. REMBO supplies the atmosphere and
+the surface mass balance; the ocean comes from snapclim.
 
-- **Program:** `yelmox_rembo/yelmox_rembo.f90` + `yelmox_rembo/yelmox_rembo_output.f90` + `libs/kryos*.f90`.
-- **Build:** `make yelmox_rembo` (links the REMBO stack; prereq `rembo-static`).
-- **Configs:** `yelmox_rembo/yelmox_rembo_Greenland.nml` (main) + `yelmox_rembo/rembo_Greenland.nml` (REMBO's own parameters, staged into the run dir).
+- **Program:** `yelmox/yelmox.f90`, backend in `libs/yelmox_climate.f90`, with the
+  REMBO adapter `libs/climate_rembo.f90`.
+- **Build:** `make yelmox rembo=1` (links rembo1; prerequisite `rembo-static`).
+  Without `rembo=1`, a stub (`libs/climate_rembo_stub.f90`) stops the run if
+  `climate = "rembo"`.
+- **Config:** `yelmox/yelmox_rembo_Greenland.nml`, plus REMBO's own parameters in
+  `yelmox/rembo_Greenland.nml` (staged into the run folder via `.runme/info.json`).
+- **Script:** `scripts/rembo/run_rembo.sh`.
 
-## What's distinct
+## Configuration
 
-- **REMBO atmosphere + SMB.** REMBO is driver-owned (module-global `rembo_ann`),
-  initialized with `rembo_init`, and advanced by `step_rembo`, which calls
-  `rembo_update` (or `rembo_equilibrate` on the first cold-start call). REMBO runs
-  on `grid_clim` (= the Yelmo grid in the single-grid Greenland setup) and works
-  internally in double precision.
-- **SMB via the shared carrier.** `step_rembo` copies `rembo_ann%smb` / `%T_srf`
-  into `dom%smb%ann%smb` / `%tsrf`, so the standard `couple_smb_to_yelmo` (inside
-  `step_icesheet`) remaps it conservatively to Yelmo with the water-equiv→ice-equiv
-  scaling and the optional `lim_pd_ice` limiter — no REMBO-specific coupler needed.
-- **Ocean still from snapclim.** `step_rembo` also calls `snapclim_update` on
-  `grid_clim` for the ocean forcing (optionally adding the hysteresis ocean anomaly
-  when `ocn_type = "const"`). Atmosphere/SMB no longer come from snapclim/smbpal.
-
-## Stepping order
-
-Main loop (per timestep):
-
-```fortran
-call update_hyster_forcing()     ! dT_summer / dT_ann / dT_ocn from the hyster module
-call bsl_update(bsl, ts%time_rel)
-
-call step_spinup_tuning(dom, ts)
-call step_isostasy(dom, ts, bsl)
-call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update
-call refresh_hub(dom)
-call step_rembo()                ! REMBO atmosphere/SMB (-> dom%smb%ann) + snapclim ocean
-call step_marine_shelf(dom, ts)
-```
-
-Like the other multigrid flavors, this inlines the `step_*` primitives and
-substitutes `step_rembo` for the generic `step_climate`. REMBO and marine run
-*after* `step_icesheet`/`yelmo_update`, so their output is consumed on the next
-step (the standard one-step coupling lag).
-
-## Forcing
-
-::: {.callout-note}
-## REMBO still uses the legacy `hyster` module
-Transient forcing here comes from the older `hyster` module (`hyster_init`,
-`hyster_calc_forcing` → `dT_summer` / `dT_ann` / `dT_ocn`), **not** the `tsgen`
-`[tsforcing]` mechanism used by the single-domain [`yelmox`](flavor-yelmox.md).
-Porting REMBO's forcing to `tsgen` is future work; for now it reads the `[hyster]`
-namelist group and `ctrl.use_hyster` / `f_ta` / `f_to`.
-:::
+- **Grid.** REMBO runs on the grid it was compiled for (Greenland, GRL-16KM),
+  which must be `grid_clim`; the backend checks this at start-up.
+- **Surface mass balance.** `[coupling] smb_method = "climate"`: REMBO's smb and
+  surface temperature, at the current surface. REMBO gives annual fields only, so
+  smbpal and smb_simple are not available with it.
+- **Update cadence.** `[coupling] dt_clim = dtt`: REMBO updates its energy balance
+  and its smb on its own intervals (`dtime_emb`, `dtime_smb`).
+- **Ocean.** The `[snap]` group, as for snapclim.
+- **Transient forcing.** `[tsforcing]` maps the tsgen value `f_now` onto REMBO's
+  anomalies: the summer air temperature `dT_sum = f_now·f_ta`, the annual
+  `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6), and the ocean
+  `dT_ocn = dT_ann·f_to`, added to a snapclim ocean held at its reference
+  (`ocn_type = "const"`).
+- **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
 ## Output
 
-REMBO runs write `yelmo2D.nc` (heavy 2D) and `yelmo-rembo.nc` (small 1D + 2D,
-including REMBO's `T_ann` / `T_jja` / `pr` diagnostics), plus a restart bundle with
-a `rembo_restart.nc`.
+The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, ...), plus, with
+`[output] write_clim`, `rembo.nc` (annual and summer air temperature,
+precipitation, smb) and `rembo_ts.nc` (the applied anomalies, the smb integrated
+over the ice sheet and the accumulation-area ratio). The tsgen forcing goes to
+`yelmo_ts.nc`, as for the other climates. Restart bundles hold REMBO's
+`rembo_restart.nc`; REMBO reads its restart as set in `rembo_Greenland.nml`.

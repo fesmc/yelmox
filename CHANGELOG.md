@@ -18,6 +18,17 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- `yelmox_rembo` is removed: REMBO runs use `yelmox` with `climate = "rembo"`
+  and `smb_method = "climate"`, built with `make yelmox rembo=1` (without it, a
+  stub stops the run). REMBO supplies the atmosphere and smb, snapclim the ocean.
+  The par files move to `yelmox/yelmox_rembo_Greenland.nml` and
+  `yelmox/rembo_Greenland.nml` (`ctrl.time_equil` becomes
+  `coupling.time_equil_thrm`, `ctrl.write_restart` is dropped), the run script to
+  `scripts/rembo/` (runme `-e yelmox`; the `rembo` alias is gone). Output with
+  `[output] write_clim`: `rembo.nc` (`t2m_ann`, `t2m_sum`, `pr_ann` now in mm/a,
+  `smb_ann`) and `rembo_ts.nc` (`dT_sum`, the applied `f_now·f_ta`, was `dT_jja`
+  = `f_now`; `dT_ann`, `dT_ocn`, `smb_mean`, `aar`; `V_dT` is dropped); the tsgen
+  forcing is in `yelmo_ts.nc`.
 - With ESM forcing the marine shelf takes the ice-shelf base as `z_srf - H_ice`
   (Yelmo's definition), like the other climates, instead of reconstructing it from
   flotation. ESM results change under the ice shelves.

@@ -399,8 +399,7 @@ same handful of calls:
   (`domain_init_state`) or restart-bundle restore + hub rebuild. Single-domain
   drivers restore the shared bsl from the same bundle; multi-domain drivers
   restore it once via **`bsl_startup(bsl, ts, fldr)`** and pass
-  `restore_bsl=.false.`. Flavors with their own cold start (esm, rembo) keep
-  their cold branch and call this on the restart branch only.
+  `restore_bsl=.false.`.
 - **`domain_init_ice(dom, ts)`** — the cold-start ice state after
   `yelmo_init_state`, in every flavor: `[coupling] init_marine_H` (LGM-like
   marine ice), then `init_method`: `none`, `equil` (`init_equil_time` years with

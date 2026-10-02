@@ -116,16 +116,6 @@ yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(rembo_dep) $(ye
 	@echo "    yelmox_bipolar.x is ready."
 	@echo " "
 
-# REMBO-coupled driver: reuses the multigrid kryos_domain, with REMBO as the
-# atmosphere/SMB (step_rembo) and its own combined output module.
-yelmox_rembo : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -c -o $(objdir)/yelmox_rembo_output.o yelmox_rembo/yelmox_rembo_output.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) $(INC_REMBO) -o $(bindir)/yelmox_rembo.x yelmox_rembo/yelmox_rembo.f90 \
-		$(objdir)/yelmox_rembo_output.o $(yelmox_libs) $(LIB_REMBO) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_rembo.x is ready."
-	@echo " "
-
 
 test_timestepping : fesmutils-static yelmo-static
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -o ./libyelmox/bin/test_timestepping.x tests/test_timestepping.f90 \
@@ -148,7 +138,8 @@ usage:
 	@echo "    * USAGE * "
 	@echo ""
 	@echo " Default (multigrid) drivers, one per flavor folder:"
-	@echo "   make yelmox | yelmox_bipolar | yelmox_rembo"
+	@echo "   make yelmox | yelmox_bipolar"
+	@echo "   rembo=1 links REMBO (climate = rembo)"
 	@echo " make clean      : cleans object files"
 	@echo ""
 

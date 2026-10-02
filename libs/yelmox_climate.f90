@@ -65,7 +65,6 @@ module yelmox_climate
     public :: climate_init
     public :: climate_update
     public :: climate_air_anom
-    public :: climate_ocean_const
     public :: climate_file_base, climate_write_2D, climate_write_1D
     public :: climate_restart_write
 
@@ -251,16 +250,6 @@ contains
         end select
 
     end function climate_air_anom
-
-    logical function climate_ocean_const(cl) result(is_const)
-        ! Is the backend's ocean held at its reference state (snapclim ocn_type
-        ! = "const")? REMBO then adds its own ocean anomaly.
-        type(yelmox_climate_class), intent(in) :: cl
-
-        is_const = .false.
-        if (trim(cl%method) == "snapclim") is_const = (trim(cl%snapclim%par%ocn_type) == "const")
-
-    end function climate_ocean_const
 
     ! ===== output ==========================================================
 

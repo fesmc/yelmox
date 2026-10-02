@@ -27,7 +27,7 @@ website:
             href: flavor-bipolar.md
           - text: "ESM forcing (yelmox)"
             href: flavor-esm.md
-          - text: "yelmox_rembo"
+          - text: "REMBO climate (yelmox)"
             href: flavor-rembo.md
       - text: "Database namelists"
         href: database-namelists.md
