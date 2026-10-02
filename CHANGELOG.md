@@ -18,6 +18,14 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- The climate backend is chosen at runtime: `[coupling] climate = "snapclim" |
+  "snapesm"` replaces the `make CLIMATE=` switch (one `libs/yelmox_climate.f90`
+  holds both backends; `yelmox_snapesm.x` is gone). The driver's transient forcing
+  goes to the backend (`climate_update(..., tsf)`), which applies it its own way.
+  The bipolar ocean box model takes its air-temperature anomaly from
+  `climate_air_anom` and rembo asks `climate_ocean_const`, instead of reading
+  snapclim's internals. Par files set `climate` (`"esm"` in the `yelmox_esm` ones,
+  not read until ESM becomes a backend); results do not change.
 - The domain owns its physical constants: `[domain] phys_const` (e.g. `"Earth"`,
   a group of `input/yelmo_phys_const.nml`) is loaded once and the same record goes
   to the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and

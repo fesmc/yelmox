@@ -45,25 +45,14 @@ $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 $(objdir)/snapesm.o: $(libdir)/snapesm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# ---- Climate backend selection: snapclim (default) or snapesm ----------------
-# The backend-agnostic domain (kryos) reads dom%clim, filled by the
-# yelmox_climate adapter. Both adapter variants share the module name yelmox_climate;
-# CLIMATE selects which source (and backend object) is compiled. Build with e.g.
-#   make yelmox CLIMATE=snapesm
-CLIMATE ?= snapclim
-ifeq ($(CLIMATE),snapesm)
-    climate_backend_obj = $(objdir)/snapesm.o
-    yelmox_climate_src  = $(libdir)/yelmox_climate_snapesm.f90
-else
-    climate_backend_obj = $(objdir)/snapclim.o
-    yelmox_climate_src  = $(libdir)/yelmox_climate_snapclim.f90
-endif
-
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/yelmox_climate.o: $(yelmox_climate_src) $(objdir)/climate_out.o $(climate_backend_obj)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+# The climate backend of a domain ([coupling] climate = snapclim | snapesm),
+# chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
+$(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o \
+						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/kryos_forcing.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
 # Hi-res topography reference hub for multigrid yelmox
 $(objdir)/htopo.o: $(libdir)/htopo.f90
@@ -208,7 +197,8 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/smb_simple.o \
 					    $(objdir)/climate_out.o \
 					    $(objdir)/yelmox_climate.o \
-					    $(climate_backend_obj) \
+					    $(objdir)/snapclim.o \
+					    $(objdir)/snapesm.o \
 						$(objdir)/htopo.o \
 						$(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o \

@@ -17,7 +17,7 @@ program yelmox_rembo
     use yelmo, only : yelmo_load_command_line_args, wp, dp, yelmo_end, &
                       yelmo_init_state, yelmo_update_equil, yelmo_print_bound
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
-    use yelmox_climate, only : climate_update
+    use yelmox_climate, only : climate_update, climate_ocean_const
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
                                rembo_ann, rembo_restart_write
     use tsgen, only : tsgen_class
@@ -252,7 +252,7 @@ contains
         ! Ocean forcing via the climate backend (grid_clim); optional hysteresis anomaly.
         call climate_update(dom%cl, dom%clim, z_srf=z_srf_c, time=ts%time, &
                             domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins_c)
-        if (tsf%active .and. trim(dom%cl%snp%par%ocn_type) == "const") &
+        if (tsf%active .and. climate_ocean_const(dom%cl)) &
             dom%clim%now%to_ann = dom%clim%now%to_ann + dT_ocn
     end subroutine step_rembo
 

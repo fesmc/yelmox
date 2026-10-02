@@ -56,6 +56,7 @@ module kryos
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"
+        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm
 
         ! Cold-start ice state ([coupling]): init_marine_H first, then init_method.
         character(len=56)  :: init_method     = "equil"   ! none | equil | recon | recon_ref
@@ -135,7 +136,7 @@ module kryos
         type(yelmo_class)      :: yelmo
         type(marshelf_class)   :: mshlf
         type(isos_class)       :: isos
-        type(yelmox_climate_class) :: cl    ! climate backend (snapclim | snapesm)
+        type(yelmox_climate_class) :: cl    ! climate backend ([coupling] climate)
         type(climate_out_class)    :: clim  ! backend-agnostic climate output (now/ref)
         type(smbpal_class)     :: smb
         type(smb_simple_class) :: smbs    ! alternative SMB (smb_method="smb_simple")
@@ -300,7 +301,7 @@ contains
         dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
         if (do_climate) then
             call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
-            call climate_init(dom%cl, path_par, domain, trim(dom%ctl%grid_clim), &
+            call climate_init(dom%cl, dom%ctl%climate, path_par, domain, trim(dom%ctl%grid_clim), &
                               nx_c, ny_c, time, basins_c, group="snap"//trim(sfx))
         end if
 
@@ -465,6 +466,7 @@ contains
         call nml_read(path_par, gc, "with_climate",      ctl%with_climate)
         call nml_read(path_par, gc, "with_marine_shelf", ctl%with_marine_shelf)
         call nml_read(path_par, gc, "equil_method",   ctl%equil_method)
+        call nml_read(path_par, gc, "climate",        ctl%climate)
         ctl%smb_method = "smbpal"
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)

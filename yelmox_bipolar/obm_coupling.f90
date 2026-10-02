@@ -22,6 +22,7 @@ module obm_coupling
     use ncio,          only : nc_read
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
+    use yelmox_climate, only : climate_air_anom
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
     use ocean2ice,     only : calc_ocean_temperature_field
@@ -147,7 +148,7 @@ contains
 
     subroutine coupling_atm2obm(dom, obm, hemisphere, time)
         ! Atmosphere -> OBM: drive the box-model atmospheric temperatures + vapor
-        ! fluxes from this domain's snapclim air-temperature anomaly series.
+        ! fluxes from this domain's air-temperature anomaly index (climate_air_anom).
         ! Hemisphere-specific: north sets thetan/phin, south sets thetas/phit.
         ! Both hemispheres also set the shared tropical box temperature thetat; if
         ! both are active the south value overwrites the north one, exactly as in
@@ -157,12 +158,10 @@ contains
         character(len=*), intent(in)    :: hemisphere
         real(wp),         intent(in)    :: time
 
-        real(wp) :: at, dTa
+        real(wp) :: dTa
 
-        ! Air-temperature anomaly (snapclim series), scaled to a temperature change.
-        ! (Reaches into the snapclim backend; the bipolar driver builds with CLIMATE=snapclim.)
-        at  = series_interp(dom%cl%snp%at%time, dom%cl%snp%at%var, time)
-        dTa = at * dom%cl%snp%par%dTa_const
+        ! Air-temperature anomaly index of the domain's climate backend.
+        dTa = climate_air_anom(dom%cl, time)
 
         select case(trim(hemisphere))
             case("north")
@@ -282,41 +281,6 @@ contains
 
     ! ----- private helpers -----
 
-    function series_interp(series_time, series_var, time) result(var)
-        ! Linear interpolation of a (time, var) series at `time`.
-        real(wp), dimension(:), intent(in) :: series_time, series_var
-        real(wp),               intent(in) :: time
-        real(wp) :: var
-        var = interp_linear(series_time, series_var, xout=time)
-    end function series_interp
-
-    function interp_linear(x, y, xout) result(yout)
-        ! Simple linear interpolation of a point, clamped to the series endpoints.
-        real(wp), dimension(:), intent(in) :: x, y
-        real(wp),               intent(in) :: xout
-        real(wp) :: yout
-        integer  :: j, n
-        real(wp) :: alph
-
-        n = size(x)
-        if (xout .lt. x(1)) then
-            yout = y(1)
-        else if (xout .gt. x(n)) then
-            yout = y(n)
-        else
-            do j = 1, n
-                if (x(j) .ge. xout) exit
-            end do
-            if (j .eq. 1) then
-                yout = y(1)
-            else if (j .eq. n+1) then
-                yout = y(n)
-            else
-                alph = (xout - x(j-1)) / (x(j) - x(j-1))
-                yout = y(j-1) + alph*(y(j) - y(j-1))
-            end if
-        end if
-    end function interp_linear
 
     function r8_normal_ab(a, b) result(val)
         ! Sample of a normal PDF with mean a, standard deviation b (Box-Muller).

@@ -747,6 +747,7 @@
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "opt"    ! "none", "relax", "opt"
+    climate         = "snapclim" ! climate backend: "snapclim" or "snapesm"
     smb_method      = "smbpal" ! "smbpal" or "smb_simple"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     restart    = "None"        ! restart bundle folder, or "None" for a cold start

@@ -7,6 +7,13 @@ Working handoff for the `snapclim` → `snapesm` refactor. Read with
 `snapesm` wrapper over the fesm-utils primitives `varslice` (field loading) and `tsgen`/`series`
 (scalar forcing), validated to tight tolerance against snapclim on real configs.
 
+**Update (driver refactor, phase 5):** the backend is now chosen at runtime,
+`[coupling] climate = "snapclim" | "snapesm"`. The `CLIMATE` build switch and the two adapter
+files are gone: one `libs/yelmox_climate.f90` holds both backends, and the driver's transient
+forcing (`tsforcing`) is handed to the backend. The bipolar ocean box model and rembo no longer
+reach into snapclim (`climate_air_anom`, `climate_ocean_const`). The notes below on
+`CLIMATE=`/`dom%cl%snp` describe the state before that.
+
 **Status:** the numeric physics port is **complete and validated to tight tolerance** on
 Greenland GRL-16KM `snap_1ind_new` + `fraction`. Remaining work is **in-model integration**
 (wire a `climate_backend` switch into `yelmox_domain`, then retire snapclim).

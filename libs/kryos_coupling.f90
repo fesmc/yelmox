@@ -340,25 +340,15 @@ contains
     end subroutine step_climate
 
     subroutine update_climate(dom, z_srf, basins, time, tsf)
-        ! One climate-backend update on grid_clim. With an active transient
-        ! forcing (tsf) its spatially-homogeneous anomalies dTa/dTo/dSo are
-        ! applied; otherwise snapclim uses its own index.
+        ! One climate-backend update on grid_clim, with the transient forcing
+        ! (tsf) when given; the backend applies it in its own way.
         type(kryos_domain),    intent(inout) :: dom
         real(wp),              intent(in)    :: z_srf(:,:), basins(:,:)
         real(wp),              intent(in)    :: time
         type(tsforcing_class), intent(in), optional :: tsf
 
-        if (present(tsf)) then
-            if (tsf%active) then
-                call climate_update(dom%cl, dom%clim, z_srf=z_srf, time=time, &
-                                    domain=dom%ctl%domain, dTa=tsf%dTa, dTo=tsf%dTo, &
-                                    dSo=tsf%dSo, dx=dom%ctl%dx_clim, basins=basins)
-                return
-            end if
-        end if
-
-        call climate_update(dom%cl, dom%clim, z_srf=z_srf, time=time, &
-                            domain=dom%ctl%domain, dx=dom%ctl%dx_clim, basins=basins)
+        call climate_update(dom%cl, dom%clim, z_srf=z_srf, time=time, domain=dom%ctl%domain, &
+                            dx=dom%ctl%dx_clim, basins=basins, tsf=tsf)
     end subroutine update_climate
 
     subroutine step_smb(dom, ts, init)

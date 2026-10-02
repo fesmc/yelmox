@@ -146,6 +146,7 @@ module snapclim
     public :: snapclim_class 
     public :: snapclim_init 
     public :: snapclim_update 
+    public :: snapclim_air_anom
 
     public :: snapclim_var_to_ocn
 
@@ -2298,6 +2299,22 @@ contains
         return 
 
     end function series_2D_interp 
+
+    function snapclim_air_anom(snp,time) result(dT)
+        ! [K] Air-temperature anomaly from the index series at `time`, scaled by
+        ! dTa_const (what atm_type='anom' applies without an external anomaly).
+
+        implicit none
+
+        type(snapclim_class), intent(IN) :: snp
+        real(wp),             intent(IN) :: time
+        real(wp) :: dT
+
+        dT = series_interp(snp%at,time)*snp%par%dTa_const
+
+        return
+
+    end function snapclim_air_anom
 
     function series_interp(series,time) result(var)
         ! Wrapper for simple `interp_linear` function
