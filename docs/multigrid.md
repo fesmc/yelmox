@@ -319,8 +319,9 @@ masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer set
 its grid (`grid_hub`) is the finest resolution in the setup, and it is the
 reference geometry the coupler remaps *from*. On the hub grid it holds static
 fields (the code masks `regions`/`basins`/`sectors` and the bed roughness
-`z_bed_sd`, loaded once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later
-refreshed each step from Yelmo/isostasy). `{domain}/{grid_name}` in the paths
+`z_bed_sd`, loaded once), the reference geometry `z_bed_ref`/`H_ice_ref`/`z_srf_ref`
+(loaded once) and the current geometry `z_bed`/`H_ice`/`z_srf`/`f_grnd`/`z_sl`
+(refreshed each step, see below). `{domain}/{grid_name}` in the paths
 resolve to `name`/`grid_hub`. `htopo_init` resolves the grid from
 `grid_<name>.txt` (the disk grid table) and reads the fields onto it —
 validated by `tests/test_htopo.f90` against the real ANT-16KM data. A blank
@@ -337,6 +338,16 @@ are both its initial topography and its present-day reference (`yelmo_init`
 `topo_init`/`topo_pd`). Yelmo then processes them as it would its own files
 (`[yelmo_init_topo]` keeps `init_topo_state`, `z_bed_f_sd`, smoothing; its
 `grad_lim_zb` applies). Where `grid_ice = grid_hub` the remap is a copy.
+
+The hub follows the models each step (`refresh_hub`, after Yelmo). On Yelmo's
+grid it mirrors Yelmo, fractional grounding included. On a finer hub it keeps
+its hi-res reference and adds Yelmo's anomalies, refined bilinearly: the bed
+displacement `z_bed - z_bed_ref`, and the change in ice thickness from the hub
+reference as Yelmo received it (remapped conservatively), clipped at zero
+thickness. `htopo_update` then recomputes on the hub the grounding (0 or 1, from
+flotation) and the surface elevation, with Yelmo's densities; sea level is
+refined bilinearly. The hi-res bed and ice therefore reach the marine shelf and
+the climate's surface elevation, instead of a refined copy of Yelmo's fields.
 
 The code masks reach Yelmo the same way (nearest neighbour): `regions` and
 `basins` are Yelmo's (`yelmo_init` `regions`/`basins`), and every component uses

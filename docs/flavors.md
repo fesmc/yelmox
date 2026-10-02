@@ -30,7 +30,7 @@ Every modern flavor advances the model by calling these primitives (from
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs.
 - `step_icesheet` — run `yelmo_update`.
-- `refresh_hub` — mirror the prognostic geometry into the hi-res reference hub.
+- `refresh_hub` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
 - `step_climate` — climate on `grid_clim` (snapclim/snapesm), on the `dt_clim` cadence.
 - `step_smb` — surface mass balance on `grid_smb` (smbpal or smb_simple).
 - `step_marine_shelf` — sub-shelf melt on `grid_mshlf`.

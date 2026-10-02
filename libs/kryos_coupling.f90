@@ -11,6 +11,7 @@ module kryos_coupling
     use yelmox_climate, only : climate_update
     use smbpal,       only : smbpal_update_monthly, smbpal_update_monthly_equil
     use smb_simple_m, only : smb_simple_set_mask, smb_simple_update
+    use htopo,        only : htopo_update
     use ice_optimization, only : optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
@@ -409,21 +410,35 @@ contains
     end subroutine step_smb
 
     subroutine refresh_hub(dom)
-        ! Refresh the hi-res geometry hub from the prognostic models (Yelmo grid
-        ! -> hub grid, bilinear). The hub is then the geometry source for the
-        ! coupling steps. Static masks (regions/basins) are not refreshed.
+        ! Refresh the hub's current geometry from the models. On the Yelmo grid
+        ! there is no finer information, so the hub mirrors Yelmo (including its
+        ! fractional grounding). On a finer hub, the hub keeps its hi-res reference
+        ! and adds Yelmo's anomalies, refined bilinearly: the bed displacement
+        ! (z_bed - z_bed_ref) and the change in ice thickness from the hub
+        ! reference as Yelmo received it (conservative); htopo_update recomputes
+        ! the grounding and the surface on the hub. Static masks are not refreshed.
         type(kryos_domain), intent(inout) :: dom
 
-        call remap(dom, dom%yelmo%tpo%now%H_ice,  dom%ctl%grid_ice, &
-                              dom%topo%H_ice,  dom%ctl%grid_hub, "bilin")
-        call remap(dom, dom%yelmo%bnd%z_bed,      dom%ctl%grid_ice, &
-                              dom%topo%z_bed,  dom%ctl%grid_hub, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%f_grnd, dom%ctl%grid_ice, &
-                              dom%topo%f_grnd, dom%ctl%grid_hub, "bilin")
-        call remap(dom, dom%yelmo%bnd%z_sl,       dom%ctl%grid_ice, &
-                              dom%topo%z_sl,   dom%ctl%grid_hub, "bilin")
-        call remap(dom, dom%yelmo%tpo%now%z_srf,  dom%ctl%grid_ice, &
-                              dom%topo%z_srf,  dom%ctl%grid_hub, "bilin")
+        real(wp), allocatable :: H_ice_ref_y(:,:), dz_bed_h(:,:), dH_ice_h(:,:), z_sl_h(:,:)
+        character(len=256) :: gh, gy
+
+        gh = trim(dom%ctl%grid_hub)
+        gy = trim(dom%ctl%grid_ice)
+
+        if (trim(gh) == trim(gy)) then
+            dom%topo%H_ice  = dom%yelmo%tpo%now%H_ice
+            dom%topo%z_bed  = dom%yelmo%bnd%z_bed
+            dom%topo%f_grnd = dom%yelmo%tpo%now%f_grnd
+            dom%topo%z_sl   = dom%yelmo%bnd%z_sl
+            dom%topo%z_srf  = dom%yelmo%tpo%now%z_srf
+        else
+            call remap(dom, dom%topo%H_ice_ref, gh, H_ice_ref_y, gy, "con")
+            call remap(dom, dom%yelmo%bnd%z_bed - dom%yelmo%bnd%z_bed_ref, gy, dz_bed_h, gh, "bilin")
+            call remap(dom, dom%yelmo%tpo%now%H_ice - H_ice_ref_y,         gy, dH_ice_h, gh, "bilin")
+            call remap(dom, dom%yelmo%bnd%z_sl,                            gy, z_sl_h,   gh, "bilin")
+            call htopo_update(dom%topo, dz_bed_h, dH_ice_h, z_sl_h, &
+                              dom%yelmo%bnd%c%rho_ice, dom%yelmo%bnd%c%rho_sw)
+        end if
     end subroutine refresh_hub
 
     subroutine step_marine_shelf(dom, ts)

@@ -244,9 +244,9 @@ contains
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         call yelmo_init_grid(dom%yelmo%grd, grid_y)
 
-        call remap(dom, dom%topo%z_bed,    dom%ctl%grid_hub, topo_y%z_bed,    dom%ctl%grid_ice, "con")
-        call remap(dom, dom%topo%H_ice,    dom%ctl%grid_hub, topo_y%H_ice,    dom%ctl%grid_ice, "con")
-        call remap(dom, dom%topo%z_srf,    dom%ctl%grid_hub, topo_y%z_srf,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%z_bed_ref, dom%ctl%grid_hub, topo_y%z_bed,   dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%H_ice_ref, dom%ctl%grid_hub, topo_y%H_ice,   dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%z_srf_ref, dom%ctl%grid_hub, topo_y%z_srf,   dom%ctl%grid_ice, "con")
         call remap(dom, dom%topo%z_bed_sd, dom%ctl%grid_hub, topo_y%z_bed_sd, dom%ctl%grid_ice, "con")
 
         call remap(dom, dom%topo%regions,  dom%ctl%grid_hub, regions_y,       dom%ctl%grid_ice, "nn")

@@ -18,6 +18,13 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- The hi-res hub keeps its reference geometry (`z_bed_ref`/`H_ice_ref`/`z_srf_ref`).
+  On a hub finer than Yelmo, `refresh_hub` adds Yelmo's bed displacement and
+  change in ice thickness to it and recomputes grounding (from flotation) and the
+  surface on the hub (`htopo_update`), instead of overwriting the hub with
+  Yelmo's fields refined bilinearly. On Yelmo's grid the hub still mirrors
+  Yelmo. Multigrid runs (e.g. Antarctica, hub 16 km / Yelmo 32 km) change
+  through the marine shelf and the climate's surface elevation.
 - Builds use OpenMP by default (`openmp ?= 1` in `config/Makefile`); `make <driver>
   openmp=0` builds serial. Regenerate the Makefile with configme to pick it up.
 - `input/yelmo_defaults.nml` re-synced with yelmo dev (`ytrc.elsa_restart`).

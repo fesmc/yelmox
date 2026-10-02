@@ -6,11 +6,14 @@ module htopo
     ! geometry that the coupler remaps *from* when a coarser module needs
     ! z_bed/H_ice/z_srf/masks.
     !
-    ! Two provenance classes of field live here:
+    ! Three kinds of field live here:
     !   * regions, basins, sectors, z_bed_sd -- static (code masks and bed
     !     roughness), loaded once from file;
-    !   * z_bed, H_ice, z_srf -- dynamic geometry, loaded here as the initial
-    !     reference and refreshed each step from the models (refresh_hub).
+    !   * z_bed_ref, H_ice_ref, z_srf_ref -- the hi-res reference geometry,
+    !     loaded once from file;
+    !   * z_bed, H_ice, z_srf, f_grnd, z_sl -- the current geometry, refreshed
+    !     each step from the models (refresh_hub). On a hub finer than the ice
+    !     sheet it is the reference plus the models' anomalies (htopo_update).
     !
     ! The file paths and variable names come from the domain definition
     ! (&domain); {domain}/{grid_name} in the paths resolve to the domain name
@@ -64,19 +67,23 @@ module htopo
         type(htopo_par_class) :: par
         type(grid_class)      :: grid         ! topo grid, from grid_<name>.txt
         integer               :: nx, ny
-        real(wp), allocatable :: z_bed(:,:)   ! [m] bedrock elevation
-        real(wp), allocatable :: H_ice(:,:)   ! [m] ice thickness
-        real(wp), allocatable :: z_srf(:,:)   ! [m] surface elevation
-        real(wp), allocatable :: z_bed_sd(:,:) ! [m] standard deviation of z_bed (static)
-        real(wp), allocatable :: regions(:,:) ! region mask
-        real(wp), allocatable :: basins(:,:)  ! basin mask
-        real(wp), allocatable :: sectors(:,:) ! sector mask (e.g. Antarctic APIS/WAIS/EAIS)
-        ! Dynamic geometry refreshed from the models each step (not file-loaded).
-        real(wp), allocatable :: f_grnd(:,:)  ! [1] grounded-ice fraction
-        real(wp), allocatable :: z_sl(:,:)    ! [m] sea-surface / sea-level height
+        ! Reference geometry (static, from file).
+        real(wp), allocatable :: z_bed_ref(:,:) ! [m] bedrock elevation
+        real(wp), allocatable :: H_ice_ref(:,:) ! [m] ice thickness
+        real(wp), allocatable :: z_srf_ref(:,:) ! [m] surface elevation
+        real(wp), allocatable :: z_bed_sd(:,:)  ! [m] standard deviation of z_bed (static)
+        real(wp), allocatable :: regions(:,:)   ! region mask
+        real(wp), allocatable :: basins(:,:)    ! basin mask
+        real(wp), allocatable :: sectors(:,:)   ! sector mask (e.g. Antarctic APIS/WAIS/EAIS)
+        ! Current geometry, refreshed from the models each step.
+        real(wp), allocatable :: z_bed(:,:)     ! [m] bedrock elevation
+        real(wp), allocatable :: H_ice(:,:)     ! [m] ice thickness
+        real(wp), allocatable :: z_srf(:,:)     ! [m] surface elevation
+        real(wp), allocatable :: f_grnd(:,:)    ! [1] grounded-ice fraction
+        real(wp), allocatable :: z_sl(:,:)      ! [m] sea-surface / sea-level height
     end type
 
-    public :: htopo_class, htopo_init
+    public :: htopo_class, htopo_init, htopo_update
     public :: htopo_ice_allowed, htopo_relax_tau, htopo_region_codes
     public :: htopo_write_init, htopo_write_step
 
@@ -104,9 +111,9 @@ contains
         htopo%nx = htopo%grid%G%nx
         htopo%ny = htopo%grid%G%ny
 
-        allocate(htopo%z_bed(htopo%nx,htopo%ny))
-        allocate(htopo%H_ice(htopo%nx,htopo%ny))
-        allocate(htopo%z_srf(htopo%nx,htopo%ny))
+        allocate(htopo%z_bed_ref(htopo%nx,htopo%ny))
+        allocate(htopo%H_ice_ref(htopo%nx,htopo%ny))
+        allocate(htopo%z_srf_ref(htopo%nx,htopo%ny))
         allocate(htopo%z_bed_sd(htopo%nx,htopo%ny))
         allocate(htopo%regions(htopo%nx,htopo%ny))
         allocate(htopo%basins(htopo%nx,htopo%ny))
@@ -114,10 +121,15 @@ contains
         allocate(htopo%f_grnd(htopo%nx,htopo%ny)); htopo%f_grnd = 0.0_wp
         allocate(htopo%z_sl(htopo%nx,htopo%ny));   htopo%z_sl   = 0.0_wp
 
-        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(1), htopo%z_bed, missing_value=mv)
-        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(2), htopo%H_ice, missing_value=mv)
-        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(3), htopo%z_srf, missing_value=mv)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(1), htopo%z_bed_ref, missing_value=mv)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(2), htopo%H_ice_ref, missing_value=mv)
+        call nc_read(htopo%par%topo_path,    htopo%par%topo_names(3), htopo%z_srf_ref, missing_value=mv)
         call htopo_fill_missing(htopo)
+
+        ! The current geometry starts from the reference.
+        htopo%z_bed = htopo%z_bed_ref
+        htopo%H_ice = htopo%H_ice_ref
+        htopo%z_srf = htopo%z_srf_ref
 
         htopo%z_bed_sd = 0.0_wp
         if (len_trim(htopo%par%topo_names(4)) > 0) then
@@ -138,6 +150,53 @@ contains
             call nc_read(htopo%par%sectors_path, htopo%par%sectors_var, htopo%sectors)
 
     end subroutine htopo_init
+
+    subroutine htopo_update(htopo, dz_bed, dH_ice, z_sl, rho_ice, rho_sw)
+        ! Current geometry on a hub finer than the ice sheet: the hi-res reference
+        ! plus the models' anomalies (on the hub grid), with ice thickness clipped
+        ! at 0. Each hub cell is either fully ice-covered or ice-free, so the
+        ! grounded fraction is 0 or 1 from flotation, and the surface follows from
+        ! the bed, the ice and sea level.
+        type(htopo_class), intent(inout) :: htopo
+        real(wp),          intent(in)    :: dz_bed(:,:)   ! [m] bed displacement
+        real(wp),          intent(in)    :: dH_ice(:,:)   ! [m] change in ice thickness
+        real(wp),          intent(in)    :: z_sl(:,:)     ! [m] sea level
+        real(wp),          intent(in)    :: rho_ice, rho_sw  ! [kg m-3] densities
+
+        htopo%z_bed = htopo%z_bed_ref + dz_bed
+        htopo%H_ice = max(htopo%H_ice_ref + dH_ice, 0.0_wp)
+        htopo%z_sl  = z_sl
+
+        htopo%f_grnd = 0.0_wp
+        where (calc_H_grnd(htopo%H_ice, htopo%z_bed, htopo%z_sl, rho_ice, rho_sw) >= 0.0_wp) &
+            htopo%f_grnd = 1.0_wp
+        htopo%z_srf = calc_z_srf(htopo%H_ice, htopo%z_bed, htopo%z_sl, rho_ice, rho_sw)
+
+    end subroutine htopo_update
+
+    elemental function calc_H_grnd(H_ice, z_bed, z_sl, rho_ice, rho_sw) result(H_grnd)
+        ! Ice overburden relative to flotation: >= 0 grounded, < 0 floating. Above
+        ! sea level, the bed's height counts too, so ice-free land is grounded.
+        real(wp), intent(in) :: H_ice, z_bed, z_sl, rho_ice, rho_sw
+        real(wp) :: H_grnd
+
+        if (z_sl > z_bed) then
+            H_grnd = H_ice - (rho_sw/rho_ice)*(z_sl - z_bed)
+        else
+            H_grnd = H_ice + (z_bed - z_sl)
+        end if
+
+    end function calc_H_grnd
+
+    elemental function calc_z_srf(H_ice, z_bed, z_sl, rho_ice, rho_sw) result(z_srf)
+        ! Surface elevation: the top of grounded ice or of floating ice in
+        ! hydrostatic equilibrium, whichever is higher (sea level if ice-free ocean).
+        real(wp), intent(in) :: H_ice, z_bed, z_sl, rho_ice, rho_sw
+        real(wp) :: z_srf
+
+        z_srf = max(z_bed + H_ice, z_sl + (1.0_wp - rho_ice/rho_sw)*H_ice)
+
+    end function calc_z_srf
 
     function htopo_ice_allowed(par, regions) result(allowed)
         ! Where ice is allowed, from the region codes on any grid (ice_codes_mode:
@@ -217,30 +276,30 @@ contains
 
         integer :: n_bed, n_ice, n_srf
 
-        n_bed = count(htopo%z_bed == mv)
-        n_ice = count(htopo%H_ice == mv)
-        n_srf = count(htopo%z_srf == mv)
+        n_bed = count(htopo%z_bed_ref == mv)
+        n_ice = count(htopo%H_ice_ref == mv)
+        n_srf = count(htopo%z_srf_ref == mv)
         if (n_bed + n_ice + n_srf == 0) return
 
-        where (htopo%H_ice == mv) htopo%H_ice = 0.0_wp
+        where (htopo%H_ice_ref == mv) htopo%H_ice_ref = 0.0_wp
 
         if (n_bed > 0) then
-            if (n_bed < size(htopo%z_bed)) call fill_nearest(htopo%z_bed, mv)
-            if (any(htopo%z_bed == mv)) then
+            if (n_bed < size(htopo%z_bed_ref)) call fill_nearest(htopo%z_bed_ref, mv)
+            if (any(htopo%z_bed_ref == mv)) then
                 write(*,*) ""
                 write(*,*) "htopo_fill_missing:: error: missing bedrock elevations could not be filled."
                 write(*,*) "  topo_path: ", trim(htopo%par%topo_path)
                 write(*,*) "  z_bed:     ", trim(htopo%par%topo_names(1))
-                write(*,*) "  missing:   ", count(htopo%z_bed == mv), " of ", size(htopo%z_bed)
+                write(*,*) "  missing:   ", count(htopo%z_bed_ref == mv), " of ", size(htopo%z_bed_ref)
                 stop
             end if
         end if
 
-        where (htopo%z_srf == mv) &
-            htopo%z_srf = max(htopo%z_bed + htopo%H_ice, (1.0_wp - rho_ice/rho_sw)*htopo%H_ice)
+        where (htopo%z_srf_ref == mv) &
+            htopo%z_srf_ref = max(htopo%z_bed_ref + htopo%H_ice_ref, (1.0_wp - rho_ice/rho_sw)*htopo%H_ice_ref)
 
         write(*,*) "htopo_init:: filled missing values: z_bed ", n_bed, ", H_ice ", n_ice, &
-                   ", z_srf ", n_srf, " of ", size(htopo%z_bed)
+                   ", z_srf ", n_srf, " of ", size(htopo%z_bed_ref)
 
     end subroutine htopo_fill_missing
 

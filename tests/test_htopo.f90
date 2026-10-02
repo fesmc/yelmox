@@ -16,26 +16,26 @@ program test_htopo
     type(htopo_class) :: ht_gaps
     integer :: fails, i, j
     logical, allocatable :: gap(:,:), gap_srf(:,:)
-    real(wp), allocatable :: z_srf_exp(:,:)
+    real(wp), allocatable :: z_srf_exp(:,:), zero(:,:)
 
     fails = 0
 
     call htopo_init(ht, "tests/test_htopo.nml", "domain", "Antarctica", "ANT-16KM", map_fldr="maps")
 
     write(*,*) "htopo grid   : "//trim(ht%par%grid_name), " nx,ny =", ht%nx, ht%ny
-    write(*,*) "z_bed  range :", minval(ht%z_bed),   maxval(ht%z_bed)
-    write(*,*) "H_ice  range :", minval(ht%H_ice),   maxval(ht%H_ice)
-    write(*,*) "z_srf  range :", minval(ht%z_srf),   maxval(ht%z_srf)
+    write(*,*) "z_bed  range :", minval(ht%z_bed_ref),   maxval(ht%z_bed_ref)
+    write(*,*) "H_ice  range :", minval(ht%H_ice_ref),   maxval(ht%H_ice_ref)
+    write(*,*) "z_srf  range :", minval(ht%z_srf_ref),   maxval(ht%z_srf_ref)
     write(*,*) "regions range:", minval(ht%regions), maxval(ht%regions)
     write(*,*) "basins range :", minval(ht%basins),  maxval(ht%basins)
 
     if (ht%nx /= 381 .or. ht%ny /= 381) then
         write(*,*) "FAIL: unexpected topo grid size"; fails = fails + 1
     end if
-    if (maxval(ht%H_ice) < 1000.0) then
+    if (maxval(ht%H_ice_ref) < 1000.0) then
         write(*,*) "FAIL: H_ice looks empty"; fails = fails + 1
     end if
-    if (minval(ht%z_bed) > 0.0) then
+    if (minval(ht%z_bed_ref) > 0.0) then
         write(*,*) "FAIL: z_bed has no ocean floor"; fails = fails + 1
     end if
     if (maxval(ht%basins) < 1.0) then
@@ -77,7 +77,7 @@ program test_htopo
     if (maxval(abs(ht_nomask%z_bed_sd)) /= 0.0) then
         write(*,*) "FAIL: blank z_bed_sd name did not give z_bed_sd = 0"; fails = fails + 1
     end if
-    if (maxval(abs(ht_nomask%z_bed - ht%z_bed)) /= 0.0) then
+    if (maxval(abs(ht_nomask%z_bed_ref - ht%z_bed_ref)) /= 0.0) then
         write(*,*) "FAIL: blank mask paths changed the topography"; fails = fails + 1
     end if
     if (minval(ht_nomask%sectors) /= 1.0 .or. maxval(ht_nomask%sectors) /= 1.0) then
@@ -121,7 +121,7 @@ program test_htopo
     gap_srf = gap
     do j = 1, ht%ny
     do i = 1, ht%nx
-        if (ht%H_ice(i,j) > 0.0 .and. mod(i+j,50) == 0) gap_srf(i,j) = .true.
+        if (ht%H_ice_ref(i,j) > 0.0 .and. mod(i+j,50) == 0) gap_srf(i,j) = .true.
     end do
     end do
 
@@ -133,27 +133,57 @@ program test_htopo
     ! after the band, for rows away from the y borders); the surface from the
     ! bed and the ice thickness at sea level 0.
     allocate(z_srf_exp(ht%nx,ht%ny))
-    z_srf_exp = max(ht_gaps%z_bed + ht_gaps%H_ice, (1.0_wp - 910.0_wp/1028.0_wp)*ht_gaps%H_ice)
+    z_srf_exp = max(ht_gaps%z_bed_ref + ht_gaps%H_ice_ref, (1.0_wp - 910.0_wp/1028.0_wp)*ht_gaps%H_ice_ref)
 
-    if (any(ht_gaps%H_ice /= 0.0 .and. gap)) then
+    if (any(ht_gaps%H_ice_ref /= 0.0 .and. gap)) then
         write(*,*) "FAIL: gap cells have ice"; fails = fails + 1
     end if
     do j = 5, ht%ny-4
-        if (any(ht_gaps%z_bed(1:n_band,j) /= ht%z_bed(n_band+1,j))) then
+        if (any(ht_gaps%z_bed_ref(1:n_band,j) /= ht%z_bed_ref(n_band+1,j))) then
             write(*,*) "FAIL: gap z_bed is not the nearest valid bed, row ", j; fails = fails + 1
             exit
         end if
     end do
-    if (any(gap_srf .and. abs(ht_gaps%z_srf - z_srf_exp) > 1e-3)) then
+    if (any(gap_srf .and. abs(ht_gaps%z_srf_ref - z_srf_exp) > 1e-3)) then
         write(*,*) "FAIL: gap z_srf does not follow z_bed and H_ice"; fails = fails + 1
     end if
-    if (any(.not. gap     .and. ht_gaps%z_bed /= ht%z_bed) .or. &
-        any(.not. gap     .and. ht_gaps%H_ice /= ht%H_ice) .or. &
-        any(.not. gap_srf .and. ht_gaps%z_srf /= ht%z_srf)) then
+    if (any(.not. gap     .and. ht_gaps%z_bed_ref /= ht%z_bed_ref) .or. &
+        any(.not. gap     .and. ht_gaps%H_ice_ref /= ht%H_ice_ref) .or. &
+        any(.not. gap_srf .and. ht_gaps%z_srf_ref /= ht%z_srf_ref)) then
         write(*,*) "FAIL: valid cells changed"; fails = fails + 1
     end if
 
     call delete_file("test_htopo_gaps.nc")
+
+    ! Current geometry from the reference plus anomalies (htopo_update). The
+    ! current geometry starts from the reference; no anomaly keeps it, with
+    ! the grounding and surface from flotation at sea level 0.
+    if (any(ht%z_bed /= ht%z_bed_ref) .or. any(ht%H_ice /= ht%H_ice_ref)) then
+        write(*,*) "FAIL: current geometry does not start from the reference"; fails = fails + 1
+    end if
+    allocate(zero(ht%nx,ht%ny)); zero = 0.0_wp
+    call htopo_update(ht, zero, zero, zero, 910.0_wp, 1028.0_wp)
+    if (any(ht%z_bed /= ht%z_bed_ref) .or. any(ht%H_ice /= max(ht%H_ice_ref, 0.0_wp)) .or. &
+        any(ht%z_sl /= 0.0)) then
+        write(*,*) "FAIL: htopo_update without anomalies changed the geometry"; fails = fails + 1
+    end if
+    if (any(ht%f_grnd == 1.0 .neqv. (ht%z_bed >= 0.0 .or. &
+            ht%H_ice - (1028.0_wp/910.0_wp)*(0.0_wp - ht%z_bed) >= 0.0))) then
+        write(*,*) "FAIL: grounding does not follow flotation"; fails = fails + 1
+    end if
+    if (any(ht%z_srf /= max(ht%z_bed + ht%H_ice, (1.0_wp - 910.0_wp/1028.0_wp)*ht%H_ice))) then
+        write(*,*) "FAIL: surface does not follow bed, ice and sea level"; fails = fails + 1
+    end if
+    if (count(ht%f_grnd == 0.0 .and. ht%H_ice > 0.0) == 0) then
+        write(*,*) "FAIL: no floating ice in the reference"; fails = fails + 1
+    end if
+
+    ! Bed displacement and ice change add to the reference; ice is clipped at 0.
+    call htopo_update(ht, zero - 100.0_wp, zero - 500.0_wp, zero, 910.0_wp, 1028.0_wp)
+    if (any(ht%z_bed /= ht%z_bed_ref - 100.0_wp) .or. &
+        any(ht%H_ice /= max(ht%H_ice_ref - 500.0_wp, 0.0_wp))) then
+        write(*,*) "FAIL: htopo_update anomalies"; fails = fails + 1
+    end if
 
     if (fails > 0) stop 1
     write(*,*) "PASS: test_htopo"
@@ -169,11 +199,11 @@ contains
         call nc_create(filename)
         call nc_write_dim(filename, "xc", x=ht%grid%G%x, units="km")
         call nc_write_dim(filename, "yc", x=ht%grid%G%y, units="km")
-        call nc_write(filename, "z_bed", merge(fill, ht%z_bed, gap),     dim1="xc", dim2="yc", &
+        call nc_write(filename, "z_bed", merge(fill, ht%z_bed_ref, gap),     dim1="xc", dim2="yc", &
                       missing_value=fill)
-        call nc_write(filename, "H_ice", merge(fill, ht%H_ice, gap),     dim1="xc", dim2="yc", &
+        call nc_write(filename, "H_ice", merge(fill, ht%H_ice_ref, gap),     dim1="xc", dim2="yc", &
                       missing_value=fill)
-        call nc_write(filename, "z_srf", merge(fill, ht%z_srf, gap_srf), dim1="xc", dim2="yc", &
+        call nc_write(filename, "z_srf", merge(fill, ht%z_srf_ref, gap_srf), dim1="xc", dim2="yc", &
                       missing_value=fill)
     end subroutine write_gaps_file
 
