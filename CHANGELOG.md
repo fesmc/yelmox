@@ -18,6 +18,11 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- `yelmox_esm` is removed: ESM runs use `yelmox` with `climate = "esm"`. Its par
+  files move to `yelmox/yelmox_esm_*.nml` (without `[esm] use_smb`), its run
+  scripts to `scripts/ismip7/`, `scripts/tipmip/` and `scripts/1pctCO2/` (runme
+  `-e yelmox`; the `esm` alias is gone), and scripts set
+  `coupling.smb_method = climate | smbpal` instead of `esm.use_smb`.
 - Output: the climate backend writes its own file, `[output] write_clim`
   (was `write_snap`): `snap.nc` (snapclim, snapesm) or `esm.nc` (the esm fields:
   temperature, precipitation or SMB anomalies, shelf anomalies, discharge) plus

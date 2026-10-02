@@ -1,50 +1,53 @@
 #!/usr/bin/env bash
 #
-# ISMIP7 workflow for Greenland (refactored yelmox_esm).
+# ISMIP7 workflow for Antarctica (yelmox, climate = esm).
 #
-#   Step 1  spinup     15-kyr present-day OPTIMIZED ice-sheet spin-up
+#   Step 1  spinup     20-kyr present-day OPTIMIZED ice-sheet spin-up
 #                      (coupling.equil_method=opt) -> writes a restart bundle
-#   Step 2  scenarios  ssp126 / ssp370 / ssp585, each branched off that bundle
+#   Step 2  scenarios  ssp585, branched off that bundle
 #
 # The ice sheet + isostasy are ACTIVE (coupling.with_ice_sheet/with_isostasy=True in
-# yelmox_esm_Greenland.nml). The spin-up optimizes basal friction + thermal forcing to
-# present day (&opt cf/tf_time_end=15e3), and the scenarios evolve the ice sheet under
-# ISMIP7 climate/ocean forcing.
+# yelmox_esm_Antarctica_ismip7.nml). The spin-up optimizes basal friction + thermal
+# forcing to present day (&opt cf/tf_time_end=20e3), and the scenarios evolve the ice
+# sheet under ISMIP7 climate/ocean forcing.
 #
 # Run the steps in order on the cluster; let the spin-up finish before launching
 # the scenarios (they read its restart bundle):
 #
-#   yelmox_esm/run_ismip7_greenland.sh spinup
-#   yelmox_esm/run_ismip7_greenland.sh scenarios
+#   scripts/ismip7/run_ismip7_antarctica.sh spinup
+#   scripts/ismip7/run_ismip7_antarctica.sh scenarios
 #
 # Stage only -- create the run dirs + SLURM submit script but do NOT submit
 # (a dry run to inspect everything first): set STAGE=1
 #
-#   STAGE=1 yelmox_esm/run_ismip7_greenland.sh spinup
-#   STAGE=1 yelmox_esm/run_ismip7_greenland.sh scenarios
+#   STAGE=1 scripts/ismip7/run_ismip7_antarctica.sh spinup
+#   STAGE=1 scripts/ismip7/run_ismip7_antarctica.sh scenarios
+#
+# NOTE: the ANT-8KM grid needs a large stack. The SLURM submit script sets it,
+# but for a local run first do:  ulimit -s unlimited
 #
 set -euo pipefail
-cd "$(dirname "$0")/.." || exit 1                  # repo root
+cd "$(dirname "$0")/../.." || exit 1               # repo root
 
 # ---- configuration ---------------------------------------------------------
-EXE="esm"                                          # -> libyelmox/bin/yelmox_esm.x
-NML="yelmox_esm/yelmox_esm_Greenland.nml"
-OUTROOT="output/ismip7_grl"
+EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
+NML="yelmox/yelmox_esm_Antarctica_ismip7.nml"
+OUTROOT="output/ismip7_ant"
 GCM="CESM2-WACCM"
-GRID="GRL-8KM"
-SCENARIOS=(ssp126 ssp370 ssp585)
+GRID="ANT-8KM"
+SCENARIOS=(ssp585)                                 # only ssp585 present on Levante
 
-SPINUP_YEARS=15000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=15e3)
+SPINUP_YEARS=20000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=20e3)
 PROJ_END=2300                                      # scenario end year (CE)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
-# Walltimes differ hugely: the 15-kyr opt spin-up is the long job; the ~285-yr
-# projections are short. Spin-up estimate from run_mg_resolution.sh (25 kyr GRL ~10h);
-# verify against your actual throughput + queue max walltime (bump to a longer queue
-# if 8 h is not enough).
-HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 8"
-HPCOPT_SCEN="-q compute -w 02:00:00 --omp 8"
+# Walltimes differ hugely: the 20-kyr opt spin-up is the long job; the ~285-yr
+# projection is short. A 20-kyr ANT-8KM opt spin-up is heavy and will very likely
+# EXCEED 8 h -- use a longer queue (cf. run_mg_resolution.sh -q 12h) and set the
+# walltime to your measured throughput.
+HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 16"    # ANT-8KM is heavy; likely needs > 8h + longer queue
+HPCOPT_SCEN="-q compute -w 08:00:00 --omp 16"
 
 SPINUP_OUT="$OUTROOT/spinup"
 # The spin-up's final restart bundle. yelmox names it restart-<time/1e3 %.3f>-kyr.

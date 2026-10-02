@@ -1,9 +1,9 @@
 ! ============================================================================
-! yelmox_esm main config -- 1pctCO2 Antarctica, forcing-only SCAFFOLD.
+! yelmox (climate = esm) main config -- 1pctCO2 Antarctica, forcing-only SCAFFOLD.
 ! UNTESTED / DATA-PENDING: the 1pctCO2 forcing is not on this machine yet
 ! (see input/esm/esm_ant_1pctCO2.nml header). Derived from
 ! yelmox_esm_Antarctica_ismip7.nml; only &esm, &spinup, &transient differ.
-! Run via yelmox_esm/run_1pctco2_antarctica.sh once the data is staged.
+! Run via scripts/1pctCO2/run_1pctco2_antarctica.sh once the data is staged.
 ! ============================================================================
 &ctrl
     run_step        = "spinup"
@@ -18,8 +18,7 @@
     use_esm         = False             ! use ESM snapshots? (scenario step sets True)
     esm_name        = "1pctCO2-r1i1p4f1" ! label only: the 1pctCO2 par nml has no {gcm} templating
 
-    ! Forcing switches (read here by yelmox_esm; keep alongside use_esm)
-    use_smb         = False             ! load SMB directly vs. compute from T/P
+    ! Forcing switches (the smb source is [coupling] smb_method)
     use_var         = False             ! include climate variability
     use_hist        = False             ! load historical period
     use_proj        = False             ! load projection period
@@ -691,7 +690,7 @@
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)
-    climate         = "esm"      ! climate backend: the ESM forcing of yelmox_esm
+    climate         = "esm"      ! climate backend: "snapclim", "snapesm" or "esm"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start

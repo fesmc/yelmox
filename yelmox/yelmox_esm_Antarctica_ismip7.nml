@@ -6,17 +6,16 @@
 
 &esm
     ! Experiment
-    par_file        = "input/esm/esm_nudge.nml"
+    par_file        = "input/esm/esm_ant_ismip7.nml"
     experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
-    use_esm         = True             ! use ESM snapshots?   
-    esm_name        = "UKESM"           ! esm model, if homogeneous: applied homogeneous forcing
+    use_esm         = False             ! use ESM snapshots?
+    esm_name        = "CESM2-WACCM"     ! esm model, if homogeneous: applied homogeneous forcing
 
-    ! Forcing switches (read here by yelmox_esm; keep alongside use_esm)
-    use_smb         = False             ! load SMB directly vs. compute from T/P
+    ! Forcing switches (the smb source is [coupling] smb_method)
     use_var         = False             ! include climate variability
     use_hist        = False             ! load historical period
     use_proj        = False             ! load projection period
-    
+
     
     ! Climatic variables
     lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
@@ -33,37 +32,34 @@
     tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2020              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 20e3              ! [yr] Ending time (model years)
-    dtt             = 10.0              ! [yr] Main loop timestep 
+    time_end        = 10.0              ! [yr] Ending time (model years) - short forcing-only smoke test
+    dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
     use_hist        = False             ! load historical period. If false, use ref before projection.
-    time_hist       = 1850.0, 1990.0    ! [yr] Year interval used as Historical period
-    time_proj       = 2020.0, 2300.0    ! [yr] Year interval used as Projection period
-    time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
-                                        ! If "opt" this time interval will be used as optimization 
-    time_esm_ref    = 1990.0, 2019.0    ! [yr] Year interval used as Reference of ESM
+    time_hist       = 1850, 2014        ! [yr] Year interval used as Historical period
+    time_proj       = 2015, 2300        ! [yr] Year interval used as Projection period
+    time_ref        = 1985, 2014        ! [yr] RACMO2.3 reference climatology (within its 1979-2022 axis)
+                                        ! If "opt" this time interval will be used as optimization
+    time_esm_ref    = 1960, 1989        ! [yr] Year interval used as Reference of ESM
     clim_var        = False             ! include climate variability
     clim_seed       = 10                ! Randomnes seed
 /
 
 &transient
     tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
-    tstep_const     = 4500.0            ! Assumed time for "const" method
-    time_init       = 4501.0            ! [yr] Starting time (years CE)
-    time_end        = 5000.0            ! [yr] Ending time (years CE)
+    tstep_const     = 2020              ! Assumed time for "const" method
+    time_init       = 2015.0            ! [yr] Starting time (years CE)
+    time_end        = 3500.0            ! [yr] Ending time (years CE)
     dtt             = 1.0               ! [yr] Main loop timestep 
 
-    ! Time intervals climatology
-    time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
-                                        ! If "opt" this time interval will be used as optimization 
-    
-    ! Time intervals ESM
-    time_esm_ref    = 4501.0, 5000.0    ! [yr] Year interval used as Reference of ESM
-    use_hist        = False             ! load historical period. If false, dont use snapshots for historical.
-    time_hist       = 1950.0, 1990.0    ! [yr] Year interval used as Historical period
-    use_proj        = True             ! load projection period. If false, dont use snapshots for projection projection.
-    time_proj       = 4501.0, 5000.0    ! [yr] Year interval used as Projection period
+    ! Time intervals (check with ESM forcings)
+    use_hist        = False             ! load historical period. If false, use ref before projection.
+    time_hist       = 1850, 2014        ! [yr] Year interval used as Historical period
+    time_proj       = 2015, 2300        ! [yr] Year interval used as Projection period
+    time_ref        = 1985, 2014        ! [yr] Year interval used as Reference
+                                        ! If "opt" this time interval will be used as optimization
+    time_esm_ref    = 1960, 1989        ! [yr] Year interval used as Reference of ESM
     clim_var        = False             ! include climate variability
     clim_seed       = 1                 ! Randomnes seed
 /
@@ -100,17 +96,17 @@
 /
 
 &tm_2D
-    method          = "times"           ! "const", "file", "times"
-    dt              = 5e3
+    method          = "const"           ! "const", "file", "times"
+    dt              = 15e3
     file            = "input/timeout_ramp_100kyr.txt"
-    times           = 4501,5000
+    times           = 1020
 /
 
 &tm_2Dsm
-    method          = "times"           ! "const", "file", "times"
-    dt              = 1.0
+    method          = "const"           ! "const", "file", "times"
+    dt              = 2.5e3
     file            = "input/1pctCO2_out.txt"
-    times           = 4501,4550,4600,4650,4700,4750,4800,4850,4900,4950,5000
+    times           = 1020
 /
 
 &tm_rst
@@ -133,9 +129,9 @@
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
     rel_tau1        = 1.0               ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 6000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 1e3               ! [yr] Time limit for time period 1
-    rel_time2       = 1e3               ! [yr] Time limit for time period 2
+    rel_tau2        = 1.0 !6000.0            ! [yr] Relaxation timescale in time period 2
+    rel_time1       = 10.0 !1e3               ! [yr] Time limit for time period 1
+    rel_time2       = 10.0 !1e3               ! [yr] Time limit for time period 2
     rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = True              ! Should thermal forcing be optimized?
@@ -145,7 +141,7 @@
     tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
     tau_m           = 10.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
+    tf_min          = -1.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  1.0              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False    
@@ -414,8 +410,8 @@
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
-    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_vel_path       = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"
+    pd_vel_names      = "vx_mosaic" "vy_mosaic"            ! Surface velocity
     pd_age_load       = False 
     pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
@@ -428,7 +424,7 @@
     const_insol = True
     const_kabp  = 0.0
     insol_fldr  = "input"
-    abl_method  = "pdd" !"itm"   ! "itm" or "pdd"
+    abl_method  = "itm"   ! "itm" or "pdd"
     sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
     sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
     sigma_land  = 5.0     ! Standard deviation of temperature [K] over land 
@@ -470,7 +466,7 @@
 /
 
 &marine_shelf
-    bmb_method      = "quad-nl"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    bmb_method      = "quad-nl" ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
     tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
@@ -540,8 +536,8 @@
     alpha_pico     = 7.5e-5     ! Thermal expansion coefficien [1/ºC]. Reese et al., (2018) suggest 7.5e-5.
     beta_pico      = 7.7e-4     ! Salt contraction coefficient [1/PSU]. Reese et al., (2018) suggest 7.7e-4.
     rho_star       = 1033.0     ! Reference density [kg/m3]. Reese et al., (2018) suggest 1033.0.
-    gamma_tstar    = 630.0      ! Effective turbulent temperature exchange velocity [m/yr]. Reese et al., (2018) uses 630.0 and suggest 600-1000.
-    C_over         = 1.0        ! Overturning strength [Sv m3/kg]. Reese et al., (2018) suggest 1.0.
+    gamma_tstar    = 1500.0      ! Effective turbulent temperature exchange velocity [m/yr]. Reese et al., (2018) uses 630.0 and suggest 600-1000.
+    C_over         = 2.0        ! Overturning strength [Sv m3/kg]. Reese et al., (2018) suggest 1.0.
 
 /
 
@@ -553,11 +549,12 @@
 /
 
 &ghf
-    use_obs   = True 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-HR24.nc"
-    obs_name  = "ghf"
-    obs_err_name = "None"     ! Uncertainty field ("None": not used)
-    f_stdev   = 0.0            ! Number of standard deviations added to obs
+    use_obs   = True
+    obs_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"
+    obs_name  = "geothermal_heat_flux2"
+    obs_err_name = "geothermal_heat_flux2"
+    convert_ghf_units = True   ! True converts from W/m^2 to mW/m^2, False does nothing
+    f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
 
 /
@@ -570,6 +567,7 @@
     correct_compression = .true.    ! Account for compression effects on relaxation time?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 2             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
+    ! Jan: change dt_prog to 0.1 (up to 0.02)
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
     pad         = 1024.             ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
@@ -611,7 +609,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-8KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
@@ -648,18 +646,18 @@
     ! A blank component grid takes the default given in brackets.
     name         = "Antarctica"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "ANT-16KM"         ! hi-res geometry hub
+    grid_hub     = "ANT-8KM"          ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = ""                 ! isostasy [grid_ice]
     grid_clim    = ""                 ! reference climate + transient forcing [grid_ice]
     grid_smb     = ""                 ! surface mass balance [grid_clim]
     grid_mshlf   = ""                 ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
+    topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"
+    topo_names   = "bed_bedmap3" "thickness_bedmap3" "surface_bedmap3" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
     regions_var  = "mask"
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
-    basins_var   = "basin"
+    basins_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.1.nc"  ! "" = none (basins = 1)
+    basins_var   = "mouginot_basins"
     sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" ! "" = none (sectors = 1)
     sectors_var  = "mask_regions"
     ice_codes_mode = "exclude"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
@@ -678,12 +676,12 @@
     ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
-    with_ice_sheet    = True   ! Is the ice sheet active?
-    with_isostasy     = True   ! Is isostasy active?
+    with_ice_sheet    = True   ! Is the ice sheet active? (OFF: forcing-only test)
+    with_isostasy     = True   ! Is isostasy active? (OFF: forcing-only test)
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
-    equil_method    = "opt"    ! "none", "relax", "opt" (spinup phase)
-    climate         = "esm"      ! climate backend: the ESM forcing of yelmox_esm
+    equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)
+    climate         = "esm"      ! climate backend: "snapclim", "snapesm" or "esm"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start

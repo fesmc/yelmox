@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# TIPMIP forcing-only workflow for Greenland (refactored yelmox_esm) -- SCAFFOLD.
+# TIPMIP forcing-only workflow for Greenland (yelmox, climate = esm) -- SCAFFOLD.
 #
 #   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
 #   Step 2  scenarios  TIPMIP experiment(s), each branched off that bundle
@@ -12,12 +12,12 @@
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
-#   yelmox_esm/run_tipmip_greenland.sh spinup
-#   yelmox_esm/run_tipmip_greenland.sh scenarios
+#   scripts/tipmip/run_tipmip_greenland.sh spinup
+#   scripts/tipmip/run_tipmip_greenland.sh scenarios
 #
 # Stage only (create dirs + SLURM submit script, do NOT submit): STAGE=1
 #
-#   STAGE=1 yelmox_esm/run_tipmip_greenland.sh spinup
+#   STAGE=1 scripts/tipmip/run_tipmip_greenland.sh spinup
 #
 # MODELS (select with the MODEL env var, default ipsl):
 #   MODEL=ipsl     IPSL-CM6-ESMCO2 @ GRL-8KM -- RAMP (esm-up2p0, 232 yr) + both
@@ -36,11 +36,11 @@
 # esm.par_file + transient.time_end per experiment (see the per-model RUNS table).
 #
 set -euo pipefail
-cd "$(dirname "$0")/.." || exit 1                  # repo root
+cd "$(dirname "$0")/../.." || exit 1               # repo root
 
 # ---- configuration ---------------------------------------------------------
-EXE="esm"                                          # -> libyelmox/bin/yelmox_esm.x
-NML="yelmox_esm/yelmox_esm_Greenland_tipmip.nml"
+EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
+NML="yelmox/yelmox_esm_Greenland_tipmip.nml"
 SPINUP_YEARS=10                                    # forcing-only: short suffices
 MODEL="${MODEL:-ipsl}"                             # ipsl | ecearth
 

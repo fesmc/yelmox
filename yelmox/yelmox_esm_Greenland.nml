@@ -5,14 +5,13 @@
 /
 
 &esm
-    ! Experiment  (TIPMIP: forcing = piControl-anomalies, see input/esm/esm_grl_tipmip.nml)
-    par_file        = "input/esm/esm_grl_tipmip.nml"
-    experiment      = "ctrl"            ! spinup: ctrl; scenarios set esm-up2p0 / -gwl2p0 / -gwl4p0
-    use_esm         = False             ! use ESM snapshots? (scenario step sets True)
-    esm_name        = "IPSL-CM6-ESMCO2" ! TIPMIP forcing model (also: EC-Earth3-ESM-1, GRL-4KM only)
+    ! Experiment
+    par_file        = "input/esm/esm_grl_ismip7.nml"
+    experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
+    use_esm         = False             ! use ESM snapshots?
+    esm_name        = "CESM2-WACCM"     ! esm model, if homogeneous: applied homogeneous forcing
 
-    ! Forcing switches (read here by yelmox_esm; keep alongside use_esm)
-    use_smb         = False             ! load SMB directly vs. compute from T/P
+    ! Forcing switches (the smb source is [coupling] smb_method)
     use_var         = False             ! include climate variability
     use_hist        = False             ! load historical period
     use_proj        = False             ! load projection period
@@ -48,25 +47,19 @@
 /
 
 &transient
-    ! TIPMIP ramp (esm-up2p0) runs on the piControl-branch clock: model years
-    ! 0..232, forcing = anomalies vs piControl. Stabilisations (gwl2p0/gwl4p0)
-    ! span different years (109..159 / 232..282) and need these edited.
     tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
-    tstep_const     = 0.0               ! Assumed time for "const" method
-    time_init       = 0.0               ! [yr] Starting time (ramp: piControl-branch year 0)
-    time_end        = 232.0             ! [yr] Ending time (ramp: 232 yr)
+    tstep_const     = 2015.0            ! Assumed time for "const" method
+    time_init       = 2015.0            ! [yr] Starting time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
     use_hist        = False             ! load historical period. If false, use ref before projection.
-    time_ref        = 1961, 1990        ! [yr] Reference period for the MAR base climatology
+    time_ref        = 1985, 2014        ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization
-    time_esm_ref    = 0, 2              ! [yr] ESM reference = ramp start (anomaly ~ 0, ratio ~ 1)
-    time_hist       = -1, -1            ! [yr] no TIPMIP historical: window kept ENTIRELY below
-                                        ! time_init so the time-routed "time<=time_hist(2)" branch
-                                        ! in esm_forcing_update never fires (ts_hist et al. are not
-                                        ! even allocated when use_hist=False). All times route to proj.
-    time_proj       = 0, 231            ! [yr] Projection = full ramp
+    time_esm_ref    = 1960, 1989        ! [yr] Year interval used as Reference of ESM
+    time_hist       = 1850, 2014        ! [yr] Year interval used as Historical period
+    time_proj       = 2015, 2300        ! [yr] Year interval used as Projection period
 
     clim_var        = False             ! include climate variability
     clim_seed       = 1                 ! Randomnes seed
@@ -278,6 +271,7 @@
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim
     beta_min            = 100            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    slide_T             = True            ! Reduce sliding below pressure melting point (sub-temperate sliding)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_solver           = "energy"       ! "residual" | "energy"
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
@@ -685,12 +679,12 @@
     ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
-    with_ice_sheet    = False  ! Is the ice sheet active? (OFF: forcing-only test)
-    with_isostasy     = False  ! Is isostasy active? (OFF: forcing-only test)
+    with_ice_sheet    = True   ! Is the ice sheet active? (OFF: forcing-only test)
+    with_isostasy     = True   ! Is isostasy active? (OFF: forcing-only test)
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
     equil_method    = "none"   ! "none", "relax", "opt" (opt OFF: forcing-only test)
-    climate         = "esm"      ! climate backend: the ESM forcing of yelmox_esm
+    climate         = "esm"      ! climate backend: "snapclim", "snapesm" or "esm"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start

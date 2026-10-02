@@ -16,9 +16,8 @@ core that these drivers reuse.
 
 | Flavor | Build | Climate / SMB | Ocean | Distinctive feature |
 |---|---|---|---|---|
-| [`yelmox`](flavor-yelmox.md) | `make yelmox` | snapclim + smbpal | snapclim | Single domain; canonical driver. Transient time-series forcing (`tsgen`). |
+| [`yelmox`](flavor-yelmox.md) | `make yelmox` | `[coupling] climate`: snapclim, snapesm or [esm](flavor-esm.md); smbpal, smb_simple or the climate's smb | the climate (profiles or shelf base) | Single domain; canonical driver. Transient time-series forcing (`tsgen`). |
 | [`yelmox_bipolar`](flavor-bipolar.md) | `make yelmox_bipolar` | snapclim + smbpal (×2) | snapclim + shared OBM | Two hemispheres, shared sea level + Ocean Box Model. |
-| [`yelmox_esm`](flavor-esm.md) | `make yelmox_esm` | ESM forcing (`libs/esm.f90`) | ESM | Earth-System-Model forcing replaces snapclim; calendar timeline. |
 | [`yelmox_rembo`](flavor-rembo.md) | `make yelmox_rembo` | REMBOv1 | snapclim | REMBO energy/moisture-balance atmosphere + SMB. |
 
 ## Shared coupling primitives

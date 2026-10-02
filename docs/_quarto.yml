@@ -25,7 +25,7 @@ website:
             href: flavor-yelmox.md
           - text: "yelmox_bipolar"
             href: flavor-bipolar.md
-          - text: "yelmox_esm"
+          - text: "ESM forcing (yelmox)"
             href: flavor-esm.md
           - text: "yelmox_rembo"
             href: flavor-rembo.md

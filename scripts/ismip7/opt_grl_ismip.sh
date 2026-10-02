@@ -2,7 +2,7 @@
 #
 # ISMIP7 Greenland optimization spin-up (L. Gutierrez Gonzalez), ported from
 # legacy/opt_grl_ismip.sh (yelmox v2.2, par/yelmo_Greenland_esm_ismip7.nml) to
-# the yelmox_esm driver and yelmox_esm/yelmox_esm_Greenland.nml. Only the
+# yelmox (climate = esm) and yelmox/yelmox_esm_Greenland.nml. Only the
 # overrides of the original are carried over; the base configuration is the
 # current par file. Key changes:
 #   spinup.equil_method       -> coupling.equil_method
@@ -26,7 +26,7 @@ res_params=(
 
 ctrl_params=(
     "ctrl.run_step=spinup"
-    "esm.use_smb=True"
+    "coupling.smb_method=climate"
     "coupling.equil_method=opt"
     "spinup.time_end=15e3"
     "coupling.kill_shelves=True"
@@ -95,6 +95,6 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e esm --omp 8 -n yelmox_esm/yelmox_esm_Greenland.nml -o "${output_path}" \
+runme -rs -q 48h -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
       -p "${res_params[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${hyd_params[@]}" \
       "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"

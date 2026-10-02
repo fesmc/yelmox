@@ -7,7 +7,6 @@
     "exe_aliases" :
         {   "yelmox"           : "libyelmox/bin/yelmox.x",
             "bipolar"          : "libyelmox/bin/yelmox_bipolar.x",
-            "esm"              : "libyelmox/bin/yelmox_esm.x",
             "rembo"            : "libyelmox/bin/yelmox_rembo.x"
         },
 

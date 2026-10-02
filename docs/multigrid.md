@@ -8,10 +8,10 @@ modules: `kryos`, `kryos_regions`, `kryos_coupling`, `kryos_startup`, `kryos_out
 domain-specific startups ported. The bipolar driver (`yelmox_bipolar.f90`) also
 carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level
 and a shared Ocean Box Model exchanging freshwater flux / ocean temperature
-between hemispheres (`yelmox_bipolar/obm_coupling.f90`). A third driver (`yelmox_esm.f90`)
-swaps snapclim for ESM climatic forcing (`libs/esm.f90`), running esm as a
-first-class component on its own grid (`grid_clim`) and remapping its outputs to
-the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy
+between hemispheres (`yelmox_bipolar/obm_coupling.f90`). ESM climatic forcing is a
+climate backend of `yelmox` (`[coupling] climate = "esm"`, see
+[ESM forcing](flavor-esm.md)), running on its own grid (`grid_clim`) with its
+outputs remapped to the consumer grids, like snapclim. Remaining: FastIsostasy
 hi-res output (below).
 
 ## Motivation
@@ -484,59 +484,10 @@ program yelmox_bipolar
 end program
 ```
 
-- **`yelmox_esm`** (single domain, in `yelmox_esm/`) — ESM climatic forcing in
-  place of snapclim. Reuses `domain_init` (with `init_climate=.false.`, so
-  snapclim is skipped) plus the shared `step_spinup_tuning/step_isostasy/step_icesheet/
-  refresh_hub` primitives and the restart bundle, but the driver owns an
-  `esm_forcing_class` and calls its own `step_climate_esm` / `step_marine_shelf_esm`
-  (contained in the program) instead of the snapclim-based steps. esm is a
-  first-class multigrid component: it runs entirely on its own grid (*esm grid* =
-  `grid_clim`, exactly like snapclim), and each output is remapped to the consumer
-  module's grid at coupling time — atmosphere to `grid_smb` (smbpal), the
-  depth-interpolated ocean forcing to `grid_mshlf` (marine_shelf). This works
-  because `marshelf_interp_shelf` reads only `mshlf%par` (grid-agnostic), so the ESM
-  ocean interpolation runs on `grid_clim` and the resulting `T_shlf`/`S_shlf` are
-  remapped to `grid_mshlf` before `marshelf_update`; `esm.f90` is untouched.
-  Geometry comes from the hub, remapped to whichever grid a step needs; SMB / ocean
-  BCs aggregate back to Yelmo. With `grid_clim == grid_smb == grid_mshlf ==
-  grid_hub == grid_ice` every remap is an identity copy, reproducing
-  `yelmox_esm.f90`; set `grid_clim` to a coarse ESM grid and it genuinely fans out.
-  Config splits ESM-specific control ([esm] + the run_step group
-  [spinup]/[transient]: `time_ref/hist/proj/esm_ref`, `use_*`, CMIP output) from
-  the shared mg groups ([domain]/[coupling]/[output]). Output (incl. the
-  CMIP-formatted files) is kept identical to `yelmox_esm.f90` via the
-  `yelmox_esm_output` module (in the same folder). Invoke with
-  `runme -e esm -n yelmox_esm/yelmox_esm_Antarctica.nml`.
-
-```fortran
-program yelmox_esm
-    use yelmox_domain
-    use esm
-    use yelmox_esm_output
-    type(kryos_domain)        :: dom
-    type(bsl_class)         :: bsl    ! shared, driver-owned
-    type(esm_forcing_class) :: esm    ! driver-owned climate (replaces snapclim)
-
-    call esm_ctl_load(ec, esm, path_par)      ! [ctrl] run_step + [esm] + [run_step]
-    call tstep_init(ts, path_par, trim(ec%run_step), ec%dtt, &
-                    time_ref=ec%calendar_ref, cal=ec%calendar)   ! per-phase timeline
-    call domain_init(dom, path_par, ts%time, init_climate=.false., &   ! skip snapclim
-                     timeline_group=trim(ec%run_step))
-    call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_clim)      ! on esm's own grid
-    ! cold: esm_cold_start (contained); restart: domain_startup + re-forcing
-
-    do
-        ! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on [tm_rst]
-        if (ts%is_finished) exit
-        call tstep_update(ts, dom%ctl%dtt)
-        call bsl_update(bsl, ...)                       ! once, shared
-        call step_spinup_tuning(dom, ts); call step_isostasy(dom, ts, bsl)
-        call step_icesheet(dom, ts); call refresh_hub(dom)
-        call step_climate_esm(dom, esm, ec, ts)         ! esm + smbpal (contained)
-        call step_marine_shelf_esm(dom, esm, ec, ts)    ! esm ocean BCs (contained)
-    end do
-end program
-```
+- **ESM forcing** is not a separate driver: `yelmox` with `[coupling] climate =
+  "esm"` (see [ESM forcing](flavor-esm.md)). The backend runs on `grid_clim`
+  and supplies the atmosphere (or the surface mass balance directly), the ocean
+  at the shelf base and subglacial discharge to the shared steps.
 
 ## Integration gaps to resolve during the build
 

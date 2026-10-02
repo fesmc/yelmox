@@ -116,14 +116,6 @@ yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(yelmox_libs) $(
 	@echo "    yelmox_bipolar.x is ready."
 	@echo " "
 
-yelmox_esm : fesmutils-static yelmo-static isostasy-static $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -c -o $(objdir)/yelmox_esm_output.o yelmox_esm/yelmox_esm_output.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_esm.x yelmox_esm/yelmox_esm.f90 \
-		$(objdir)/yelmox_esm_output.o $(yelmox_libs) $(LFLAGS)
-	@echo " "
-	@echo "    yelmox_esm.x is ready."
-	@echo " "
-
 # REMBO-coupled driver: reuses the multigrid kryos_domain, with REMBO as the
 # atmosphere/SMB (step_rembo) and its own combined output module.
 yelmox_rembo : fesmutils-static yelmo-static rembo-static isostasy-static $(yelmox_libs)
@@ -156,7 +148,7 @@ usage:
 	@echo "    * USAGE * "
 	@echo ""
 	@echo " Default (multigrid) drivers, one per flavor folder:"
-	@echo "   make yelmox | yelmox_bipolar | yelmox_esm | yelmox_rembo"
+	@echo "   make yelmox | yelmox_bipolar | yelmox_rembo"
 	@echo " make clean      : cleans object files"
 	@echo ""
 

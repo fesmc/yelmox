@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 1pctCO2 forcing-only workflow for Greenland (refactored yelmox_esm) -- SCAFFOLD.
+# 1pctCO2 forcing-only workflow for Antarctica (yelmox, climate = esm) -- SCAFFOLD.
 #
 #   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
 #   Step 2  scenarios  the 1pctCO2 run, branched off that bundle
@@ -9,45 +9,44 @@
 # they produce climate + ocean forcing from the 1pctCO2 CMIP fields, no ice dynamics.
 # 1pctCO2 = idealized CMIP experiment, atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140.
 # Forcing is ABSOLUTE tas/pr/thetao/so, self-referenced to the run start (~1xCO2);
-# see input/esm/esm_grl_1pctCO2.nml and its header. Greenland reference climatology
-# is MAR (atmosphere) + ERA-INT-ORAS4 (ocean), both present on this machine.
+# see input/esm/esm_ant_1pctCO2.nml and its header.
 #
-# *** SCENARIO is UNTESTED / DATA-PENDING ***  The 1pctCO2 forcing is NOT on this
-# machine yet (the whole ice_data/1pctCO2/ tree is absent), so the scenarios step
-# will stop in varslice until the data is staged (expected layout in the par nml
-# header). The SPINUP, however, only needs the MAR + ORAS4 reference climatology
-# (present), so it can run now.
+# *** UNTESTED / DATA-PENDING ***  The 1pctCO2 forcing is NOT on this machine yet
+# (the whole ice_data/1pctCO2/ tree is absent). This scaffold is wired against the
+# expected layout (realization r1i1p4f1, window 2020-2160) so it should run once the
+# data is staged. Until then only STAGE=1 (dir/submit-script staging) will succeed;
+# a real run will stop in varslice when it cannot find the 1pctCO2 files.
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
-#   yelmox_esm/run_1pctco2_greenland.sh spinup
-#   yelmox_esm/run_1pctco2_greenland.sh scenarios
+#   scripts/1pctCO2/run_1pctco2_antarctica.sh spinup
+#   scripts/1pctCO2/run_1pctco2_antarctica.sh scenarios
 #
 # Stage only (create dirs + SLURM submit script, do NOT submit): STAGE=1
 #
-#   STAGE=1 yelmox_esm/run_1pctco2_greenland.sh spinup
+#   STAGE=1 scripts/1pctCO2/run_1pctco2_antarctica.sh spinup
 #
-# NOTE: the GRL-8KM grid needs a large stack. The SLURM submit script sets it; for
-# a local run first do:  ulimit -s unlimited
+# NOTE: larger ANT grids need a big stack. The SLURM submit script sets it; for a
+# local run first do:  ulimit -s unlimited
 #
 set -euo pipefail
-cd "$(dirname "$0")/.." || exit 1                  # repo root
+cd "$(dirname "$0")/../.." || exit 1               # repo root
 
 # ---- configuration ---------------------------------------------------------
-EXE="esm"                                          # -> libyelmox/bin/yelmox_esm.x
-NML="yelmox_esm/yelmox_esm_Greenland_1pctCO2.nml"
-OUTROOT="output/1pctco2_grl"
+EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
+NML="yelmox/yelmox_esm_Antarctica_1pctCO2.nml"
+OUTROOT="output/1pctco2_ant"
 GCM="1pctCO2-r1i1p4f1"                             # label only (no {gcm} templating in the par nml)
-GRID="GRL-8KM"
+GRID="ANT-32KM"                                    # lightest grid; bump once data + grid confirmed
 SCENARIOS=(1pctCO2)
 
 SPINUP_YEARS=10                                    # forcing-only: short suffices
-PROJ_INIT=2020                                     # 1pctCO2 start year (year 0 = 1xCO2)
+PROJ_INIT=2020                                     # 1pctCO2 start year (run year 0 = 1xCO2)
 PROJ_END=2160                                      # 1pctCO2 end year (140 yr)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
-HPCOPT="-q compute -w 04:00:00 --omp 8"
+HPCOPT="-q compute -w 04:00:00 --omp 16"
 
 SPINUP_OUT="$OUTROOT/spinup"
 # Absolute path: the executable runs from inside the scenario's run dir, so a
