@@ -167,13 +167,13 @@ contains
             call isos_write_1D_step(dom%isos, trim(fnm_isos), time)
         end if
 
-        ! The climate's own 1D diagnostics (esm), over the ice on the climate grid.
+        ! The climate's own 1D diagnostics (esm, rembo), over the ice on the climate grid.
         if (dom%ctl%write_clim .and. dom%ctl%with_climate) then
             call remap(dom, dom%topo%H_ice,  dom%ctl%grid_hub, H_ice_c,  dom%ctl%grid_clim, "bilin")
             call remap(dom, dom%topo%f_grnd, dom%ctl%grid_hub, f_grnd_c, dom%ctl%grid_clim, "bilin")
             call climate_write_1D(dom%cl, dom%clim, &
                     trim(outfldr)//trim(climate_file_base(dom%cl))//"_ts.nc", time, &
-                    H_ice_c, f_grnd_c, is_init)
+                    H_ice_c, f_grnd_c, dom%ctl%dx_clim, is_init)
         end if
     end subroutine domain_write_1D
 

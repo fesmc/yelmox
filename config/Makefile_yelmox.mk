@@ -48,11 +48,19 @@ $(objdir)/snapesm.o: $(libdir)/snapesm.f90
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# The climate backend of a domain ([coupling] climate = snapclim | snapesm | esm),
-# chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
+# REMBO for the rembo climate backend: the adapter over rembo1 with rembo=1,
+# else a stub with the same interface that stops if climate = "rembo".
+$(objdir)/climate_rembo.o: $(libdir)/climate_rembo.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_REMBO) -c -o $@ $<
+
+$(objdir)/climate_rembo_stub.o: $(libdir)/climate_rembo_stub.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+# The climate backend of a domain ([coupling] climate = snapclim | snapesm | esm
+# | rembo), chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
 $(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o \
 						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/esm_forcing.o \
-						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o
+						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o $(climate_rembo_obj)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
 # Hi-res topography reference hub for multigrid yelmox
@@ -201,6 +209,7 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/smb_simple.o \
 					    $(objdir)/climate_out.o \
+					    $(climate_rembo_obj) \
 					    $(objdir)/yelmox_climate.o \
 					    $(objdir)/snapclim.o \
 					    $(objdir)/snapesm.o \

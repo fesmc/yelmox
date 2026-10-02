@@ -56,7 +56,7 @@ module kryos
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"      ! smbpal | smb_simple | climate (from the backend)
-        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm | esm
+        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm | esm | rembo
 
         ! Cold-start ice state ([coupling]): init_marine_H first, then init_method.
         character(len=56)  :: init_method     = "equil"   ! none | equil | recon | recon_ref
@@ -108,7 +108,7 @@ module kryos
         logical :: write_isos  = .true.
         logical :: write_mshlf = .true.
         logical :: write_smb   = .true.
-        logical :: write_clim  = .true.     ! the climate backend's file (snap.nc, esm.nc + esm_ts.nc)
+        logical :: write_clim  = .true.     ! the climate backend's file (snap.nc; esm.nc, rembo.nc + _ts.nc)
         logical :: write_htopo = .true.
         ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc), every dt_cmip.
         logical  :: write_cmip = .false.
@@ -478,7 +478,7 @@ contains
         select case(trim(ctl%smb_method))
             case("smbpal", "climate")
             case("smb_simple")
-                if (trim(ctl%climate) == "esm") then
+                if (trim(ctl%climate) == "esm" .or. trim(ctl%climate) == "rembo") then
                     write(*,*) "domain_ctl_load:: error: "//trim(gc)//".smb_method = smb_simple needs &
                                &a sea-level air temperature (climate = snapclim or snapesm)."
                     stop 1

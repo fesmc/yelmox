@@ -23,6 +23,7 @@ module kryos_startup
                                step_marine_shelf, couple_to_yelmo, couple_isostasy_to_yelmo, &
                                couple_smb_to_yelmo, check_isostasy_reference
     use kryos_forcing,  only : tsforcing_class, tsforcing_restart_write
+    use yelmox_climate, only : climate_restart_write
 
     implicit none
     private
@@ -340,6 +341,8 @@ contains
         character(len=*), intent(in), optional :: outfldr
 
         character(len=1024) :: bundle
+        real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_sl_c(:,:)
+        character(len=256) :: gc, gh
 
         if (present(fldr)) then
             bundle = trim(fldr)
@@ -358,6 +361,16 @@ contains
             call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
         call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
         call smbpal_restart_write(dom%smb,   trim(bundle)//"/smbpal_restart.nc", time)
+
+        ! The climate backend's own state (REMBO), with the hub geometry on grid_clim.
+        if (dom%ctl%with_climate) then
+            gc = trim(dom%ctl%grid_clim)
+            gh = trim(dom%ctl%grid_hub)
+            call remap(dom, dom%topo%z_srf, gh, z_srf_c, gc, "bilin")
+            call remap(dom, dom%topo%H_ice, gh, H_ice_c, gc, "bilin")
+            call remap(dom, dom%topo%z_sl,  gh, z_sl_c,  gc, "bilin")
+            call climate_restart_write(dom%cl, trim(bundle), time, z_srf_c, H_ice_c, z_sl_c)
+        end if
 
         write(*,*) "domain_restart_write:: wrote bundle "//trim(bundle)
     end subroutine domain_restart_write
