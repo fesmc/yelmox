@@ -18,6 +18,9 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- With ESM forcing the marine shelf takes the ice-shelf base as `z_srf - H_ice`
+  (Yelmo's definition), like the other climates, instead of reconstructing it from
+  flotation. ESM results change under the ice shelves.
 - `yelmox_esm` is removed: ESM runs use `yelmox` with `climate = "esm"`. Its par
   files move to `yelmox/yelmox_esm_*.nml` (without `[esm] use_smb`), its run
   scripts to `scripts/ismip7/`, `scripts/tipmip/` and `scripts/1pctCO2/` (runme

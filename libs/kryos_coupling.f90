@@ -498,14 +498,13 @@ contains
         call remap(dom, dom%topo%basins,  gh, basins_m,  gm, "nn")
 
         if (dom%clim%has_ocn_shelf) then
-            ! Ocean already at the shelf base (esm): grid_clim -> mshlf grid. The
-            ! shelf base follows flotation, as in the esm driver (no z_srf).
+            ! Ocean already at the shelf base (esm): grid_clim -> mshlf grid.
             call remap(dom, dom%clim%now%T_shlf,  gc, dom%mshlf%now%T_shlf,  gm, "bilin")
             call remap(dom, dom%clim%now%S_shlf,  gc, dom%mshlf%now%S_shlf,  gm, "bilin")
             call remap(dom, dom%clim%now%dT_shlf, gc, dom%mshlf%now%dT_shlf, gm, "bilin")
             call remap(dom, dom%clim%now%dS_shlf, gc, dom%mshlf%now%dS_shlf, gm, "bilin")
             call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
-                    z_sl_m, dx=dom%ctl%dx_mshlf)
+                    z_sl_m, dx=dom%ctl%dx_mshlf, z_srf=z_srf_m)
             return
         end if
 
