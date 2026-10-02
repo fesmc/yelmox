@@ -151,6 +151,10 @@ contains
         ! start only; restart skips it.
         call domain_init_ice(dom, ts)
 
+        ! The hub follows the initialized ice state, so the initial output and
+        ! restart bundle see it.
+        call refresh_hub(dom)
+
     end subroutine domain_init_state
 
     subroutine domain_opt_init_cb_ref(dom)
