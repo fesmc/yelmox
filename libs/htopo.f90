@@ -26,6 +26,7 @@ module htopo
     use ncio
     use coords,   only : grid_class, grid_cdo_read_desc
     use interp2D, only : fill_nearest
+    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
 
     implicit none
     private
@@ -33,8 +34,6 @@ module htopo
     integer, parameter :: wp = kind(1.0)     ! single precision (matches yelmox libs)
 
     real(wp), parameter :: mv      = -9999.0_wp   ! missing value of the topography reads
-    real(wp), parameter :: rho_ice =   910.0_wp   ! [kg/m3] ice density (surface of gap cells)
-    real(wp), parameter :: rho_sw  =  1028.0_wp   ! [kg/m3] seawater density
     real(wp), parameter :: tol_code = 1e-3_wp     ! tolerance to match a mask code
 
     integer, parameter :: n_codes_max = 20        ! max entries of the code lists
@@ -61,6 +60,8 @@ module htopo
         integer            :: n_ice_codes     ! number of ice_codes given
         integer            :: n_relax_codes   ! number of relax_codes given
         integer            :: n_regions       ! number of named regions
+        real(wp)           :: rho_ice         ! [kg m-3] ice density (from the domain's constants)
+        real(wp)           :: rho_sw          ! [kg m-3] seawater density
     end type
 
     type htopo_class
@@ -89,7 +90,7 @@ module htopo
 
 contains
 
-    subroutine htopo_init(htopo, filename, group, domain, grid_name, map_fldr)
+    subroutine htopo_init(htopo, filename, group, domain, grid_name, cnst, map_fldr)
         ! Load the hub's file paths from the domain definition, resolve its grid
         ! from the disk grid table, and read the reference fields onto that grid.
         type(htopo_class), intent(out) :: htopo
@@ -97,6 +98,7 @@ contains
         character(len=*),  intent(in)  :: group      ! namelist group, e.g. "domain"
         character(len=*),  intent(in)  :: domain     ! domain name
         character(len=*),  intent(in)  :: grid_name  ! hub grid (grid_hub)
+        type(phys_const_class), intent(in) :: cnst   ! physical constants of the domain
         character(len=*),  intent(in), optional :: map_fldr
 
         character(len=256) :: mfldr
@@ -105,6 +107,10 @@ contains
         if (present(map_fldr)) mfldr = trim(map_fldr)
 
         call htopo_par_load(htopo%par, filename, group, domain, grid_name)
+
+        call phys_const_require(cnst, "htopo_init")
+        call phys_const_get(cnst, "rho_ice", htopo%par%rho_ice)
+        call phys_const_get(cnst, "rho_sw",  htopo%par%rho_sw)
 
         ! Topo grid definition (nx,ny + coordinates) from grid_<name>.txt.
         call grid_cdo_read_desc(htopo%grid, trim(htopo%par%grid_name), trim(mfldr))
@@ -151,7 +157,7 @@ contains
 
     end subroutine htopo_init
 
-    subroutine htopo_update(htopo, dz_bed, dH_ice, z_sl, rho_ice, rho_sw)
+    subroutine htopo_update(htopo, dz_bed, dH_ice, z_sl)
         ! Current geometry on a hub finer than the ice sheet: the hi-res reference
         ! plus the models' anomalies (on the hub grid), with ice thickness clipped
         ! at 0. Each hub cell is either fully ice-covered or ice-free, so the
@@ -161,16 +167,16 @@ contains
         real(wp),          intent(in)    :: dz_bed(:,:)   ! [m] bed displacement
         real(wp),          intent(in)    :: dH_ice(:,:)   ! [m] change in ice thickness
         real(wp),          intent(in)    :: z_sl(:,:)     ! [m] sea level
-        real(wp),          intent(in)    :: rho_ice, rho_sw  ! [kg m-3] densities
 
         htopo%z_bed = htopo%z_bed_ref + dz_bed
         htopo%H_ice = max(htopo%H_ice_ref + dH_ice, 0.0_wp)
         htopo%z_sl  = z_sl
 
         htopo%f_grnd = 0.0_wp
-        where (calc_H_grnd(htopo%H_ice, htopo%z_bed, htopo%z_sl, rho_ice, rho_sw) >= 0.0_wp) &
-            htopo%f_grnd = 1.0_wp
-        htopo%z_srf = calc_z_srf(htopo%H_ice, htopo%z_bed, htopo%z_sl, rho_ice, rho_sw)
+        where (calc_H_grnd(htopo%H_ice, htopo%z_bed, htopo%z_sl, &
+                           htopo%par%rho_ice, htopo%par%rho_sw) >= 0.0_wp) htopo%f_grnd = 1.0_wp
+        htopo%z_srf = calc_z_srf(htopo%H_ice, htopo%z_bed, htopo%z_sl, &
+                                 htopo%par%rho_ice, htopo%par%rho_sw)
 
     end subroutine htopo_update
 
@@ -296,7 +302,8 @@ contains
         end if
 
         where (htopo%z_srf_ref == mv) &
-            htopo%z_srf_ref = max(htopo%z_bed_ref + htopo%H_ice_ref, (1.0_wp - rho_ice/rho_sw)*htopo%H_ice_ref)
+            htopo%z_srf_ref = calc_z_srf(htopo%H_ice_ref, htopo%z_bed_ref, 0.0_wp, &
+                                         htopo%par%rho_ice, htopo%par%rho_sw)
 
         write(*,*) "htopo_init:: filled missing values: z_bed ", n_bed, ", H_ice ", n_ice, &
                    ", z_srf ", n_srf, " of ", size(htopo%z_bed_ref)

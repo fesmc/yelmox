@@ -41,6 +41,7 @@
     ! topography and code masks ({grid_name} in the paths = grid_hub).
     ! A blank component grid takes the default given in brackets.
     name         = "SRG"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
     grid_hub     = "SRG-250M"         ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = "SRG-16KM"         ! isostasy [grid_ice] (coarse: the glacier grid is not needed)

@@ -283,13 +283,15 @@ end module yelmox_domain
 ### Domain definition (`[domain]`) and the hi-res hub (htopo)
 
 One `[domain]` group (`[domain_north]`/`[domain_south]` in bipolar) defines the
-domain: its name, the grid of every component, and the hub's topography and code
-masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer sets
-`domain`/`grid_name`). A blank component grid takes its default:
+domain: its name, its physical constants, the grid of every component, and the
+hub's topography and code masks. Yelmo takes the domain name and its grid from it
+(`[yelmo]` no longer sets `domain`/`grid_name`). A blank component grid takes its
+default:
 
 ```
 &domain
     name         = "Antarctica"
+    phys_const   = "Earth"      ! physical constants: group of input/yelmo_phys_const.nml
     grid_hub     = "ANT-16KM"   ! hi-res geometry hub
     grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
     grid_isos    = ""           ! isostasy                             [grid_ice]
@@ -314,6 +316,12 @@ masks. Yelmo takes the domain name and its grid from it (`[yelmo]` no longer set
     relax_tau    = 0.0              ! [yr] relaxation timescale there
 /
 ```
+
+The domain loads its physical constants once (`phys_const_load`, the group
+`phys_const` of `input/yelmo_phys_const.nml`) and hands the same record to every
+component: the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and
+`smb_simple`. Yelmo's own `yelmo.phys_const` then only selects its calendar year
+(`sec_year`).
 
 `htopo` holds the hub. It sits *above* every physics module (including Yelmo):
 its grid (`grid_hub`) is the finest resolution in the setup, and it is the

@@ -715,6 +715,7 @@
     ! topography and code masks ({grid_name} in the paths = grid_hub).
     ! A blank component grid takes the default given in brackets.
     name         = "Antarctica"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
     grid_hub     = "ANT-32KM"         ! hub on the Yelmo grid (single-grid setup)
     grid_ice     = "ANT-32KM"         ! Yelmo [grid_hub]
     grid_isos    = "ANT-32KM"         ! isostasy [grid_ice]

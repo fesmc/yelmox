@@ -22,6 +22,7 @@ module kryos
 
     use nml,          only : nml_read, nml_replace
     use coords,       only : grid_class, grid_cdo_read_desc
+    use phys_constants, only : phys_const_class, phys_const_load
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_init_grid, ytopo_input_class
     use yelmo_defs,   only : MASK_ICE_NONE, MASK_ICE_DYNAMIC
     use marine_shelf, only : marshelf_class, marshelf_init
@@ -41,6 +42,9 @@ module kryos
 
     ! Folder holding the grid descriptions (grid_<name>.txt) and cached maps.
     character(len=*), parameter :: MAP_FLDR = "maps"
+
+    ! Physical constants: one group per planet/setup, chosen by [domain] phys_const.
+    character(len=*), parameter :: PHYS_CONST_FILE = "input/yelmo_phys_const.nml"
 
     type domain_ctl
         ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
@@ -76,6 +80,7 @@ module kryos
         ! Domain name + grid of every component ([domain]; the source of truth
         ! for remap keys). A blank component grid takes its default.
         character(len=256) :: domain     = ""   ! e.g. "Antarctica"
+        character(len=56)  :: phys_const = ""   ! group of PHYS_CONST_FILE, e.g. "Earth"
         character(len=256) :: grid_hub   = ""   ! hi-res geometry hub, highest res
         character(len=256) :: grid_ice   = ""   ! Yelmo grid (default = grid_hub)
         character(len=256) :: grid_mshlf = ""   ! marine-shelf grid (default = grid_hub)
@@ -136,6 +141,7 @@ module kryos
         type(smb_simple_class) :: smbs    ! alternative SMB (smb_method="smb_simple")
         type(sediments_class)  :: sed
         type(geothermal_class) :: gthrm
+        type(phys_const_class) :: cnst    ! physical constants, shared by every component
         type(htopo_class)      :: topo    ! hi-res geometry reference hub
         type(coupler_class)    :: cpl     ! this region's grid resolution + map cache
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
@@ -227,8 +233,11 @@ contains
         call domain_ctl_load(dom%ctl, path_par, trim(sfx), trim(tgroup))
         domain = trim(dom%ctl%domain)
 
+        ! --- physical constants of the domain, handed to every component ---
+        call phys_const_load(dom%cnst, PHYS_CONST_FILE, group=trim(dom%ctl%phys_const))
+
         ! --- hi-res geometry hub (topography + masks from [domain]) + coupler ---
-        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), domain, dom%ctl%grid_hub)
+        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), domain, dom%ctl%grid_hub, dom%cnst)
 
         ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
         call coupler_init(dom%cpl)
@@ -258,7 +267,7 @@ contains
         call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
                         group="yelmo"//trim(sfx), regions=regions_y, basins=basins_y, &
-                        mask_ice=mask_ice_y, topo_init=topo_y, topo_pd=topo_y)
+                        mask_ice=mask_ice_y, topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
 
         ! Where the ice relaxes to the reference (ytopo.topo_rel = -1).
         dom%yelmo%bnd%tau_relax = htopo_relax_tau(dom%topo%par, regions_y)
@@ -272,7 +281,7 @@ contains
         dom%ctl%dx_isos = dom%yelmo%grd%G%dx * (grid_i%G%dx / grid_y%G%dx)
         dom%ctl%dy_isos = dom%yelmo%grd%G%dy * (grid_i%G%dy / grid_y%G%dy)
         call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
-                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%yelmo%bnd%cnst)
+                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%cnst)
 
         call sediments_init(dom%sed, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
                             domain, dom%ctl%grid_ice, group="sed"//trim(sfx))
@@ -313,7 +322,7 @@ contains
             call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x, wp), &
                                  y=real(grid_s%y, wp), lat=lats_s, &
                                  group="smb_simple"//trim(sfx), units="m", &
-                                 cnst=dom%yelmo%bnd%cnst)
+                                 cnst=dom%cnst)
             call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_ice, &
                        Href_s, dom%ctl%grid_smb, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
@@ -332,7 +341,7 @@ contains
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
                            domain, trim(dom%ctl%grid_mshlf), regions_m, basins_m, &
-                           cnst=dom%yelmo%bnd%cnst)
+                           cnst=dom%cnst)
 
         ! Optimization state (basal friction + thermal forcing); no-op unless
         ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
@@ -428,6 +437,7 @@ contains
         ! component. The hub's topography and masks are read by htopo_init.
         gd = "domain"//trim(suffix)
         call nml_read(path_par, gd, "name",     ctl%domain)
+        call nml_read(path_par, gd, "phys_const", ctl%phys_const)
         call nml_read(path_par, gd, "grid_hub", ctl%grid_hub)
         ctl%grid_ice   = ""
         ctl%grid_isos  = ""

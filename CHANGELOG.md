@@ -18,6 +18,12 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- The domain owns its physical constants: `[domain] phys_const` (e.g. `"Earth"`,
+  a group of `input/yelmo_phys_const.nml`) is loaded once and the same record goes
+  to the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and
+  `smb_simple`. Before, Yelmo loaded them and the others took Yelmo's copy; the
+  hub had its own densities. `yelmo.phys_const` now only selects Yelmo's calendar
+  year. All par files set `phys_const = "Earth"`; results do not change.
 - The hi-res hub keeps its reference geometry (`z_bed_ref`/`H_ice_ref`/`z_srf_ref`).
   On a hub finer than Yelmo, `refresh_hub` adds Yelmo's bed displacement and
   change in ice thickness to it and recomputes grounding (from flotation) and the

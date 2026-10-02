@@ -4,6 +4,7 @@ program test_htopo
 
     use htopo
     use ncio
+    use phys_constants, only : phys_const_class, phys_const_load
 
     implicit none
 
@@ -14,13 +15,16 @@ program test_htopo
     type(htopo_class) :: ht
     type(htopo_class) :: ht_nomask
     type(htopo_class) :: ht_gaps
+    type(phys_const_class) :: cnst
     integer :: fails, i, j
     logical, allocatable :: gap(:,:), gap_srf(:,:)
     real(wp), allocatable :: z_srf_exp(:,:), zero(:,:)
 
     fails = 0
 
-    call htopo_init(ht, "tests/test_htopo.nml", "domain", "Antarctica", "ANT-16KM", map_fldr="maps")
+    call phys_const_load(cnst, "input/yelmo_phys_const.nml", group="Earth")
+
+    call htopo_init(ht, "tests/test_htopo.nml", "domain", "Antarctica", "ANT-16KM", cnst, map_fldr="maps")
 
     write(*,*) "htopo grid   : "//trim(ht%par%grid_name), " nx,ny =", ht%nx, ht%ny
     write(*,*) "z_bed  range :", minval(ht%z_bed_ref),   maxval(ht%z_bed_ref)
@@ -67,7 +71,7 @@ program test_htopo
 
     ! Blank mask paths and z_bed_sd name: nothing is read and the masks
     ! default to 1, z_bed_sd to 0.
-    call htopo_init(ht_nomask, "tests/test_htopo.nml", "domain_nomask", "Antarctica", "ANT-16KM", &
+    call htopo_init(ht_nomask, "tests/test_htopo.nml", "domain_nomask", "Antarctica", "ANT-16KM", cnst, &
                     map_fldr="maps")
 
     if (minval(ht_nomask%regions) /= 1.0 .or. maxval(ht_nomask%regions) /= 1.0 .or. &
@@ -126,7 +130,7 @@ program test_htopo
     end do
 
     call write_gaps_file("test_htopo_gaps.nc", ht, gap, gap_srf)
-    call htopo_init(ht_gaps, "tests/test_htopo.nml", "domain_gaps", "Antarctica", "ANT-16KM", &
+    call htopo_init(ht_gaps, "tests/test_htopo.nml", "domain_gaps", "Antarctica", "ANT-16KM", cnst, &
                     map_fldr="maps")
 
     ! No ice in the gaps; the bed from the nearest valid cell (the first column
@@ -162,7 +166,7 @@ program test_htopo
         write(*,*) "FAIL: current geometry does not start from the reference"; fails = fails + 1
     end if
     allocate(zero(ht%nx,ht%ny)); zero = 0.0_wp
-    call htopo_update(ht, zero, zero, zero, 910.0_wp, 1028.0_wp)
+    call htopo_update(ht, zero, zero, zero)
     if (any(ht%z_bed /= ht%z_bed_ref) .or. any(ht%H_ice /= max(ht%H_ice_ref, 0.0_wp)) .or. &
         any(ht%z_sl /= 0.0)) then
         write(*,*) "FAIL: htopo_update without anomalies changed the geometry"; fails = fails + 1
@@ -179,7 +183,7 @@ program test_htopo
     end if
 
     ! Bed displacement and ice change add to the reference; ice is clipped at 0.
-    call htopo_update(ht, zero - 100.0_wp, zero - 500.0_wp, zero, 910.0_wp, 1028.0_wp)
+    call htopo_update(ht, zero - 100.0_wp, zero - 500.0_wp, zero)
     if (any(ht%z_bed /= ht%z_bed_ref - 100.0_wp) .or. &
         any(ht%H_ice /= max(ht%H_ice_ref - 500.0_wp, 0.0_wp))) then
         write(*,*) "FAIL: htopo_update anomalies"; fails = fails + 1

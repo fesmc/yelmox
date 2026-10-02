@@ -436,8 +436,7 @@ contains
             call remap(dom, dom%yelmo%bnd%z_bed - dom%yelmo%bnd%z_bed_ref, gy, dz_bed_h, gh, "bilin")
             call remap(dom, dom%yelmo%tpo%now%H_ice - H_ice_ref_y,         gy, dH_ice_h, gh, "bilin")
             call remap(dom, dom%yelmo%bnd%z_sl,                            gy, z_sl_h,   gh, "bilin")
-            call htopo_update(dom%topo, dz_bed_h, dH_ice_h, z_sl_h, &
-                              dom%yelmo%bnd%c%rho_ice, dom%yelmo%bnd%c%rho_sw)
+            call htopo_update(dom%topo, dz_bed_h, dH_ice_h, z_sl_h)
         end if
     end subroutine refresh_hub
 
