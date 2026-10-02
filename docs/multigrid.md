@@ -347,8 +347,8 @@ are both its initial topography and its present-day reference (`yelmo_init`
 (`[yelmo_init_topo]` keeps `init_topo_state`, `z_bed_f_sd`, smoothing; its
 `grad_lim_zb` applies). Where `grid_ice = grid_hub` the remap is a copy.
 
-The hub follows the models each step (`refresh_hub`, after Yelmo). On Yelmo's
-grid it mirrors Yelmo, fractional grounding included. On a finer hub it keeps
+The hub follows the models each step (`couple_yelmo_to_htopo`, after Yelmo). On
+Yelmo's grid it mirrors Yelmo, fractional grounding included. On a finer hub it keeps
 its hi-res reference and adds Yelmo's anomalies, refined bilinearly: the bed
 displacement `z_bed - z_bed_ref`, and the change in ice thickness from the hub
 reference as Yelmo received it (remapped conservatively), clipped at zero

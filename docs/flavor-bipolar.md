@@ -49,7 +49,7 @@ if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)   ! ocean box model, 
 if (active_north) then                         ! ice sheet, hub, climate + smb, per domain
     call couple_to_yelmo(dom_north)
     call step_icesheet(dom_north, ts)
-    call refresh_hub(dom_north)
+    call couple_yelmo_to_htopo(dom_north)
     call step_climate(dom_north, ts)
     call step_smb(dom_north, ts)
 end if

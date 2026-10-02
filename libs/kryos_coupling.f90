@@ -21,7 +21,7 @@ module kryos_coupling
     private
 
     public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
-    public :: step_smb, refresh_hub, update_climate
+    public :: step_smb, couple_yelmo_to_htopo, update_climate
     public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
     public :: couple_climate_to_yelmo
@@ -430,8 +430,8 @@ contains
         end if
     end subroutine step_smb
 
-    subroutine refresh_hub(dom)
-        ! Refresh the hub's current geometry from the models. On the Yelmo grid
+    subroutine couple_yelmo_to_htopo(dom)
+        ! Land Yelmo's state on the hub's current geometry. On the Yelmo grid
         ! there is no finer information, so the hub mirrors Yelmo (including its
         ! fractional grounding). On a finer hub, the hub keeps its hi-res reference
         ! and adds Yelmo's anomalies, refined bilinearly: the bed displacement
@@ -459,7 +459,7 @@ contains
             call remap(dom, dom%yelmo%bnd%z_sl,                            gy, z_sl_h,   gh, "bilin")
             call htopo_update(dom%topo, dz_bed_h, dH_ice_h, z_sl_h)
         end if
-    end subroutine refresh_hub
+    end subroutine couple_yelmo_to_htopo
 
     subroutine step_marine_shelf(dom, ts)
         ! Run marine_shelf on its own grid: geometry/masks from the hub, ocean

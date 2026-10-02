@@ -35,7 +35,7 @@ call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
-call refresh_hub(dom)             ! hi-res geometry from the models
+call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
 call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
 call step_smb(dom, ts)            ! surface mass balance
 call step_marine_shelf(dom, ts)   ! shelf melt

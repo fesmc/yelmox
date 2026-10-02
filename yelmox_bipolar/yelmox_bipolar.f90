@@ -31,8 +31,8 @@ program yelmox_bipolar
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
-                               step_icesheet, refresh_hub, step_climate, step_smb, &
-                               step_marine_shelf
+                               step_icesheet, couple_yelmo_to_htopo, step_climate, &
+                               step_smb, step_marine_shelf
     use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
                                restart_bundle_dir, restart_bundle_mkdir
     use kryos_output,   only : domain_write_init, domain_write_step, &
@@ -168,14 +168,14 @@ program yelmox_bipolar
         if (active_north) then
             call couple_to_yelmo(dom_north)   ! bedrock now; smb + shelf melt lag one step
             call step_icesheet(dom_north, ts)
-            call refresh_hub(dom_north)
+            call couple_yelmo_to_htopo(dom_north)
             call step_climate(dom_north, ts)
             call step_smb(dom_north, ts)
         end if
         if (active_south) then
             call couple_to_yelmo(dom_south)
             call step_icesheet(dom_south, ts)
-            call refresh_hub(dom_south)
+            call couple_yelmo_to_htopo(dom_south)
             call step_climate(dom_south, ts)
             call step_smb(dom_south, ts)
         end if

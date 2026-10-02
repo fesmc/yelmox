@@ -15,8 +15,8 @@ program yelmox
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
-                               step_icesheet, refresh_hub, step_climate, step_smb, &
-                               step_marine_shelf
+                               step_icesheet, couple_yelmo_to_htopo, step_climate, &
+                               step_smb, step_marine_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_due, &
@@ -165,7 +165,7 @@ program yelmox
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
         call step_icesheet(dom, ts)       ! yelmo_update
-        call refresh_hub(dom)             ! hi-res geometry from the models
+        call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
         call step_smb(dom, ts)            ! surface mass balance
         call step_marine_shelf(dom, ts)   ! shelf melt

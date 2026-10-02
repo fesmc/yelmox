@@ -5,8 +5,8 @@ module kryos
     ! remap maps (dom%cpl).
     !
     ! The hub is the geometry source of truth: it is refreshed from the
-    ! prognostic models each step (refresh_hub), and the coupling steps remap
-    ! fields to/from it through the coupler. Each component runs on its own grid,
+    ! prognostic models each step (couple_yelmo_to_htopo), and the coupling
+    ! steps remap fields to/from it through the coupler. Each component runs on its own grid,
     ! named in domain_ctl; a component's grid is just a string, so e.g.
     ! marine_shelf can run on the hub grid or on the Yelmo grid simply by
     ! changing grid_mshlf.

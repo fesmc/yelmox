@@ -12,8 +12,9 @@ module htopo
     !   * z_bed_ref, H_ice_ref, z_srf_ref -- the hi-res reference geometry,
     !     loaded once from file;
     !   * z_bed, H_ice, z_srf, f_grnd, z_sl -- the current geometry, refreshed
-    !     each step from the models (refresh_hub). On a hub finer than the ice
-    !     sheet it is the reference plus the models' anomalies (htopo_update).
+    !     each step from the models (couple_yelmo_to_htopo). On a hub finer
+    !     than the ice sheet it is the reference plus the models' anomalies
+    !     (htopo_update).
     !
     ! The file paths and variable names come from the domain definition
     ! (&domain); {domain}/{grid_name} in the paths resolve to the domain name

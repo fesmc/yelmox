@@ -79,9 +79,9 @@ annotated git tag. Dates are release (tag) dates.
   hub had its own densities. `yelmo.phys_const` now only selects Yelmo's calendar
   year. All par files set `phys_const = "Earth"`; results do not change.
 - The hi-res hub keeps its reference geometry (`z_bed_ref`/`H_ice_ref`/`z_srf_ref`).
-  On a hub finer than Yelmo, `refresh_hub` adds Yelmo's bed displacement and
-  change in ice thickness to it and recomputes grounding (from flotation) and the
-  surface on the hub (`htopo_update`), instead of overwriting the hub with
+  On a hub finer than Yelmo, `couple_yelmo_to_htopo` (was `refresh_hub`) adds
+  Yelmo's bed displacement and change in ice thickness to it and recomputes
+  grounding (from flotation) and the surface on the hub (`htopo_update`), instead of overwriting the hub with
   Yelmo's fields refined bilinearly. On Yelmo's grid the hub still mirrors
   Yelmo. Multigrid runs (e.g. Antarctica, hub 16 km / Yelmo 32 km) change
   through the marine shelf and the climate's surface elevation.
@@ -182,7 +182,7 @@ annotated git tag. Dates are release (tag) dates.
   (cold start, restart bundles), `kryos_output` and `kryos_forcing` (`tsforcing`).
   Code is moved unchanged; drivers import each name explicitly.
 - Renamed coupling primitives: `step_optimize` -> `step_spinup_tuning` (it also
-  ramps the relaxation timescale), `refresh_htopo` -> `refresh_hub`,
+  ramps the relaxation timescale), `refresh_htopo` -> `couple_yelmo_to_htopo`,
   `domain_update_smb` -> `step_smb`.
 - `couple_to_yelmo` assembles the Yelmo boundary state as its own step, called
   by the drivers before `step_icesheet` (which no longer runs the couplers).
