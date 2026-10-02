@@ -18,6 +18,15 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- Run control in `[ctrl]`: `run_step` names the group holding the timeline
+  (`"ctrl"` = `[ctrl]` itself; ESM `"spinup"`/`"transient"`), `calendar` /
+  `calendar_ref` set calendar years and their reference (ESM `True`/`2000`, before
+  hard-coded in `yelmox_esm`). Cold start in `[coupling]`, for every driver:
+  `kill_shelves` (no ice where the present-day bed is ocean) and `time_equil_thrm`
+  (equilibration with topography fixed after `init_method`), applied in
+  `domain_init_ice`. They replace the ESM `[spinup]`/`[transient]` keys
+  `kill_shelves` / `time_equil`; the fixed-topography equilibration no longer
+  requires `equil_method = "opt"`. Scripts set `coupling.kill_shelves`.
 - The climate backend is chosen at runtime: `[coupling] climate = "snapclim" |
   "snapesm"` replaces the `make CLIMATE=` switch (one `libs/yelmox_climate.f90`
   holds both backends; `yelmox_snapesm.x` is gone). The driver's transient forcing

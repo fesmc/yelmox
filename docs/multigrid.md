@@ -388,8 +388,10 @@ Common driver plumbing also lives in `yelmox_domain`, so every flavor uses the
 same handful of calls:
 
 - **`tstep_init(ts, path_par, group, dtt [, time_ref, cal])`** (fesm-utils
-  `timestepping`, namelist form) — reads the run's timeline group (`[ctrl]`, or
-  the esm `run_step` group) and initializes the driver-owned timestepper.
+  `timestepping`, namelist form) — reads the run's timeline group (`[ctrl]
+  run_step`: `"ctrl"` for `[ctrl]` itself, or a phase group such as `[spinup]`/
+  `[transient]`) and initializes the driver-owned timestepper; `[ctrl] calendar`
+  / `calendar_ref` give `cal` / `time_ref` (calendar years, e.g. ESM runs).
   `domain_init` takes the same group name
   (`timeline_group`, default `"ctrl"`) and reads the values the domain logic
   needs (`tstep_method`, `dtt`) itself — nothing is injected after init.
@@ -517,7 +519,7 @@ program yelmox_esm
 
     call esm_ctl_load(ec, esm, path_par)      ! [ctrl] run_step + [esm] + [run_step]
     call tstep_init(ts, path_par, trim(ec%run_step), ec%dtt, &
-                    time_ref=2000.0_wp, cal=.true.)      ! per-phase timeline
+                    time_ref=ec%calendar_ref, cal=ec%calendar)   ! per-phase timeline
     call domain_init(dom, path_par, ts%time, init_climate=.false., &   ! skip snapclim
                      timeline_group=trim(ec%run_step))
     call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_clim)      ! on esm's own grid

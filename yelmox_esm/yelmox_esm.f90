@@ -60,11 +60,12 @@ program yelmox_esm
     ! rest, and the timeline is driver-owned via tstep_init)
     type esm_ctl_params
         character(len=56) :: run_step
-        real(wp) :: dtt, time_equil
+        logical  :: calendar
+        real(wp) :: calendar_ref
+        real(wp) :: dtt
         real(wp) :: time_ref(2), time_hist(2), time_proj(2), time_esm_ref(2)
         character(len=56) :: clim_var
         integer  :: clim_seed
-        logical  :: kill_shelves
         logical  :: use_esm, use_smb, use_var, use_proj, use_hist
         logical  :: write_formatted
         real(wp) :: dt_formatted
@@ -106,7 +107,7 @@ program yelmox_esm
     ! Timestepping (driver-owned; the [run_step] group holds this run phase's
     ! timeline, with tstep_const applied as a calendar constant).
     call tstep_init(ts, path_par, trim(ec%run_step), ec%dtt, &
-                    time_ref=2000.0_wp, cal=.true.)
+                    time_ref=ec%calendar_ref, cal=ec%calendar)
 
     write(*,*)
     write(*,*) "yelmox_esm: run_step = "//trim(ec%run_step)
@@ -255,7 +256,9 @@ contains
         type(esm_forcing_class), intent(inout) :: esm
         character(len=*),        intent(in)    :: path_par
 
-        call nml_read(path_par, "ctrl", "run_step", ec%run_step)
+        call nml_read(path_par, "ctrl", "run_step",     ec%run_step)
+        call nml_read(path_par, "ctrl", "calendar",     ec%calendar)
+        call nml_read(path_par, "ctrl", "calendar_ref", ec%calendar_ref)
 
         ! [esm] group: experiment identity + physics parameters.
         call nml_read(path_par, "esm", "par_file",        ec%par_file)
@@ -276,14 +279,12 @@ contains
         call nml_read(path_par, "esm", "grid_src",        esm%grid_src)
 
         ! [run_step] group: esm reference/history/projection periods + switches.
-        call nml_read(path_par, trim(ec%run_step), "time_equil",   ec%time_equil)
         call nml_read(path_par, trim(ec%run_step), "time_ref",     ec%time_ref)
         call nml_read(path_par, trim(ec%run_step), "time_hist",    ec%time_hist)
         call nml_read(path_par, trim(ec%run_step), "time_proj",    ec%time_proj)
         call nml_read(path_par, trim(ec%run_step), "time_esm_ref", ec%time_esm_ref)
         call nml_read(path_par, trim(ec%run_step), "clim_var",     ec%clim_var)
         call nml_read(path_par, trim(ec%run_step), "clim_seed",    ec%clim_seed)
-        call nml_read(path_par, trim(ec%run_step), "kill_shelves", ec%kill_shelves)
     end subroutine esm_ctl_load
 
     ! ---------------------------------------------------------------------------
@@ -317,21 +318,9 @@ contains
         call yelmo_print_bound(dom%yelmo%bnd)
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
-        ! Optional: kill ice shelves beyond present-day extent.
-        if (ec%kill_shelves) then
-            where(dom%yelmo%dta%pd%mask_bed .eq. mask_bed_ocean) &
-                dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
-        end if
-
-        ! Spinup cold start: the ice state ([coupling] init_method), then the
-        ! optimization's fixed-topography equilibration.
-        if (trim(ec%run_step) == "spinup") then
-            call domain_init_ice(dom, ts)
-            if (dom%ctl%with_ice_sheet .and. trim(dom%ctl%equil_method) == "opt" &
-                                       .and. ec%time_equil > 0.0_wp) &
-                call yelmo_update_equil(dom%yelmo, ts%time, time_tot=ec%time_equil, &
-                                        dt=ec%dtt, topo_fixed=.true.)
-        end if
+        ! Spinup cold start: the ice state ([coupling] kill_shelves, init_method,
+        ! time_equil_thrm).
+        if (trim(ec%run_step) == "spinup") call domain_init_ice(dom, ts)
 
     end subroutine esm_cold_start
 

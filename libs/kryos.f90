@@ -62,6 +62,8 @@ module kryos
         character(len=56)  :: init_method     = "equil"   ! none | equil | recon | recon_ref
         logical            :: init_marine_H   = .false.   ! impose LGM-like marine ice
         real(wp)           :: init_equil_time = 10.0_wp   ! [yr] equil: equilibration time
+        logical            :: kill_shelves    = .false.   ! no ice where the present-day bed is ocean
+        real(wp)           :: time_equil_thrm = 0.0_wp    ! [yr] then equilibrate with topography fixed
         character(len=512) :: recon_path = ""             ! recon*: ice reconstruction file
         character(len=56)  :: recon_var  = ""             ! recon*: its ice-thickness variable
         real(wp)           :: recon_codes(20)             ! recon: regions where its ice is imposed
@@ -480,6 +482,8 @@ contains
         ! Cold-start ice state. The keys of the selected init_method are required.
         call nml_read(path_par, gc, "init_method",   ctl%init_method)
         call nml_read(path_par, gc, "init_marine_H", ctl%init_marine_H)
+        call nml_read(path_par, gc, "kill_shelves",    ctl%kill_shelves)
+        call nml_read(path_par, gc, "time_equil_thrm", ctl%time_equil_thrm)
         select case(trim(ctl%init_method))
             case("none")
             case("equil")

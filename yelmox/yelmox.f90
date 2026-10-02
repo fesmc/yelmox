@@ -37,6 +37,13 @@ program yelmox
     character(len=512) :: outfldr
     real(wp)           :: dtt
 
+    ! Run control ([ctrl]): the group holding this run phase's timeline (e.g.
+    ! "spinup", "transient"; "ctrl" = [ctrl] itself), and whether the timeline
+    ! is in calendar years (tstep_const then a calendar time, against calendar_ref).
+    character(len=56)  :: run_step
+    logical            :: calendar
+    real(wp)           :: calendar_ref
+
     ! Transient time-series forcing (tsgen), owned by the driver. The single
     ! forcing value f_now is mapped onto the snapclim anomalies via per-channel
     ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
@@ -48,8 +55,11 @@ program yelmox
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
 
-    ! Timestepping (driver-owned; the [ctrl] group holds the shared timeline).
-    call tstep_init(ts, path_par, "ctrl", dtt)
+    ! Timestepping (driver-owned; the [run_step] group holds the shared timeline).
+    call nml_read(path_par, "ctrl", "run_step",     run_step)
+    call nml_read(path_par, "ctrl", "calendar",     calendar)
+    call nml_read(path_par, "ctrl", "calendar_ref", calendar_ref)
+    call tstep_init(ts, path_par, trim(run_step), dtt, time_ref=calendar_ref, cal=calendar)
 
     ! Single-domain runs write to the run dir.
     outfldr = "./"
@@ -59,8 +69,8 @@ program yelmox
     call bsl_update(bsl, ts%time_rel)
 
     ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
-    ! reads the timeline values it needs from the same [ctrl] group.
-    call domain_init(dom, path_par, ts%time)
+    ! reads the timeline values it needs from the same [run_step] group.
+    call domain_init(dom, path_par, ts%time, timeline_group=trim(run_step))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))

@@ -832,6 +832,8 @@
     init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     init_equil_time         = 10.0      ! [yr] equil: equilibration time
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
+    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 /
 
 &output_south
@@ -1314,6 +1316,8 @@
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
     init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
+    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 /
 
 &output_north

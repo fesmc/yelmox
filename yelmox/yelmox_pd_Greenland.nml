@@ -1,5 +1,8 @@
 &ctrl
     ! Shared timeline (driver-owned). Domain component choices live in [coupling].
+    run_step        = "ctrl"            ! group holding the timeline ("ctrl" = this group)
+    calendar        = False             ! timeline in calendar years (tstep_const = calendar time)
+    calendar_ref    = 1950.0            ! [yr CE] calendar reference
     tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
     tstep_const     = 0.0               ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time
@@ -748,6 +751,8 @@
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
     init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
+    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 /
 
 &output

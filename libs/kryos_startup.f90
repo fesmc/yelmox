@@ -7,7 +7,8 @@ module kryos_startup
     use timestepping, only : tstep_class
     use yelmo,        only : wp, yelmo_update_equil, yelmo_init_state, yelmo_init_topo, &
                              yelmo_print_bound, yelmo_restart_write, yelmo_restart_init, &
-                             yelmo_regions_update
+                             yelmo_regions_update, mask_bed_ocean
+    use yelmo_defs,   only : MASK_ICE_NONE
     use yelmo_tools,  only : smooth_gauss_2D
     use basal_dragging,   only : calc_cb_ref
     use yelmo_topography, only : calc_ytopo_diagnostic
@@ -211,13 +212,18 @@ contains
     end subroutine domain_init_isostasy
 
     subroutine domain_init_ice(dom, ts)
-        ! Cold-start ice state, after yelmo_init_state ([coupling]): LGM-like
-        ! marine ice first (init_marine_H), then init_method -- none, a short
-        ! equilibration with constant boundaries (equil), or the ice
-        ! reconstruction recon_path as the initial ice (recon) or only as the
-        ! reference ice (recon_ref).
+        ! Cold-start ice state, after yelmo_init_state ([coupling]): no ice where
+        ! the present-day bed is ocean (kill_shelves), LGM-like marine ice
+        ! (init_marine_H), then init_method -- none, a short equilibration with
+        ! constant boundaries (equil), or the ice reconstruction recon_path as the
+        ! initial ice (recon) or only as the reference ice (recon_ref) -- and last
+        ! an equilibration with topography fixed (time_equil_thrm > 0).
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
+
+        if (dom%ctl%kill_shelves) then
+            where (dom%yelmo%dta%pd%mask_bed == mask_bed_ocean) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
+        end if
 
         if (dom%ctl%init_marine_H) call domain_init_marine_ice(dom)
 
@@ -231,6 +237,10 @@ contains
             case("recon", "recon_ref")
                 call domain_init_recon(dom, ts)
         end select
+
+        if (dom%ctl%with_ice_sheet .and. dom%ctl%time_equil_thrm > 0.0_wp) &
+            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%time_equil_thrm, &
+                                    dt=dom%ctl%dtt, topo_fixed=.TRUE.)
 
     end subroutine domain_init_ice
 

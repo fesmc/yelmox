@@ -7,6 +7,8 @@
 ! ============================================================================
 &ctrl
     run_step        = "spinup"
+    calendar        = True              ! timeline in calendar years (tstep_const = calendar time)
+    calendar_ref    = 2000.0            ! [yr CE] calendar reference
 /
 
 &esm
@@ -43,7 +45,6 @@
     tstep_const     = 2020              ! Assumed time for "const" method (1pctCO2 era label)
     time_init       = 0.0               ! [yr] Starting time (model years)
     time_end        = 10.0              ! [yr] Ending time (model years) - short forcing-only smoke test
-    time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
@@ -56,7 +57,6 @@
 
     clim_var        = False             ! include climate variability
     clim_seed       = 10                ! Randomnes seed
-    kill_shelves    = False             ! Kill ice shelves beyond PD.
 /
 
 &transient
@@ -67,7 +67,6 @@
     tstep_const     = 2020              ! Assumed time for "const" method
     time_init       = 2020.0            ! [yr] 1pctCO2 start (year 2020 = 1xCO2)
     time_end        = 2160.0            ! [yr] 1pctCO2 end (140 yr; ~4xCO2 near yr 140)
-    time_equil      = 0.0               ! [yr] Equilibration time
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
@@ -83,7 +82,6 @@
 
     clim_var        = False             ! include climate variability
     clim_seed       = 1                 ! Randomnes seed
-    kill_shelves    = False             ! Kill ice shelves beyond PD.
 /
 
 &tm_1D
@@ -692,6 +690,8 @@
     init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     init_equil_time         = 1.0       ! [yr] equil: equilibration time
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
+    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 /
 
 &output
