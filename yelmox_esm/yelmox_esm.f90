@@ -387,9 +387,9 @@ contains
         ! Extrapolate reference ocean into ice-shelf interiors.
         if (dom%mshlf%par%extrap_shlf) then
             call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), H_ice_e, basins_e, &
-                                            -esm%to_var_ref%z, z_bed_e)
+                                            -esm%to_ref%z, z_bed_e)
             call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), H_ice_e, basins_e, &
-                                            -esm%so_var_ref%z, z_bed_e)
+                                            -esm%so_ref%z, z_bed_e)
         end if
 
         ! Step 2: anomaly fields (historical / projection / homogeneous). mshlf is

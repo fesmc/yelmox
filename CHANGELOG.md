@@ -66,6 +66,10 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `yelmox_esm`: with `marine_shelf.extrap_shlf = True`, the reference ocean is
+  extrapolated into the ice shelves on its own depth axis (`to_ref`/`so_ref`).
+  It used the axis of the variability fields, which are loaded only with
+  `use_var = True` (e.g. `scripts/1pctCO2/opt_ant.sh` sets `extrap_shlf` without it).
 - `input/esm/esm_ant_ismip7.nml`: the SMB reference (`gcm_smb_ref`, read with
   `esm.use_smb = True`) is the RACMO2.3 monthly climatology `{grid}_RACMO23-VW23.nc`;
   the ERA5 1979-2022 file it pointed to has no `smb`.
