@@ -32,10 +32,8 @@ module climate_out
         real(wp), allocatable :: S_shlf(:,:)    ! ocean salinity [psu]
         real(wp), allocatable :: dT_shlf(:,:)   ! temperature anomaly to the reference ocean [K]
         real(wp), allocatable :: dS_shlf(:,:)   ! salinity anomaly to the reference ocean [psu]
-        ! surface mass balance, at the reference (present-day) surface
-        real(wp), allocatable :: smb(:,:)       ! reference smb, annual (units of smbpal's smb)
-        real(wp), allocatable :: dsmb(:,:)      ! smb anomaly, annual
-        real(wp), allocatable :: dsmb_dz(:,:)   ! smb elevation gradient [per m]
+        ! surface mass balance, at the current surface
+        real(wp), allocatable :: smb(:,:)       ! annual (units of smbpal's smb)
         real(wp), allocatable :: tsrf(:,:)      ! surface temperature, annual [K]
         ! subglacial discharge
         real(wp), allocatable :: Qd(:,:)        ! annual (units of Yelmo's bnd%Qd)

@@ -99,11 +99,12 @@ contains
 
     end subroutine climate_init
 
-    subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, basins, domain, &
-                              dx, dtt, mshlf, tsf, init)
+    subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, basins, &
+                              domain, dx, dtt, mshlf, tsf, init)
         ! Update the backend on the climate grid and fill `out`. The geometry is
-        ! the domain's, on the climate grid; the marine shelf lends its parameters
-        ! to the esm ocean, which is interpolated to the shelf base here.
+        ! the domain's, on the climate grid, with its present-day surface
+        ! (z_srf_ref); the marine shelf lends its parameters to the esm ocean,
+        ! which is interpolated to the shelf base here.
         !
         ! With an active transient forcing, its spatially homogeneous anomalies
         ! (dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so) go to the backend:
@@ -116,6 +117,7 @@ contains
         type(climate_out_class),    intent(inout) :: out
         type(tstep_class),          intent(in)    :: ts
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
+        real(wp),         intent(in) :: z_srf_ref(:,:)
         real(wp),         intent(in) :: basins(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
@@ -194,7 +196,7 @@ contains
 
             case("esm")
                 call esm_update(cl, out, ts%time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, &
-                                basins, domain, mshlf)
+                                z_srf_ref, basins, domain, mshlf)
         end select
 
     end subroutine climate_update
@@ -446,7 +448,8 @@ contains
 
     end subroutine esm_init
 
-    subroutine esm_update(cl, out, time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, basins, domain, mshlf)
+    subroutine esm_update(cl, out, time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
+                          basins, domain, mshlf)
         ! The reference climatology at the current surface, the esm anomalies
         ! (historical / projection / homogeneous) and the variability, then the
         ! products: atmosphere, the surface mass balance (smb_method = climate),
@@ -455,6 +458,7 @@ contains
         type(climate_out_class),    intent(inout) :: out
         real(wp),         intent(in) :: time, dtt
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
+        real(wp),         intent(in) :: z_srf_ref(:,:)
         real(wp),         intent(in) :: basins(:,:)
         character(len=*), intent(in) :: domain
         type(marshelf_class), intent(in) :: mshlf
@@ -489,15 +493,17 @@ contains
             out%ref%pr_ann = esm%pr_ann * 365.0_wp
         end if
 
-        ! Surface mass balance at the present-day surface, with its anomaly and
-        ! elevation gradient; surface temperature from the near-surface air.
+        ! Surface mass balance at the current surface: the reference smb and its
+        ! anomaly (both at the present-day surface), corrected for the elevation
+        ! change with the esm smb gradient. Surface temperature from the
+        ! near-surface air, at most melting over ice.
         out%has_smb = ec%use_smb
         if (ec%use_smb) then
-            out%now%smb     = esm%smb_ann
-            out%now%dsmb    = sum(esm%dsmb, dim=3) / 12.0_wp
-            out%now%dsmb_dz = esm%dsmbdz
+            out%now%smb = esm%smb_ann + sum(esm%dsmb, dim=3) / 12.0_wp &
+                        - esm%dsmbdz*(z_srf_ref - z_srf)
         end if
         out%now%tsrf = sum(esm%t2m + esm%dts + esm%dts_var, dim=3) / 12.0_wp
+        where (H_ice > 0.0_wp .and. out%now%tsrf > 273.15_wp) out%now%tsrf = 273.15_wp
 
         ! Ocean at the shelf base: the reference ocean interpolated to the shelf
         ! base, plus the esm anomalies (themselves at the shelf base).

@@ -355,7 +355,7 @@ contains
         logical,               intent(in), optional :: init
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
-        real(wp), allocatable :: z_sl_c(:,:), basins_c(:,:)
+        real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:), basins_c(:,:)
         character(len=256) :: gc, gh
 
         gc = trim(dom%ctl%grid_clim)
@@ -366,10 +366,11 @@ contains
         call remap(dom, dom%topo%z_bed,  gh, z_bed_c,  gc, "bilin")
         call remap(dom, dom%topo%f_grnd, gh, f_grnd_c, gc, "bilin")
         call remap(dom, dom%topo%z_sl,   gh, z_sl_c,   gc, "bilin")
+        call remap(dom, dom%topo%z_srf_ref, gh, z_srf_ref_c, gc, "bilin")
         call remap(dom, dom%topo%basins, gh, basins_c, gc, "nn")
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
-                            basins_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
+                            z_srf_ref_c, basins_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
                             dtt=dom%ctl%dtt, mshlf=dom%mshlf, tsf=tsf, init=init)
     end subroutine update_climate
 
@@ -386,7 +387,7 @@ contains
 
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
         real(wp), allocatable :: tsl_s(:,:), Href_s(:,:)
-        real(wp), allocatable :: smb_s(:,:), dsmb_s(:,:), dsmbdz_s(:,:), pd_zsrf_s(:,:), tsrf_s(:,:)
+        real(wp), allocatable :: smb_s(:,:), tsrf_s(:,:)
         character(len=256) :: gc, gs, gh, gy
         logical :: is_init
 
@@ -401,20 +402,12 @@ contains
         gy = trim(dom%ctl%grid_ice)
 
         if (trim(dom%ctl%smb_method) == "climate") then
-            ! The climate's own surface mass balance (esm): the reference smb and
-            ! its anomaly, corrected for the elevation change from the present-day
-            ! surface with the climate's smb gradient; surface temperature from the
-            ! climate, at most melting over ice.
-            call remap(dom, dom%clim%now%smb,       gc, smb_s,     gs, "bilin")
-            call remap(dom, dom%clim%now%dsmb,      gc, dsmb_s,    gs, "bilin")
-            call remap(dom, dom%clim%now%dsmb_dz,   gc, dsmbdz_s,  gs, "bilin")
-            call remap(dom, dom%yelmo%dta%pd%z_srf, gy, pd_zsrf_s, gs, "bilin")
-            call remap(dom, dom%topo%z_srf,         gh, z_srf_s,   gs, "bilin")
-            call remap(dom, dom%topo%H_ice,         gh, H_ice_s,   gs, "bilin")
-            call remap(dom, dom%clim%now%tsrf,      gc, tsrf_s,    gs, "bilin")
-            dom%smb%ann%smb  = smb_s + dsmb_s - dsmbdz_s*(pd_zsrf_s - z_srf_s)
+            ! The climate's own surface mass balance and surface temperature, at
+            ! the current surface.
+            call remap(dom, dom%clim%now%smb,  gc, smb_s,  gs, "bilin")
+            call remap(dom, dom%clim%now%tsrf, gc, tsrf_s, gs, "bilin")
+            dom%smb%ann%smb  = smb_s
             dom%smb%ann%tsrf = tsrf_s
-            where (H_ice_s > 0.0_wp .and. tsrf_s > 273.15_wp) dom%smb%ann%tsrf = 273.15_wp
         else if (trim(dom%ctl%smb_method) == "smb_simple") then
             ! smb_simple: surface elevation + sea-level temperature, masked to the
             ! reference ice extent (refreshed each call in case H_ice_ref changed).
