@@ -1,43 +1,45 @@
 ---
-title: "Program flavors"
+title: "Programs and climate backends"
 ---
 
-YelmoX ships several **driver programs** ("flavors"), each a `program` that wires
-Yelmo together with a different set of forcing/coupling components. All of the
-modern (multigrid) flavors are built on the shared `kryos_domain` type and the
-`step_*` coupling primitives of the Kryos modules (`libs/kryos*.f90`);
-they differ in **which components are active** and in **how the per-step coupling
-sequence is assembled**.
+YelmoX has two **programs**, both built on the shared `kryos_domain` type and the
+coupling primitives of the Kryos modules (`libs/kryos*.f90`):
 
-See [Multigrid coupling](multigrid.md) for the design of the shared `kryos_domain`
-core that these drivers reuse.
-
-## The flavors
-
-| Flavor | Build | Climate / SMB | Ocean | Distinctive feature |
+| Program | Build | Domains | Climate | Ocean |
 |---|---|---|---|---|
-| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | `[coupling] climate`: snapclim, snapesm, [esm](flavor-esm.md) or [rembo](flavor-rembo.md); smbpal, smb_simple or the climate's smb | the climate (profiles or shelf base) | Single domain; canonical driver. Transient time-series forcing (`tsgen`). |
-| [`yelmox_bipolar`](flavor-bipolar.md) | `make yelmox_bipolar` | snapclim + smbpal (×2) | snapclim + shared OBM | Two hemispheres, shared sea level + Ocean Box Model. |
+| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[coupling] climate`) | the climate (depth profiles or shelf base) |
+| [`yelmox_bipolar`](flavor-bipolar.md) | `make yelmox_bipolar` | north + south | snapclim (×2) | snapclim + shared Ocean Box Model |
+
+The forcing of a `yelmox` run is set at runtime by its **climate backend**,
+`[coupling] climate`:
+
+| Backend | Supplies | Page |
+|---|---|---|
+| `snapclim` | atmosphere + ocean profiles, from climate snapshots blended by indices | [snapclim and snapesm](climate-snap.md) |
+| `snapesm` | as snapclim, configured as one blend model over any number of snapshots | [snapclim and snapesm](climate-snap.md) |
+| `esm` | reference climatology + Earth-system-model anomalies; atmosphere or smb, ocean at the shelf base, subglacial discharge | [ESM forcing](flavor-esm.md) |
+| `rembo` | REMBOv1 atmosphere + smb; ocean from snapclim | [REMBO climate](flavor-rembo.md) |
+
+See [Multigrid coupling](multigrid.md) for the architecture shared by both programs.
 
 ## Shared coupling primitives
 
-Every modern flavor advances the model by calling these primitives (from
-`kryos_coupling`), in a flavor-specific order:
+Both programs advance a domain with these primitives (from `kryos_coupling`):
 
 - `step_spinup_tuning` — spinup relaxation + basal-friction / thermal-forcing tuning.
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
-- `step_climate` — climate on `grid_clim` from the backend chosen by `[coupling] climate` (`snapclim`, `snapesm`, `esm` or `rembo`), with the transient forcing, on the `dt_clim` cadence.
+- `step_climate` — climate on `grid_clim` from the backend, with the transient forcing, on the `dt_clim` cadence.
 - `step_smb` — surface mass balance on `grid_smb` (`smb_method`: smbpal, smb_simple, or the climate's own, `climate`).
 - `step_marine_shelf` — sub-shelf melt on `grid_mshlf`, from the climate's ocean as depth profiles or at the shelf base.
 
 Every driver writes the sequence out in its time loop, so the coupling order can
-be read directly from the program; drivers with extra steps (a second domain, an
-ocean box model) interleave them there.
+be read directly from the program; `yelmox_bipolar` interleaves the second domain
+and the ocean box model there.
 
-## Initialization ordering (applies to all flavors)
+## Initialization ordering
 
 On cold start, the Yelmo applied mass-balance diagnostics (`smb`, `bmb`, `fmb`)
 are populated at the initial time so the first output snapshot reflects the

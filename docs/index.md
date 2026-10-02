@@ -12,7 +12,7 @@ With [`configme`](https://github.com/fesmc/configme) installed (see [Install con
 configme install yelmox
 ```
 
-That's it, you should now be ready to compile and run any yelmox program flavor:
+That's it, you should now be ready to compile and run any yelmox program:
 
 ```bash
 make clean

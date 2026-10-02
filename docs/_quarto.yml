@@ -17,7 +17,7 @@ website:
     left:
       - text: "Home"
         href: index.md
-      - text: "Flavors"
+      - text: "Programs"
         menu:
           - text: "Overview"
             href: flavors.md
@@ -25,13 +25,17 @@ website:
             href: flavor-yelmox.md
           - text: "yelmox_bipolar"
             href: flavor-bipolar.md
-          - text: "ESM forcing (yelmox)"
+      - text: "Climate backends"
+        menu:
+          - text: "snapclim and snapesm"
+            href: climate-snap.md
+          - text: "ESM forcing"
             href: flavor-esm.md
-          - text: "REMBO climate (yelmox)"
+          - text: "REMBO climate"
             href: flavor-rembo.md
       - text: "Database namelists"
         href: database-namelists.md
-      - text: "Multigrid design"
+      - text: "Multigrid coupling"
         href: multigrid.md
 
 format:

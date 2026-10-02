@@ -5,8 +5,8 @@ module snapesm
     !   Indices   -> tsgen      (one tsgen_class per driving index)
     !   Wrapper   -> this module (blend + transforms + derive + output state + restart)
     !
-    ! Replacement for the monolithic `snapclim`. See docs/snapesm-design.md for the
-    ! design rationale, the unified five-knob model, and the migration plan.
+    ! Replacement for the monolithic `snapclim`. See docs/climate-snap.md for its
+    ! configuration.
     !
     ! Config model: a `var_defs` database nml defines varslice groups (permanent
     ! per-file variable metadata); each climate-state group &<group>_<snapshot> names
@@ -188,7 +188,7 @@ contains
 
     subroutine snapesm_update(sc, z_srf, time, domain, dTa, dTo, dSo, dx, basins)
         ! Mirrors snapclim_update. Pipeline: advance indices -> refresh loads ->
-        ! combine -> transform -> derive (see docs/snapesm-design.md).
+        ! combine -> transform -> derive.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)

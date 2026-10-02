@@ -5,7 +5,7 @@ program yelmox
     ! plus the hi-res topography reference hub and the coupler maps, builds the
     ! initial boundary state (or restores a restart bundle), and runs the coupling
     ! time loop with per-module output. The multi-domain (bipolar) variant lives
-    ! in yelmox_bipolar/. See docs/multigrid.md and libs/yelmox_domain.f90.
+    ! in yelmox_bipolar/. See docs/multigrid.md and libs/kryos*.f90.
 
     use nml
     use timestepping
