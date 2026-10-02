@@ -8,10 +8,12 @@ module kryos_output
     use yelmo,        only : wp, yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use marine_shelf, only : marshelf_class
     use fastisostasy, only : isos_class
-    use climate_out,  only : climate_out_class
     use smbpal,       only : smbpal_class
     use htopo,        only : htopo_write_init, htopo_write_step
-    use kryos,        only : kryos_domain, MAP_FLDR
+    use timestepping, only : tstep_class
+    use yelmox_climate, only : climate_file_base, climate_write_2D, climate_write_1D
+    use cmip_output,  only : cmip_write_init, write_step_2D_cmip, write_step_1D_cmip
+    use kryos,        only : kryos_domain, MAP_FLDR, remap, cadence_due
 
     implicit none
     private
@@ -34,6 +36,7 @@ module kryos_output
     public :: YELMO_VARS_2D, YELMO_VARS_2D_SM
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: domain_write_init_sm, domain_write_step_sm
+    public :: domain_write_cmip
 
 contains
 
@@ -64,8 +67,8 @@ contains
             call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_mshlf, time)
         if (dom%ctl%write_smb) &
             call io_dims_init(trim(io_fname(outfldr,"smbpal")), dom%ctl%grid_smb,   time)
-        if (dom%ctl%write_snap) &
-            call io_dims_init(trim(io_fname(outfldr,"snap")),   dom%ctl%grid_clim,  time)
+        if (dom%ctl%write_clim) &
+            call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
     end subroutine domain_write_init
 
     subroutine domain_write_step(dom, outfldr, time, nms)
@@ -96,8 +99,8 @@ contains
             call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf")), time)
         if (dom%ctl%write_smb) &
             call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
-        if (dom%ctl%write_snap) &
-            call snap_write_step(dom%clim, trim(io_fname(outfldr,"snap")), time)
+        if (dom%ctl%write_clim) &
+            call clim_write_step(dom, trim(io_fname(outfldr,climate_file_base(dom%cl))), time)
     end subroutine domain_write_step
 
     subroutine domain_write_init_sm(dom, outfldr, time)
@@ -145,6 +148,7 @@ contains
 
         logical :: is_init
         character(len=512) :: fnm_isos
+        real(wp), allocatable :: H_ice_c(:,:), f_grnd_c(:,:)
 
         is_init = .false.
         if (present(init)) is_init = init
@@ -162,7 +166,40 @@ contains
             if (is_init) call isos_write_1D_init(trim(fnm_isos), time)
             call isos_write_1D_step(dom%isos, trim(fnm_isos), time)
         end if
+
+        ! The climate's own 1D diagnostics (esm), over the ice on the climate grid.
+        if (dom%ctl%write_clim .and. dom%ctl%with_climate) then
+            call remap(dom, dom%topo%H_ice,  dom%ctl%grid_hub, H_ice_c,  dom%ctl%grid_clim, "bilin")
+            call remap(dom, dom%topo%f_grnd, dom%ctl%grid_hub, f_grnd_c, dom%ctl%grid_clim, "bilin")
+            call climate_write_1D(dom%cl, dom%clim, &
+                    trim(outfldr)//trim(climate_file_base(dom%cl))//"_ts.nc", time, &
+                    H_ice_c, f_grnd_c, is_init)
+        end if
     end subroutine domain_write_1D
+
+    subroutine domain_write_cmip(dom, outfldr, ts, init)
+        ! CMIP/ISMIP-formatted output ([output] write_cmip): init creates the
+        ! files, otherwise one record every dt_cmip of elapsed time.
+        type(kryos_domain), intent(inout) :: dom
+        character(len=*),   intent(in)    :: outfldr
+        type(tstep_class),  intent(in)    :: ts
+        logical, intent(in), optional     :: init
+
+        logical :: is_init
+
+        if (.not. dom%ctl%write_cmip) return
+
+        is_init = .false.
+        if (present(init)) is_init = init
+
+        if (is_init) then
+            call cmip_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo_cmip")), &
+                                 trim(io_fname(outfldr,"yelmo_ts_cmip")), ts%time)
+        else if (cadence_due(ts%time_elapsed, dom%ctl%dt_cmip)) then
+            call write_step_2D_cmip(dom%yelmo, dom%mshlf, trim(io_fname(outfldr,"yelmo_cmip")), ts%time)
+            call write_step_1D_cmip(dom%yelmo, dom%mshlf, trim(io_fname(outfldr,"yelmo_ts_cmip")), ts%time)
+        end if
+    end subroutine domain_write_cmip
 
     ! --- private output helpers ---
 
@@ -237,19 +274,18 @@ contains
         call nc_close(ncid)
     end subroutine smb_write_step
 
-    subroutine snap_write_step(clim, filename, time)
-        type(climate_out_class), intent(in) :: clim
-        character(len=*),        intent(in) :: filename
-        real(wp),                intent(in) :: time
+    subroutine clim_write_step(dom, filename, time)
+        ! One record of the climate's 2D file (fields chosen by the backend).
+        type(kryos_domain), intent(in) :: dom
+        character(len=*),   intent(in) :: filename
+        real(wp),           intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "t2m_ann", clim%now%ta_ann, n, ncid, "K", "Annual mean air temperature")
-        if (allocated(clim%now%pr_ann)) &
-            call io_var2D(filename, "pr_ann",  clim%now%pr_ann, n, ncid, "mm/a", "Annual mean precipitation")
+        call climate_write_2D(dom%cl, dom%clim, filename, ncid, n)
         call nc_close(ncid)
-    end subroutine snap_write_step
+    end subroutine clim_write_step
 
     subroutine isos_write_1D_init(filename, time)
         character(len=*), intent(in) :: filename

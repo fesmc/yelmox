@@ -85,7 +85,11 @@ $(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \
 						$(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
-$(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o
+# CMIP/ISMIP-formatted output ([output] write_cmip)
+$(objdir)/cmip_output.o: $(libdir)/cmip_output.f90 $(objdir)/marine_shelf.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
+
+$(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)/cmip_output.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
 # Bipolar ocean coupling: bridge over kryos_domain + the obm box model. Lives
@@ -206,6 +210,7 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 						$(objdir)/kryos_coupling.o \
 						$(objdir)/kryos_forcing.o \
 						$(objdir)/kryos_startup.o \
+						$(objdir)/cmip_output.o \
 						$(objdir)/kryos_output.o
 
 # Ocean box model stack + its kryos_domain coupling bridge: bipolar-only, linked

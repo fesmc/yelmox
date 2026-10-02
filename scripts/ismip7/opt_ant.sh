@@ -20,7 +20,7 @@ ctrl_params=(
     "tm_1D.dt=1.0"
     "tm_2Dsm.dt=2.5e3"
     "tm_2D.dt=15e3"
-    "esm.write_formatted=False"
+    "output.write_cmip=False"
 )
 
 opt_params=(

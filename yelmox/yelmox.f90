@@ -24,7 +24,7 @@ program yelmox
                                tsforcing_write_step
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
-                               domain_write_1D
+                               domain_write_1D, domain_write_cmip
 
     implicit none
 
@@ -113,6 +113,7 @@ program yelmox
     if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
     if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
     if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+    call domain_write_cmip(dom, trim(outfldr), ts, init=.TRUE.)
 
     ! === main time loop ===
     ! Output and restarts are written at the top of the loop for the current
@@ -135,6 +136,9 @@ program yelmox
             call domain_write_1D(dom, trim(outfldr), ts%time)
             call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
         end if
+
+        ! CMIP-formatted output ([output] write_cmip, every dt_cmip).
+        call domain_write_cmip(dom, trim(outfldr), ts)
 
         ! Restart bundle (domain + shared bsl + tsforcing state).
         if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then

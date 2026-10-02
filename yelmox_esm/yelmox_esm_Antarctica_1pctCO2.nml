@@ -24,9 +24,6 @@
     use_hist        = False             ! load historical period
     use_proj        = False             ! load projection period
 
-    ! CMIP conventions
-    write_formatted = False             ! CMIP convention
-    dt_formatted    = 1.0               ! CMIP output timestep
     
     ! Climatic variables
     lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
@@ -715,6 +712,8 @@
     write_isos  = True
     write_mshlf = True
     write_smb   = True
-    write_snap  = False        ! no snapclim in the ESM driver
+    write_clim  = False        ! the climate's file (snap.nc; esm.nc + esm_ts.nc)
     write_htopo = True
+    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip     = 1.0          ! [yr] its interval
 /

@@ -42,6 +42,7 @@ program yelmox_esm
     use kryos_startup,  only : domain_startup, domain_init_isostasy, domain_init_ice, &
                                domain_opt_init_cb_ref, run_restart_write
     use yelmox_esm_output
+    use cmip_output,    only : cmip_write_init, write_step_2D_cmip, write_step_1D_cmip
 
     implicit none
 
@@ -67,8 +68,6 @@ program yelmox_esm
         character(len=56) :: clim_var
         integer  :: clim_seed
         logical  :: use_esm, use_smb, use_var, use_proj, use_hist
-        logical  :: write_formatted
-        real(wp) :: dt_formatted
         character(len=512) :: par_file
         character(len=56)  :: experiment, esm_name
     end type
@@ -175,11 +174,7 @@ program yelmox_esm
     call yelmo_write_reg_init(dom%yelmo, file1D_esm, time_init=ts%time, units="years", &
                               mask=(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE))
 
-    if (ec%write_formatted) then
-        call yelmo_write_init(dom%yelmo, file2D_cmip, time_init=ts%time, units="years")
-        call yelmo_write_reg_init(dom%yelmo, file1D_cmip, time_init=ts%time, units="years", &
-                                  mask=(dom%yelmo%bnd%mask_ice /= MASK_ICE_NONE))
-    end if
+    if (dom%ctl%write_cmip) call cmip_write_init(dom%yelmo, file2D_cmip, file1D_cmip, ts%time)
 
     ! ================= MAIN TIME LOOP ========================================
 
@@ -202,8 +197,8 @@ program yelmox_esm
             if (tm_1D%active) call write_1D_esm(dom%yelmo, esm, dom%mshlf, file1D_esm, ts%time)
         end if
 
-        if (ec%write_formatted) then
-            if (cadence_due(ts%time_elapsed, ec%dt_formatted)) then
+        if (dom%ctl%write_cmip) then
+            if (cadence_due(ts%time_elapsed, dom%ctl%dt_cmip)) then
                 call write_step_2D_cmip(dom%yelmo, dom%mshlf, file2D_cmip, ts%time)
                 call write_step_1D_cmip(dom%yelmo, dom%mshlf, file1D_cmip, ts%time)
             end if
@@ -269,8 +264,6 @@ contains
         call nml_read(path_par, "esm", "use_var",         ec%use_var)
         call nml_read(path_par, "esm", "use_proj",        ec%use_proj)
         call nml_read(path_par, "esm", "use_hist",        ec%use_hist)
-        call nml_read(path_par, "esm", "write_formatted", ec%write_formatted)
-        call nml_read(path_par, "esm", "dt_formatted",    ec%dt_formatted)
         call nml_read(path_par, "esm", "lapse",           esm%lapse)
         call nml_read(path_par, "esm", "f_p",             esm%beta_p)
         call nml_read(path_par, "esm", "f_ocn",           esm%f_ocn)

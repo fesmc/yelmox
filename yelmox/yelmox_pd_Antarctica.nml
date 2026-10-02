@@ -739,6 +739,8 @@
     write_isos  = True
     write_mshlf = True
     write_smb   = True
-    write_snap  = True
+    write_clim  = True
     write_htopo = True
+    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip     = 1.0          ! [yr] its interval
 /

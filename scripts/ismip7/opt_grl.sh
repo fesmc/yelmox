@@ -19,7 +19,7 @@ ctrl_params=(
     "tm_2D.dt=15e3"
     "yelmo.nz_aa=11"
     "yelmo.dt_min=0.1"
-    "esm.write_formatted=False"
+    "output.write_cmip=False"
 )
 
 opt_params=(

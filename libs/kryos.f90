@@ -108,8 +108,11 @@ module kryos
         logical :: write_isos  = .true.
         logical :: write_mshlf = .true.
         logical :: write_smb   = .true.
-        logical :: write_snap  = .true.
+        logical :: write_clim  = .true.     ! the climate backend's file (snap.nc, esm.nc + esm_ts.nc)
         logical :: write_htopo = .true.
+        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc), every dt_cmip.
+        logical  :: write_cmip = .false.
+        real(wp) :: dt_cmip    = 1.0_wp
     end type domain_ctl
 
     ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters.
@@ -532,8 +535,10 @@ contains
         call nml_read(path_par, go, "write_isos",  ctl%write_isos)
         call nml_read(path_par, go, "write_mshlf", ctl%write_mshlf)
         call nml_read(path_par, go, "write_smb",   ctl%write_smb)
-        call nml_read(path_par, go, "write_snap",  ctl%write_snap)
+        call nml_read(path_par, go, "write_clim",  ctl%write_clim)
         call nml_read(path_par, go, "write_htopo", ctl%write_htopo)
+        call nml_read(path_par, go, "write_cmip",  ctl%write_cmip)
+        call nml_read(path_par, go, "dt_cmip",     ctl%dt_cmip)
     end subroutine domain_ctl_load
 
     ! ----- remap: identity-copy when src == dst, else via the coupler ---

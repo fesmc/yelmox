@@ -69,8 +69,10 @@
     write_isos  = True
     write_mshlf = True
     write_smb   = False        ! REMBO provides the SMB (see rembo.nc); smbpal is only a carrier
-    write_snap  = False        ! REMBO provides the atmosphere; snapclim is used for ocean only
+    write_clim  = False        ! the climate's file (snap.nc; esm.nc + esm_ts.nc)
     write_htopo = True
+    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip     = 1.0          ! [yr] its interval
 /
 
 &tm_1D

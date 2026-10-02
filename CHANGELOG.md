@@ -18,6 +18,14 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- Output: the climate backend writes its own file, `[output] write_clim`
+  (was `write_snap`): `snap.nc` (snapclim, snapesm) or `esm.nc` (the esm fields:
+  temperature, precipitation or SMB anomalies, shelf anomalies, discharge) plus
+  `esm_ts.nc` (the forcing means over ice and floating ice, before in
+  `yelmo_ts_esm.nc`, now on the climate grid). CMIP/ISMIP-formatted output is a
+  general option, `[output] write_cmip` / `dt_cmip` (was `[esm] write_formatted` /
+  `dt_formatted`), with its writers in `libs/cmip_output.f90`. Scripts set
+  `output.write_cmip`.
 - ESM forcing is a climate backend: `[coupling] climate = "esm"` runs
   `esm_forcing` (unchanged) inside `yelmox`, reading `[esm]` and its periods from
   the `run_step` group. The climate products grow: the ocean at the shelf base
