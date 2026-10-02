@@ -704,7 +704,7 @@ contains
                         do m = 1, 12 
                             esm%dts(:,:,m) = esm%ts_hist%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
                             if (use_smb) then
-                                esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_ref%var(:,:,m,1)
+                                esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_esm_ref%var(:,:,m,1)
                             else
                                 esm%dpr(:,:,m) = esm%pr_hist%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
                             end if
