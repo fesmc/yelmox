@@ -15,7 +15,7 @@ module kryos_startup
     use yelmo_io,         only : yelmo_restart_read_topo_bnd
     use marine_shelf, only : marshelf_restart_write, marshelf_restart_read
     use fastisostasy, only : isos_init_ref, isos_init_state, isos_restart_write, &
-                             bsl_class, bsl_update, bsl_restart_read, bsl_restart_write
+                             bsl_class, bsl_restart_read, bsl_restart_write
     use smbpal,       only : smbpal_restart_write, smbpal_restart_read
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
@@ -37,19 +37,19 @@ module kryos_startup
 
 contains
 
-    subroutine bsl_startup(bsl, ts, fldr)
+    subroutine bsl_startup(bsl, fldr)
         ! Restore the shared, driver-owned barystatic sea level from a run-level
-        ! restart bundle (fldr/bsl_restart.nc) and refresh it for the current
-        ! time. No-op when fldr is "None" (bsl_init already set the cold state).
-        ! bsl is prognostic under method="fastiso"/"mixed" and cannot be
-        ! re-derived from time, hence the explicit restore.
+        ! restart bundle (fldr/bsl_restart.nc). No-op when fldr is "None"
+        ! (bsl_init already set the cold state). bsl is prognostic under
+        ! method="fastiso"/"mixed" and cannot be re-derived from time, hence the
+        ! explicit restore. The restored state is the end of the step that wrote
+        ! the bundle, as in the continuous run; the driver's bsl_update at the
+        ! start of the next step refreshes it, so it is not updated here.
         type(bsl_class),   intent(inout) :: bsl
-        type(tstep_class), intent(in)    :: ts
         character(len=*),  intent(in)    :: fldr
 
         if (trim(fldr) == "None") return
         call bsl_restart_read(bsl, trim(fldr)//"/bsl_restart.nc")
-        call bsl_update(bsl, ts%time_rel)
     end subroutine bsl_startup
 
     subroutine domain_startup(dom, ts, bsl, restore_bsl, tsf)
@@ -77,7 +77,7 @@ contains
         if (trim(dom%ctl%restart) == "None") then
             call domain_init_state(dom, ts, bsl, tsf=tsf)
         else
-            if (do_bsl) call bsl_startup(bsl, ts, trim(dom%ctl%restart))
+            if (do_bsl) call bsl_startup(bsl, trim(dom%ctl%restart))
             call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
             call couple_yelmo_to_htopo(dom)
         end if
@@ -383,8 +383,8 @@ contains
         ! Restore all stateful sub-models from a restart bundle folder. The shared
         ! barystatic sea level (bsl) is restored by the driver (bsl is prognostic
         ! under method="fastiso"/"mixed" and cannot be re-derived from time, so the
-        ! driver reads bsl_now back from the run's bsl_restart.nc and calls
-        ! bsl_update once); this routine only consumes the restored bsl.
+        ! driver restores it from the run's bsl_restart.nc, bsl_startup); this
+        ! routine only consumes the restored bsl.
         !
         ! Isostasy is restored through its proper init-from-restart path
         ! (isos_init_state with use_restart), NOT a bare isos_restart_read: the

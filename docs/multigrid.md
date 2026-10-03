@@ -248,7 +248,7 @@ Both programs use the same driver plumbing:
 - **`domain_startup(dom, ts, bsl [, restore_bsl, tsf])`** (`kryos_startup`) —
   cold start (`domain_init_state`) or restart-bundle restore + hub rebuild.
   `yelmox` restores the shared bsl from the same bundle; `yelmox_bipolar`
-  restores it once via **`bsl_startup(bsl, ts, fldr)`** and passes
+  restores it once via **`bsl_startup(bsl, fldr)`** and passes
   `restore_bsl=.false.`.
 - **`domain_init_ice(dom, ts)`** — the cold-start ice state after
   `yelmo_init_state` (`[coupling]` `kill_shelves`, `init_marine_H`,

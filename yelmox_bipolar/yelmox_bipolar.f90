@@ -88,7 +88,7 @@ program yelmox_bipolar
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
     call nml_read(path_par, "ctrl", "restart_bsl", restart_bsl)
-    call bsl_startup(bsl, ts, restart_bsl)
+    call bsl_startup(bsl, restart_bsl)
 
     ! === Per-domain initialization ===
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
