@@ -12,7 +12,10 @@ base. Both run on `grid_clim` and read the `[snap]` group.
 - **Program:** `yelmox` (`make yelmox`), backends in `libs/snapclim.f90` and
   `libs/snapesm.f90`, behind `libs/yelmox_climate.f90`.
 - **Select:** `[coupling] climate = "snapclim"` or `"snapesm"`.
-- **Output:** with `[output] write_clim`, `snap.nc`.
+- **Output:** with `[output] write_clim`, `snap.nc`: the annual air temperature
+  and precipitation; with snapesm also its driving indices (`idx_<name>`), the
+  surface elevation, the monthly atmosphere (`tas`, `tsl`, `pr`), `ta_sum`,
+  `tsl_ann` and the ocean profiles (`to_ann`, `so_ann` on `depth`).
 
 ## snapclim
 
@@ -68,5 +71,8 @@ Three kinds of group follow:
   built). See [Database namelists](database-namelists.md).
 - **Indices**, `[snap_idx_<name>]`: a `tsgen` series (`method`, `series_file`,
   `sigma`).
+
+Restart bundles hold the state of each index, `snapesm_idx_<name>_restart.nc`,
+with the configuration (snapshots, fields, reference) as attributes.
 
 The transient forcing is added on top in every configuration.

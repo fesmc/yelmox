@@ -18,7 +18,9 @@ module yelmox_climate
     use timestepping,  only : tstep_class
     use climate_out,   only : climate_out_class
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom
-    use snapesm,       only : snapesm_class, snapesm_init, snapesm_update
+    use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
+                              snapesm_write_init, snapesm_write_step, &
+                              snapesm_restart_write, snapesm_restart_read
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
                               esm_forcing_update, esm_variability_update, esm_summer_mean
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
@@ -53,7 +55,7 @@ module yelmox_climate
     type yelmox_climate_class
         character(len=16)       :: method = ""   ! snapclim | snapesm | esm | rembo
         character(len=256)      :: grid_name     ! the climate grid (grid_clim)
-        character(len=256)      :: domain        ! domain name
+        logical                 :: south = .false.   ! southern hemisphere
         type(snapclim_class)    :: snapclim
         type(snapesm_class)     :: snapesm
         type(esm_forcing_class) :: esm
@@ -65,13 +67,14 @@ module yelmox_climate
     public :: climate_init
     public :: climate_update
     public :: climate_air_anom
-    public :: climate_file_base, climate_write_2D, climate_write_1D
-    public :: climate_restart_write
+    public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
+    public :: climate_restart_write, climate_restart_read
 
 contains
 
     subroutine climate_init(cl, method, filename, domain, grid_name, nx, ny, time, basins, &
-                            sfx, timeline_group, smb_direct)
+                            south, sfx, timeline_group, smb_direct)
+        ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
         ! smb_direct: the surface mass balance is taken from the climate
         ! ([coupling] smb_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
@@ -81,13 +84,14 @@ contains
         integer,          intent(in) :: nx, ny
         real(wp),         intent(in) :: time
         real(wp),         intent(in) :: basins(:,:)
+        logical,          intent(in) :: south
         character(len=*), intent(in) :: sfx              ! namelist group suffix of the domain
         character(len=*), intent(in) :: timeline_group   ! group of the run phase's timeline
         logical,          intent(in) :: smb_direct
 
         cl%method    = trim(method)
         cl%grid_name = trim(grid_name)
-        cl%domain    = trim(domain)
+        cl%south     = south
 
         if (smb_direct .and. trim(cl%method) /= "esm" .and. trim(cl%method) /= "rembo") then
             write(*,*) "climate_init:: error: smb_method = climate needs a climate that supplies &
@@ -103,17 +107,17 @@ contains
         select case(trim(cl%method))
             case("snapclim")
                 call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, basins, &
-                                   group="snap"//trim(sfx))
+                                   south, group="snap"//trim(sfx))
             case("snapesm")
                 call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, time, basins, &
-                                  group="snap"//trim(sfx))
+                                  south, group="snap"//trim(sfx))
             case("esm")
                 call esm_init(cl, filename, domain, grid_name, "esm"//trim(sfx), timeline_group, &
                               smb_direct)
             case("rembo")
                 ! REMBO for the atmosphere and smb, snapclim for the ocean.
                 call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, basins, &
-                                   group="snap"//trim(sfx))
+                                   south, group="snap"//trim(sfx))
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))
                 cl%rembo%ta_sum = 0.0_wp
@@ -168,10 +172,10 @@ contains
         select case(trim(cl%method))
             case("snapclim")
                 if (forced) then
-                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, domain=domain, &
+                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
                                          dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx, basins=basins)
                 else
-                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, domain=domain, &
+                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
                                          dx=dx, basins=basins)
                 end if
 
@@ -196,10 +200,10 @@ contains
 
             case("snapesm")
                 if (forced) then
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, domain=domain, &
+                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
                                         dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx, basins=basins)
                 else
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, domain=domain, &
+                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
                                         dx=dx, basins=basins)
                 end if
 
@@ -270,6 +274,19 @@ contains
 
     end function climate_file_base
 
+    subroutine climate_write_init(cl, filename)
+        ! The backend's own axes in its 2D output file (created with xc, yc and
+        ! time by the caller).
+        type(yelmox_climate_class), intent(in) :: cl
+        character(len=*),           intent(in) :: filename
+
+        select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_write_init(cl%snapesm, filename)
+        end select
+
+    end subroutine climate_write_init
+
     subroutine climate_write_2D(cl, out, filename, ncid, n)
         ! Write one record of the climate (record n of an open 2D file on the
         ! climate grid): the annual near-surface air temperature and
@@ -284,6 +301,8 @@ contains
             call write2D("pr_ann", out%now%pr_ann, "mm/a", "Precipitation (ann)")
 
         select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_write_step(cl%snapesm, filename, ncid, n)
             case("esm")
                 call write_esm()
             case("rembo")
@@ -296,11 +315,8 @@ contains
 
         subroutine write_esm()
 
-            logical :: south
-
             associate(esm => cl%esm)
-            south = (trim(cl%domain) == "Antarctica")
-            call write2D("t2m_sum", esm%t2m_sum + esm_summer_mean(esm%dts, south), "K", &
+            call write2D("t2m_sum", esm%t2m_sum + esm_summer_mean(esm%dts, cl%south), "K", &
                          "Near-surface air temperature (sum)")
             call write2D("dts_ann", sum(esm%dts, dim=3)/12.0_wp, "K", "Surface air temperature anomaly")
             if (cl%esm_ctl%use_smb) then
@@ -476,17 +492,36 @@ contains
 
     subroutine climate_restart_write(cl, fldr, time, z_srf, H_ice, z_sl)
         ! The backend's own restart in the bundle folder `fldr`, with the
-        ! geometry on the climate grid: REMBO's (rembo_restart.nc); the other
-        ! backends hold no state.
+        ! geometry on the climate grid: snapesm's driving indices
+        ! (snapesm_idx_<name>_restart.nc) or REMBO's (rembo_restart.nc); snapclim
+        ! and esm hold no state.
         type(yelmox_climate_class), intent(in) :: cl
         character(len=*),           intent(in) :: fldr
         real(wp),                   intent(in) :: time
         real(wp),                   intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
 
-        if (trim(cl%method) == "rembo") &
-            call rembo_clim_restart_write(trim(fldr)//"/rembo_restart.nc", time, z_srf, H_ice, z_sl)
+        select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_restart_write(cl%snapesm, trim(fldr), time)
+            case("rembo")
+                call rembo_clim_restart_write(trim(fldr)//"/rembo_restart.nc", time, z_srf, H_ice, z_sl)
+        end select
 
     end subroutine climate_restart_write
+
+    subroutine climate_restart_read(cl, fldr)
+        ! Restore the backend's own state from the bundle folder `fldr`:
+        ! snapesm's driving indices. REMBO reads its restart itself, as set in
+        ! its own parameter file.
+        type(yelmox_climate_class), intent(inout) :: cl
+        character(len=*),           intent(in)    :: fldr
+
+        select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_restart_read(cl%snapesm, trim(fldr))
+        end select
+
+    end subroutine climate_restart_read
 
     ! ===== esm backend =====================================================
 
@@ -555,7 +590,7 @@ contains
 
         associate(esm => cl%esm, ec => cl%esm_ctl)
 
-        call esm_clim_update(esm, z_srf, time, ec%time_ref, ec%use_smb, domain, cl%grid_name)
+        call esm_clim_update(esm, z_srf, time, ec%time_ref, ec%use_smb, cl%south)
 
         ! Extrapolate the reference ocean into ice-shelf interiors.
         if (mshlf%par%extrap_shlf) then
@@ -666,7 +701,7 @@ contains
         out%has_smb = .true.
 
         ! Ocean (depth profiles) from snapclim; its reference is clim0.
-        call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, domain=domain, &
+        call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
                              dx=dx, basins=basins)
         out%now%to_ann = cl%snapclim%now%to_ann
         out%now%so_ann = cl%snapclim%now%so_ann

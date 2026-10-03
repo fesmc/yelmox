@@ -389,7 +389,7 @@ contains
     
     end subroutine esm_forcing_init
 
-    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,domain,grid_name)
+    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,south)
         ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
 
         implicit none
@@ -399,7 +399,7 @@ contains
         real(wp),                intent(IN)    :: time
         real(wp),                intent(IN)    :: time_ref(2)
         logical,                 intent(IN)    :: use_smb
-        character(len=*),        intent(IN)    :: domain, grid_name
+        logical,                 intent(IN)    :: south     ! southern hemisphere
 
         ! Local variables 
         integer :: m
@@ -407,14 +407,10 @@ contains
         real(wp), parameter :: pi = 3.14159265359 
         character(len=56)   :: slice_method, ref_grid_name 
         !type(map_scrip_class) :: mps
-        logical  :: south
 
         ! Get slices for current time
         slice_method = "extrap"
 
-        ! select domain
-        south = .FALSE. 
-        if (trim(domain).eq."Antarctica") south = .TRUE.
 
         ! Climatology reference
         ! === Atmospheric fields ===

@@ -13,9 +13,8 @@ module snapesm
     ! the group(s) supplying each field (1 = monthly, 2 = [ann, sum] -> synthesized).
     !
     ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
-    ! checked against snapclim (tests/test_snapesm_ref.f90). The module's own
-    ! output and restart (snapesm_write_*, snapesm_restart_*) are stubs; yelmox
-    ! writes snap.nc from the climate output.
+    ! checked against snapclim (tests/test_snapesm_ref.f90); output and restart
+    ! (snapesm_write_*, snapesm_restart_*) are in place; snapesm_end is a stub.
 
     use precision, only : wp, sp, dp
     use ncio
@@ -111,6 +110,7 @@ module snapesm
         character(len=256) :: var_defs      ! path to the varslice variable-database nml
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
+        logical            :: south         ! southern hemisphere (seasons, lapse rates)
         character(len=16)  :: combine       ! default combine mode
         integer            :: manifold      ! index-manifold dimension (0/1/2)
         character(len=64)  :: ref_name      ! which snapshot is the reference
@@ -152,7 +152,7 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, basins, group)
+    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, basins, south, group)
         ! Mirrors snapclim_init, plus `time` (required to initialize the tsgen indices,
         ! which anchor ramp-type series to their start time).
         implicit none
@@ -163,6 +163,7 @@ contains
         integer,               intent(IN)    :: nx, ny
         real(wp),              intent(IN)    :: time
         real(wp),              intent(IN)    :: basins(:,:)
+        logical,               intent(IN)    :: south     ! southern hemisphere
         character(len=*),      intent(IN), optional :: group
 
         character(len=64) :: base_group
@@ -175,6 +176,7 @@ contains
         call snapesm_par_load(sc, filename, trim(base_group), domain, grid_name)
         sc%par%nx = nx
         sc%par%ny = ny
+        sc%par%south = south
 
         ! Initialize the driving indices (tsgen). Group is &<base_group>_idx_<idxname>.
         do k = 1, sc%par%n_idx
@@ -188,14 +190,13 @@ contains
         return
     end subroutine snapesm_init
 
-    subroutine snapesm_update(sc, z_srf, time, domain, dTa, dTo, dSo, dx, basins)
+    subroutine snapesm_update(sc, z_srf, time, dTa, dTo, dSo, dx, basins)
         ! Mirrors snapclim_update. Pipeline: advance indices -> refresh loads ->
         ! combine -> transform -> derive.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(wp),              intent(IN)    :: time
-        character(len=*),      intent(IN)    :: domain
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
         real(wp),              intent(IN)    :: basins(:,:)
 
@@ -431,7 +432,7 @@ contains
         logical  :: south
         real(wp) :: l1, l2
 
-        south = (trim(sc%par%domain) == "Antarctica")
+        south = sc%par%south
         l1 = sc%par%lapse(1)
         l2 = sc%par%lapse(2)
 
@@ -546,54 +547,145 @@ contains
     ! Diagnostic output
     ! =====================================================================
 
-    subroutine snapesm_write_init(sc, filename, time_init)
+    subroutine snapesm_write_init(sc, filename)
+        ! Add the month and depth axes of the snapesm fields to an existing 2D
+        ! output file (xc, yc and time defined by the caller).
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
-        real(wp),              intent(IN) :: time_init
 
-        ! TODO: create NetCDF file with x/y/month/depth/time dims; write static fields.
+        call nc_write_dim(filename, "month", x=1, dx=1, nx=NMONTH, units="month")
+        if (allocated(sc%now%depth)) &
+            call nc_write_dim(filename, "depth", x=sc%now%depth, units="m")
 
         return
     end subroutine snapesm_write_init
 
-    subroutine snapesm_write_step(sc, filename, time)
+    subroutine snapesm_write_step(sc, filename, ncid, n)
+        ! Write record n of the snapesm state into an open 2D output file
+        ! (axes from snapesm_write_init): the driving indices, the surface
+        ! elevation, the monthly atmosphere, the summer and sea-level
+        ! temperatures and the ocean profiles -- the fields the enabled registry
+        ! fills.
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
-        real(wp),              intent(IN) :: time
+        integer,               intent(IN) :: ncid, n
 
-        ! TODO: append `now` fields, generalized over the enabled registry.
+        integer :: k
+
+        do k = 1, sc%par%n_idx
+            call nc_write(filename, "idx_"//trim(sc%idx_name(k)), sc%idx(k)%f_now, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="1", &
+                          long_name="Driving index "//trim(sc%idx_name(k)))
+        end do
+
+        associate(now => sc%now)
+        if (allocated(now%z_srf))   call write2D("z_srf",   now%z_srf,   "m",    "Surface elevation")
+        if (allocated(now%tas))     call write3D("tas",     now%tas,     "month", "K",    "Near-surface air temperature")
+        if (allocated(now%tsl))     call write3D("tsl",     now%tsl,     "month", "K",    "Sea-level air temperature")
+        if (allocated(now%pr))      call write3D("pr",      now%pr,      "month", "mm/d", "Precipitation")
+        if (allocated(now%ta_sum))  call write2D("ta_sum",  now%ta_sum,  "K",    "Near-surface air temperature (sum)")
+        if (allocated(now%tsl_ann)) call write2D("tsl_ann", now%tsl_ann, "K",    "Sea-level air temperature (ann)")
+        if (allocated(now%to_ann))  call write3D("to_ann",  now%to_ann,  "depth", "K",    "Ocean temperature (ann)")
+        if (allocated(now%so_ann))  call write3D("so_ann",  now%so_ann,  "depth", "PSU",  "Ocean salinity (ann)")
+        end associate
 
         return
+
+    contains
+
+        subroutine write2D(vnm, var, units, long_name)
+            character(len=*), intent(IN) :: vnm, units, long_name
+            real(wp),         intent(IN) :: var(:,:)
+            call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3="time", &
+                          start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
+                          units=units, long_name=long_name)
+        end subroutine write2D
+
+        subroutine write3D(vnm, var, dim3, units, long_name)
+            character(len=*), intent(IN) :: vnm, dim3, units, long_name
+            real(wp),         intent(IN) :: var(:,:,:)
+            call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3=dim3, dim4="time", &
+                          start=[1,1,1,n], count=[size(var,1),size(var,2),size(var,3),1], &
+                          ncid=ncid, units=units, long_name=long_name)
+        end subroutine write3D
+
     end subroutine snapesm_write_step
 
     ! =====================================================================
     ! Restart (+ provenance record)
     ! =====================================================================
 
-    subroutine snapesm_restart_write(sc, filename, time)
+    subroutine snapesm_restart_write(sc, fldr, time)
+        ! The prognostic state of snapesm: its driving indices, one tsgen restart
+        ! file per index in the bundle folder fldr (snapesm_idx_<name>_restart.nc).
+        ! Each file also carries a provenance record of the configuration as
+        ! global attributes (documentation only: the fields are recomputed from
+        ! time on the next update).
         implicit none
         type(snapesm_class), intent(IN) :: sc
-        character(len=*),      intent(IN) :: filename
+        character(len=*),      intent(IN) :: fldr
         real(wp),              intent(IN) :: time
 
-        ! TODO: tsgen_restart_write per index (real prognostic state) + a provenance
-        !       record documenting snapshots/registry/weights (documentation only).
+        character(len=512)  :: fnm
+        character(len=1024) :: snaps, fields
+        integer :: k
+
+        snaps = ""
+        do k = 1, sc%par%n_snap
+            snaps = trim(snaps)//" "//trim(sc%snap(k)%spec%name)
+        end do
+        fields = ""
+        do k = 1, sc%par%n_field
+            fields = trim(fields)//" "//trim(sc%registry(k)%name)
+        end do
+
+        do k = 1, sc%par%n_idx
+            fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
+            call tsgen_restart_write(trim(fnm), sc%idx(k), time)
+            call nc_write_attr(trim(fnm), "snapesm_index",     trim(sc%idx_name(k)))
+            call nc_write_attr(trim(fnm), "snapesm_var_defs",  trim(sc%par%var_defs))
+            call nc_write_attr(trim(fnm), "snapesm_ref_name",  trim(sc%par%ref_name))
+            call nc_write_attr(trim(fnm), "snapesm_snapshots", trim(adjustl(snaps)))
+            call nc_write_attr(trim(fnm), "snapesm_fields",    trim(adjustl(fields)))
+        end do
 
         return
     end subroutine snapesm_restart_write
 
-    subroutine snapesm_restart_read(sc, filename)
+    subroutine snapesm_restart_read(sc, fldr)
+        ! Restore the driving indices written by snapesm_restart_write (after
+        ! snapesm_init). An index without a restart file (a bundle written
+        ! before snapesm had one) keeps its cold-start state.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        character(len=*),      intent(IN)    :: filename
+        character(len=*),      intent(IN)    :: fldr
 
-        ! TODO: tsgen_restart_read per index; fields are recomputed from time on the
-        !       next update, so the provenance record is not reloaded to drive the run.
+        character(len=512) :: fnm
+        logical :: found
+        integer :: k
+
+        do k = 1, sc%par%n_idx
+            fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
+            inquire(file=trim(fnm), exist=found)
+            if (found) then
+                call tsgen_restart_read(sc%idx(k), trim(fnm))
+            else
+                write(*,*) "snapesm_restart_read:: WARNING: no restart file "//trim(fnm)// &
+                           "; keeping the cold-start state of index "//trim(sc%idx_name(k))//"."
+            end if
+        end do
 
         return
     end subroutine snapesm_restart_read
+
+    function snapesm_idx_restart_file(fldr, name) result(fnm)
+        ! Restart file of one driving index in the bundle folder fldr.
+        character(len=*), intent(IN) :: fldr, name
+        character(len=512) :: fnm
+        fnm = trim(fldr)//"/snapesm_idx_"//trim(name)//"_restart.nc"
+    end function snapesm_idx_restart_file
 
     ! =====================================================================
     ! Parameter loading & setup
@@ -808,7 +900,7 @@ contains
 
         nx = sc%par%nx
         ny = sc%par%ny
-        south = (trim(sc%par%domain) == "Antarctica")
+        south = sc%par%south
         l1 = sc%par%lapse(1)
         l2 = sc%par%lapse(2)
 

@@ -13,6 +13,13 @@ annotated git tag. Dates are release (tag) dates.
   scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files kept
   in `scripts/ant-paleo/legacy/`; the transient now runs on relative time so that
   sea level follows the record (it stayed at present day before).
+- snapesm writes its state to `snap.nc` (`[output] write_clim`): the driving
+  indices `idx_<name>`, `z_srf`, monthly `tas`/`tsl`/`pr`, `ta_sum`, `tsl_ann`
+  and the ocean profiles `to_ann`/`so_ann` (before only `t2m_ann`, `pr_ann`).
+- snapesm restarts: restart bundles hold the state of each driving index
+  (`snapesm_idx_<name>_restart.nc`, with the snapesm configuration as
+  attributes), restored on restart; bundles without them keep the cold-start
+  indices.
 - `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`;
   the originals are in `scripts/ismip7/legacy/`.
@@ -22,6 +29,9 @@ annotated git tag. Dates are release (tag) dates.
   gains `ydyn.ssa_vel_lim_method` (default `"drag"`, a smooth speed-limit drag) and
   `ssa_vel_lim_tau`; all par files take `ssa_vel_max = 10000` (was 5000) and
   `pc_eps = 0.02` (was 1.0). Ice-sheet results change.
+- The hemisphere of a domain (seasons, lapse rates in snapclim, snapesm and the
+  esm forcing) follows from the latitude of `grid_clim` (south when its mean is
+  below 0), no longer from the domain name `Antarctica`.
 - `yelmox_rembo` is removed: REMBO runs use `yelmox` with `climate = "rembo"`
   and `smb_method = "climate"`, built with `make yelmox rembo=1` (without it, a
   stub stops the run). REMBO supplies the atmosphere and smb, snapclim the ocean.

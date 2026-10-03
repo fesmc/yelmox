@@ -11,7 +11,7 @@ module kryos_output
     use smbpal,       only : smbpal_class
     use htopo,        only : htopo_write_init, htopo_write_step
     use timestepping, only : tstep_class
-    use yelmox_climate, only : climate_file_base, climate_write_2D, climate_write_1D
+    use yelmox_climate, only : climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     use cmip_output,  only : cmip_write_init, write_step_2D_cmip, write_step_1D_cmip
     use kryos,        only : kryos_domain, MAP_FLDR, remap, cadence_due
 
@@ -67,8 +67,10 @@ contains
             call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_mshlf, time)
         if (dom%ctl%write_smb) &
             call io_dims_init(trim(io_fname(outfldr,"smbpal")), dom%ctl%grid_smb,   time)
-        if (dom%ctl%write_clim) &
+        if (dom%ctl%write_clim) then
             call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
+            call climate_write_init(dom%cl, trim(io_fname(outfldr,climate_file_base(dom%cl))))
+        end if
     end subroutine domain_write_init
 
     subroutine domain_write_step(dom, outfldr, time, nms)

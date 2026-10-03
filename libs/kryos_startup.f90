@@ -24,7 +24,7 @@ module kryos_startup
                                couple_isostasy_to_yelmo, couple_smb_to_yelmo, &
                                check_isostasy_reference
     use kryos_forcing,  only : tsforcing_class, tsforcing_restart_write
-    use yelmox_climate, only : climate_restart_write
+    use yelmox_climate, only : climate_restart_write, climate_restart_read
 
     implicit none
     private
@@ -366,7 +366,7 @@ contains
         call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
         call smbpal_restart_write(dom%smb,   trim(bundle)//"/smbpal_restart.nc", time)
 
-        ! The climate backend's own state (REMBO), with the hub geometry on grid_clim.
+        ! The climate backend's own state (snapesm, REMBO), with the hub geometry on grid_clim.
         if (dom%ctl%with_climate) then
             gc = trim(dom%ctl%grid_clim)
             gh = trim(dom%ctl%grid_hub)
@@ -441,6 +441,9 @@ contains
         ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
         call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc")
+
+        ! The climate backend's own state (snapesm's driving indices).
+        if (dom%ctl%with_climate) call climate_restart_read(dom%cl, trim(fldr))
 
         ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) from the
         ! restored H_ice and the isostasy-updated z_bed/z_sl, then recompute the

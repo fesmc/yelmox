@@ -46,12 +46,13 @@ program test_snapclim_ref
     times = [0.0_wp, -21000.0_wp, -120000.0_wp]
     nt = size(times)
 
-    call snapclim_init(snp, trim(path_par), trim(domain), trim(grid), nx, ny, basins, group="snap")
+    call snapclim_init(snp, trim(path_par), trim(domain), trim(grid), nx, ny, basins, &
+                       south=.FALSE., group="snap")   ! Greenland
 
     call dump_init(trim(outfile), snp, xc, yc, times(1))
 
     do it = 1, nt
-        call snapclim_update(snp, z_srf=z_srf, time=times(it), domain=trim(domain), basins=basins)
+        call snapclim_update(snp, z_srf=z_srf, time=times(it), basins=basins)
         call dump_step(trim(outfile), snp, times(it), it)
         write(*,"(a,f12.1,a,f10.4,a,f10.4)") " time=", times(it), &
             "  ta_ann(mid)=", snp%now%ta_ann(nx/2,ny/2), &
