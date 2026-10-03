@@ -27,16 +27,24 @@ module obm
 
 contains
 
-    subroutine obm_init(obm_object, path_par, name)
-        implicit none 
-        type(obm_class) :: obm_object 
+    subroutine obm_init(obm_object, path_par, name, restart)
+        ! restart: OBM restart file to start from, or "None" for the
+        ! namelist initial state.
+        implicit none
+        type(obm_class) :: obm_object
         character(len=512):: path_par, name
+        character(len=*), intent(in) :: restart
 
         select case(name)
             case("stommel")
+                if (trim(restart) /= "None") then
+                    write(*,*) "obm_init:: error: the stommel OBM has no restart support; &
+                               &got restart = "//trim(restart)
+                    stop 1
+                end if
                 call stommel_init(obm_object, path_par, name)
             case("nautilus")
-                call nautilus_init(obm_object, path_par, name)
+                call nautilus_init(obm_object, path_par, name, restart)
             case DEFAULT
                 ! do nothing
         end select

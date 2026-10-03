@@ -1,7 +1,7 @@
 program yelmox_bipolar
     ! Multigrid yelmox driver -- bipolar (two hemispheric domains + ocean box model).
     !
-    ! Advances a Northern- and a Southern-Hemisphere ice_domain on a shared
+    ! Advances a Northern- and a Southern-Hemisphere kryos_domain on a shared
     ! timeline, coupled through a shared Ocean Box Model (OBM), following the
     ! original yelmox_bipolar convention: one parameter file holds both domains,
     ! each domain's groups carry a hemisphere suffix (yelmo_north, coupling_south,
@@ -12,15 +12,15 @@ program yelmox_bipolar
     !
     ! [ctrl] active_north / active_south select which hemispheres run; a bipolar
     ! run is never more than these two domains, so they are held as two explicit
-    ! ice_domain variables (not an array) -- the inter-domain ocean coupling is
+    ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
-    ! Per-step coupling order (matches yelmox_bipolar): shared sea level, then per
-    ! domain spinup + isostasy, then one OBM step, then per domain ice sheet +
-    ! climate, then the ocean exchanges (atm->obm, ism->obm freshwater flux,
-    ! hysteresis forcing, obm->ism ocean temperature), then per domain marine
-    ! shelf (which reads the obm-updated ocean temperature). Per-domain physics
-    ! live in libs/yelmox_domain.f90; the ocean coupling lives in
+    ! Per-step coupling order: shared sea level, then per domain spin-up tuning +
+    ! isostasy, then one OBM step, then per domain ice sheet + climate + smb,
+    ! then the ocean exchanges (atm->obm, ism->obm freshwater flux, hysteresis
+    ! forcing, obm->ism ocean temperature), then per domain marine shelf (which
+    ! reads the obm-updated ocean temperature). Per-domain physics live in the
+    ! kryos modules (libs/kryos*.f90); the ocean coupling lives in
     ! yelmox_bipolar/obm_coupling.f90. See docs/multigrid.md.
 
     use nml
@@ -28,7 +28,16 @@ program yelmox_bipolar
     use timeout
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
-    use yelmox_domain
+    use kryos,          only : kryos_domain, domain_init
+    use kryos_regions,  only : domain_regions_init
+    use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
+                               step_icesheet, couple_yelmo_to_htopo, step_climate, &
+                               step_smb, step_marine_shelf
+    use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
+                               restart_bundle_dir, restart_bundle_mkdir
+    use kryos_output,   only : domain_write_init, domain_write_step, &
+                               domain_write_init_sm, domain_write_step_sm, &
+                               domain_write_1D
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
@@ -42,14 +51,14 @@ program yelmox_bipolar
     character(len=512) :: restart_bsl
 
     ! Two explicit hemispheric domains (bipolar: never more than north + south).
-    type(ice_domain)   :: dom_north, dom_south
+    type(kryos_domain)   :: dom_north, dom_south
     character(len=512) :: outfldr_north, outfldr_south
     logical            :: active_north, active_south
 
     ! Shared, driver-owned ocean box model + its coupling control (obm_coupling).
     type(obm_class)        :: obox      ! ocean box model state ("obm" is the module name)
     type(obm_coupling_ctl) :: oc
-    character(len=512)     :: obm_file, obm_file_restart
+    character(len=512)     :: obm_file, obm_restart
 
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
     logical             :: do_2D, do_2Dsm, do_1D, do_rst
@@ -74,8 +83,8 @@ program yelmox_bipolar
     call obm_ctl_load(oc, path_par)
 
     ! === Shared, driver-owned barystatic sea level (one per run, common to both
-    !     domains, exactly as in yelmox_bipolar). Restored once from a run-level
-    !     bsl_restart.nc ([ctrl] restart_bsl) when restarting. ===
+    !     domains). Restored once from the run-level restart bundle ([ctrl]
+    !     restart_bsl, which also holds the OBM restart) when restarting. ===
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
     call nml_read(path_par, "ctrl", "restart_bsl", restart_bsl)
@@ -88,11 +97,13 @@ program yelmox_bipolar
     ! Hydrographic masks (Yelmo grid) restricting the freshwater flux per domain.
     call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
 
-    ! === Ocean box model init + output file ===
+    ! === Ocean box model init (from the run-level bundle when restarting) +
+    !     output file ===
     if (oc%active_obm) then
-        obm_file         = trim(oc%obm_name)//".nc"
-        obm_file_restart = trim(oc%obm_name)//"_restart.nc"
-        call obm_init(obox, path_par, oc%obm_name)
+        obm_file    = trim(oc%obm_name)//".nc"
+        obm_restart = "None"
+        if (trim(restart_bsl) /= "None") obm_restart = trim(restart_bsl)//"/obm_restart.nc"
+        call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
     end if
 
@@ -123,11 +134,13 @@ program yelmox_bipolar
         if (active_south) call write_domain_step(dom_south, outfldr_south)
         if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
 
-        ! Shared bsl (+ obm) restart at the run root, next to the domain bundles.
+        ! Run-level restart bundle at the run root (shared bsl + obm), next to
+        ! the per-domain bundles.
         if (do_rst) then
             call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
-            if (oc%active_obm) call write_obm_restart(obox, obm_file_restart, ts%time, "years")
+            if (oc%active_obm) call write_obm_restart(obox, &
+                    trim(restart_bundle_dir(ts%time))//"/obm_restart.nc", ts%time, "years")
         end if
 
         if (ts%is_finished) exit
@@ -138,16 +151,34 @@ program yelmox_bipolar
         ! Shared sea level: update once per step, before either domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        ! Spinup relaxation + isostasy (both domains) -- before the OBM step.
-        if (active_north) call advance_isostasy(dom_north)
-        if (active_south) call advance_isostasy(dom_south)
+        ! Spin-up tuning + isostasy (each domain), before the OBM step.
+        if (active_north) then
+            call step_spinup_tuning(dom_north, ts)
+            call step_isostasy(dom_north, ts, bsl)
+        end if
+        if (active_south) then
+            call step_spinup_tuning(dom_south, ts)
+            call step_isostasy(dom_south, ts, bsl)
+        end if
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
         if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
 
-        ! Ice sheet + hi-res hub refresh + climate/smb (both domains).
-        if (active_north) call advance_dynamics(dom_north)
-        if (active_south) call advance_dynamics(dom_south)
+        ! Ice sheet, hub refresh, climate + surface mass balance (each domain).
+        if (active_north) then
+            call couple_to_yelmo(dom_north)   ! bedrock now; smb + shelf melt lag one step
+            call step_icesheet(dom_north, ts)
+            call couple_yelmo_to_htopo(dom_north)
+            call step_climate(dom_north, ts)
+            call step_smb(dom_north, ts)
+        end if
+        if (active_south) then
+            call couple_to_yelmo(dom_south)
+            call step_icesheet(dom_south, ts)
+            call couple_yelmo_to_htopo(dom_south)
+            call step_climate(dom_south, ts)
+            call step_smb(dom_south, ts)
+        end if
 
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
         ! flux, hysteresis forcing, obm->ism ocean temperature.
@@ -175,7 +206,7 @@ contains
         ! Initialize one hemisphere: sub-models + hi-res hub + coupler maps, its
         ! output folder + regions, and the initial (cold) or restored state. The
         ! shared bsl was already initialized/restored by the driver above.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(out)   :: outfldr
 
@@ -195,39 +226,23 @@ contains
         call domain_startup(dom, ts, bsl, restore_bsl=.false.)
         if (trim(dom%ctl%restart) /= "None") then
             call step_climate(dom, ts)
+            call step_smb(dom, ts)
             call step_marine_shelf(dom, ts)
         end if
 
         write(*,*)
         write(*,*) "yelmox_bipolar: domain initialized ("//trim(adjustl(suffix))//")"
         write(*,*) "  domain      : "//trim(dom%ctl%domain)
-        write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
-        write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
+        write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_ice), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
+        write(*,*) "  topo grid   : "//trim(dom%ctl%grid_hub),  dom%topo%nx,      dom%topo%ny
         write(*,*) "  coupler maps: ", dom%cpl%nmaps
         write(*,*) "  output dir  : "//trim(outfldr)
         write(*,*)
     end subroutine setup_domain
 
-    subroutine advance_isostasy(dom)
-        ! Per-domain part that precedes the OBM step: spinup relaxation +
-        ! cb_ref/tf_corr tuning, then isostasy against the shared sea level.
-        type(ice_domain), intent(inout) :: dom
-        call step_optimize(dom, ts)
-        call step_isostasy(dom, ts, bsl)
-    end subroutine advance_isostasy
-
-    subroutine advance_dynamics(dom)
-        ! Per-domain part after the OBM step and before the ocean coupling: ice
-        ! sheet update, hi-res hub refresh, then climate + surface mass balance.
-        type(ice_domain), intent(inout) :: dom
-        call step_icesheet(dom, ts)
-        call refresh_htopo(dom)
-        call step_climate(dom, ts)
-    end subroutine advance_dynamics
-
     subroutine write_domain_init(dom, outfldr)
         ! Create the 2D + 1D output files.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
@@ -239,7 +254,7 @@ contains
         ! Append 2D/1D records and write the domain restart bundle on the shared
         ! cadence (do_2D/do_2Dsm/do_1D/do_rst, set by the driver at the top of
         ! the loop); the driver writes the single shared bsl (+ obm) restart.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)

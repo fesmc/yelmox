@@ -46,6 +46,19 @@ REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
 
+# REMBO climate backend (make rembo=1): link rembo1; by default a stub that
+# stops if climate = "rembo".
+rembo ?= 0
+ifeq ($(rembo), 1)
+    climate_rembo_obj = $(objdir)/climate_rembo.o
+    rembo_dep = rembo-static
+    rembo_lib = $(LIB_REMBO)
+else
+    climate_rembo_obj = $(objdir)/climate_rembo_stub.o
+    rembo_dep =
+    rembo_lib =
+endif
+
 # OpenMP build (make openmp=1): swap the serial dependency builds for their
 # OpenMP variants and append the compiler's OpenMP flag (set in the compiler
 # fragment as FFLAGS_OPENMP).

@@ -1,9 +1,8 @@
 module obm_coupling
-    ! Bipolar ocean coupling: exchanges scalars between an ice_domain (Yelmo +
-    ! snapclim) and the shared Ocean Box Model (OBM). Ported from
-    ! yelmox_bipolar.f90. This is a bridge module -- it sits above both
-    ! yelmox_domain (ice_domain) and the libs/obm ocean box model. It is only
-    ! pertinent to the bipolar flavor, so it lives here next to its driver.
+    ! Bipolar ocean coupling: exchanges scalars between a kryos_domain (Yelmo +
+    ! snapclim) and the shared Ocean Box Model (OBM). This is a bridge module -- it sits above both
+    ! the Kryos modules (kryos_domain) and the libs/obm ocean box model. It is only
+    ! pertinent to yelmox_bipolar, so it lives here next to its driver.
     !
     ! The whole obm stack is single precision (obm_defs preci = kind(1.0)), which
     ! matches Yelmo's wp (= sp), so obm and Yelmo/snapclim fields are exchanged
@@ -22,7 +21,8 @@ module obm_coupling
     use nml,           only : nml_read
     use ncio,          only : nc_read
     use yelmo,         only : wp
-    use yelmox_domain, only : ice_domain
+    use kryos,         only : kryos_domain
+    use yelmox_climate, only : climate_air_anom
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
     use ocean2ice,     only : calc_ocean_temperature_field
@@ -95,7 +95,7 @@ contains
         ! flux per hemisphere. Only touches a domain when it is active and its
         ! fwf coupling is on, so an inactive domain may be uninitialized.
         type(obm_coupling_ctl), intent(inout) :: oc
-        type(ice_domain),       intent(in)    :: dom_north, dom_south
+        type(kryos_domain),       intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
 
         if (.not. oc%ism2obm) return
@@ -119,7 +119,7 @@ contains
         ! their marine-shelf steps.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(obm_class),        intent(inout) :: obm
-        type(ice_domain),       intent(inout) :: dom_north, dom_south
+        type(kryos_domain),       intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         real(wp),               intent(in)    :: time, time_init, dtt
 
@@ -148,22 +148,20 @@ contains
 
     subroutine coupling_atm2obm(dom, obm, hemisphere, time)
         ! Atmosphere -> OBM: drive the box-model atmospheric temperatures + vapor
-        ! fluxes from this domain's snapclim air-temperature anomaly series.
+        ! fluxes from this domain's air-temperature anomaly index (climate_air_anom).
         ! Hemisphere-specific: north sets thetan/phin, south sets thetas/phit.
         ! Both hemispheres also set the shared tropical box temperature thetat; if
         ! both are active the south value overwrites the north one, exactly as in
         ! yelmox_bipolar (the original flagged this as redundant).
-        type(ice_domain), intent(in)    :: dom
+        type(kryos_domain), intent(in)    :: dom
         type(obm_class),  intent(inout) :: obm
         character(len=*), intent(in)    :: hemisphere
         real(wp),         intent(in)    :: time
 
-        real(wp) :: at, dTa
+        real(wp) :: dTa
 
-        ! Air-temperature anomaly (snapclim series), scaled to a temperature change.
-        ! (Reaches into the snapclim backend; the bipolar driver builds with CLIMATE=snapclim.)
-        at  = series_interp(dom%cl%snp%at%time, dom%cl%snp%at%var, time)
-        dTa = at * dom%cl%snp%par%dTa_const
+        ! Air-temperature anomaly index of the domain's climate backend.
+        dTa = climate_air_anom(dom%cl, time)
 
         select case(trim(hemisphere))
             case("north")
@@ -187,7 +185,7 @@ contains
         ! the box model's northern (fn) or southern (fs) input flux.
         ! dom is intent(inout) because calc_fwf takes its mass-balance fields as
         ! non-intent (modifiable) allocatable dummies.
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),      intent(inout) :: dom
         type(obm_class),       intent(inout) :: obm
         real(wp), allocatable, intent(inout) :: mask(:,:)
         character(len=*),      intent(in)    :: hemisphere
@@ -217,7 +215,7 @@ contains
         ! OBM -> ice sheet: broadcast the box-model ocean temperature (northern box
         ! tn / southern box ts) into the domain's snapclim ocean-temperature field
         ! to_ann, which marine_shelf then reads as its ocean forcing.
-        type(ice_domain), intent(inout) :: dom
+        type(kryos_domain), intent(inout) :: dom
         type(obm_class),  intent(in)    :: obm
         character(len=*), intent(in)    :: obm_name
         character(len=*), intent(in)    :: hemisphere
@@ -236,8 +234,7 @@ contains
     subroutine update_bipolar_hyster_forcing(t, t0, obm, dt, branch_time_thr, &
                                              rate, forcing, forc_method)
         ! Hysteresis forcing for the nautilus box model: nudge one obm control
-        ! (phit/phin/fs/fn, or fn+fs) along a prescribed path. Ported verbatim
-        ! from yelmox_bipolar.f90.
+        ! (phit/phin/fs/fn, or fn+fs) along a prescribed path.
         real(wp),          intent(in)    :: t, t0
         type(obm_class),   intent(inout) :: obm
         real(wp),          intent(in)    :: dt
@@ -282,47 +279,12 @@ contains
         end select
     end subroutine update_bipolar_hyster_forcing
 
-    ! ----- private helpers (ported from yelmox_bipolar.f90) -----
+    ! ----- private helpers -----
 
-    function series_interp(series_time, series_var, time) result(var)
-        ! Linear interpolation of a (time, var) series at `time`.
-        real(wp), dimension(:), intent(in) :: series_time, series_var
-        real(wp),               intent(in) :: time
-        real(wp) :: var
-        var = interp_linear(series_time, series_var, xout=time)
-    end function series_interp
-
-    function interp_linear(x, y, xout) result(yout)
-        ! Simple linear interpolation of a point, clamped to the series endpoints.
-        real(wp), dimension(:), intent(in) :: x, y
-        real(wp),               intent(in) :: xout
-        real(wp) :: yout
-        integer  :: j, n
-        real(wp) :: alph
-
-        n = size(x)
-        if (xout .lt. x(1)) then
-            yout = y(1)
-        else if (xout .gt. x(n)) then
-            yout = y(n)
-        else
-            do j = 1, n
-                if (x(j) .ge. xout) exit
-            end do
-            if (j .eq. 1) then
-                yout = y(1)
-            else if (j .eq. n+1) then
-                yout = y(n)
-            else
-                alph = (xout - x(j-1)) / (x(j) - x(j-1))
-                yout = y(j-1) + alph*(y(j) - y(j-1))
-            end if
-        end if
-    end function interp_linear
 
     function r8_normal_ab(a, b) result(val)
         ! Sample of a normal PDF with mean a, standard deviation b (Box-Muller).
-        ! Ported from yelmox_bipolar.f90 (John Burkardt, MIT license).
+        ! After John Burkardt (MIT license).
         real(wp), intent(in) :: a, b
         real(wp) :: val
 

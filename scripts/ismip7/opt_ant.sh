@@ -1,26 +1,26 @@
 #!/bin/bash
 #
 # ISMIP7 Antarctica optimization spin-up. Same as legacy/opt_ant.sh: all its
-# overrides are valid for the current yelmox_esm driver. opt.cf_init=-1 starts
+# overrides are valid for the current yelmox (climate = esm). opt.cf_init=-1 starts
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
 
 resolution=ANT-16KM
 output_path=output_albedo/ismip7/${resolution}/opt-l21-bedmap3
 
 ctrl_params=(
-    "yelmo.grid_name=${resolution}"
+    "domain.grid_hub=${resolution}"
     "isos.rheology_file=isostasy_data/earth_structure/yelmo/${resolution}_GIA_HR24.nc"
     "ctrl.run_step=spinup"
-    "esm.use_smb=True"
+    "coupling.smb_method=climate"
     "coupling.equil_method=opt"
     "spinup.time_end=15.0e3"
-    "spinup.kill_shelves=True"
+    "coupling.kill_shelves=True"
     "yelmo.nz_aa=11"
     "yelmo.dt_min=0.1"
     "tm_1D.dt=1.0"
     "tm_2Dsm.dt=2.5e3"
     "tm_2D.dt=15e3"
-    "esm.write_formatted=False"
+    "output.write_cmip=False"
 )
 
 opt_params=(
@@ -66,5 +66,5 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e esm --omp 8 -n yelmox_esm/yelmox_esm_Antarctica_ismip7.nml -o "${output_path}" \
+runme -rs -q 48h -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica_ismip7.nml -o "${output_path}" \
       -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"

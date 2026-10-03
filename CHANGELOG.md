@@ -18,6 +18,73 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- `yelmox_rembo` is removed: REMBO runs use `yelmox` with `climate = "rembo"`
+  and `smb_method = "climate"`, built with `make yelmox rembo=1` (without it, a
+  stub stops the run). REMBO supplies the atmosphere and smb, snapclim the ocean.
+  The par files move to `yelmox/yelmox_rembo_Greenland.nml` and
+  `yelmox/rembo_Greenland.nml` (`ctrl.time_equil` becomes
+  `coupling.time_equil_thrm`, `ctrl.write_restart` is dropped), the run script to
+  `scripts/rembo/` (runme `-e yelmox`; the `rembo` alias is gone). Output with
+  `[output] write_clim`: `rembo.nc` (`t2m_ann`, `t2m_sum`, `pr_ann` now in mm/a,
+  `smb_ann`) and `rembo_ts.nc` (`dT_sum`, the applied `f_now·f_ta`, was `dT_jja`
+  = `f_now`; `dT_ann`, `dT_ocn`, `smb_mean`, `aar`; `V_dT` is dropped); the tsgen
+  forcing is in `yelmo_ts.nc`.
+- With ESM forcing the marine shelf takes the ice-shelf base as `z_srf - H_ice`
+  (Yelmo's definition), like the other climates, instead of reconstructing it from
+  flotation. ESM results change under the ice shelves.
+- `yelmox_esm` is removed: ESM runs use `yelmox` with `climate = "esm"`. Its par
+  files move to `yelmox/yelmox_esm_*.nml` (without `[esm] use_smb`), its run
+  scripts to `scripts/ismip7/`, `scripts/tipmip/` and `scripts/1pctCO2/` (runme
+  `-e yelmox`; the `esm` alias is gone), and scripts set
+  `coupling.smb_method = climate | smbpal` instead of `esm.use_smb`.
+- Output: the climate backend writes its own file, `[output] write_clim`
+  (was `write_snap`): `snap.nc` (snapclim, snapesm) or `esm.nc` (the esm fields:
+  temperature, precipitation or SMB anomalies, shelf anomalies, discharge) plus
+  `esm_ts.nc` (the forcing means over ice and floating ice, before in
+  `yelmo_ts_esm.nc`, now on the climate grid). CMIP/ISMIP-formatted output is a
+  general option, `[output] write_cmip` / `dt_cmip` (was `[esm] write_formatted` /
+  `dt_formatted`), with its writers in `libs/cmip_output.f90`. Scripts set
+  `output.write_cmip`.
+- ESM forcing is a climate backend: `[coupling] climate = "esm"` runs
+  `esm_forcing` (unchanged) inside `yelmox`, reading `[esm]` and its periods from
+  the `run_step` group. The climate products grow: the ocean at the shelf base
+  (`T_shlf`/`S_shlf`, used by `step_marine_shelf` in place of depth profiles), the
+  surface mass balance (`smb_method = "climate"`: reference smb + anomaly,
+  corrected from the present-day surface with the smb gradient; replaces
+  `[esm] use_smb`) and subglacial discharge (`Qd`, landed by `couple_to_yelmo`).
+  `climate_update` takes the domain geometry on `grid_clim`, the marine-shelf
+  parameters and `dtt`. The ESM par files set `dt_clim = 1` (every step) and gain
+  `[tsforcing]`/`[tsgen]` (inactive).
+- Run control in `[ctrl]`: `run_step` names the group holding the timeline
+  (`"ctrl"` = `[ctrl]` itself; ESM `"spinup"`/`"transient"`), `calendar` /
+  `calendar_ref` set calendar years and their reference (ESM `True`/`2000`, before
+  hard-coded in `yelmox_esm`). Cold start in `[coupling]`, for every driver:
+  `kill_shelves` (no ice where the present-day bed is ocean) and `time_equil_thrm`
+  (equilibration with topography fixed after `init_method`), applied in
+  `domain_init_ice`. They replace the ESM `[spinup]`/`[transient]` keys
+  `kill_shelves` / `time_equil`; the fixed-topography equilibration no longer
+  requires `equil_method = "opt"`. Scripts set `coupling.kill_shelves`.
+- The climate backend is chosen at runtime: `[coupling] climate = "snapclim" |
+  "snapesm"` replaces the `make CLIMATE=` switch (one `libs/yelmox_climate.f90`
+  holds both backends; `yelmox_snapesm.x` is gone). The driver's transient forcing
+  goes to the backend (`climate_update(..., tsf)`), which applies it its own way.
+  The bipolar ocean box model takes its air-temperature anomaly from
+  `climate_air_anom` and rembo asks `climate_ocean_const`, instead of reading
+  snapclim's internals. Par files set `climate` (`"esm"` in the `yelmox_esm` ones,
+  not read until ESM becomes a backend); results do not change.
+- The domain owns its physical constants: `[domain] phys_const` (e.g. `"Earth"`,
+  a group of `input/yelmo_phys_const.nml`) is loaded once and the same record goes
+  to the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and
+  `smb_simple`. Before, Yelmo loaded them and the others took Yelmo's copy; the
+  hub had its own densities. `yelmo.phys_const` now only selects Yelmo's calendar
+  year. All par files set `phys_const = "Earth"`; results do not change.
+- The hi-res hub keeps its reference geometry (`z_bed_ref`/`H_ice_ref`/`z_srf_ref`).
+  On a hub finer than Yelmo, `couple_yelmo_to_htopo` (was `refresh_hub`) adds
+  Yelmo's bed displacement and change in ice thickness to it and recomputes
+  grounding (from flotation) and the surface on the hub (`htopo_update`), instead of overwriting the hub with
+  Yelmo's fields refined bilinearly. On Yelmo's grid the hub still mirrors
+  Yelmo. Multigrid runs (e.g. Antarctica, hub 16 km / Yelmo 32 km) change
+  through the marine shelf and the climate's surface elevation.
 - Builds use OpenMP by default (`openmp ?= 1` in `config/Makefile`); `make <driver>
   openmp=0` builds serial. Regenerate the Makefile with configme to pick it up.
 - `input/yelmo_defaults.nml` re-synced with yelmo dev (`ytrc.elsa_restart`).
@@ -34,6 +101,116 @@ annotated git tag. Dates are release (tag) dates.
   nodes" method (was quadrature), so results change. Par files drop
   `ytopo.surf_gl_method`, `ytopo.margin2nd` and `ydyn.ssa_beta_max` (removed in
   yelmo); `input/` yelmo copies re-synced. Requires that yelmo dev.
+- `input/`: yelmo input copies re-synced with yelmo kryos-init (`yelmo_defaults.nml`:
+  `yelmo.mask_border`; `yelmo-variables-ydyn.md`: `H_ice_solv`, `f_ice_solv`).
+  Requires a yelmo with these keys.
+- **New `[domain]` group defines the domain** (`[domain_north]`/`[domain_south]`
+  in bipolar): `name`, the grid of every component (`grid_hub`, `grid_ice`,
+  `grid_isos`, `grid_clim`, `grid_smb`, `grid_mshlf`; blank = default) and the
+  hub's topography and code masks (`topo_path`, `topo_names`, `regions_path`/`_var`,
+  `basins_path`/`_var`; a blank mask path gives a mask of 1). It replaces
+  `[htopo]`, the `grid_*` keys of `[coupling]` and `domain`/`grid_name` in
+  `[yelmo]` (Yelmo gets them from `[domain]`). All par files and run scripts are
+  migrated (`yelmo.grid_name`/`htopo.grid_name` -> `domain.grid_ice`/`grid_hub`,
+  `coupling.grid_*` -> `domain.grid_*`); results are unchanged. The hub grid
+  no longer tracks the Yelmo grid: `grid_ice = ""` tracks the hub instead.
+- The hub also reads the bed roughness `z_bed_sd` (4th `[domain] topo_names`
+  entry; `""` = none, 0). Par files take the name from `yelmo_init_topo`, except
+  where that was not a bed-roughness field (`bed`, `bed_bedmap3`, `H_ice`,
+  `none`), which become `""`. SRG keeps `z_bed_err`.
+- **Yelmo is populated from the domain.** Its grid comes from
+  `maps/grid_<grid_ice>.txt`, and the hub topography, remapped conservatively to
+  `grid_ice`, is both its initial topography and its present-day reference
+  (`H_ice_ref`, `z_bed_ref`, optimization target). Par files drop `yelmo.grid_path`,
+  `yelmo_init_topo.init_topo_load/path/names` and `yelmo_data.pd_topo_load/path/names`.
+  Unchanged where `grid_ice = grid_hub`; where they differ (yelmox Antarctica,
+  bipolar south: Yelmo 32 km, hub 16 km) Yelmo starts from the remapped 16 km
+  topography instead of its own 32 km files. `f_grnd_pin` (diagnostic) changes
+  where `z_bed_sd` was read from a non-roughness field. Requires yelmo kryos-init.
+- The hub fills the gaps of its topography file (missing values, e.g. outside
+  the coverage of the ISMIP7 obs files): `H_ice = 0`, `z_bed` from the nearest
+  valid cell (fesm-utils `fill_nearest`), `z_srf` from `z_bed` and `H_ice` at sea
+  level 0, and `z_bed_sd = 0`. The counts are logged. Before, the raw fill
+  values (-9e33) reached the remaps; Yelmo's own reads set them to -9999.
+- **Ice mask and named regions from the domain.** `[domain]` gains
+  `sectors_path`/`_var` (a third code mask), `ice_codes_mode` (`all`, `include`,
+  `exclude`) with `ice_codes` (codes of `regions`: where ice is allowed), and
+  `region_names`/`region_mask`/`region_codes` (named regions for 1D output,
+  `yelmo_ts_<name>.nc`). The hub's `regions` and `basins` (nearest neighbour to
+  `grid_ice`) are now Yelmo's too, one set for every component, and the ice mask
+  is passed to `yelmo_init`; `[yelmo_masks]` keeps no keys. This replaces
+  `libs/ice_sub_regions.f90` and the per-domain masks in `domain_regions_init`
+  and in Yelmo. Par files: Antarctica `exclude 2.0`, APIS/WAIS/EAIS = sectors
+  3/1/2 of `BASINS-nasa mask_regions`; Greenland `include 1.3 1.11 1.0`;
+  Laurentide `exclude 1.30`, Hudson = regions 1.12, `yelmo.mask_border = "none"`;
+  North `exclude 1.0`; others `all`. Physics is
+  unchanged where `grid_ice = grid_hub`; Yelmo's `basins`/`regions` output
+  changes where its own files differed (Antarctica `basin_reese` -> `basin`).
+- **Relaxation to the reference from the domain.** `[domain]` gains
+  `relax_codes_mode` (`none`, `all`, `include`, `exclude`), `relax_codes` (codes of
+  `regions`) and `relax_tau`: Yelmo's `tau_relax` is `relax_tau` where selected and
+  -1 (free) elsewhere, used with `ytopo.topo_rel = -1`. It replaces the Patagonia
+  case of `domain_regions_init`, which no config reached since the domain was
+  renamed SRG. `yelmox_SRG.nml`: `exclude 1.0`, 50 yr (the icefield evolves freely,
+  the rest relaxes, as the Patagonia case did); all other par files `none`.
+- Greenland no longer sets `cb_ref = ytill.cf_ref` at the start when
+  `ytill.method = -1`: an external `cb_ref` is up to the user (optimization or
+  restart). A Greenland cold start with `method = -1` and no optimization (e.g.
+  `yelmox_esm_Greenland*.nml` with `equil_method = "none"`) now starts from
+  Yelmo's `cb_ref = 1` fallback instead of 40.
+- `scale_glacial_smb` and `use_negis` apply to any domain, not only to one named
+  Greenland. `scale_glacial_smb = True` needs a `[glacial_smb]` group (`dt_lgm`,
+  `lat_lim`, `fac_lim`; were fixed at -8 K, 55°N, 0.9); `[negis]` gains
+  `basin_centre`/`basin_south`/`basin_north` (were fixed at 9.1/9.2/9.3). No par
+  file sets either switch.
+- **Cold-start ice state from `[coupling]`**, the same in every driver
+  (`domain_init_ice`): `init_marine_H` (was `greenland_init_marine_H`), then
+  `init_method` = `none`, `equil` (`init_equil_time`), `recon` or `recon_ref`
+  (`recon_path`, `recon_var`, `recon_codes`). It replaces the startup chosen by
+  domain name (and, for Laurentide/North, by `tstep_method`) and the own
+  equilibrations of `yelmox_esm` (1 yr, spin-up only) and `yelmox_rembo` (10 yr).
+  Par files keep their behaviour: Antarctica, SRG, Pyrenees, bipolar south and
+  REMBO `equil` 10 yr; ESM `equil` 1 yr; Greenland and bipolar north `none`;
+  Laurentide and North `recon` (ICE-6G_C, regions 1.1/1.11/1.12). A transient
+  Laurentide run (was "grow from zero ice") now sets `init_method = "recon_ref"`;
+  a transient North run, `none`.
+- The domain type `ice_domain` is renamed `kryos_domain`, in line with the
+  Kryos naming of the cryosphere-component framework.
+- `libs/yelmox_domain.f90` is split, by concept, into `kryos` (domain type,
+  configuration, init, `remap`), `kryos_regions` (region-specific masks and
+  physics), `kryos_coupling` (`step_*`, `couple_*_to_yelmo`), `kryos_startup`
+  (cold start, restart bundles), `kryos_output` and `kryos_forcing` (`tsforcing`).
+  Code is moved unchanged; drivers import each name explicitly.
+- Renamed coupling primitives: `step_optimize` -> `step_spinup_tuning` (it also
+  ramps the relaxation timescale), `refresh_htopo` -> `couple_yelmo_to_htopo`,
+  `domain_update_smb` -> `step_smb`.
+- `couple_to_yelmo` assembles the Yelmo boundary state as its own step, called
+  by the drivers before `step_icesheet` (which no longer runs the couplers).
+  The Greenland NEGIS friction update now sees the bedrock of the current step
+  (`use_negis = True` only; no config sets it).
+- `step_climate` no longer runs the surface mass balance; drivers call
+  `step_smb` right after it.
+- `yelmox` and `yelmox_bipolar` write the per-step coupling sequence out in the
+  time loop; `yelmox_step` and the bipolar `advance_isostasy`/`advance_dynamics`
+  wrappers are gone.
+- `step_climate` and `domain_startup` take the transient forcing object (`tsf`)
+  as one optional argument instead of `dTa`/`dTo`/`dSo`; `update_climate` applies
+  its anomalies only when it is active.
+- `domain_ctl` grid names: `grid_name` -> `grid_hub` (the hi-res hub),
+  `grid_yelmo` -> `grid_ice` (Yelmo).
+- Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
+  now set up isostasy through the shared `domain_init_isostasy` (conservative
+  ice-load coarsening + isostasy reference check). The optimisation's
+  cold-start `cb_ref` (`domain_opt_init_cb_ref`) is set before
+  `yelmo_init_state` in every driver (was after it in `yelmox`/`yelmox_bipolar`),
+  so results of `opt` cold starts change slightly.
+- `yelmox_rembo`: `greenland_init_marine_H` applies the shared rule (H = 800 m
+  where H < 600 m and z_bed > -500 m) instead of H×1.2, and the driver no longer
+  shrinks `dtt`/`dtime_emb` during a tsgen ramp.
+- `yelmox_bipolar`: the OBM restart (`obm_restart.nc`) is written into the
+  run-root restart bundle and read back from `[ctrl] restart_bsl`;
+  `&nautilus use_restart/restart` removed.
+
 - Driver time loops (`yelmox`, `yelmox_bipolar`, `yelmox_esm`, `yelmox_rembo`):
   output and restarts are written at the top of the loop for the current time
   (`time_init` on the first pass), then the loop exits once finished, else
@@ -151,6 +328,8 @@ annotated git tag. Dates are release (tag) dates.
   memory (differing between builds). Results are unchanged.
 
 ### Removed
+- `libs/simpleclim.f90` (empty stub) and the unreachable `"const"` branch of
+  the LGM-north cold start.
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.
 - Legacy single-grid programs (`<flavor>/legacy/`, `make <flavor>-legacy`) and
   retired flavors (`retired/`: `yelmox_ismip6`, `yelmox_nahosmip`,

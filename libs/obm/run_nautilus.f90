@@ -21,7 +21,7 @@ program run_nautilus
 
     ! Initialize Nautilus object
     type(obm_class) :: nautilus
-    call nautilus_init(nautilus, "/home/sergio/entra/proyects/d07_YelmoXBipolar/v1.12.2/par/obm_nautilus.nml","nautilus")
+    call nautilus_init(nautilus, "/home/sergio/entra/proyects/d07_YelmoXBipolar/v1.12.2/par/obm_nautilus.nml","nautilus","None")
 
     do n = 0, ceiling((tend-t0)/dt)
         ! Get current time 

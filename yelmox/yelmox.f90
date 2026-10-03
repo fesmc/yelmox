@@ -1,43 +1,65 @@
 program yelmox
     ! Multigrid yelmox driver (single domain).
     !
-    ! Initializes one ice_domain (each sub-model on its own configurable grid)
+    ! Initializes one kryos_domain (each sub-model on its own configurable grid)
     ! plus the hi-res topography reference hub and the coupler maps, builds the
     ! initial boundary state (or restores a restart bundle), and runs the coupling
     ! time loop with per-module output. The multi-domain (bipolar) variant lives
-    ! in yelmox_bipolar/. See docs/multigrid.md and libs/yelmox_domain.f90.
+    ! in yelmox_bipolar/. See docs/multigrid.md and libs/kryos*.f90.
 
     use nml
     use timestepping
     use timeout
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
-    use yelmox_domain
+    use kryos,          only : kryos_domain, domain_init
+    use kryos_regions,  only : domain_regions_init
+    use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
+                               step_icesheet, couple_yelmo_to_htopo, step_climate, &
+                               step_smb, step_marine_shelf
+    use kryos_startup,  only : domain_startup, run_restart_write
+    use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
+                               tsforcing_kill, tsforcing_restart_due, &
+                               tsforcing_restart_fldr, tsforcing_restart_read, &
+                               tsforcing_write_step
+    use kryos_output,   only : domain_write_init, domain_write_step, &
+                               domain_write_init_sm, domain_write_step_sm, &
+                               domain_write_1D, domain_write_cmip
 
     implicit none
 
     character(len=512) :: path_par
     type(tstep_class)  :: ts
-    type(ice_domain)   :: dom
+    type(kryos_domain)   :: dom
     type(bsl_class)    :: bsl        ! shared, driver-owned barystatic sea level
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
 
     character(len=512) :: outfldr
     real(wp)           :: dtt
 
+    ! Run control ([ctrl]): the group holding this run phase's timeline (e.g.
+    ! "spinup", "transient"; "ctrl" = [ctrl] itself), and whether the timeline
+    ! is in calendar years (tstep_const then a calendar time, against calendar_ref).
+    character(len=56)  :: run_step
+    logical            :: calendar
+    real(wp)           :: calendar_ref
+
     ! Transient time-series forcing (tsgen), owned by the driver. The single
-    ! forcing value f_now is mapped onto the snapclim anomalies via per-channel
+    ! forcing value f_now is mapped onto the climate anomalies via per-channel
     ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
     ! The tsforcing_class also owns the forcing-increment restart bookkeeping and
-    ! the kill switch (see libs/yelmox_domain.f90).
+    ! the kill switch (see libs/kryos_forcing.f90).
     type(tsforcing_class) :: tsf
     real(wp) :: fvar
 
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
 
-    ! Timestepping (driver-owned; the [ctrl] group holds the shared timeline).
-    call tstep_init(ts, path_par, "ctrl", dtt)
+    ! Timestepping (driver-owned; the [run_step] group holds the shared timeline).
+    call nml_read(path_par, "ctrl", "run_step",     run_step)
+    call nml_read(path_par, "ctrl", "calendar",     calendar)
+    call nml_read(path_par, "ctrl", "calendar_ref", calendar_ref)
+    call tstep_init(ts, path_par, trim(run_step), dtt, time_ref=calendar_ref, cal=calendar)
 
     ! Single-domain runs write to the run dir.
     outfldr = "./"
@@ -47,13 +69,13 @@ program yelmox
     call bsl_update(bsl, ts%time_rel)
 
     ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
-    ! reads the timeline values it needs from the same [ctrl] group.
-    call domain_init(dom, path_par, ts%time)
+    ! reads the timeline values it needs from the same [run_step] group.
+    call domain_init(dom, path_par, ts%time, timeline_group=trim(run_step))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
 
-    ! Transient time-series forcing (tsgen -> snapclim anomalies). Initialize
+    ! Transient time-series forcing (tsgen -> climate anomalies). Initialize
     ! before startup so the initial (cold-start) climate carries the same
     ! anomalies as the time loop. tsforcing reads [tsforcing] + [tsgen]; on a
     ! restart run, resume the series from the saved tsgen state in the bundle.
@@ -64,30 +86,19 @@ program yelmox
     ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
     ! then re-establish the climate/smb and marine-shelf forcing from the
     ! restored state (the bundle does not hold them), so the first step and the
-    ! first output see a valid boundary state. Pass the forcing anomalies only
-    ! when active, so snapclim keeps its own index when there is no transient
-    ! forcing.
-    if (trim(dom%ctl%restart) == "None") then
-        if (tsf%active) then
-            call domain_startup(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call domain_startup(dom, ts, bsl)
-        end if
-    else
-        call domain_startup(dom, ts, bsl)
-        if (tsf%active) then
-            call step_climate(dom, ts, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call step_climate(dom, ts)
-        end if
+    ! first output see a valid boundary state.
+    call domain_startup(dom, ts, bsl, tsf=tsf)
+    if (trim(dom%ctl%restart) /= "None") then
+        call step_climate(dom, ts, tsf)
+        call step_smb(dom, ts)
         call step_marine_shelf(dom, ts)
     end if
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"
     write(*,*) "  domain      : "//trim(dom%ctl%domain)
-    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_yelmo), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
-    write(*,*) "  topo grid   : "//trim(dom%ctl%grid_name),  dom%topo%nx,      dom%topo%ny
+    write(*,*) "  Yelmo grid  : "//trim(dom%ctl%grid_ice), dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny
+    write(*,*) "  topo grid   : "//trim(dom%ctl%grid_hub),  dom%topo%nx,      dom%topo%ny
     write(*,*) "  coupler maps: ", dom%cpl%nmaps
     write(*,*)
 
@@ -102,6 +113,7 @@ program yelmox
     if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
     if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
     if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+    call domain_write_cmip(dom, trim(outfldr), ts, init=.TRUE.)
 
     ! === main time loop ===
     ! Output and restarts are written at the top of the loop for the current
@@ -125,6 +137,9 @@ program yelmox
             call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
         end if
 
+        ! CMIP-formatted output ([output] write_cmip, every dt_cmip).
+        call domain_write_cmip(dom, trim(outfldr), ts)
+
         ! Restart bundle (domain + shared bsl + tsforcing state).
         if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then
             call run_restart_write(dom, bsl, ts%time, tsf=tsf)
@@ -138,15 +153,22 @@ program yelmox
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
 
+        ! Transient forcing: advance the series every step (feedback methods need
+        ! the response-derivative window); response variable = ice volume [Gt].
         if (tsf%active) then
-            ! Advance the forcing series every step (feedback methods need the
-            ! response-derivative window); response variable = ice volume [Gt].
             fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
             call tsforcing_update(tsf, ts%time, var=fvar)
-            call yelmox_step(dom, ts, bsl, dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo)
-        else
-            call yelmox_step(dom, ts, bsl)
         end if
+
+        ! === coupling sequence ===
+        call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+        call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
+        call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+        call step_icesheet(dom, ts)       ! yelmo_update
+        call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
+        call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
+        call step_smb(dom, ts)            ! surface mass balance
+        call step_marine_shelf(dom, ts)   ! shelf melt
 
         ! Forcing-increment restart each |Δf| > restart_every_df (folders
         ! restart-<n>), so a ramp can be branched at fixed forcing levels.

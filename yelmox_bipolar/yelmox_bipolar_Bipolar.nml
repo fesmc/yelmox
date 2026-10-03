@@ -20,7 +20,7 @@
 
     active_north    = True              ! Run the Northern-Hemisphere domain?
     active_south    = True              ! Run the Southern-Hemisphere domain?
-    restart_bsl     = "None"            ! Shared bsl restart bundle folder, or "None"
+    restart_bsl     = "None"            ! Run-level restart bundle folder (bsl + obm), or "None"
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
     active_obm       = False            ! Run the shared ocean box model?
@@ -85,10 +85,6 @@
     hyster_forcing_method = "triangular"     ! "linear", "triangular", "sin", "noise"
     hyster_rate = 0.0                        ! rate (amplitude for "sin"/"noise")
     hyster_positive_branch_time = 0.0        ! branch time (period for "sin")
-
-    ! ctrl
-    use_restart = False
-    restart = "none"
 
     ! Constants
     specific_heat_capacity = 4000       ! [Jkg-1C-1] Specific heat capacity of seawater
@@ -386,9 +382,7 @@
 /
 
 &yelmo_south
-    domain          = "Antarctica"
-    grid_name       = "ANT-32KM"
-    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    ! domain, grid_name and the grid come from &domain_south
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     nml_ytopo       = "ytopo"
@@ -424,18 +418,11 @@
 /
 
 &yelmo_masks_south
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin_reese" "basin_mask"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+    ! regions and basins come from the hub ([domain_south])
 /
 
 &yelmo_init_topo_south
-    init_topo_load    = True 
-    init_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    init_topo_names   = "H_ice" "z_bed" "z_bed_sd" "z_srf"      ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The initial topography comes from the hub ([domain_south])
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -444,9 +431,7 @@
 /
 
 &yelmo_data_south
-    pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The present-day topography comes from the hub ([domain_south])
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc" 
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
@@ -798,41 +783,57 @@
     q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
 /
 
-&htopo_south
-    domain       = "Antarctica"
-    grid_name    = "ANT-16KM"      ! hi-res reference hub; "" would track the Yelmo grid
+&domain_south
+    ! Domain definition: name, the grid of every component, and the hub's
+    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Antarctica"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "ANT-16KM"         ! hi-res geometry hub
+    grid_ice     = "ANT-32KM"         ! Yelmo [grid_hub]
+    grid_isos    = "ANT-32KM"         ! isostasy [grid_ice]
+    grid_clim    = "ANT-32KM"         ! reference climate + transient forcing [grid_ice]
+    grid_smb     = "ANT-32KM"         ! surface mass balance [grid_clim]
+    grid_mshlf   = "ANT-16KM"         ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    name_z_bed   = "z_bed"
-    name_H_ice   = "H_ice"
-    name_z_srf   = "z_srf"
-    basins_load  = True
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
+    regions_var  = "mask"
+    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
+    basins_var   = "basin"
+    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" ! "" = none (sectors = 1)
+    sectors_var  = "mask_regions"
+    ice_codes_mode = "exclude"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
+    ice_codes    = 2.0               ! codes of regions ("" = none)
+    region_names = "APIS" "WAIS" "EAIS" ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
+    region_mask  = "sectors"         ! code mask of the named regions: regions, basins or sectors
+    region_codes = 3.0 1.0 2.0       ! one code per named region
+    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
+    relax_codes  = ""                ! codes of regions ("" = none)
+    relax_tau    = 0.0               ! [yr] relaxation timescale there
 /
 
 &coupling_south
-    ! Domain setup: active components + methods, per-component grids, restart.
+    ! Coupling: active components + methods, restart.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
-    equil_method    = "opt"    ! "none", "relax", "opt"
-    smb_method      = "smbpal" ! "smbpal" or "smb_simple"
+    equil_method    = "opt"    ! "none" or "opt"
+    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
-    grid_mshlf = "ANT-16KM"    ! hi-res hub grid; set "ANT-32KM" to keep mshlf on the Yelmo grid
-    grid_isos  = "ANT-32KM"    ! isostasy grid; default = grid_yelmo (identity, exact parity)
-    grid_clim  = "ANT-32KM"    ! climate grid; must have forcing data (default = grid_yelmo)
-    grid_smb   = "ANT-32KM"    ! smb grid; default = grid_clim
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
-    ! Domain-specific switches (Greenland only; keep False elsewhere).
-    scale_glacial_smb       = False   ! Reduce negative glacial smb (Greenland)
-    lim_pd_ice              = False   ! Extra melt outside PD ice extent (Greenland)
-    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
+    ! Optional switches.
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_south] group)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis_south] group)
+    init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_equil_time         = 10.0      ! [yr] equil: equilibration time
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
+    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 /
 
 &output_south
@@ -840,8 +841,10 @@
     write_isos  = True
     write_mshlf = True
     write_smb   = True
-    write_snap  = True
+    write_clim  = True
     write_htopo = True
+    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip     = 1.0          ! [yr] its interval
 /
 
 &opt_north
@@ -876,9 +879,7 @@
 /
 
 &yelmo_north
-    domain          = "Greenland"
-    grid_name       = "GRL-16KM"
-    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    ! domain, grid_name and the grid come from &domain_north
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     nml_ytopo       = "ytopo"
@@ -914,18 +915,11 @@
 /
 
 &yelmo_masks_north
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin" "basin_mask"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+    ! regions and basins come from the hub ([domain_north])
 /
 
 &yelmo_init_topo_north
-    init_topo_load    = True 
-    init_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    init_topo_names   = "H_ice" "z_bed" "z_bed_sd" "z_srf"      ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The initial topography comes from the hub ([domain_north])
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -934,9 +928,7 @@
 /
 
 &yelmo_data_north
-    pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+    ! The present-day topography comes from the hub ([domain_north])
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
@@ -1279,19 +1271,34 @@
     q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
 /
 
-&htopo_north
-    domain       = "Greenland"
-    grid_name    = ""              ! "" tracks the Yelmo grid (topo read natively, no remapping)
+&domain_north
+    ! Domain definition: name, the grid of every component, and the hub's
+    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Greenland"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "GRL-16KM"         ! hi-res geometry hub
+    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_isos    = "GRL-32KM"         ! isostasy [grid_ice]
+    grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
+    grid_smb     = "GRL-32KM"         ! surface mass balance [grid_clim]
+    grid_mshlf   = "GRL-32KM"         ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    name_z_bed   = "z_bed"
-    name_H_ice   = "H_ice"
-    name_z_srf   = "z_srf"
-    basins_load  = True
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
+    regions_var  = "mask"
+    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
+    basins_var   = "basin"
+    sectors_path = ""                ! "" = none (sectors = 1)
+    sectors_var  = ""
+    ice_codes_mode = "include"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
+    ice_codes    = 1.3 1.11 1.0      ! codes of regions ("" = none)
+    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
+    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
+    region_codes = ""                ! one code per named region
+    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
+    relax_codes  = ""                ! codes of regions ("" = none)
+    relax_tau    = 0.0               ! [yr] relaxation timescale there
 /
 
 &coupling_north
@@ -1300,19 +1307,19 @@
     with_climate      = True
     with_marine_shelf = True
     equil_method    = "none"
+    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     smb_method      = "smbpal"
     dt_clim         = 10.0
-    grid_mshlf = "GRL-32KM"
-    grid_isos  = "GRL-32KM"
-    grid_clim  = "GRL-32KM"
-    grid_smb   = "GRL-32KM"
     restart    = "None"
 
-    ! Domain-specific switches (Greenland).
-    scale_glacial_smb       = False   ! Reduce negative glacial smb
+    ! Optional switches.
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_north] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
+    init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
+    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 /
 
 &output_north
@@ -1320,7 +1327,9 @@
     write_isos  = True
     write_mshlf = True
     write_smb   = True
-    write_snap  = True
+    write_clim  = True
     write_htopo = True
+    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip     = 1.0          ! [yr] its interval
 /
 

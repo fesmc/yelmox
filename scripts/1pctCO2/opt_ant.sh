@@ -4,12 +4,12 @@ resolution=ANT-16KM
 output_path=output_albedo/1pctCO2/opt-${resolution}-l21-bedmap3
 
 ctrl_params=(
-    "yelmo.grid_name=${resolution}"
+    "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
-    "esm.use_smb=False"
+    "coupling.smb_method=smbpal"
     "coupling.equil_method=opt"
     "spinup.time_end=15.0e3"
-    "spinup.kill_shelves=True"
+    "coupling.kill_shelves=True"
     "tm_1D.dt=10.0"
     "tm_2Dsm.dt=2e3"
     "yelmo.nz_aa=11"
@@ -65,5 +65,5 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e esm --omp 8 -n yelmox_esm/yelmox_esm_Antarctica_1pctCO2.nml -o "${output_path}" \
+runme -rs -q 48h -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica_1pctCO2.nml -o "${output_path}" \
       -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${hyd_params[@]}" "${mat_params[@]}"

@@ -45,43 +45,65 @@ $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 $(objdir)/snapesm.o: $(libdir)/snapesm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# ---- Climate backend selection: snapclim (default) or snapesm ----------------
-# The backend-agnostic domain (yelmox_domain) reads dom%clim, filled by the
-# yelmox_climate adapter. Both adapter variants share the module name yelmox_climate;
-# CLIMATE selects which source (and backend object) is compiled. Build with e.g.
-#   make yelmox CLIMATE=snapesm
-CLIMATE ?= snapclim
-ifeq ($(CLIMATE),snapesm)
-    climate_backend_obj = $(objdir)/snapesm.o
-    yelmox_climate_src  = $(libdir)/yelmox_climate_snapesm.f90
-else
-    climate_backend_obj = $(objdir)/snapclim.o
-    yelmox_climate_src  = $(libdir)/yelmox_climate_snapclim.f90
-endif
-
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/yelmox_climate.o: $(yelmox_climate_src) $(objdir)/climate_out.o $(climate_backend_obj)
+# REMBO for the rembo climate backend: the adapter over rembo1 with rembo=1,
+# else a stub with the same interface that stops if climate = "rembo".
+$(objdir)/climate_rembo.o: $(libdir)/climate_rembo.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_REMBO) -c -o $@ $<
+
+$(objdir)/climate_rembo_stub.o: $(libdir)/climate_rembo_stub.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+# The climate backend of a domain ([coupling] climate = snapclim | snapesm | esm
+# | rembo), chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
+$(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o \
+						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/esm_forcing.o \
+						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o $(climate_rembo_obj)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
 # Hi-res topography reference hub for multigrid yelmox
 $(objdir)/htopo.o: $(libdir)/htopo.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# Multigrid coupling driver support (ice_domain + step_* primitives)
-$(objdir)/yelmox_domain.o: $(libdir)/yelmox_domain.f90 $(objdir)/marine_shelf.o \
+# Kryos: the domain (kryos_domain + config + init + remap) and the modules built
+# on it -- region-specific physics, per-step coupling, cold start + restarts,
+# output, and the driver-owned transient forcing.
+$(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o \
 						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
 						$(objdir)/htopo.o \
-						$(objdir)/sediments.o $(objdir)/geothermal.o \
-						$(objdir)/ice_sub_regions.o
+						$(objdir)/sediments.o $(objdir)/geothermal.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
-# Bipolar ocean coupling: bridge over ice_domain (yelmox_domain) + the obm box
-# model. Lives alongside the bipolar driver in yelmox_bipolar/ -- it is only
-# pertinent to that flavor -- and is linked via obm_libs (bipolar targets only).
-$(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/yelmox_domain.o \
+$(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o \
+						$(objdir)/htopo.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+$(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
+						$(objdir)/kryos_regions.o $(objdir)/kryos_forcing.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+$(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
+
+$(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \
+						$(objdir)/kryos_regions.o $(objdir)/kryos_coupling.o \
+						$(objdir)/kryos_forcing.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+# CMIP/ISMIP-formatted output ([output] write_cmip)
+$(objdir)/cmip_output.o: $(libdir)/cmip_output.f90 $(objdir)/marine_shelf.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
+
+$(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)/cmip_output.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
+
+# Bipolar ocean coupling: bridge over kryos_domain + the obm box model. Lives
+# alongside the bipolar driver in yelmox_bipolar/ -- it is only pertinent to
+# that flavor -- and is linked via obm_libs (bipolar targets only).
+$(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<
 
@@ -143,9 +165,6 @@ $(objdir)/pico_physics.o: $(libdir)/pico/pico_physics.f90
 $(objdir)/pico.o: $(libdir)/pico/pico.f90 $(objdir)/pico_geometry.o $(objdir)/pico_physics.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/ice_sub_regions.o: $(libdir)/ice_sub_regions.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $^
-
 # oceanic models for bipolar mode
 $(objdir)/obm_defs.o: $(libdir)/obm/obm_defs.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -190,13 +209,20 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/smbpal.o \
 					    $(objdir)/smb_simple.o \
 					    $(objdir)/climate_out.o \
+					    $(climate_rembo_obj) \
 					    $(objdir)/yelmox_climate.o \
-					    $(climate_backend_obj) \
+					    $(objdir)/snapclim.o \
+					    $(objdir)/snapesm.o \
 						$(objdir)/htopo.o \
-						$(objdir)/yelmox_domain.o \
-						$(objdir)/ice_sub_regions.o
+						$(objdir)/kryos.o \
+						$(objdir)/kryos_regions.o \
+						$(objdir)/kryos_coupling.o \
+						$(objdir)/kryos_forcing.o \
+						$(objdir)/kryos_startup.o \
+						$(objdir)/cmip_output.o \
+						$(objdir)/kryos_output.o
 
-# Ocean box model stack + its ice_domain coupling bridge: bipolar-only, linked
+# Ocean box model stack + its kryos_domain coupling bridge: bipolar-only, linked
 # on top of yelmox_libs by the yelmox_bipolar targets.
 obm_libs = 				$(objdir)/obm_defs.o\
 						$(objdir)/ice2ocean.o\

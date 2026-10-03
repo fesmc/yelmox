@@ -31,21 +31,24 @@ module nautilus
     
     contains
 
-    subroutine nautilus_init(ntls, filename, group)
+    subroutine nautilus_init(ntls, filename, group, restart)
+        ! restart: restart file to take the prognostic state from (last time
+        ! record), or "None" for the namelist initial state.
 
-        implicit none 
+        implicit none
 
         type(obm_class), intent(INOUT) :: ntls
-        character(len=*),  intent(IN) :: filename, group 
+        character(len=*),  intent(IN) :: filename, group
+        character(len=*),  intent(IN) :: restart
 
         integer          :: n
         logical          :: use_restart
-        character(len=256) :: ocn_restart
+        character(len=512) :: ocn_restart
+
+        use_restart = (trim(restart) /= "None")
+        ocn_restart = trim(restart)
 
         ! Read parameters from namelist file
-        call nml_read(filename, group, "use_restart", use_restart)
-        call nml_read(filename, group, "restart", ocn_restart)
-
         call nml_read(filename, group, "specific_heat_capacity", ntls%par%specific_heat_capacity)
         call nml_read(filename, group, "density_of_seawater", ntls%par%density_of_seawater)
         call nml_read(filename, group, "therm_exp_coeff", ntls%par%therm_exp_coeff)

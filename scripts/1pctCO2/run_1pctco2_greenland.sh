@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 1pctCO2 forcing-only workflow for Greenland (refactored yelmox_esm) -- SCAFFOLD.
+# 1pctCO2 forcing-only workflow for Greenland (yelmox, climate = esm) -- SCAFFOLD.
 #
 #   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
 #   Step 2  scenarios  the 1pctCO2 run, branched off that bundle
@@ -20,22 +20,22 @@
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
-#   yelmox_esm/run_1pctco2_greenland.sh spinup
-#   yelmox_esm/run_1pctco2_greenland.sh scenarios
+#   scripts/1pctCO2/run_1pctco2_greenland.sh spinup
+#   scripts/1pctCO2/run_1pctco2_greenland.sh scenarios
 #
 # Stage only (create dirs + SLURM submit script, do NOT submit): STAGE=1
 #
-#   STAGE=1 yelmox_esm/run_1pctco2_greenland.sh spinup
+#   STAGE=1 scripts/1pctCO2/run_1pctco2_greenland.sh spinup
 #
 # NOTE: the GRL-8KM grid needs a large stack. The SLURM submit script sets it; for
 # a local run first do:  ulimit -s unlimited
 #
 set -euo pipefail
-cd "$(dirname "$0")/.." || exit 1                  # repo root
+cd "$(dirname "$0")/../.." || exit 1               # repo root
 
 # ---- configuration ---------------------------------------------------------
-EXE="esm"                                          # -> libyelmox/bin/yelmox_esm.x
-NML="yelmox_esm/yelmox_esm_Greenland_1pctCO2.nml"
+EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
+NML="yelmox/yelmox_esm_Greenland_1pctCO2.nml"
 OUTROOT="output/1pctco2_grl"
 GCM="1pctCO2-r1i1p4f1"                             # label only (no {gcm} templating in the par nml)
 GRID="GRL-8KM"
@@ -59,7 +59,7 @@ case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
       -p ctrl.run_step=spinup esm.experiment=ctrl esm.esm_name="$GCM" \
-         yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+         domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
@@ -67,7 +67,7 @@ case "${1:-}" in
       runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.use_esm=True esm.use_hist=False esm.use_proj=True \
-           yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+           domain.grid_hub="$GRID" \
            coupling.restart="$BUNDLE" \
            transient.time_init="$PROJ_INIT" transient.time_end="$PROJ_END"
     done

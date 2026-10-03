@@ -5,15 +5,17 @@ module snapesm
     !   Indices   -> tsgen      (one tsgen_class per driving index)
     !   Wrapper   -> this module (blend + transforms + derive + output state + restart)
     !
-    ! Replacement for the monolithic `snapclim`. See docs/snapesm-design.md for the
-    ! design rationale, the unified five-knob model, and the migration plan.
+    ! Replacement for the monolithic `snapclim`. See docs/climate-snap.md for its
+    ! configuration.
     !
     ! Config model: a `var_defs` database nml defines varslice groups (permanent
     ! per-file variable metadata); each climate-state group &<group>_<snapshot> names
     ! the group(s) supplying each field (1 = monthly, 2 = [ann, sum] -> synthesized).
     !
-    ! STATUS: config/loading + the pipeline structure compile; the numeric physics
-    ! (reduce / weights / transform / derive) is stubbed against snapclim references.
+    ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
+    ! checked against snapclim (tests/test_snapesm_ref.f90). The module's own
+    ! output and restart (snapesm_write_*, snapesm_restart_*) are stubs; yelmox
+    ! writes snap.nc from the climate output.
 
     use precision, only : wp, sp, dp
     use ncio
@@ -188,7 +190,7 @@ contains
 
     subroutine snapesm_update(sc, z_srf, time, domain, dTa, dTo, dSo, dx, basins)
         ! Mirrors snapclim_update. Pipeline: advance indices -> refresh loads ->
-        ! combine -> transform -> derive (see docs/snapesm-design.md).
+        ! combine -> transform -> derive.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)

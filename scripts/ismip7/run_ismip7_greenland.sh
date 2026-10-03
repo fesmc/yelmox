@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ISMIP7 workflow for Greenland (refactored yelmox_esm).
+# ISMIP7 workflow for Greenland (yelmox, climate = esm).
 #
 #   Step 1  spinup     15-kyr present-day OPTIMIZED ice-sheet spin-up
 #                      (coupling.equil_method=opt) -> writes a restart bundle
@@ -14,21 +14,21 @@
 # Run the steps in order on the cluster; let the spin-up finish before launching
 # the scenarios (they read its restart bundle):
 #
-#   yelmox_esm/run_ismip7_greenland.sh spinup
-#   yelmox_esm/run_ismip7_greenland.sh scenarios
+#   scripts/ismip7/run_ismip7_greenland.sh spinup
+#   scripts/ismip7/run_ismip7_greenland.sh scenarios
 #
 # Stage only -- create the run dirs + SLURM submit script but do NOT submit
 # (a dry run to inspect everything first): set STAGE=1
 #
-#   STAGE=1 yelmox_esm/run_ismip7_greenland.sh spinup
-#   STAGE=1 yelmox_esm/run_ismip7_greenland.sh scenarios
+#   STAGE=1 scripts/ismip7/run_ismip7_greenland.sh spinup
+#   STAGE=1 scripts/ismip7/run_ismip7_greenland.sh scenarios
 #
 set -euo pipefail
-cd "$(dirname "$0")/.." || exit 1                  # repo root
+cd "$(dirname "$0")/../.." || exit 1               # repo root
 
 # ---- configuration ---------------------------------------------------------
-EXE="esm"                                          # -> libyelmox/bin/yelmox_esm.x
-NML="yelmox_esm/yelmox_esm_Greenland.nml"
+EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
+NML="yelmox/yelmox_esm_Greenland.nml"
 OUTROOT="output/ismip7_grl"
 GCM="CESM2-WACCM"
 GRID="GRL-8KM"
@@ -57,7 +57,7 @@ case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
       -p ctrl.run_step=spinup coupling.equil_method="opt" \
-         yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+         domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
@@ -65,7 +65,7 @@ case "${1:-}" in
       runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.use_esm=True esm.use_hist=True esm.use_proj=True \
-           yelmo.grid_name="$GRID" htopo.grid_name="$GRID" \
+           domain.grid_hub="$GRID" \
            coupling.restart="$BUNDLE" \
            transient.time_init=2015 transient.time_end="$PROJ_END"
     done
