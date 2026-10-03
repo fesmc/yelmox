@@ -47,12 +47,12 @@ program test_snapesm_ref
     nt = size(times)
 
     call snapesm_init(sc, trim(path_par), trim(domain), trim(grid), nx, ny, &
-                      times(1), basins, group="snp")
+                      times(1), basins, south=.FALSE., group="snp")   ! Greenland
 
     call dump_init(trim(outfile), sc, xc, yc, times(1))
 
     do it = 1, nt
-        call snapesm_update(sc, z_srf=z_srf, time=times(it), domain=trim(domain), basins=basins)
+        call snapesm_update(sc, z_srf=z_srf, time=times(it), basins=basins)
         call dump_step(trim(outfile), sc, times(it), it)
         write(*,"(a,f12.1,a,f10.4,a,f10.4)") " time=", times(it), &
             "  ta_ann(mid)=", sc%now%ta_ann(nx/2,ny/2), &

@@ -86,6 +86,7 @@ module snapclim
         real(wp) :: f_p
         real(wp) :: f_p_ne
         real(wp) :: f_stdev
+        logical  :: south = .FALSE.   ! southern hemisphere (seasons, lapse rates)
 
     end type
 
@@ -203,7 +204,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins,group)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins,south,group)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -216,6 +217,7 @@ contains
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
         real(wp), intent(IN) :: basins(:,:)
+        logical,  intent(IN) :: south       ! southern hemisphere
         character(len=*),  intent(IN), optional :: group
 
         ! Local variables 
@@ -236,6 +238,7 @@ contains
         call snapclim_par_load(snp%par,snp%hybrid,filename,group=nml_group)
         snp%par%nx = nx 
         snp%par%ny = ny 
+        snp%par%south = south
 
         ! If using recon method load parameters 
         if (trim(snp%par%atm_type) .eq. "recon") then 
@@ -320,14 +323,14 @@ contains
         ! == clim0: reference climate (eg, present day) ==
 
         call snapshot_par_load(snp%clim0%par,filename,trim(nml_group)//"_clim0",domain,grid_name,init=.TRUE.)
-        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
+        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
         call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,trim(nml_group)//"_clim1",domain,grid_name,init=.TRUE.)                
-            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
             if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
         end if 
@@ -336,7 +339,7 @@ contains
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,trim(nml_group)//"_clim2",domain,grid_name,init=.TRUE.)                
-            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
             if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
         end if 
@@ -345,7 +348,7 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,trim(nml_group)//"_clim3",domain,grid_name,init=.TRUE.)
-            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,domain,basins)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
             if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
         end if 
@@ -383,14 +386,13 @@ contains
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,time,domain,dTa,dTo,dSo,dx,basins)
+    subroutine snapclim_update(snp,z_srf,time,dTa,dTo,dSo,dx,basins)
 
         implicit none 
 
         type(snapclim_class), intent(INOUT) :: snp
         real(wp), intent(IN)    :: z_srf(:,:) 
         real(wp), intent(IN)    :: time    ! Current simulation year
-        character(len=*), intent(IN) :: domain 
         real(wp), intent(IN)    :: basins(:,:)
         real(wp), intent(IN), optional :: dTa   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dTo   ! For atm_type='anom'
@@ -461,13 +463,8 @@ contains
         !write(*,"(6f12.2)") time, at, ap, ao, bt, bp, bo
         !stop "snapclim" 
 
-        ! Determine whether the domain is in the south or not, by checking
-        ! for the substrings ANT/ant in the domain name 
-        if (trim(domain) .eq. "Antarctica") then 
-            south = .TRUE. 
-        else 
-            south = .FALSE.
-        end if 
+        ! Hemisphere of the domain
+        south = snp%par%south
 
         ! Step 0: store z_srf and generate mask
 
@@ -603,7 +600,7 @@ contains
 
                 ! Load reconstruction fields of tas and pr for the current time 
                 call read_climate_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%z_srf, &
-                                                                    snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,time,domain,basins) 
+                                                                    snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,time,snp%par%south,basins) 
 
                 ! We  have loaded dT and pr/pr_0 fields, apply to reference climate  
                 ! to get current climate snapshot 
@@ -1152,7 +1149,7 @@ contains
 
     end subroutine calc_salinity_anom
 
-    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,f_p_ne,time,domain,basins)
+    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,f_p_ne,time,south,basins)
         ! Given a predefined climate snapshot clim (already allocated),
         ! repopulate it with new snapshot based on current time 
 
@@ -1165,7 +1162,7 @@ contains
         real(wp),       intent(IN) :: f_p 
         real(wp),       intent(IN) :: f_p_ne
         real(wp),       intent(IN) :: time 
-        character(len=*), intent(IN) :: domain 
+        logical,        intent(IN) :: south     ! southern hemisphere
         real(wp),       intent(IN) :: basins(:,:)
 
         ! Local variables 
@@ -1179,10 +1176,6 @@ contains
         real(wp), allocatable :: z_srf_pd(:,:)  
 
         real(wp) :: lapse_mon(12)   
-        logical :: south 
-
-        south = .FALSE. 
-        if (trim(domain).eq."Antarctica") south = .TRUE. 
 
         nt = size(par%clim_times,1) 
         nx = size(clim%z_srf,1)
@@ -1682,7 +1675,7 @@ contains
 
     end subroutine snapshot_par_load
 
-    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_p_ne,f_stdev,domain,basins)
+    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_p_ne,f_stdev,south,basins)
         ! `names` is a vector of names in the netcdf file that 
         ! correspond to the fields to be read in:
         ! (1) 2D elevation field
@@ -1698,7 +1691,7 @@ contains
         real(wp),       intent(IN) :: f_p 
         real(wp),       intent(IN) :: f_p_ne
         real(wp),       intent(IN) :: f_stdev
-        character(len=*), intent(IN) :: domain   
+        logical,        intent(IN) :: south     ! southern hemisphere
         real(wp),       intent(IN) :: basins(:,:)       
   
         ! Local variables
@@ -1707,10 +1700,7 @@ contains
         logical, allocatable :: mask_missing(:,:,:)
         character(len=56)  :: tmp_str 
         integer :: m 
-        logical :: south 
 
-        south = .FALSE. 
-        if (trim(domain).eq."Antarctica") south = .TRUE. 
 
         ! (Re)allocate the clim object
         call clim_allocate(clim,nx,ny)

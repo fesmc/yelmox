@@ -53,7 +53,7 @@ module yelmox_climate
     type yelmox_climate_class
         character(len=16)       :: method = ""   ! snapclim | snapesm | esm | rembo
         character(len=256)      :: grid_name     ! the climate grid (grid_clim)
-        character(len=256)      :: domain        ! domain name
+        logical                 :: south = .false.   ! southern hemisphere
         type(snapclim_class)    :: snapclim
         type(snapesm_class)     :: snapesm
         type(esm_forcing_class) :: esm
@@ -71,7 +71,8 @@ module yelmox_climate
 contains
 
     subroutine climate_init(cl, method, filename, domain, grid_name, nx, ny, time, basins, &
-                            sfx, timeline_group, smb_direct)
+                            south, sfx, timeline_group, smb_direct)
+        ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
         ! smb_direct: the surface mass balance is taken from the climate
         ! ([coupling] smb_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
@@ -81,13 +82,14 @@ contains
         integer,          intent(in) :: nx, ny
         real(wp),         intent(in) :: time
         real(wp),         intent(in) :: basins(:,:)
+        logical,          intent(in) :: south
         character(len=*), intent(in) :: sfx              ! namelist group suffix of the domain
         character(len=*), intent(in) :: timeline_group   ! group of the run phase's timeline
         logical,          intent(in) :: smb_direct
 
         cl%method    = trim(method)
         cl%grid_name = trim(grid_name)
-        cl%domain    = trim(domain)
+        cl%south     = south
 
         if (smb_direct .and. trim(cl%method) /= "esm" .and. trim(cl%method) /= "rembo") then
             write(*,*) "climate_init:: error: smb_method = climate needs a climate that supplies &
@@ -103,17 +105,17 @@ contains
         select case(trim(cl%method))
             case("snapclim")
                 call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, basins, &
-                                   group="snap"//trim(sfx))
+                                   south, group="snap"//trim(sfx))
             case("snapesm")
                 call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, time, basins, &
-                                  group="snap"//trim(sfx))
+                                  south, group="snap"//trim(sfx))
             case("esm")
                 call esm_init(cl, filename, domain, grid_name, "esm"//trim(sfx), timeline_group, &
                               smb_direct)
             case("rembo")
                 ! REMBO for the atmosphere and smb, snapclim for the ocean.
                 call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, basins, &
-                                   group="snap"//trim(sfx))
+                                   south, group="snap"//trim(sfx))
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))
                 cl%rembo%ta_sum = 0.0_wp
@@ -168,10 +170,10 @@ contains
         select case(trim(cl%method))
             case("snapclim")
                 if (forced) then
-                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, domain=domain, &
+                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
                                          dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx, basins=basins)
                 else
-                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, domain=domain, &
+                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
                                          dx=dx, basins=basins)
                 end if
 
@@ -196,10 +198,10 @@ contains
 
             case("snapesm")
                 if (forced) then
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, domain=domain, &
+                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
                                         dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx, basins=basins)
                 else
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, domain=domain, &
+                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
                                         dx=dx, basins=basins)
                 end if
 
@@ -296,11 +298,8 @@ contains
 
         subroutine write_esm()
 
-            logical :: south
-
             associate(esm => cl%esm)
-            south = (trim(cl%domain) == "Antarctica")
-            call write2D("t2m_sum", esm%t2m_sum + esm_summer_mean(esm%dts, south), "K", &
+            call write2D("t2m_sum", esm%t2m_sum + esm_summer_mean(esm%dts, cl%south), "K", &
                          "Near-surface air temperature (sum)")
             call write2D("dts_ann", sum(esm%dts, dim=3)/12.0_wp, "K", "Surface air temperature anomaly")
             if (cl%esm_ctl%use_smb) then
@@ -555,7 +554,7 @@ contains
 
         associate(esm => cl%esm, ec => cl%esm_ctl)
 
-        call esm_clim_update(esm, z_srf, time, ec%time_ref, ec%use_smb, domain, cl%grid_name)
+        call esm_clim_update(esm, z_srf, time, ec%time_ref, ec%use_smb, cl%south)
 
         ! Extrapolate the reference ocean into ice-shelf interiors.
         if (mshlf%par%extrap_shlf) then
@@ -666,7 +665,7 @@ contains
         out%has_smb = .true.
 
         ! Ocean (depth profiles) from snapclim; its reference is clim0.
-        call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, domain=domain, &
+        call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
                              dx=dx, basins=basins)
         out%now%to_ann = cl%snapclim%now%to_ann
         out%now%so_ann = cl%snapclim%now%so_ann

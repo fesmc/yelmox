@@ -98,6 +98,7 @@ module kryos
         ! grids, set grid_clim to the highest-resolution climate input.
         character(len=256) :: grid_clim = ""    ! climate grid (default = grid_ice)
         real(wp) :: dx_clim = 0.0_wp            ! climate grid spacing (Yelmo dx units)
+        logical  :: south   = .false.           ! southern hemisphere (from the grid_clim latitude)
         character(len=256) :: grid_smb = ""     ! smb grid (default = grid_clim)
 
         ! Restart bundle folder ([coupling]); "None" = cold start.
@@ -293,9 +294,13 @@ contains
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny
         dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
+        ! Hemisphere of the domain (seasons, lapse rates): south when the climate
+        ! grid lies mostly south of the equator.
+        dom%ctl%south = (sum(grid_c%lat) / size(grid_c%lat) < 0.0_wp)
         call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
         call climate_init(dom%cl, dom%ctl%climate, path_par, domain, trim(dom%ctl%grid_clim), &
-                          nx_c, ny_c, time, basins_c, sfx=trim(sfx), timeline_group=trim(tgroup), &
+                          nx_c, ny_c, time, basins_c, dom%ctl%south, sfx=trim(sfx), &
+                          timeline_group=trim(tgroup), &
                           smb_direct=(trim(dom%ctl%smb_method) == "climate"))
 
         ! --- smb on its configured grid (grid_smb) ---

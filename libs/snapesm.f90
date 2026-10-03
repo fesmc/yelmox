@@ -111,6 +111,7 @@ module snapesm
         character(len=256) :: var_defs      ! path to the varslice variable-database nml
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
+        logical            :: south         ! southern hemisphere (seasons, lapse rates)
         character(len=16)  :: combine       ! default combine mode
         integer            :: manifold      ! index-manifold dimension (0/1/2)
         character(len=64)  :: ref_name      ! which snapshot is the reference
@@ -152,7 +153,7 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, basins, group)
+    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, basins, south, group)
         ! Mirrors snapclim_init, plus `time` (required to initialize the tsgen indices,
         ! which anchor ramp-type series to their start time).
         implicit none
@@ -163,6 +164,7 @@ contains
         integer,               intent(IN)    :: nx, ny
         real(wp),              intent(IN)    :: time
         real(wp),              intent(IN)    :: basins(:,:)
+        logical,               intent(IN)    :: south     ! southern hemisphere
         character(len=*),      intent(IN), optional :: group
 
         character(len=64) :: base_group
@@ -175,6 +177,7 @@ contains
         call snapesm_par_load(sc, filename, trim(base_group), domain, grid_name)
         sc%par%nx = nx
         sc%par%ny = ny
+        sc%par%south = south
 
         ! Initialize the driving indices (tsgen). Group is &<base_group>_idx_<idxname>.
         do k = 1, sc%par%n_idx
@@ -188,14 +191,13 @@ contains
         return
     end subroutine snapesm_init
 
-    subroutine snapesm_update(sc, z_srf, time, domain, dTa, dTo, dSo, dx, basins)
+    subroutine snapesm_update(sc, z_srf, time, dTa, dTo, dSo, dx, basins)
         ! Mirrors snapclim_update. Pipeline: advance indices -> refresh loads ->
         ! combine -> transform -> derive.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(wp),              intent(IN)    :: time
-        character(len=*),      intent(IN)    :: domain
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
         real(wp),              intent(IN)    :: basins(:,:)
 
@@ -431,7 +433,7 @@ contains
         logical  :: south
         real(wp) :: l1, l2
 
-        south = (trim(sc%par%domain) == "Antarctica")
+        south = sc%par%south
         l1 = sc%par%lapse(1)
         l2 = sc%par%lapse(2)
 
@@ -808,7 +810,7 @@ contains
 
         nx = sc%par%nx
         ny = sc%par%ny
-        south = (trim(sc%par%domain) == "Antarctica")
+        south = sc%par%south
         l1 = sc%par%lapse(1)
         l2 = sc%par%lapse(2)
 

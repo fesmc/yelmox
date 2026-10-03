@@ -22,6 +22,9 @@ annotated git tag. Dates are release (tag) dates.
   gains `ydyn.ssa_vel_lim_method` (default `"drag"`, a smooth speed-limit drag) and
   `ssa_vel_lim_tau`; all par files take `ssa_vel_max = 10000` (was 5000) and
   `pc_eps = 0.02` (was 1.0). Ice-sheet results change.
+- The hemisphere of a domain (seasons, lapse rates in snapclim, snapesm and the
+  esm forcing) follows from the latitude of `grid_clim` (south when its mean is
+  below 0), no longer from the domain name `Antarctica`.
 - `yelmox_rembo` is removed: REMBO runs use `yelmox` with `climate = "rembo"`
   and `smb_method = "climate"`, built with `make yelmox rembo=1` (without it, a
   stub stops the run). REMBO supplies the atmosphere and smb, snapclim the ocean.
