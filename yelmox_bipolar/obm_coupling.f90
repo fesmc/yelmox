@@ -1,8 +1,8 @@
 module obm_coupling
     ! Bipolar ocean coupling: exchanges scalars between a kryos_domain (Yelmo +
     ! snapclim) and the shared Ocean Box Model (OBM). This is a bridge module -- it sits above both
-    ! yelmox_domain (kryos_domain) and the libs/obm ocean box model. It is only
-    ! pertinent to the bipolar flavor, so it lives here next to its driver.
+    ! the Kryos modules (kryos_domain) and the libs/obm ocean box model. It is only
+    ! pertinent to yelmox_bipolar, so it lives here next to its driver.
     !
     ! The whole obm stack is single precision (obm_defs preci = kind(1.0)), which
     ! matches Yelmo's wp (= sp), so obm and Yelmo/snapclim fields are exchanged

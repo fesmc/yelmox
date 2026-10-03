@@ -12,8 +12,10 @@ module snapesm
     ! per-file variable metadata); each climate-state group &<group>_<snapshot> names
     ! the group(s) supplying each field (1 = monthly, 2 = [ann, sum] -> synthesized).
     !
-    ! STATUS: config/loading + the pipeline structure compile; the numeric physics
-    ! (reduce / weights / transform / derive) is stubbed against snapclim references.
+    ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
+    ! checked against snapclim (tests/test_snapesm_ref.f90). The module's own
+    ! output and restart (snapesm_write_*, snapesm_restart_*) are stubs; yelmox
+    ! writes snap.nc from the climate output.
 
     use precision, only : wp, sp, dp
     use ncio

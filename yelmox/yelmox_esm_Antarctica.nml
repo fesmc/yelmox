@@ -679,8 +679,8 @@
     with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
-    equil_method    = "opt"    ! "none", "relax", "opt"
-    climate         = "esm"      ! climate backend: "snapclim", "snapesm" or "esm"
+    equil_method    = "opt"    ! "none" or "opt"
+    climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
     restart    = "None"        ! restart bundle folder, or "None" for a cold start

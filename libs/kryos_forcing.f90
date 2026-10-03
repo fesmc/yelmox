@@ -1,8 +1,8 @@
 module kryos_forcing
     ! Driver-owned transient forcing: a tsgen series whose scalar output f_now is
-    ! mapped onto snapclim's homogeneous anomalies via the [tsforcing] gains
-    ! (dTa=f_now*f_ta, dTo=f_now*f_to, dSo=f_now*f_so; only consumed by snapclim
-    ! in "anom" mode). Also holds the forcing-increment restart bookkeeping (write
+    ! mapped onto homogeneous climate anomalies via the [tsforcing] gains
+    ! (dTa=f_now*f_ta, dTo=f_now*f_to, dSo=f_now*f_so), applied by the climate
+    ! backend in its own way (yelmox_climate). Also holds the forcing-increment restart bookkeeping (write
     ! a bundle each |Δf_now| > restart_every_df, folders named restart-<n>) and
     ! surfaces the tsgen kill flag. One instance per run, held by the driver like
     ! bsl -- deliberately NOT part of kryos_domain, so multi-domain drivers choose
@@ -36,7 +36,7 @@ module kryos_forcing
 
 contains
 
-    ! ===== transient forcing (tsgen -> snapclim anomalies) ===================
+    ! ===== transient forcing (tsgen -> climate anomalies) ====================
 
     subroutine tsforcing_init(tsf, path_par, time)
         ! Read [tsforcing] and initialize the tsgen series + derived anomalies. The
@@ -80,7 +80,7 @@ contains
     end subroutine tsforcing_update
 
     subroutine tsforcing_set_anom(tsf)
-        ! Map the scalar forcing f_now onto the three snapclim anomalies.
+        ! Map the scalar forcing f_now onto the three climate anomalies.
         type(tsforcing_class), intent(inout) :: tsf
         tsf%dTa = tsf%tsg%f_now * tsf%f_ta
         tsf%dTo = tsf%tsg%f_now * tsf%f_to

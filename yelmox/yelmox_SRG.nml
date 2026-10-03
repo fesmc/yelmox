@@ -16,9 +16,9 @@
     with_isostasy     = False  ! Is isostasy active? (SRG-16KM grid when on)
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = False  ! Ocean forcing off for now (imposed constant / none)
-    equil_method    = "none"   ! "none", "relax", "opt"
-    climate         = "snapclim" ! climate backend: "snapclim", "snapesm" or "esm"
-    smb_method      = "smbpal" ! "smbpal" or "smb_simple"
+    equil_method    = "none"   ! "none" or "opt"
+    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     restart    = "None"        ! restart bundle folder, or "None" for a cold start
 

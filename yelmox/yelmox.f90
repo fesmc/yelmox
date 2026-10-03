@@ -45,10 +45,10 @@ program yelmox
     real(wp)           :: calendar_ref
 
     ! Transient time-series forcing (tsgen), owned by the driver. The single
-    ! forcing value f_now is mapped onto the snapclim anomalies via per-channel
+    ! forcing value f_now is mapped onto the climate anomalies via per-channel
     ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
     ! The tsforcing_class also owns the forcing-increment restart bookkeeping and
-    ! the kill switch (see libs/yelmox_domain.f90).
+    ! the kill switch (see libs/kryos_forcing.f90).
     type(tsforcing_class) :: tsf
     real(wp) :: fvar
 
@@ -75,7 +75,7 @@ program yelmox
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
 
-    ! Transient time-series forcing (tsgen -> snapclim anomalies). Initialize
+    ! Transient time-series forcing (tsgen -> climate anomalies). Initialize
     ! before startup so the initial (cold-start) climate carries the same
     ! anomalies as the time loop. tsforcing reads [tsforcing] + [tsgen]; on a
     ! restart run, resume the series from the saved tsgen state in the bundle.

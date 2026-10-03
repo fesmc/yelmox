@@ -53,7 +53,7 @@ module kryos
         character(len=56) :: tstep_method = "const"
         real(wp) :: dtt         = 10.0_wp
         ! Cadences + methods ([coupling]).
-        real(wp) :: dt_clim     = 10.0_wp   ! [yr] snapclim snapshot update frequency
+        real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
         character(len=56) :: equil_method = "none"
         character(len=56) :: smb_method   = "smbpal"      ! smbpal | smb_simple | climate (from the backend)
         character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm | esm | rembo
@@ -160,8 +160,8 @@ module kryos
     public :: domain_ctl, negis_params, glacial_smb_params, kryos_domain
     public :: domain_init
     public :: cadence_due
-    ! remap is used by every coupling step, and by flavor drivers (e.g. the ESM
-    ! driver) to move fields between the hub/Yelmo grids and their own grid.
+    ! remap is used by every coupling step, and by drivers to move fields
+    ! between the hub/Yelmo grids and their own grid.
     public :: remap, remap_method_smooth
 
     ! Domain-level remap: identity-copy when src == dst, else remap via the coupler.
@@ -298,8 +298,8 @@ contains
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
 
         ! --- climate on its configured grid (grid_clim) ---
-        ! snapclim reads grid-specific input data, so grid_clim must be a grid whose
-        ! forcing files exist (the Yelmo grid for the standard setup).
+        ! The climate backends read grid-specific input data, so grid_clim must be
+        ! a grid whose forcing files exist (the Yelmo grid for the standard setup).
         call grid_cdo_read_desc(grid_c, trim(dom%ctl%grid_clim), MAP_FLDR)
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny

@@ -375,10 +375,10 @@ contains
     end subroutine update_climate
 
     subroutine step_smb(dom, ts, init)
-        ! Surface mass balance on grid_smb. Two methods: smbpal (default; monthly,
-        ! needs tas/pr + geometry) or smb_simple (needs z_srf + sea-level
-        ! temperature). Geometry comes from the hi-res hub, atmospheric forcing from
-        ! snapclim (grid_clim). init=.true. runs the smbpal ITM equilibration before
+        ! Surface mass balance on grid_smb. Three methods: smbpal (default; monthly,
+        ! needs tas/pr + geometry), smb_simple (needs z_srf + sea-level
+        ! temperature) or the climate's own (climate: esm, rembo). Geometry comes from the hi-res hub, atmospheric forcing from
+        ! the climate (grid_clim). init=.true. runs the smbpal ITM equilibration before
         ! the first update. The result stays on grid_smb in the SMB model's fields
         ! (dom%smb%ann or dom%smbs); couple_smb_to_yelmo lands it on the Yelmo grid.
         type(kryos_domain),  intent(inout) :: dom

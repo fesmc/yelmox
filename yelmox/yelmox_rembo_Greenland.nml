@@ -17,7 +17,7 @@
     with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
-    equil_method    = "none"   ! "none", "relax", "opt" (legacy optimize=False -> none)
+    equil_method    = "none"   ! "none" or "opt" (legacy optimize=False -> none)
     climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapclim ocean
     smb_method      = "climate" ! the smb from the climate (REMBO)
     dt_clim         = 10.0     ! [yr] climate update interval (= dtt: REMBO has its own intervals)
