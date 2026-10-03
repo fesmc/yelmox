@@ -548,26 +548,70 @@ contains
     ! Diagnostic output
     ! =====================================================================
 
-    subroutine snapesm_write_init(sc, filename, time_init)
+    subroutine snapesm_write_init(sc, filename)
+        ! Add the month and depth axes of the snapesm fields to an existing 2D
+        ! output file (xc, yc and time defined by the caller).
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
-        real(wp),              intent(IN) :: time_init
 
-        ! TODO: create NetCDF file with x/y/month/depth/time dims; write static fields.
+        call nc_write_dim(filename, "month", x=1, dx=1, nx=NMONTH, units="month")
+        if (allocated(sc%now%depth)) &
+            call nc_write_dim(filename, "depth", x=sc%now%depth, units="m")
 
         return
     end subroutine snapesm_write_init
 
-    subroutine snapesm_write_step(sc, filename, time)
+    subroutine snapesm_write_step(sc, filename, ncid, n)
+        ! Write record n of the snapesm state into an open 2D output file
+        ! (axes from snapesm_write_init): the driving indices, the surface
+        ! elevation, the monthly atmosphere, the summer and sea-level
+        ! temperatures and the ocean profiles -- the fields the enabled registry
+        ! fills.
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
-        real(wp),              intent(IN) :: time
+        integer,               intent(IN) :: ncid, n
 
-        ! TODO: append `now` fields, generalized over the enabled registry.
+        integer :: k
+
+        do k = 1, sc%par%n_idx
+            call nc_write(filename, "idx_"//trim(sc%idx_name(k)), sc%idx(k)%f_now, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="1", &
+                          long_name="Driving index "//trim(sc%idx_name(k)))
+        end do
+
+        associate(now => sc%now)
+        if (allocated(now%z_srf))   call write2D("z_srf",   now%z_srf,   "m",    "Surface elevation")
+        if (allocated(now%tas))     call write3D("tas",     now%tas,     "month", "K",    "Near-surface air temperature")
+        if (allocated(now%tsl))     call write3D("tsl",     now%tsl,     "month", "K",    "Sea-level air temperature")
+        if (allocated(now%pr))      call write3D("pr",      now%pr,      "month", "mm/d", "Precipitation")
+        if (allocated(now%ta_sum))  call write2D("ta_sum",  now%ta_sum,  "K",    "Near-surface air temperature (sum)")
+        if (allocated(now%tsl_ann)) call write2D("tsl_ann", now%tsl_ann, "K",    "Sea-level air temperature (ann)")
+        if (allocated(now%to_ann))  call write3D("to_ann",  now%to_ann,  "depth", "K",    "Ocean temperature (ann)")
+        if (allocated(now%so_ann))  call write3D("so_ann",  now%so_ann,  "depth", "PSU",  "Ocean salinity (ann)")
+        end associate
 
         return
+
+    contains
+
+        subroutine write2D(vnm, var, units, long_name)
+            character(len=*), intent(IN) :: vnm, units, long_name
+            real(wp),         intent(IN) :: var(:,:)
+            call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3="time", &
+                          start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
+                          units=units, long_name=long_name)
+        end subroutine write2D
+
+        subroutine write3D(vnm, var, dim3, units, long_name)
+            character(len=*), intent(IN) :: vnm, dim3, units, long_name
+            real(wp),         intent(IN) :: var(:,:,:)
+            call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3=dim3, dim4="time", &
+                          start=[1,1,1,n], count=[size(var,1),size(var,2),size(var,3),1], &
+                          ncid=ncid, units=units, long_name=long_name)
+        end subroutine write3D
+
     end subroutine snapesm_write_step
 
     ! =====================================================================

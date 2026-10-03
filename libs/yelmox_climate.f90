@@ -18,7 +18,8 @@ module yelmox_climate
     use timestepping,  only : tstep_class
     use climate_out,   only : climate_out_class
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom
-    use snapesm,       only : snapesm_class, snapesm_init, snapesm_update
+    use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
+                              snapesm_write_init, snapesm_write_step
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
                               esm_forcing_update, esm_variability_update, esm_summer_mean
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
@@ -65,7 +66,7 @@ module yelmox_climate
     public :: climate_init
     public :: climate_update
     public :: climate_air_anom
-    public :: climate_file_base, climate_write_2D, climate_write_1D
+    public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     public :: climate_restart_write
 
 contains
@@ -272,6 +273,19 @@ contains
 
     end function climate_file_base
 
+    subroutine climate_write_init(cl, filename)
+        ! The backend's own axes in its 2D output file (created with xc, yc and
+        ! time by the caller).
+        type(yelmox_climate_class), intent(in) :: cl
+        character(len=*),           intent(in) :: filename
+
+        select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_write_init(cl%snapesm, filename)
+        end select
+
+    end subroutine climate_write_init
+
     subroutine climate_write_2D(cl, out, filename, ncid, n)
         ! Write one record of the climate (record n of an open 2D file on the
         ! climate grid): the annual near-surface air temperature and
@@ -286,6 +300,8 @@ contains
             call write2D("pr_ann", out%now%pr_ann, "mm/a", "Precipitation (ann)")
 
         select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_write_step(cl%snapesm, filename, ncid, n)
             case("esm")
                 call write_esm()
             case("rembo")
