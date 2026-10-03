@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>yelmox_rembo – YelmoX</title>
+<title>REMBO climate – YelmoX</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -22,41 +22,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -131,10 +96,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Flavors</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
         <li>
     <a class="dropdown-item" href="./flavors.html">
  <span class="dropdown-text">Overview</span></a>
@@ -147,19 +112,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./flavor-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="./flavor-esm.html">
- <span class="dropdown-text">yelmox_esm</span></a>
+ <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./flavor-rembo.html">
- <span class="dropdown-text">yelmox_rembo</span></a>
+ <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./multigrid.html"> 
-<span class="menu-text">Multigrid design</span></a>
+<span class="menu-text">Multigrid coupling</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -177,9 +157,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#whats-distinct" id="toc-whats-distinct" class="nav-link active" data-scroll-target="#whats-distinct">What’s distinct</a></li>
-  <li><a href="#stepping-order" id="toc-stepping-order" class="nav-link" data-scroll-target="#stepping-order">Stepping order</a></li>
-  <li><a href="#forcing" id="toc-forcing" class="nav-link" data-scroll-target="#forcing">Forcing</a></li>
+  <li><a href="#configuration" id="toc-configuration" class="nav-link active" data-scroll-target="#configuration">Configuration</a></li>
   <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output">Output</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/flavor-rembo.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -189,7 +167,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">yelmox_rembo</h1>
+<h1 class="title">REMBO climate</h1>
 </div>
 
 
@@ -206,53 +184,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>A single-domain (Greenland) driver in which <strong>REMBOv1</strong> — an energy/moisture-balance regional atmosphere with an integrated surface-mass-balance scheme — <strong>replaces the snapclim + smbpal atmosphere/SMB</strong>. The ocean forcing still comes from snapclim. REMBO’s SMB is staged into the shared SMB carrier so the generic <code>couple_smb_to_yelmo</code> lands it on the Yelmo grid like any other SMB module.</p>
+<p>Runs with <strong>REMBOv1</strong>, an energy/moisture-balance regional atmosphere with an integrated surface-mass-balance scheme, use the <code>yelmox</code> program with the REMBO climate backend: <code>[coupling] climate = "rembo"</code>. REMBO supplies the atmosphere and the surface mass balance; the ocean comes from snapclim.</p>
 <ul>
-<li><strong>Program:</strong> <code>yelmox_rembo/yelmox_rembo.f90</code> + <code>yelmox_rembo/yelmox_rembo_output.f90</code> + <code>libs/yelmox_domain.f90</code>.</li>
-<li><strong>Build:</strong> <code>make yelmox_rembo</code> (links the REMBO stack; prereq <code>rembo-static</code>).</li>
-<li><strong>Configs:</strong> <code>yelmox_rembo/yelmox_rembo_Greenland.nml</code> (main) + <code>yelmox_rembo/rembo_Greenland.nml</code> (REMBO’s own parameters, staged into the run dir).</li>
+<li><strong>Program:</strong> <code>yelmox/yelmox.f90</code>, backend in <code>libs/yelmox_climate.f90</code>, with the REMBO adapter <code>libs/climate_rembo.f90</code>.</li>
+<li><strong>Build:</strong> <code>make yelmox rembo=1</code> (links rembo1; prerequisite <code>rembo-static</code>). Without <code>rembo=1</code>, a stub (<code>libs/climate_rembo_stub.f90</code>) stops the run if <code>climate = "rembo"</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_rembo_Greenland.nml</code>, plus REMBO’s own parameters in <code>yelmox/rembo_Greenland.nml</code> (staged into the run folder via <code>.runme/info.json</code>).</li>
+<li><strong>Script:</strong> <code>scripts/rembo/run_rembo.sh</code>.</li>
 </ul>
-<section id="whats-distinct" class="level2">
-<h2 class="anchored" data-anchor-id="whats-distinct">What’s distinct</h2>
+<section id="configuration" class="level2">
+<h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
 <ul>
-<li><strong>REMBO atmosphere + SMB.</strong> REMBO is driver-owned (module-global <code>rembo_ann</code>), initialized with <code>rembo_init</code>, and advanced by <code>step_rembo</code>, which calls <code>rembo_update</code> (or <code>rembo_equilibrate</code> on the first cold-start call). REMBO runs on <code>grid_clim</code> (= the Yelmo grid in the single-grid Greenland setup) and works internally in double precision.</li>
-<li><strong>SMB via the shared carrier.</strong> <code>step_rembo</code> copies <code>rembo_ann%smb</code> / <code>%T_srf</code> into <code>dom%smb%ann%smb</code> / <code>%tsrf</code>, so the standard <code>couple_smb_to_yelmo</code> (inside <code>step_icesheet</code>) remaps it conservatively to Yelmo with the water-equiv→ice-equiv scaling and the optional <code>lim_pd_ice</code> limiter — no REMBO-specific coupler needed.</li>
-<li><strong>Ocean still from snapclim.</strong> <code>step_rembo</code> also calls <code>snapclim_update</code> on <code>grid_clim</code> for the ocean forcing (optionally adding the hysteresis ocean anomaly when <code>ocn_type = "const"</code>). Atmosphere/SMB no longer come from snapclim/smbpal.</li>
+<li><strong>Grid.</strong> REMBO runs on the grid it was compiled for (Greenland, GRL-16KM), which must be <code>grid_clim</code>; the backend checks this at start-up.</li>
+<li><strong>Surface mass balance.</strong> <code>[coupling] smb_method = "climate"</code>: REMBO’s smb and surface temperature, at the current surface. REMBO gives annual fields only, so smbpal and smb_simple are not available with it.</li>
+<li><strong>Update cadence.</strong> <code>[coupling] dt_clim = dtt</code>: REMBO updates its energy balance and its smb on its own intervals (<code>dtime_emb</code>, <code>dtime_smb</code>).</li>
+<li><strong>Ocean.</strong> The <code>[snap]</code> group, as for snapclim.</li>
+<li><strong>Transient forcing.</strong> <code>[tsforcing]</code> maps the tsgen value <code>f_now</code> onto REMBO’s anomalies: the summer air temperature <code>dT_sum = f_now·f_ta</code>, the annual <code>dT_ann = 1.3·dT_sum</code> (REMBO’s winter factor 1.6), and the ocean <code>dT_ocn = dT_ann·f_to</code>, added to a snapclim ocean held at its reference (<code>ocn_type = "const"</code>).</li>
+<li><strong>Cold start.</strong> REMBO is equilibrated (10 years) before its first update.</li>
 </ul>
-</section>
-<section id="stepping-order" class="level2">
-<h2 class="anchored" data-anchor-id="stepping-order">Stepping order</h2>
-<p>Main loop (per timestep):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">call update_hyster_forcing()     ! dT_summer / dT_ann / dT_ocn from the hyster module</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">call bsl_update(bsl, ts%time_rel)</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">call step_optimize(dom, ts)</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">call step_isostasy(dom, ts, bsl)</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">call refresh_htopo(dom)</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">call step_rembo()                ! REMBO atmosphere/SMB (-&gt; dom%smb%ann) + snapclim ocean</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">call step_marine_shelf(dom, ts)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Like the other multigrid flavors, this inlines the <code>step_*</code> primitives and substitutes <code>step_rembo</code> for the generic <code>step_climate</code>. REMBO and marine run <em>after</em> <code>step_icesheet</code>/<code>yelmo_update</code>, so their output is consumed on the next step (the standard one-step coupling lag). During a hysteresis ramp the driver also shrinks the main timestep and REMBO’s internal <code>dtime_emb</code> for stability.</p>
-</section>
-<section id="forcing" class="level2">
-<h2 class="anchored" data-anchor-id="forcing">Forcing</h2>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>REMBO still uses the legacy <code>hyster</code> module
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Transient forcing here comes from the older <code>hyster</code> module (<code>hyster_init</code>, <code>hyster_calc_forcing</code> → <code>dT_summer</code> / <code>dT_ann</code> / <code>dT_ocn</code>), <strong>not</strong> the <code>tsgen</code> <code>[tsforcing]</code> mechanism used by the single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a>. Porting REMBO’s forcing to <code>tsgen</code> is future work; for now it reads the <code>[hyster]</code> namelist group and <code>ctrl.use_hyster</code> / <code>f_ta</code> / <code>f_to</code>.</p>
-</div>
-</div>
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>REMBO runs write <code>yelmo2D.nc</code> (heavy 2D) and <code>yelmo-rembo.nc</code> (small 1D + 2D, including REMBO’s <code>T_ann</code> / <code>T_jja</code> / <code>pr</code> diagnostics), plus a restart bundle with a <code>rembo_restart.nc</code>.</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>rembo.nc</code> (annual and summer air temperature, precipitation, smb) and <code>rembo_ts.nc</code> (the applied anomalies, the smb integrated over the ice sheet and the accumulation-area ratio). The tsgen forcing goes to <code>yelmo_ts.nc</code>, as for the other climates. Restart bundles hold REMBO’s <code>rembo_restart.nc</code>; REMBO reads its restart as set in <code>rembo_Greenland.nml</code>.</p>
 
 
 </section>

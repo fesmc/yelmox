@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>snapesm-handoff – YelmoX</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-6c645bba97489949a6ce198fa08f5136.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">YelmoX</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Flavors</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+        <li>
+    <a class="dropdown-item" href="./flavors.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-yelmox.html">
+ <span class="dropdown-text">yelmox (single-domain)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-bipolar.html">
+ <span class="dropdown-text">yelmox_bipolar</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-esm.html">
+ <span class="dropdown-text">yelmox_esm</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-rembo.html">
+ <span class="dropdown-text">yelmox_rembo</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./multigrid.html"> 
+<span class="menu-text">Multigrid design</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#snapesm-session-handoff" id="toc-snapesm-session-handoff" class="nav-link active" data-scroll-target="#snapesm-session-handoff">snapesm — session handoff</a>
+  <ul class="collapse">
+  <li><a href="#where-everything-lives" id="toc-where-everything-lives" class="nav-link" data-scroll-target="#where-everything-lives">Where everything lives</a>
+  <ul class="collapse">
+  <li><a href="#commits-branch-snapclim2-newest-first" id="toc-commits-branch-snapclim2-newest-first" class="nav-link" data-scroll-target="#commits-branch-snapclim2-newest-first">Commits (branch <code>snapclim2</code>, newest first)</a></li>
+  </ul></li>
+  <li><a href="#what-is-done" id="toc-what-is-done" class="nav-link" data-scroll-target="#what-is-done">What is DONE</a></li>
+  <li><a href="#what-remains-in-model-integration" id="toc-what-remains-in-model-integration" class="nav-link" data-scroll-target="#what-remains-in-model-integration">What REMAINS — in-model integration</a></li>
+  <li><a href="#build-run-commands" id="toc-build-run-commands" class="nav-link" data-scroll-target="#build-run-commands">Build &amp; run commands</a></li>
+  <li><a href="#follow-ups-known-issues" id="toc-follow-ups-known-issues" class="nav-link" data-scroll-target="#follow-ups-known-issues">Follow-ups / known issues</a></li>
+  <li><a href="#cautions-discipline" id="toc-cautions-discipline" class="nav-link" data-scroll-target="#cautions-discipline">Cautions / discipline</a></li>
+  <li><a href="#open-design-items" id="toc-open-design-items" class="nav-link" data-scroll-target="#open-design-items">Open design items</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/snapesm-handoff.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="snapesm-session-handoff" class="level1">
+<h1>snapesm — session handoff</h1>
+<p>Working handoff for the <code>snapclim</code> → <code>snapesm</code> refactor. Read with <a href="./snapesm-design.html"><code>snapesm-design.md</code></a> (design rationale + config model).</p>
+<p><strong>Goal:</strong> replace the monolithic <code>snapclim</code> (<code>libs/snapclim.f90</code>, ~2836 lines) with a thin <code>snapesm</code> wrapper over the fesm-utils primitives <code>varslice</code> (field loading) and <code>tsgen</code>/<code>series</code> (scalar forcing), validated to tight tolerance against snapclim on real configs.</p>
+<p><strong>Status:</strong> the numeric physics port is <strong>complete and validated to tight tolerance</strong> on Greenland GRL-16KM <code>snap_1ind_new</code> + <code>fraction</code>. Remaining work is <strong>in-model integration</strong> (wire a <code>climate_backend</code> switch into <code>yelmox_domain</code>, then retire snapclim).</p>
+<hr>
+<section id="where-everything-lives" class="level2">
+<h2 class="anchored" data-anchor-id="where-everything-lives">Where everything lives</h2>
+<p><strong>yelmox worktree</strong> — <code>.claude/worktrees/snapclim2</code> (branch <code>snapclim2</code>, off <code>dev</code>; module <code>snapesm</code>). - <code>libs/snapesm.f90</code> — the module (full physics; compiles + validates). - <code>config/Makefile_yelmox.mk</code> — has the <code>snapesm.o</code> compile rule (not yet in any driver object list). - <code>input/greenland_clim.nml</code> — var_defs database (per-file varslice metadata, pd/picontrol/lgm). - <code>input/greenland_snp.nml</code> — assembly config (<code>&amp;snp</code> + field/snapshot/index groups). - <code>tests/test_snapesm_ref.f90</code>, <code>tests/test_snapclim_ref.f90</code> — the two validation harnesses (identical inline dumper, same synthetic z_srf/basins/times), <code>tests/diff_nc.py</code> — field diff, <code>tests/alpha_orbital_r2020.dat</code> — header-commented index fixture (see follow-up #2).</p>
+<p><strong>fesm-utils</strong> — symlink <code>fesm-utils -&gt; /Users/alrobi001/models/fesm-utils</code>, checkout on <strong><code>dev</code></strong> at <code>10ab52d</code>. The forcing API (<code>varslice subs</code>, <code>tsgen group</code>) is <strong>merged to dev</strong> (branch <code>snp2-forcing-api</code> is now redundant). <code>dev</code> also carries the breaking condensed varslice namelist (<code>units</code>/<code>scaling</code>/<code>time</code>) — commit <code>d35664d</code>.</p>
+<p><strong>Reference outputs</strong> — <code>logs/snapclim_ref.nc</code>, <code>logs/snapesm_ref.nc</code> (gitignored; regenerate below).</p>
+<section id="commits-branch-snapclim2-newest-first" class="level3">
+<h3 class="anchored" data-anchor-id="commits-branch-snapclim2-newest-first">Commits (branch <code>snapclim2</code>, newest first)</h3>
+<p><code>d2523dc</code> validation test-bed · <code>e412632</code> numeric physics · <code>f5b87be</code> handoff · <code>9178566</code> doc→var_defs · <code>ba4af91</code> rename→snapesm + var_defs model · <code>a71dd4e</code> reference harness · <code>326c25c</code> pipeline structure · <code>9efdfe1</code> load via subs · <code>99260a1</code> par_load · <code>c48cbd9</code> skeleton.</p>
+<hr>
+</section>
+</section>
+<section id="what-is-done" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-done">What is DONE</h2>
+<ul>
+<li><strong>Design</strong> (see design note): var_defs database + assembly config; named-member output state; generalized <code>snap(:)</code>/<code>idx(:)</code> with a distinguished <code>%ref</code>. <strong>Revised during the port</strong> to a per-field blend model: temp is linear (<code>ref + aa·(s1−s0)</code>), <strong>precip is a ratio blend</strong> (<code>ref·(aa·(s1/s0−1)+1)</code>), each field carries its own driving <code>index</code>, and snapshots carry a <code>monthly</code> flag (raw monthly vs annual+summer synthesis) and a <code>time</code> (for index normalization).</li>
+<li><strong>fesm-utils forcing API merged to <code>dev</code></strong> (varslice <code>subs</code>, tsgen <code>group</code>); condensed varslice namelist is the dev format.</li>
+<li><strong>snapesm physics (validated):</strong>
+<ul>
+<li><code>reduce_snapshot</code> (+ <code>reduce_ocean</code>, <code>model_depth</code>) — port of <code>read_climate_snapshot</code> + <code>read_ocean_snapshot</code>: monthly vs annual(+summer cosine synth) atm, sea-level lapse reduction, <code>prcor</code>, and the 42→23 ocean vinterp. Ocean is read with <code>rep=12</code> (whole-year sub-annual select) to avoid the sp/dp fractional-boundary trap.</li>
+<li><code>combine</code> (+ <code>blend_field</code>, <code>find_endpoints</code>, <code>norm_index</code>) — per-field linear/ratio blend; index normalized to snapshot times via <code>series_interp1</code>; Holocene <code>f_hol</code> scaling.</li>
+<li><code>transform</code> — tsl→tas inflation (phase <code>m*30-15</code>) + aggregates.</li>
+<li><code>derive</code> — <code>fraction</code> ocean, using the <strong>pre-transform <code>ta_ann</code></strong> to reproduce snapclim’s one-step lag exactly (decision: replicate faithfully now; fix as a separate commit later).</li>
+</ul></li>
+<li><strong>Validation</strong> (<code>diff_nc.py</code> snapesm vs snapclim, GRL-16KM <code>snap_1ind_new</code>, times <code>0/-21000/-120000</code>): <code>tas,tsl,ta_ann,ta_sum,z_srf,mask</code> <strong>bit-exact</strong>; <code>pr,pr_ann,so_ann</code> ~1e-6; <code>to_ann</code> matches at all ocean cells except one deep level (800 m ≈ a coincident input node) at 0.73 K (accepted).</li>
+</ul>
+<hr>
+</section>
+<section id="what-remains-in-model-integration" class="level2">
+<h2 class="anchored" data-anchor-id="what-remains-in-model-integration">What REMAINS — in-model integration</h2>
+<p><strong>Integration BUILDS end-to-end for BOTH backends.</strong> All merged to <code>dev</code> (yelmox + fesm-utils); <code>include-serial</code> rebuilt; Yelmo/FastIsostasy/yelmox libs rebuilt against current fesm-utils. Verified: <code>make yelmox openmp=0</code> (snapclim, default) and <code>make yelmox CLIMATE=snapesm openmp=0</code> both compile + link to <code>yelmox.x</code> (EXIT=0). <strong>Remaining = run the model both ways and diff outputs.</strong></p>
+<p>Done on branch <code>snapclim2</code> (now merged to <code>dev</code>):</p>
+<ul>
+<li><strong>fesm-utils fixes</strong> (branch <code>snp-forcing-fixes</code>, off dev): tsgen/series plain-header skip; varslice <code>ndim=4</code> missing branch. Committed, not merged to dev.</li>
+<li><strong>Backend-agnostic climate</strong> (<code>e412632</code>..<code>9febf81</code>):
+<ul>
+<li><code>libs/climate_out.f90</code> — <code>climate_out_class {now, ref}</code>, each a <code>clim_state_class</code> {tas, pr, tsl_ann, ta_ann, pr_ann, to_ann, so_ann, depth}. Anomalies = now − ref.</li>
+<li><code>libs/yelmox_climate_snapclim.f90</code> / <code>_snapesm.f90</code> — same <code>module yelmox_climate</code> + API (<code>climate_init</code>/<code>climate_update</code>, fills <code>climate_out</code>); compile-verified vs each backend.</li>
+<li><code>libs/yelmox_domain.f90</code> — <code>ice_domain%snp</code> → <code>%cl</code> (adapter) + <code>%clim</code> (agnostic output); init/update via the adapter; all reads go through <code>dom%clim%now</code>/<code>%ref</code>.</li>
+<li><code>yelmox_rembo.f90</code>, <code>yelmox_bipolar/obm_coupling.f90</code> — updated to <code>dom%cl%snp</code> (backend internals; snapclim only) + <code>dom%clim%now%to_ann</code> (ocean writes).</li>
+<li><code>config/Makefile_yelmox.mk</code> — <code>CLIMATE ?= snapclim</code> selects adapter source + backend obj.</li>
+</ul></li>
+</ul>
+<p><strong>Next session — run in-model &amp; diff:</strong> 1. Run a short yelmox simulation with the default (snapclim) <code>yelmox.x</code>, then rebuild with <code>make yelmox CLIMATE=snapesm</code> and run the SAME config. Author a <code>snp</code>/var_defs config for the in-model run (the offline <code>input/greenland_snp.nml</code> + <code>greenland_clim.nml</code> are the template; the in-model <code>&amp;snap</code> group is <code>snap</code>+domain-suffix — the adapter passes <code>group="snap"//sfx</code>). 2. Diff the two runs’ <code>snap.nc</code> / marine-shelf / smb outputs. Physics matches offline (atmosphere bit-exact; ocean matches at real cells), so any divergence is an integration bug. 3. Flip the default to snapesm, keep snapclim selectable a cycle, then retire <code>libs/snapclim.f90</code> + <code>yelmox_climate_snapclim.f90</code>.</p>
+<p>Notes / caveats: - The bipolar (<code>obm_coupling</code>) + <code>rembo</code> drivers reach into <code>dom%cl%snp</code> (snapclim internals), so they build only with <code>CLIMATE=snapclim</code>. <code>make yelmox_bipolar</code> / <code>yelmox_rembo</code> under <code>CLIMATE=snapesm</code> will fail until those are migrated off backend internals. - Rebuilding <code>include-serial</code> to current fesm-utils <code>dev</code> (removed <code>ncio</code> <code>actual_range</code>) required a clean rebuild of Yelmo + FastIsostasy + the yelmox libs (their cached mods were stale). Already done this session; future fesm-utils bumps need the same.</p>
+<hr>
+</section>
+<section id="build-run-commands" class="level2">
+<h2 class="anchored" data-anchor-id="build-run-commands">Build &amp; run commands</h2>
+<p>The fesm-utils API is on <code>dev</code>, but <code>include-serial</code>’s <code>tsgen.mod</code> is stale, so snapesm still builds against <strong>scratch</strong> varslice+tsgen (from <code>fesm-utils/src</code>) until <code>include-serial</code> is rebuilt. Run from the yelmox <strong>main tree</strong> root so <code>ice_data/</code>, <code>input/</code>, <code>logs/</code>, <code>fesm-utils/</code> resolve. Note <strong><code>wp = sp</code></strong> in this build; zsh does not word-split unquoted vars — use <code>${=VAR}</code>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /Users/alrobi001/models/yelmox</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="va">S</span><span class="op">=</span><span class="va">$(</span><span class="fu">mktemp</span> <span class="at">-d</span><span class="va">)</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="va">INC</span><span class="op">=</span>fesm-utils/include-serial          <span class="co"># current except tsgen.mod</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="va">FW</span><span class="op">=</span>fesm-utils/src                       <span class="co"># dev source (has tsgen group + condensed varslice)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="va">WT</span><span class="op">=</span>.claude/worktrees/snapclim2</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="va">FF</span><span class="op">=</span><span class="st">"-ffree-line-length-0 -O2 -g"</span>        <span class="co"># </span><span class="al">NOTE</span><span class="co">: -0 not -none; -O0 -fcheck=all for debugging</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="va">NCF</span><span class="op">=</span><span class="va">$(</span><span class="fu">ls</span> <span class="at">-d</span> /opt/homebrew/Cellar/netcdf-fortran/<span class="pp">*</span>/lib <span class="kw">|</span> <span class="fu">head</span> <span class="at">-1</span><span class="va">)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="va">NCC</span><span class="op">=</span><span class="va">$(</span><span class="fu">ls</span> <span class="at">-d</span> /opt/homebrew/Cellar/netcdf/<span class="pp">*</span>/lib <span class="kw">|</span> <span class="fu">head</span> <span class="at">-1</span><span class="va">)</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="va">NCLINK</span><span class="op">=</span><span class="st">"-L</span><span class="va">$NCF</span><span class="st"> -lnetcdff -L</span><span class="va">$NCC</span><span class="st"> -lnetcdf -Wl,-rpath,</span><span class="va">$NCF</span><span class="st"> -Wl,-rpath,</span><span class="va">$NCC</span><span class="st">"</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># scratch varslice+tsgen from dev src, then snapesm, then link each harness</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="ex">gfortran</span> <span class="va">${</span><span class="er">=FF</span><span class="va">}</span> <span class="at">-I</span><span class="va">$INC</span> <span class="at">-c</span> <span class="va">$FW</span>/varslice.f90 <span class="at">-o</span> <span class="va">$S</span>/varslice.o <span class="at">-J</span><span class="va">$S</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="ex">gfortran</span> <span class="va">${</span><span class="er">=FF</span><span class="va">}</span> <span class="at">-I</span><span class="va">$INC</span> <span class="at">-c</span> <span class="va">$FW</span>/tsgen.f90    <span class="at">-o</span> <span class="va">$S</span>/tsgen.o    <span class="at">-J</span><span class="va">$S</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="ex">gfortran</span> <span class="va">${</span><span class="er">=FF</span><span class="va">}</span> <span class="at">-I</span><span class="va">$S</span> <span class="at">-I</span><span class="va">$INC</span> <span class="at">-c</span> <span class="va">$WT</span>/libs/snapesm.f90 <span class="at">-o</span> <span class="va">$S</span>/snapesm.o <span class="at">-J</span><span class="va">$S</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="ex">gfortran</span> <span class="va">${</span><span class="er">=FF</span><span class="va">}</span> <span class="at">-I</span><span class="va">$S</span> <span class="at">-I</span><span class="va">$INC</span> <span class="va">$WT</span>/tests/test_snapesm_ref.f90 <span class="dt">\</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    <span class="va">$S</span>/snapesm.o <span class="va">$S</span>/varslice.o <span class="va">$S</span>/tsgen.o <span class="at">-L</span><span class="va">$INC</span> <span class="at">-lfesmutils</span> <span class="va">${</span><span class="er">=NCLINK</span><span class="va">}</span> <span class="at">-o</span> <span class="va">$S</span>/test_snapesm_ref.x</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="va">$S</span><span class="ex">/test_snapesm_ref.x</span>                                   <span class="co"># -&gt; logs/snapesm_ref.nc</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="ex">gfortran</span> <span class="va">${</span><span class="er">=FF</span><span class="va">}</span> <span class="at">-I</span><span class="va">$INC</span> <span class="at">-c</span> libs/snapclim.f90 <span class="at">-o</span> <span class="va">$S</span>/snapclim.o <span class="at">-J</span><span class="va">$S</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="ex">gfortran</span> <span class="va">${</span><span class="er">=FF</span><span class="va">}</span> <span class="at">-I</span><span class="va">$S</span> <span class="at">-I</span><span class="va">$INC</span> <span class="va">$WT</span>/tests/test_snapclim_ref.f90 <span class="va">$S</span>/snapclim.o <span class="at">-L</span><span class="va">$INC</span> <span class="at">-lfesmutils</span> <span class="va">${</span><span class="er">=NCLINK</span><span class="va">}</span> <span class="at">-o</span> <span class="va">$S</span>/test_snapclim_ref.x</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="va">$S</span><span class="ex">/test_snapclim_ref.x</span>                                  <span class="co"># -&gt; logs/snapclim_ref.nc</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="va">$WT</span>/tests/diff_nc.py logs/snapesm_ref.nc logs/snapclim_ref.nc <span class="at">--rtol</span> 1e-4 <span class="at">--atol</span> 1e-3</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+<section id="follow-ups-known-issues" class="level2">
+<h2 class="anchored" data-anchor-id="follow-ups-known-issues">Follow-ups / known issues</h2>
+<ol type="1">
+<li><strong>nml errors on any missing param</strong> (<code>ERROR_NO_PARAM=.TRUE.</code>, not public, no setter). snapesm reads only the keys the config supplies (field: <code>kind/blend/index</code>; snapshot: <code>monthly/time/ idx_coord</code>; <code>is_ref</code> derives from <code>ref_name</code>); <code>combine/enabled/*_flags</code> are struct-default only. <strong>Decision: leave nml as-is for now.</strong> A public toggle/query would restore that config surface.</li>
+<li><strong>tsgen <code>series_load_ascii</code> rejects plain headers</strong> — production <code>.dat</code> files have a bare <code>time value</code> header; the loader skips only <code>#</code>/<code>!</code> lines. snapclim’s own <code>read_series</code> tolerated it. <strong>Fix planned: add a header-skip in tsgen</strong> (then drop the <code>tests/</code> fixture and point the config back at <code>input/alpha_orbital_r2020.dat</code>).</li>
+<li><strong>varslice <code>ndim=4</code> missing branch</strong> — <code>varslice_update</code>’s “indices not found” else-branch only allocates <code>vs%var</code> for ndim 1–3, so a 4-D field with no matching time slice segfaults on <code>vs%var = mv</code>. Worked around here (whole-year read always matches); <strong>fix planned in varslice.</strong></li>
+<li><strong><code>to_ann</code> land-cell 273.15</strong> — varslice guards missing (keeps <code>-9999</code>); snapclim adds K to the sentinel (<code>-9725.85</code>). Accepted (land cells); diff masks non-positive cells. If exact land match is ever needed, read ocean in °C and add 273.15 unconditionally in <code>reduce_ocean</code>.</li>
+<li><strong>fraction-ocean lag</strong> — snapclim reads <code>now%ta_ann</code> before recomputing it (block tagged <code>ajr: untested!!</code>). Replicated faithfully (decision (a)); the proper fix (use current-step <code>ta_ann</code>) is a deferred separate commit.</li>
+<li><strong>800 m ocean interp edge</strong> — 0.73 K at the one model level nearly coincident with an input depth node (799.55 m); <code>interp_linear</code> sp tie-break. Accepted as negligible.</li>
+</ol>
+</section>
+<section id="cautions-discipline" class="level2">
+<h2 class="anchored" data-anchor-id="cautions-discipline">Cautions / discipline</h2>
+<ul>
+<li>Worktree bash discipline: <code>git -C &lt;worktree&gt; …</code>; absolute paths for Read/Edit/Write.</li>
+<li>Don’t rebuild <code>include-serial</code> (or merge fesm-utils→dev again) while yelmox experiments run.</li>
+<li>Tight-tolerance bar: watch the two cosine phases (<code>m*30-30</code> reduce vs <code>m*30-15</code> transform) and the south/north lapse sign; <code>south = (domain=="Antarctica")</code>.</li>
+</ul>
+</section>
+<section id="open-design-items" class="level2">
+<h2 class="anchored" data-anchor-id="open-design-items">Open design items</h2>
+<ul>
+<li>Field-registry set to name explicitly vs <code>extra(:)</code>; driver <code>dTa/dTo/dSo</code> vs internal <code>idx(:)</code> composition; restart provenance-record format (all deferred to integration/restart work).</li>
+</ul>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/snapesm-handoff.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

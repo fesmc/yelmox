@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>YelmoX</title>
+<title>snapclim and snapesm – YelmoX</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -127,7 +127,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
@@ -192,63 +192,109 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#yelmox" id="toc-yelmox" class="nav-link active" data-scroll-target="#yelmox">YelmoX</a>
-  <ul class="collapse">
-  <li><a href="#quick-start" id="toc-quick-start" class="nav-link" data-scroll-target="#quick-start">Quick start</a></li>
-  <li><a href="#what-configme-install-yelmox-does" id="toc-what-configme-install-yelmox-does" class="nav-link" data-scroll-target="#what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</a></li>
-  <li><a href="#manual-clone-of-yelmox" id="toc-manual-clone-of-yelmox" class="nav-link" data-scroll-target="#manual-clone-of-yelmox">Manual clone of YelmoX</a></li>
-  <li><a href="#install-configme-one-time" id="toc-install-configme-one-time" class="nav-link" data-scroll-target="#install-configme-one-time">Install configme (one time)</a></li>
-  </ul></li>
+  <li><a href="#snapclim" id="toc-snapclim" class="nav-link active" data-scroll-target="#snapclim">snapclim</a></li>
+  <li><a href="#snapesm" id="toc-snapesm" class="nav-link" data-scroll-target="#snapesm">snapesm</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/index.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/climate-snap.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">snapclim and snapesm</h1>
+</div>
 
 
 
+<div class="quarto-title-meta">
 
-<section id="yelmox" class="level1">
-<h1>YelmoX</h1>
-<p><strong>YelmoX</strong> is the driver framework around the <a href="https://github.com/fesmc/yelmo">Yelmo</a> ice-sheet model. It bundles Yelmo together with the libraries needed to run realistic ice-sheet simulations: climate and ocean forcing modules, the <a href="https://github.com/palma-ice/FastIsostasy">FastIsostasy</a> bedrock module, the <a href="https://github.com/alex-robinson/rembo1">REMBOv1</a> energy/moisture-balance model, and shared utilities from <a href="https://github.com/fesmc/fesm-utils">fesm-utils</a>.</p>
-<p>For documentation of the Yelmo ice-sheet model itself, see <a href="https://fesmc.github.io/yelmo/">the Yelmo docs</a>.</p>
-<section id="quick-start" class="level2">
-<h2 class="anchored" data-anchor-id="quick-start">Quick start</h2>
-<p>With <a href="https://github.com/fesmc/configme"><code>configme</code></a> installed (see <a href="#install-configme-one-time">Install configme</a> below), build the whole YelmoX stack with a single command from the directory where you want the checkout to live:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>That’s it, you should now be ready to compile and run any yelmox program:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> clean</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>The two snapshot backends build the climate from a reference state plus climate <strong>snapshots</strong> (e.g.&nbsp;present day, pre-industrial, LGM), blended in time by scalar <strong>indices</strong> (e.g.&nbsp;a glacial index). Both supply the atmosphere (monthly <code>tas</code>, <code>pr</code>, lapse-rate corrected to the current surface) and the ocean as depth profiles (<code>to_ann</code>, <code>so_ann</code>), which the marine shelf interpolates to the shelf base. Both run on <code>grid_clim</code> and read the <code>[snap]</code> group.</p>
+<ul>
+<li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>), backends in <code>libs/snapclim.f90</code> and <code>libs/snapesm.f90</code>, behind <code>libs/yelmox_climate.f90</code>.</li>
+<li><strong>Select:</strong> <code>[coupling] climate = "snapclim"</code> or <code>"snapesm"</code>.</li>
+<li><strong>Output:</strong> with <code>[output] write_clim</code>, <code>snap.nc</code>.</li>
+</ul>
+<section id="snapclim" class="level2">
+<h2 class="anchored" data-anchor-id="snapclim">snapclim</h2>
+<p>The default backend of every regional config (<code>yelmox/yelmox_&lt;domain&gt;.nml</code>). <code>[snap]</code> sets the forcing method for the atmosphere (<code>atm_type</code>) and the ocean (<code>ocn_type</code>), the index files (<code>fname_at</code>, <code>fname_ao</code>, …), the lapse rates and the scaling parameters; up to four snapshots are read from <code>[snap_clim0]</code> to <code>[snap_clim3]</code>, plus <code>[snap_hybrid]</code> and <code>[snap_recon]</code> for those methods.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Climate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>const</code></td>
+<td>the reference snapshot (<code>clim0</code>)</td>
+</tr>
+<tr class="even">
+<td><code>anom</code></td>
+<td>reference + a homogeneous anomaly (<code>dTa</code>/<code>dTo</code>/<code>dSo</code>): the transient forcing’s, else from the index</td>
+</tr>
+<tr class="odd">
+<td><code>snap_1ind</code>, <code>snap_1ind_new</code>, <code>snap_1ind_abs</code>, <code>snap_1ind_miocene</code></td>
+<td>two snapshots blended by one index</td>
+</tr>
+<tr class="even">
+<td><code>snap_2ind</code>, <code>snap_2ind_abs</code></td>
+<td>snapshots blended by two indices</td>
+</tr>
+<tr class="odd">
+<td><code>hybrid</code></td>
+<td>reference + monthly temperature anomalies from a prescribed series (<code>[snap_hybrid]</code>), no snapshots</td>
+</tr>
+<tr class="even">
+<td><code>recon</code></td>
+<td>reconstructed snapshots, interpolated in time (<code>[snap_recon]</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>fraction</code> (ocean only)</td>
+<td>an ocean anomaly of <code>f_to</code> × the mean atmospheric anomaly</td>
+</tr>
+</tbody>
+</table>
+<p>The transient forcing (<code>[tsforcing]</code>/<code>[tsgen]</code>, see <a href="./flavor-yelmox.html">yelmox</a>) reaches snapclim only in the <code>anom</code> methods.</p>
 </section>
-<section id="what-configme-install-yelmox-does" class="level2">
-<h2 class="anchored" data-anchor-id="what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</h2>
-<p><code>configme install yelmox</code> clones YelmoX and its component repositories (<code>fesm-utils</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>), configures each for your machine and compiler, links them into the YelmoX directory, and builds <code>fesm-utils</code> (LIS + FFTW + utils, which can take 10-30 min). If <code>configme</code> can detect your machine from the hostname it does so, otherwise it prompts you.</p>
-<p>The only system dependency you must install yourself is <strong>netCDF</strong> (see the <a href="https://fesmc.github.io/yelmo/getting-started.html#dependencies">Yelmo dependencies notes</a> for installation tips). Everything else — LIS, FFTW, the <code>fesm-utils</code> libraries, the component repositories, their links, and <code>runme</code> — is managed by <code>configme</code>.</p>
-<p>Common options:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx   <span class="co"># pick the machine + compiler explicitly</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-d</span> https                 <span class="co"># clone over HTTPS (no GitHub SSH key needed)</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--dir</span> ~/models/yelmox    <span class="co"># put the checkout here instead of ./yelmox</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--overwrite</span>              <span class="co"># re-clone over an existing checkout</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--build-deps</span>             <span class="co"># rebuild dependency packages without prompting</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Run <code>configme list</code> for the supported machines and compilers, and <code>configme --help</code> for the full command surface. The exact clone/configure/link/build commands <code>configme install yelmox</code> runs for you are recorded in a <code>.install.sh</code> script in the checkout, and are also shown for context on the <a href="./configme-install-details.html">configme install details</a> page — these are shown for reference only; <code>configme install</code> is the recommended path and you do not need to run them by hand.</p>
-</section>
-<section id="manual-clone-of-yelmox" class="level2">
-<h2 class="anchored" data-anchor-id="manual-clone-of-yelmox">Manual clone of YelmoX</h2>
-<p><code>configme install yelmox</code> already clones the repository for you, so most users do not need this step. If you want to fetch the YelmoX source tree by hand (for example, to inspect it before installing), the repository is here: <a href="https://github.com/fesmc/yelmox">https://github.com/fesmc/yelmox</a>.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/yelmox.git</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="install-configme-one-time" class="level2">
-<h2 class="anchored" data-anchor-id="install-configme-one-time">Install configme (one time)</h2>
-<p>YelmoX is configured and built with <a href="https://github.com/fesmc/configme"><code>configme</code></a>, a small Python tool that detects your netCDF installation, configures every package in the stack for your machine and compiler, and clones/links/builds the whole thing with one command. It is installed once, globally, and provides the <code>configme</code> command on your <code>PATH</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/fesmc/configme</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>To upgrade it later, use its built-in update command:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> update</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>If the <code>configme</code> command is not found after installation, your Python user bin directory is probably not on your <code>PATH</code>; add it in your <code>~/.bashrc</code> / <code>~/.zshrc</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">PATH</span><span class="op">=</span><span class="st">"</span><span class="va">${PATH}</span><span class="st">:</span><span class="va">${HOME}</span><span class="st">/.local/bin"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="snapesm" class="level2">
+<h2 class="anchored" data-anchor-id="snapesm">snapesm</h2>
+<p>A rewrite of snapclim on the fesm-utils <code>varslice</code> reader and <code>tsgen</code> series: the snapclim methods become configurations of one blend model, over any number of snapshots, fields and indices. Example: <code>yelmox/yelmox_Greenland_snapesm.nml</code>, which reproduces snapclim <code>snap_1ind_new</code> / <code>fraction</code> (<code>yelmox_Greenland_snapclim.nml</code>).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    var_defs  <span class="kw">=</span> <span class="st">"input/greenland_clim.nml"</span>   <span class="co">! database of the input files</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    combine   <span class="kw">=</span> <span class="st">"anomaly"</span>                    <span class="co">! snapshots as anomalies from the reference</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    manifold  <span class="kw">=</span> <span class="dv">1</span>                            <span class="co">! number of indices spanning the blend (0/1/2)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    ref_name  <span class="kw">=</span> <span class="st">"pd"</span>                         <span class="co">! the reference snapshot</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    snapshots <span class="kw">=</span> <span class="st">"pd"</span> <span class="st">"picontrol"</span> <span class="st">"lgm"</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    fields    <span class="kw">=</span> <span class="st">"tas"</span> <span class="st">"pr"</span> <span class="st">"to"</span> <span class="st">"so"</span> <span class="st">"zs"</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    indices   <span class="kw">=</span> <span class="st">"at"</span> <span class="st">"ap"</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">! lapse, f_p, f_p_ne, f_stdev, f_to, f_hol, dTa_const, dTo_const, dSo_const</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">! as in snapclim</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Three kinds of group follow:</p>
+<ul>
+<li><strong>Fields</strong>, <code>[snap_field_&lt;name&gt;]</code>: <code>kind</code> (<code>atm_temp</code>, <code>atm_precip</code>, <code>ocn</code>, <code>ocn_salt</code>, <code>elev</code>), <code>blend</code> (<code>linear</code>, <code>ratio</code>, <code>fraction</code>, <code>const</code>) and the driving <code>index</code> (<code>""</code> = none).</li>
+<li><strong>Snapshots</strong>, <code>[snap_&lt;name&gt;]</code>: <code>monthly</code>, <code>time</code>, <code>idx_coord</code> (the snapshot’s position on the index manifold) and, per field, the <code>var_defs</code> group(s) holding it (one = monthly; two = annual + summer, from which the seasonal cycle is built). See <a href="./database-namelists.html">Database namelists</a>.</li>
+<li><strong>Indices</strong>, <code>[snap_idx_&lt;name&gt;]</code>: a <code>tsgen</code> series (<code>method</code>, <code>series_file</code>, <code>sigma</code>).</li>
+</ul>
+<p>The transient forcing is added on top in every configuration.</p>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->
@@ -662,4 +708,4 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/index.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/climate-snap.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

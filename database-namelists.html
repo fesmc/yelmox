@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Database namelists (varslice) – YelmoX</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-6c645bba97489949a6ce198fa08f5136.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">YelmoX</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
+        <li>
+    <a class="dropdown-item" href="./flavors.html">
+ <span class="dropdown-text">Overview</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-yelmox.html">
+ <span class="dropdown-text">yelmox (single-domain)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-bipolar.html">
+ <span class="dropdown-text">yelmox_bipolar</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-esm.html">
+ <span class="dropdown-text">ESM forcing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./flavor-rembo.html">
+ <span class="dropdown-text">REMBO climate</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link active" href="./database-namelists.html" aria-current="page"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./multigrid.html"> 
+<span class="menu-text">Multigrid coupling</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#anatomy-of-a-group" id="toc-anatomy-of-a-group" class="nav-link active" data-scroll-target="#anatomy-of-a-group">Anatomy of a group</a>
+  <ul class="collapse">
+  <li><a href="#units-vs.-scaling" id="toc-units-vs.-scaling" class="nav-link" data-scroll-target="#units-vs.-scaling"><code>units</code> vs.&nbsp;<code>scaling</code></a></li>
+  </ul></li>
+  <li><a href="#the-time-array" id="toc-the-time-array" class="nav-link" data-scroll-target="#the-time-array">The <code>time</code> array</a></li>
+  <li><a href="#paths-placeholders-and-wildcards" id="toc-paths-placeholders-and-wildcards" class="nav-link" data-scroll-target="#paths-placeholders-and-wildcards">Paths: placeholders and wildcards</a></li>
+  <li><a href="#worked-examples" id="toc-worked-examples" class="nav-link" data-scroll-target="#worked-examples">Worked examples</a></li>
+  <li><a href="#how-the-groups-are-consumed" id="toc-how-the-groups-are-consumed" class="nav-link" data-scroll-target="#how-the-groups-are-consumed">How the groups are consumed</a></li>
+  <li><a href="#quick-reference" id="toc-quick-reference" class="nav-link" data-scroll-target="#quick-reference">Quick reference</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/database-namelists.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Database namelists (varslice)</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Most forcing in YelmoX is now loaded through the shared <a href="https://github.com/fesmc/fesm-utils"><code>varslice</code></a> reader. A <strong>database namelist</strong> is a small, static description of a dataset on disk: where the file lives, which variable to read, how to convert its units, and how its records map onto a time axis. The consuming modules — <code>varslice</code> itself, <code>esm_forcing</code>, <code>snapesm</code>, <code>ismip6</code> — all read the <em>same</em> group layout, so once you understand one group you understand them all.</p>
+<p>The point of these files is to keep the <em>provenance</em> of every forcing field visible and in one place. Nothing in the namelist runs code; each group is a declarative record that says “this NetCDF file, this variable, these units, this period” — everything the reader needs to ingest the dataset and hand back a time-indexed field.</p>
+<p>See <code>input/esm/esm_ant_ismip7.nml</code> for a full, real-world example.</p>
+<section id="anatomy-of-a-group" class="level2">
+<h2 class="anchored" data-anchor-id="anatomy-of-a-group">Anatomy of a group</h2>
+<p>A single dataset is described by one namelist group. All five keys are <strong>mandatory</strong> (the reader pre-sets defaults, but the convention is to always write them out so the provenance stays in the file):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>gcm_ts_ref</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    filename    <span class="kw">=</span> <span class="st">"ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    name        <span class="kw">=</span> <span class="st">"t2m"</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    units       <span class="kw">=</span> <span class="st">"K"</span> <span class="st">"K"</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    scaling     <span class="kw">=</span> <span class="fl">1.0</span> <span class="fl">0.0</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    time        <span class="kw">=</span> <span class="dv">1</span>, <span class="fl">1979.0</span>, <span class="fl">2022.0</span>, <span class="fl">1.0</span>, <span class="fl">12.0</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>filename</code></td>
+<td>string</td>
+<td>Path to the NetCDF file (relative to the run dir). May contain placeholders and wildcards — see <a href="#paths-placeholders-and-wildcards">Paths</a>.</td>
+</tr>
+<tr class="even">
+<td><code>name</code></td>
+<td>string</td>
+<td>Name of the variable to read inside the NetCDF file.</td>
+</tr>
+<tr class="odd">
+<td><code>units</code></td>
+<td>2 strings</td>
+<td><code>"&lt;units_in&gt;" "&lt;units_out&gt;"</code> — documentation labels only.</td>
+</tr>
+<tr class="even">
+<td><code>scaling</code></td>
+<td>2 reals</td>
+<td><code>&lt;unit_scale&gt; &lt;unit_offset&gt;</code> — the actual linear unit conversion.</td>
+</tr>
+<tr class="odd">
+<td><code>time</code></td>
+<td>5 reals</td>
+<td><code>&lt;active&gt; &lt;x0&gt; &lt;x1&gt; &lt;dx&gt; &lt;sub&gt;</code> — describes the time axis. See <a href="#the-time-array">The <code>time</code> array</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>The group <strong>name</strong> (<code>&amp;gcm_ts_ref</code>, <code>&amp;gcm_to_proj</code>, …) is chosen by the consuming module — it decides which physical role a group plays (reference vs.&nbsp;projection, atmosphere vs.&nbsp;ocean, etc.). The five keys inside are always the same.</p>
+<section id="units-vs.-scaling" class="level3">
+<h3 class="anchored" data-anchor-id="units-vs.-scaling"><code>units</code> vs.&nbsp;<code>scaling</code></h3>
+<p>The two <code>units</code> strings are <strong>labels for humans</strong> — they do not trigger any conversion. The real conversion is the linear transform in <code>scaling</code>, applied to every value as it is read:</p>
+<pre><code>value_out = value_in * unit_scale + unit_offset</code></pre>
+<p><code>units</code> documents the intent so a reader can check that <code>scaling</code> actually performs it. For example, precipitation stored in <code>kg m-2 s-1</code> and wanted in <code>mm yr-1</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>units   <span class="kw">=</span> <span class="st">"kg m-2 s-1"</span> <span class="st">"mm yr-1"</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>scaling <span class="kw">=</span> <span class="fl">31556926.25</span> <span class="fl">0.0</span>     <span class="co">! CMIP standard seconds-per-year</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>or ocean temperature stored in <code>°C</code> and wanted in <code>K</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>units   <span class="kw">=</span> <span class="st">"degrees C"</span> <span class="st">"K"</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>scaling <span class="kw">=</span> <span class="fl">1.0</span> <span class="fl">273.15</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Use <code>scaling = 1.0 0.0</code> when no conversion is needed.</p>
+</section>
+</section>
+<section id="the-time-array" class="level2">
+<h2 class="anchored" data-anchor-id="the-time-array">The <code>time</code> array</h2>
+<p>The <code>time</code> key is the only subtle one. It packs five numbers:</p>
+<pre><code>time = active, x0, x1, dx, sub</code></pre>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 34%">
+<col style="width: 31%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Element</th>
+<th>Name</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>active</code></td>
+<td>with_time</td>
+<td><code>1</code> = the field is <strong>time-varying</strong> (read record-by-record). <code>0</code> = the field is <strong>static</strong> (one slice); <code>x0..x1</code> then merely <em>document</em> the period the data represents.</td>
+</tr>
+<tr class="even">
+<td><code>x0</code></td>
+<td>start</td>
+<td>First time value on the axis (calendar year, in ESM convention).</td>
+</tr>
+<tr class="odd">
+<td><code>x1</code></td>
+<td>end</td>
+<td>Last time value on the axis.</td>
+</tr>
+<tr class="even">
+<td><code>dx</code></td>
+<td>step</td>
+<td>Spacing between successive <strong>major</strong> time units (usually <code>1.0</code> year).</td>
+</tr>
+<tr class="odd">
+<td><code>sub</code></td>
+<td>sub-count</td>
+<td>Number of <strong>sub-annual</strong> records per major unit: <code>1</code> = annual, <code>12</code> = monthly. Any value <code>&gt; 1</code> switches on sub-annual handling.</td>
+</tr>
+</tbody>
+</table>
+<p>How the reader interprets these:</p>
+<ul>
+<li><p><strong>Static field</strong> (<code>active = 0</code>). <code>x0..x1</code> are preserved as-is and describe the period the (single) slice represents. Typical for a fixed surface elevation or an ocean climatology:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>time <span class="kw">=</span> <span class="dv">0</span>, <span class="dv">2000</span>, <span class="dv">2000</span>, <span class="dv">0</span>, <span class="dv">1</span>     <span class="co">! one slice, "representing year 2000"</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>time <span class="kw">=</span> <span class="dv">0</span>, <span class="dv">1990</span>, <span class="dv">2014</span>, <span class="dv">0</span>, <span class="dv">1</span>     <span class="co">! one slice, "a 1990–2014 climatology"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>Time-varying, annual</strong> (<code>active = 1</code>, <code>sub = 1</code>). The axis is built as <code>x0, x0+dx, …, x1</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>time <span class="kw">=</span> <span class="dv">1</span>, <span class="dv">1850</span>, <span class="dv">2014</span>, <span class="dv">1</span>, <span class="dv">1</span>     <span class="co">! 165 annual records, 1850…2014</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>Time-varying, sub-annual</strong> (<code>active = 1</code>, <code>sub &gt; 1</code>). A sub-annual axis is built with spacing <code>1/sub</code>, centred within each major unit (e.g.&nbsp;mid-month for <code>sub = 12</code>), spanning <code>x0</code> through <code>x1</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>time <span class="kw">=</span> <span class="dv">1</span>, <span class="fl">1979.0</span>, <span class="fl">2022.0</span>, <span class="fl">1.0</span>, <span class="fl">12.0</span>   <span class="co">! monthly records, Jan 1979 … Dec 2022</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>Static field, sub-annual</strong> (<code>active = 0</code>, <code>sub &gt; 1</code>). <code>active</code> and <code>sub</code> are independent switches: <code>active</code> decides whether the field advances along a multi-year calendar axis, <code>sub</code> decides whether there is a within-year (monthly) cycle. Combining them gives a <strong>monthly climatology</strong> — a fixed seasonal cycle, selected by month-of-year, that does <em>not</em> advance year to year. <code>x0..x1</code> document the period the climatology averages over; <code>dx = 0</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>time <span class="kw">=</span> <span class="dv">0</span>, <span class="dv">1961</span>, <span class="dv">1990</span>, <span class="dv">0</span>, <span class="dv">12</span>     <span class="co">! 12-month climatology, averaged over 1961–1990</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>Collapse to a single slice.</strong> For a <em>time-varying</em> field, setting <code>dx = 0</code> collapses <code>x1</code> to <code>x0</code>, i.e.&nbsp;read exactly one record at <code>x0</code>. (For a static field, <code>dx = 0</code> is normal and <code>x0..x1</code> are left untouched.)</p></li>
+</ul>
+<p>The generated axis length must match the length of the NetCDF file’s time dimension, or the reader stops with an error — a useful check that <code>x0</code>, <code>x1</code>, <code>dx</code>, <code>sub</code> describe the file you actually pointed at.</p>
+</section>
+<section id="paths-placeholders-and-wildcards" class="level2">
+<h2 class="anchored" data-anchor-id="paths-placeholders-and-wildcards">Paths: placeholders and wildcards</h2>
+<p><code>filename</code> is expanded before the file is opened.</p>
+<p><strong>Placeholders</strong> in <code>{braces}</code> are substituted by the caller:</p>
+<ul>
+<li><p><code>{domain}</code> and <code>{grid_name}</code> are built in — every module supplies them (e.g. <code>Antarctica</code>, <code>ANT-16KM</code>).</p></li>
+<li><p>Additional keys are passed by the consuming module. <code>esm_forcing</code>, for instance, supplies <code>{gcm}</code> and <code>{experiment}</code>, so an ISMIP7 projection path can read:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>filename <span class="kw">=</span> <span class="st">"ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/thetao/v3/{grid_name}_{gcm}_{experiment}_v3_2015-2299_thetao.nc"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>and the same namelist serves every GCM/experiment combination — you select the concrete values in the driver’s <code>[esm]</code> configuration, not here.</p></li>
+</ul>
+<p><strong>Wildcards</strong> (shell globs, <code>*</code> and <code>?</code>) are also allowed. The reader expands the pattern with <code>ls -1 … | sort</code>, so a dataset split across many files is matched and concatenated in alphabetical order:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>filename <span class="kw">=</span> <span class="st">"ice_data/{domain}/{grid_name}/{gcm}/historical/tas/*.nc"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Sort the split so alphabetical order equals chronological order (zero-pad years).</p>
+</section>
+<section id="worked-examples" class="level2">
+<h2 class="anchored" data-anchor-id="worked-examples">Worked examples</h2>
+<p>Monthly, time-varying reference climate (RACMO2.3 on the ice grid):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>gcm_ts_ref</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    filename    <span class="kw">=</span> <span class="st">"ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    name        <span class="kw">=</span> <span class="st">"t2m"</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    units       <span class="kw">=</span> <span class="st">"K"</span> <span class="st">"K"</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    scaling     <span class="kw">=</span> <span class="fl">1.0</span> <span class="fl">0.0</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    time        <span class="kw">=</span> <span class="dv">1</span>, <span class="fl">1979.0</span>, <span class="fl">2022.0</span>, <span class="fl">1.0</span>, <span class="fl">12.0</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Annual ESM projection ocean temperature, <code>°C → K</code>, GCM/experiment templated:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>gcm_to_proj</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    filename    <span class="kw">=</span> <span class="st">"ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/thetao/v3/{grid_name}_{gcm}_{experiment}_v3_2015-2299_thetao.nc"</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    name        <span class="kw">=</span> <span class="st">"thetao"</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    units       <span class="kw">=</span> <span class="st">"degrees C"</span> <span class="st">"K"</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    scaling     <span class="kw">=</span> <span class="fl">1.0</span> <span class="fl">273.15</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    time        <span class="kw">=</span> <span class="dv">1</span>, <span class="dv">2015</span>, <span class="dv">2299</span>, <span class="dv">1</span>, <span class="dv">1</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Static surface elevation (single slice, no unit change):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>gcm_zs_ref</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    filename    <span class="kw">=</span> <span class="st">"ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    name        <span class="kw">=</span> <span class="st">"z_srf"</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    units       <span class="kw">=</span> <span class="st">"m"</span> <span class="st">"m"</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    scaling     <span class="kw">=</span> <span class="fl">1.0</span> <span class="fl">0.0</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    time        <span class="kw">=</span> <span class="dv">0</span>, <span class="dv">2000</span>, <span class="dv">2000</span>, <span class="dv">0</span>, <span class="dv">1</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Static ocean climatology (single slice representing a 1990–2014 average):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>gcm_to_ref</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    filename    <span class="kw">=</span> <span class="st">"ice_data/ISMIP7/{domain}/{grid_name}/meltMIP/{grid_name}_OI_Climatology_thetao_extrap.nc"</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    name        <span class="kw">=</span> <span class="st">"thetao"</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    units       <span class="kw">=</span> <span class="st">"degrees C"</span> <span class="st">"K"</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    scaling     <span class="kw">=</span> <span class="fl">1.0</span> <span class="fl">273.15</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    time        <span class="kw">=</span> <span class="dv">0</span>, <span class="dv">1990</span>, <span class="dv">2014</span>, <span class="dv">0</span>, <span class="dv">1</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="how-the-groups-are-consumed" class="level2">
+<h2 class="anchored" data-anchor-id="how-the-groups-are-consumed">How the groups are consumed</h2>
+<p>A module loads a group into a <code>varslice</code> object once at initialization (<code>varslice_init_nml(vs, filename, group, domain, grid_name, subs=…)</code>) and then asks for a field at a given time during the run (<code>varslice_update(vs, time, method=…)</code>). The database namelist supplies everything the object needs; the <code>method</code> (e.g.&nbsp;<code>exact</code>, <code>interp</code>, <code>extrap</code>) is chosen by the caller at read time, not in the namelist.</p>
+<ul>
+<li><strong><code>esm_forcing</code></strong> groups the atmosphere/ocean database groups into reference, variability, ESM-reference, historical, and projection periods (<code>&amp;gcm_ts_ref</code>, <code>&amp;gcm_to_proj</code>, …) and supplies <code>{gcm}</code>/<code>{experiment}</code>. See <a href="./flavor-esm.html">ESM forcing</a>.</li>
+<li><strong><code>snapesm</code></strong> uses the same reader for its snapshot climate database.</li>
+<li><strong><code>ismip6</code></strong> uses it for the ISMIP6 atmosphere/ocean forcing files.</li>
+</ul>
+<p>Because they share the reader, the layout documented here is identical across all of them — a group is a group regardless of which module owns it.</p>
+</section>
+<section id="quick-reference" class="level2">
+<h2 class="anchored" data-anchor-id="quick-reference">Quick reference</h2>
+<ul>
+<li>All five keys are mandatory; always write them for provenance.</li>
+<li><code>units</code> = two documentation labels; <code>scaling</code> = <code>[scale, offset]</code> does the real <code>out = in*scale + offset</code> conversion.</li>
+<li><code>time = [active, x0, x1, dx, sub]</code>: <code>active</code> 1/0 = time-varying/static · <code>sub</code> 1/12 = annual/monthly · <code>dx = 0</code> collapses a time-varying field to a single slice at <code>x0</code>.</li>
+<li>Paths expand <code>{domain}</code>/<code>{grid_name}</code> plus module-supplied keys like <code>{gcm}</code>/<code>{experiment}</code>, and accept <code>*</code>/<code>?</code> globs (sorted alphabetically).</li>
+<li>The generated time axis length must match the file’s time dimension.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/fesmc\.github\.io\/yelmox\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/database-namelists.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

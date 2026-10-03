@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>yelmox_esm – YelmoX</title>
+<title>ESM forcing – YelmoX</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -22,41 +22,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -131,10 +96,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Flavors</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
         <li>
     <a class="dropdown-item" href="./flavors.html">
  <span class="dropdown-text">Overview</span></a>
@@ -147,19 +112,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./flavor-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="./flavor-esm.html">
- <span class="dropdown-text">yelmox_esm</span></a>
+ <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./flavor-rembo.html">
- <span class="dropdown-text">yelmox_rembo</span></a>
+ <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./multigrid.html"> 
-<span class="menu-text">Multigrid design</span></a>
+<span class="menu-text">Multigrid coupling</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -177,9 +157,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#whats-distinct" id="toc-whats-distinct" class="nav-link active" data-scroll-target="#whats-distinct">What’s distinct</a></li>
-  <li><a href="#stepping-order" id="toc-stepping-order" class="nav-link" data-scroll-target="#stepping-order">Stepping order</a></li>
-  <li><a href="#forcing" id="toc-forcing" class="nav-link" data-scroll-target="#forcing">Forcing</a></li>
+  <li><a href="#configuration" id="toc-configuration" class="nav-link active" data-scroll-target="#configuration">Configuration</a></li>
+  <li><a href="#what-the-backend-supplies" id="toc-what-the-backend-supplies" class="nav-link" data-scroll-target="#what-the-backend-supplies">What the backend supplies</a></li>
+  <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output">Output</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/flavor-esm.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -188,7 +168,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">yelmox_esm</h1>
+<h1 class="title">ESM forcing</h1>
 </div>
 
 
@@ -205,40 +185,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>A single-domain driver in which <strong>Earth-System-Model (ESM) output replaces snapclim/smbpal</strong> as the climate and ocean forcing. The driver owns an <code>esm_forcing_class</code> (from <code>libs/esm.f90</code>) instead of a snapclim object, runs it as a first-class component on its own <code>grid_clim</code>, and remaps its fields onto the consumer grids just like any other module.</p>
+<p>Runs forced by <strong>Earth-System-Model (ESM) output</strong> (ISMIP7, TIPMIP, 1pctCO2) use the <code>yelmox</code> program with the ESM climate backend: <code>[coupling] climate = "esm"</code>. The backend wraps <code>libs/esm_forcing.f90</code>: a reference climatology at the current surface (lapse rate, precipitation scaling), plus ESM anomalies over historical and projection periods, optional climate variability and subglacial discharge.</p>
 <ul>
-<li><strong>Program:</strong> <code>yelmox_esm/yelmox_esm.f90</code> + <code>yelmox_esm/yelmox_esm_output.f90</code> + <code>libs/yelmox_domain.f90</code>.</li>
-<li><strong>Build:</strong> <code>make yelmox_esm</code></li>
-<li><strong>Config:</strong> <code>yelmox_esm/yelmox_esm_Antarctica.nml</code> (and <code>..._nudge.nml</code>).</li>
+<li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (<code>make yelmox</code>), backend in <code>libs/yelmox_climate.f90</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_esm_*.nml</code> (Antarctica ISMIP7, Greenland, 1pctCO2, TIPMIP).</li>
+<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> (spin-ups <code>opt_*.sh</code>, workflows <code>run_ismip7_*.sh</code>), <code>scripts/tipmip/</code>, <code>scripts/1pctCO2/</code>.</li>
 </ul>
-<section id="whats-distinct" class="level2">
-<h2 class="anchored" data-anchor-id="whats-distinct">What’s distinct</h2>
+<section id="configuration" class="level2">
+<h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
 <ul>
-<li><strong>ESM forcing, not snapclim.</strong> <code>domain_init</code> is called with <code>init_climate = .false.</code>, which skips <code>snapclim_init</code>; the driver instead calls <code>esm_forcing_init(esm, ..., grid_clim, ...)</code>. The <code>esm_forcing_class</code> holds the ESM atmosphere/ocean fields (tas, pr, ocean temperature, and derived inputs).</li>
-<li><strong>Calendar timeline.</strong> The timeline is initialized with <code>cal = .true.</code> and <code>time_ref = 2000.0</code>, i.e.&nbsp;absolute calendar time (<code>const_cal</code>), the ESM convention — as opposed to the relative (<code>time_bp</code>) timeline used by the paleo-oriented flavors.</li>
-<li><strong>ESM-specific couplers.</strong> Besides the shared <code>couple_smb_to_yelmo</code> / <code>couple_marine_to_yelmo</code>, the driver lands an ESM-owned Yelmo input (a discharge field <code>Qd</code>) via <code>couple_esm_extras_to_yelmo</code>, just before the ice sheet runs.</li>
-<li><strong>Dedicated climate/marine steps.</strong> <code>step_climate_esm</code> and <code>step_marine_shelf_esm</code> replace the generic <code>step_climate</code> / <code>step_marine_shelf</code>, reading from the <code>esm_forcing_class</code> rather than snapclim.</li>
+<li><strong>Run phase and calendar.</strong> <code>[ctrl] run_step</code> names the group holding the timeline (<code>"spinup"</code> or <code>"transient"</code>), with <code>calendar = True</code> and <code>calendar_ref = 2000.0</code>: the timeline is in calendar years. The same group holds the ESM periods (<code>time_ref</code>, <code>time_hist</code>, <code>time_proj</code>, <code>time_esm_ref</code>) and the variability switches (<code>clim_var</code>, <code>clim_seed</code>).</li>
+<li><strong>Experiment.</strong> <code>[esm]</code>: <code>par_file</code> (the ESM data configuration in <code>input/esm/</code>), <code>experiment</code>, <code>esm_name</code>, <code>use_esm</code> / <code>use_var</code> / <code>use_hist</code> / <code>use_proj</code>, and the physical parameters <code>lapse</code>, <code>f_p</code>, <code>f_ocn</code>, <code>f_polar</code>, <code>dT_threshold</code>, <code>grid_src</code>.</li>
+<li><strong>Surface mass balance.</strong> <code>[coupling] smb_method = "climate"</code> takes the ESM’s own SMB (reference + anomaly, corrected from the present-day surface with the SMB elevation gradient); <code>"smbpal"</code> computes it from the ESM temperature and precipitation.</li>
+<li><strong>Update cadence.</strong> <code>[coupling] dt_clim = 1.0</code>: the forcing is updated every step.</li>
+<li><strong>Cold start.</strong> <code>[coupling] kill_shelves</code> (no ice where the present-day bed is ocean) and <code>time_equil_thrm</code> (equilibration with topography fixed), shared with the other configurations.</li>
 </ul>
-<p>Configuration is read by <code>esm_ctl_load</code> from the <code>[esm]</code> group: <code>par_file</code>, <code>experiment</code>, <code>esm_name</code>, and switches <code>use_esm</code> / <code>use_smb</code> / <code>use_var</code> / <code>use_proj</code> / <code>use_hist</code>, plus physical parameters (<code>lapse</code>, <code>f_p</code>, <code>f_ocn</code>, <code>f_polar</code>, <code>dT_threshold</code>, <code>grid_src</code>).</p>
 </section>
-<section id="stepping-order" class="level2">
-<h2 class="anchored" data-anchor-id="stepping-order">Stepping order</h2>
-<p>Main loop (per timestep):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">call bsl_update(bsl, ts%time_rel)          ! shared sea level, once</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">call step_optimize(dom, ts)</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">call step_isostasy(dom, ts, bsl)</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">call couple_esm_extras_to_yelmo(dom, esm)  ! land ESM-owned Yelmo input (Qd)</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">call step_icesheet(dom, ts)                ! shared couplers + yelmo_update</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">call refresh_htopo(dom)</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">call step_climate_esm(dom, esm, ec, ts)    ! ESM climate + SMB (replaces step_climate)</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">call step_marine_shelf_esm(dom, esm, ec, ts)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This mirrors the single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a> sequence, with the generic climate/marine steps swapped for their <code>*_esm</code> equivalents and the extra <code>couple_esm_extras_to_yelmo</code> call placed just before <code>step_icesheet</code> so the ESM discharge input is present when Yelmo updates. Cold start builds the initial state through <code>esm_cold_start</code>; restart uses the shared <code>domain_startup</code> followed by one <code>step_climate_esm</code> / <code>step_marine_shelf_esm</code> to prime the forcing.</p>
+<section id="what-the-backend-supplies" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-backend-supplies">What the backend supplies</h2>
+<ul>
+<li>the atmosphere (<code>tas</code>, <code>pr</code>) for smbpal, or the surface mass balance directly;</li>
+<li>the ocean <strong>at the shelf base</strong> (<code>T_shlf</code>, <code>S_shlf</code> and their anomalies), interpolated from the reference ocean with the marine-shelf parameters, so <code>step_marine_shelf</code> passes it straight to the marine shelf;</li>
+<li>subglacial discharge <code>Qd</code>, landed on Yelmo by <code>couple_to_yelmo</code>.</li>
+</ul>
 </section>
-<section id="forcing" class="level2">
-<h2 class="anchored" data-anchor-id="forcing">Forcing</h2>
-<p>Climate transience comes from the ESM data stream itself (historical/projection experiments selected in <code>[esm]</code>), so the <code>tsgen</code> <code>[tsforcing]</code> mechanism from the single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a> is <strong>not</strong> used here.</p>
+<section id="output" class="level2">
+<h2 class="anchored" data-anchor-id="output">Output</h2>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>smbpal.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>esm.nc</code> (the ESM fields on the climate grid) and <code>esm_ts.nc</code> (the forcing averaged over the ice and the floating ice), and, with <code>[output] write_cmip</code> (every <code>dt_cmip</code>), the CMIP-formatted <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code>.</p>
 
 
 </section>

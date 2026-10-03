@@ -131,10 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Flavors</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
         <li>
     <a class="dropdown-item" href="./flavors.html">
  <span class="dropdown-text">Overview</span></a>
@@ -147,19 +147,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./flavor-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="./flavor-esm.html">
- <span class="dropdown-text">yelmox_esm</span></a>
+ <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./flavor-rembo.html">
- <span class="dropdown-text">yelmox_rembo</span></a>
+ <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./multigrid.html"> 
-<span class="menu-text">Multigrid design</span></a>
+<span class="menu-text">Multigrid coupling</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -205,18 +220,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>A <strong>two-domain</strong> driver that runs a northern and a southern ice-sheet domain together, coupled through a <strong>shared barystatic sea level</strong> and a <strong>shared Ocean Box Model (OBM)</strong> that exchanges freshwater flux and ocean temperature between the hemispheres. Each domain is a full <code>ice_domain</code> (the same one the single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a> uses); the driver interleaves the <code>step_*</code> primitives across both domains plus the OBM.</p>
+<p>A <strong>two-domain</strong> driver that runs a northern and a southern ice-sheet domain together, coupled through a <strong>shared barystatic sea level</strong> and a <strong>shared Ocean Box Model (OBM)</strong> that exchanges freshwater flux and ocean temperature between the hemispheres. Each domain is a full <code>kryos_domain</code> (the same one the single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a> uses); the driver interleaves the <code>step_*</code> primitives across both domains plus the OBM.</p>
 <ul>
-<li><strong>Program:</strong> <code>yelmox_bipolar/yelmox_bipolar.f90</code> + <code>yelmox_bipolar/obm_coupling.f90</code> + <code>libs/yelmox_domain.f90</code>.</li>
+<li><strong>Program:</strong> <code>yelmox_bipolar/yelmox_bipolar.f90</code> + <code>yelmox_bipolar/obm_coupling.f90</code> + <code>libs/kryos*.f90</code>.</li>
 <li><strong>Build:</strong> <code>make yelmox_bipolar</code> (links the OBM stack, <code>$(obm_libs)</code>).</li>
 <li><strong>Config:</strong> <code>yelmox_bipolar/yelmox_bipolar_Bipolar.nml</code>.</li>
 </ul>
 <section id="whats-distinct" class="level2">
 <h2 class="anchored" data-anchor-id="whats-distinct">What’s distinct</h2>
 <ul>
-<li><strong>Two <code>ice_domain</code>s</strong> (<code>dom_north</code>, <code>dom_south</code>), each set up via <code>setup_domain</code> → <code>domain_startup</code>. Either can be individually deactivated (<code>active_north</code> / <code>active_south</code>).</li>
+<li><strong>Two <code>kryos_domain</code>s</strong> (<code>dom_north</code>, <code>dom_south</code>), each set up via <code>setup_domain</code> → <code>domain_startup</code>. Either can be individually deactivated (<code>active_north</code> / <code>active_south</code>).</li>
 <li><strong>Shared <code>bsl</code></strong> — one barystatic sea level for the run, restored once at startup (<code>bsl_startup</code>) and written to the run-root restart bundle.</li>
-<li><strong>Shared OBM</strong> (<code>obm</code>) — an ocean box model stepped once per timestep, configured via <code>obm_ctl_load</code> and coupled to the domains through <code>obm_coupling.f90</code> (<code>obm_masks_init</code>, <code>obm_exchange</code>). The OBM writes its own 1D output and restart.</li>
+<li><strong>Shared OBM</strong> (<code>obm</code>) — an ocean box model stepped once per timestep, configured via <code>obm_ctl_load</code> and coupled to the domains through <code>obm_coupling.f90</code> (<code>obm_masks_init</code>, <code>obm_exchange</code>). The OBM writes its own 1D output; its restart (<code>obm_restart.nc</code>) goes into the run-root restart bundle next to <code>bsl_restart.nc</code> and is read back from <code>[ctrl] restart_bsl</code>.</li>
 </ul>
 <p>Climate/SMB per domain is still <strong>snapclim + smbpal</strong>, exactly as in the single-domain driver; the OBM’s contribution is folded into the ocean forcing — <code>obm_exchange</code> writes the OBM ocean temperature back into each domain’s snapclim <code>to_ann</code> before the marine-shelf step reads it.</p>
 </section>
@@ -225,24 +240,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Main loop (per timestep):</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">call bsl_update(bsl, ts%time_rel)              ! shared sea level, once</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_north) <span class="kw">call</span> advance_isostasy(dom_north)   <span class="co">! step_optimize + step_isostasy</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_south) <span class="kw">call</span> advance_isostasy(dom_south)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (oc<span class="op">%</span>active_obm) <span class="kw">call</span> obm_update(obm, dtt, oc<span class="op">%</span>obm_name)   <span class="co">! ocean box model, one step</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_north) <span class="kw">call</span> advance_dynamics(dom_north)   <span class="co">! step_icesheet + refresh_htopo + step_climate</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_south) <span class="kw">call</span> advance_dynamics(dom_south)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_north) <span class="kw">then</span>                         <span class="co">! spin-up tuning + isostasy, per domain</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> step_spinup_tuning(dom_north, ts)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> step_isostasy(dom_north, ts, bsl)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">end if</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>(same <span class="kw">for</span> dom_south)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (oc<span class="op">%</span>active_obm) <span class="kw">call</span> obm_update(obox, dtt, oc<span class="op">%</span>obm_name)   <span class="co">! ocean box model, one step</span></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">call obm_exchange(oc, obm, dom_north, dom_south, ...)  ! atm-&gt;obm, ism-&gt;obm freshwater,</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>                                                       <span class="co">! hysteresis forcing, obm-&gt;ism ocean temp</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_north) <span class="kw">call</span> step_marine_shelf(dom_north, ts)  <span class="co">! reads the obm-updated to_ann</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_south) <span class="kw">call</span> step_marine_shelf(dom_south, ts)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_north) <span class="kw">then</span>                         <span class="co">! ice sheet, hub, climate + smb, per domain</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> couple_to_yelmo(dom_north)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> step_icesheet(dom_north, ts)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> couple_yelmo_to_htopo(dom_north)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> step_climate(dom_north, ts)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> step_smb(dom_north, ts)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="kw">end if</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>(same <span class="kw">for</span> dom_south)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co">call obm_exchange(oc, obox, dom_north, dom_south, ...)  ! atm-&gt;obm, ism-&gt;obm freshwater,</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>                                                       <span class="co">! hysteresis forcing, obm-&gt;ism ocean temp</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_north) <span class="kw">call</span> step_marine_shelf(dom_north, ts)  <span class="co">! reads the obm-updated to_ann</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="kw">if</span> (active_south) <span class="kw">call</span> step_marine_shelf(dom_south, ts)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Key ordering points:</p>
 <ul>
 <li><strong>Isostasy for both domains runs before the OBM step</strong>, so the OBM sees a consistent geometry.</li>
 <li><strong><code>obm_update</code> uses the previous step’s</strong> atmospheric/freshwater forcing (a one-step lag), then <code>obm_exchange</code> distributes the fresh OBM state back to the domains before the marine-shelf melt is computed.</li>
-<li><code>advance_dynamics</code> = <code>step_icesheet</code> → <code>refresh_htopo</code> → <code>step_climate</code> (the same three primitives the single-domain <code>yelmox_step</code> runs, minus optimize/isostasy which happen in <code>advance_isostasy</code> earlier).</li>
+<li>The per-domain primitives are the same as in the single-domain <code>yelmox</code>; only the spin-up tuning + isostasy part is split off so it runs before the OBM step.</li>
 </ul>
 </section>
 <section id="forcing" class="level2">

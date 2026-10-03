@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Program flavors – YelmoX</title>
+<title>Programs and climate backends – YelmoX</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -96,10 +96,10 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Flavors</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
         <li>
     <a class="dropdown-item" href="./flavors.html">
  <span class="dropdown-text">Overview</span></a>
@@ -112,19 +112,34 @@ ul.task-list li input[type="checkbox"] {
     <a class="dropdown-item" href="./flavor-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="./flavor-esm.html">
- <span class="dropdown-text">yelmox_esm</span></a>
+ <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./flavor-rembo.html">
- <span class="dropdown-text">yelmox_rembo</span></a>
+ <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./multigrid.html"> 
-<span class="menu-text">Multigrid design</span></a>
+<span class="menu-text">Multigrid coupling</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -142,9 +157,8 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#the-flavors" id="toc-the-flavors" class="nav-link active" data-scroll-target="#the-flavors">The flavors</a></li>
-  <li><a href="#shared-coupling-primitives" id="toc-shared-coupling-primitives" class="nav-link" data-scroll-target="#shared-coupling-primitives">Shared coupling primitives</a></li>
-  <li><a href="#initialization-ordering-applies-to-all-flavors" id="toc-initialization-ordering-applies-to-all-flavors" class="nav-link" data-scroll-target="#initialization-ordering-applies-to-all-flavors">Initialization ordering (applies to all flavors)</a></li>
+  <li><a href="#shared-coupling-primitives" id="toc-shared-coupling-primitives" class="nav-link active" data-scroll-target="#shared-coupling-primitives">Shared coupling primitives</a></li>
+  <li><a href="#initialization-ordering" id="toc-initialization-ordering" class="nav-link" data-scroll-target="#initialization-ordering">Initialization ordering</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/flavors.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -153,7 +167,7 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Program flavors</h1>
+<h1 class="title">Programs and climate backends</h1>
 </div>
 
 
@@ -170,68 +184,84 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>YelmoX ships several <strong>driver programs</strong> (“flavors”), each a <code>program</code> that wires Yelmo together with a different set of forcing/coupling components. All of the modern (multigrid) flavors are built on the shared <code>ice_domain</code> type and the <code>step_*</code> coupling primitives in <a href="https://github.com/fesmc/yelmox/blob/main/libs/yelmox_domain.f90"><code>libs/yelmox_domain.f90</code></a>; they differ in <strong>which components are active</strong> and in <strong>how the per-step coupling sequence is assembled</strong>.</p>
-<p>See <a href="./multigrid.html">Multigrid coupling</a> for the design of the shared <code>ice_domain</code> core that these drivers reuse.</p>
-<section id="the-flavors" class="level2">
-<h2 class="anchored" data-anchor-id="the-flavors">The flavors</h2>
+<p>YelmoX has two <strong>programs</strong>, both built on the shared <code>kryos_domain</code> type and the coupling primitives of the Kryos modules (<code>libs/kryos*.f90</code>):</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
-<th>Flavor</th>
+<th>Program</th>
 <th>Build</th>
-<th>Climate / SMB</th>
+<th>Domains</th>
+<th>Climate</th>
 <th>Ocean</th>
-<th>Distinctive feature</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><a href="./flavor-yelmox.html"><code>yelmox</code></a></td>
-<td><code>make yelmox</code></td>
-<td>snapclim + smbpal</td>
-<td>snapclim</td>
-<td>Single domain; canonical driver. Transient time-series forcing (<code>tsgen</code>).</td>
+<td><code>make yelmox</code> (<code>rembo=1</code> for REMBO)</td>
+<td>one</td>
+<td>any backend (<code>[coupling] climate</code>)</td>
+<td>the climate (depth profiles or shelf base)</td>
 </tr>
 <tr class="even">
 <td><a href="./flavor-bipolar.html"><code>yelmox_bipolar</code></a></td>
 <td><code>make yelmox_bipolar</code></td>
-<td>snapclim + smbpal (×2)</td>
-<td>snapclim + shared OBM</td>
-<td>Two hemispheres, shared sea level + Ocean Box Model.</td>
-</tr>
-<tr class="odd">
-<td><a href="./flavor-esm.html"><code>yelmox_esm</code></a></td>
-<td><code>make yelmox_esm</code></td>
-<td>ESM forcing (<code>libs/esm.f90</code>)</td>
-<td>ESM</td>
-<td>Earth-System-Model forcing replaces snapclim; calendar timeline.</td>
-</tr>
-<tr class="even">
-<td><a href="./flavor-rembo.html"><code>yelmox_rembo</code></a></td>
-<td><code>make yelmox_rembo</code></td>
-<td>REMBOv1</td>
-<td>snapclim</td>
-<td>REMBO energy/moisture-balance atmosphere + SMB.</td>
+<td>north + south</td>
+<td>snapclim (×2)</td>
+<td>snapclim + shared Ocean Box Model</td>
 </tr>
 </tbody>
 </table>
-<p>Legacy single-grid originals live under each flavor’s <code>legacy/</code> folder and build with <code>make &lt;flavor&gt;-legacy</code>. Flavors not yet ported to the multigrid driver (<code>yelmox_ismip6</code>, <code>yelmox_nahosmip</code>, <code>yelmox_rtip</code>) are legacy-only.</p>
-</section>
+<p>The forcing of a <code>yelmox</code> run is set at runtime by its <strong>climate backend</strong>, <code>[coupling] climate</code>:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Backend</th>
+<th>Supplies</th>
+<th>Page</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>snapclim</code></td>
+<td>atmosphere + ocean profiles, from climate snapshots blended by indices</td>
+<td><a href="./climate-snap.html">snapclim and snapesm</a></td>
+</tr>
+<tr class="even">
+<td><code>snapesm</code></td>
+<td>as snapclim, configured as one blend model over any number of snapshots</td>
+<td><a href="./climate-snap.html">snapclim and snapesm</a></td>
+</tr>
+<tr class="odd">
+<td><code>esm</code></td>
+<td>reference climatology + Earth-system-model anomalies; atmosphere or smb, ocean at the shelf base, subglacial discharge</td>
+<td><a href="./flavor-esm.html">ESM forcing</a></td>
+</tr>
+<tr class="even">
+<td><code>rembo</code></td>
+<td>REMBOv1 atmosphere + smb; ocean from snapclim</td>
+<td><a href="./flavor-rembo.html">REMBO climate</a></td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="./multigrid.html">Multigrid coupling</a> for the architecture shared by both programs.</p>
 <section id="shared-coupling-primitives" class="level2">
 <h2 class="anchored" data-anchor-id="shared-coupling-primitives">Shared coupling primitives</h2>
-<p>Every modern flavor advances the model by calling these primitives (from <code>yelmox_domain</code>), in a flavor-specific order:</p>
+<p>Both programs advance a domain with these primitives (from <code>kryos_coupling</code>):</p>
 <ul>
-<li><code>step_optimize</code> — spinup relaxation + basal-friction / thermal-forcing tuning.</li>
+<li><code>step_spinup_tuning</code> — spinup relaxation + basal-friction / thermal-forcing tuning.</li>
 <li><code>step_isostasy</code> — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (<code>bsl</code>).</li>
-<li><code>step_icesheet</code> — assemble the Yelmo boundary state (couplers) and run <code>yelmo_update</code>.</li>
-<li><code>refresh_htopo</code> — mirror the prognostic geometry into the hi-res reference hub.</li>
-<li><code>step_climate</code> — climate on <code>grid_clim</code> + SMB on <code>grid_smb</code> (snapclim/smbpal).</li>
-<li><code>step_marine_shelf</code> — sub-shelf melt on <code>grid_mshlf</code>.</li>
+<li><code>couple_to_yelmo</code> — assemble the Yelmo boundary state from the component outputs (incl.&nbsp;the climate’s subglacial discharge, when supplied).</li>
+<li><code>step_icesheet</code> — run <code>yelmo_update</code>.</li>
+<li><code>couple_yelmo_to_htopo</code> — the hub’s current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo’s anomalies on a finer hub).</li>
+<li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the transient forcing, on the <code>dt_clim</code> cadence.</li>
+<li><code>step_smb</code> — surface mass balance on <code>grid_smb</code> (<code>smb_method</code>: smbpal, smb_simple, or the climate’s own, <code>climate</code>).</li>
+<li><code>step_marine_shelf</code> — sub-shelf melt on <code>grid_mshlf</code>, from the climate’s ocean as depth profiles or at the shelf base.</li>
 </ul>
-<p>The single-domain <a href="./flavor-yelmox.html"><code>yelmox</code></a> wraps these in <code>yelmox_step</code>; the other drivers call the primitives directly so they can interleave extra steps (a second domain, an ocean box model, an ESM/REMBO climate step).</p>
+<p>Every driver writes the sequence out in its time loop, so the coupling order can be read directly from the program; <code>yelmox_bipolar</code> interleaves the second domain and the ocean box model there.</p>
 </section>
-<section id="initialization-ordering-applies-to-all-flavors" class="level2">
-<h2 class="anchored" data-anchor-id="initialization-ordering-applies-to-all-flavors">Initialization ordering (applies to all flavors)</h2>
+<section id="initialization-ordering" class="level2">
+<h2 class="anchored" data-anchor-id="initialization-ordering">Initialization ordering</h2>
 <p>On cold start, the Yelmo applied mass-balance diagnostics (<code>smb</code>, <code>bmb</code>, <code>fmb</code>) are populated at the initial time so the first output snapshot reflects the coupled boundary forcing rather than zeros. This is handled inside Yelmo: when the topography solver runs without advancing the ice (<code>pc_step="none"</code> at init, or any <code>topo_fixed</code> step), it diagnoses the applied mass balance from the current boundary forcing (<code>calc_ytopo_mb_diagnostic</code>). <code>mb_net</code> remains zero at <code>t=0</code> (nothing is applied), which is expected.</p>
 
 

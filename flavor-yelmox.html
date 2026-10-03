@@ -131,10 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Flavors</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
         <li>
     <a class="dropdown-item" href="./flavors.html">
  <span class="dropdown-text">Overview</span></a>
@@ -147,19 +147,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./flavor-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="./flavor-esm.html">
- <span class="dropdown-text">yelmox_esm</span></a>
+ <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./flavor-rembo.html">
- <span class="dropdown-text">yelmox_rembo</span></a>
+ <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./multigrid.html"> 
-<span class="menu-text">Multigrid design</span></a>
+<span class="menu-text">Multigrid coupling</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -180,6 +195,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#components" id="toc-components" class="nav-link active" data-scroll-target="#components">Components</a></li>
   <li><a href="#stepping-order" id="toc-stepping-order" class="nav-link" data-scroll-target="#stepping-order">Stepping order</a></li>
   <li><a href="#transient-time-series-forcing-tsgen" id="toc-transient-time-series-forcing-tsgen" class="nav-link" data-scroll-target="#transient-time-series-forcing-tsgen">Transient time-series forcing (<code>tsgen</code>)</a></li>
+  <li><a href="#configuration" id="toc-configuration" class="nav-link" data-scroll-target="#configuration">Configuration</a>
+  <ul class="collapse">
+  <li><a href="#coupling" id="toc-coupling" class="nav-link" data-scroll-target="#coupling"><code>[coupling]</code></a></li>
+  <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output"><code>[output]</code></a></li>
+  </ul></li>
   <li><a href="#also-built-from-this-driver" id="toc-also-built-from-this-driver" class="nav-link" data-scroll-target="#also-built-from-this-driver">Also built from this driver</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/flavor-yelmox.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -206,20 +226,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>The canonical driver: a single ice-sheet domain forced by <strong>snapclim</strong> (climate + ocean) and <strong>smbpal</strong> (surface mass balance), with FastIsostasy bedrock and a shared barystatic sea level. It is the reference implementation of the multigrid <code>ice_domain</code> and the template the other flavors specialize.</p>
+<p>The single-domain program: one ice-sheet domain with FastIsostasy bedrock, a shared barystatic sea level, a climate backend chosen at runtime, a surface mass balance and the marine shelf. It is the reference implementation of the multigrid <code>kryos_domain</code>; <a href="./flavor-bipolar.html"><code>yelmox_bipolar</code></a> runs two of them.</p>
 <ul>
-<li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (thin driver) + <code>libs/yelmox_domain.f90</code> (all coupling).</li>
-<li><strong>Build:</strong> <code>make yelmox</code></li>
-<li><strong>Configs:</strong> <code>yelmox/yelmox_&lt;domain&gt;.nml</code> (Antarctica, Greenland, North, LIS, Pyrenees, SRG, plus <code>pd_</code> present-day variants).</li>
+<li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (thin driver) + <code>libs/kryos*.f90</code> (domain, coupling, startup, output).</li>
+<li><strong>Build:</strong> <code>make yelmox</code> (<code>make yelmox rembo=1</code> to link REMBO).</li>
+<li><strong>Configs:</strong> <code>yelmox/yelmox_&lt;domain&gt;.nml</code> (Antarctica, Greenland, North, LIS, Pyrenees, SRG, plus <code>pd_</code> present-day and paleo variants), <code>yelmox_esm_*.nml</code> (<a href="./flavor-esm.html">ESM forcing</a>), <code>yelmox_rembo_Greenland.nml</code> (<a href="./flavor-rembo.html">REMBO</a>), <code>yelmox_Greenland_snapesm*.nml</code> (<a href="./climate-snap.html">snapesm</a>).</li>
 </ul>
 <section id="components" class="level2">
 <h2 class="anchored" data-anchor-id="components">Components</h2>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
 <thead>
 <tr class="header">
 <th>Role</th>
@@ -231,7 +246,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td>Ice sheet</td>
 <td>Yelmo</td>
-<td><code>grid_yelmo</code></td>
+<td><code>grid_ice</code></td>
 </tr>
 <tr class="even">
 <td>Isostasy + sea level</td>
@@ -240,12 +255,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Climate (atmosphere + ocean)</td>
-<td>snapclim</td>
+<td>backend of <code>[coupling] climate</code>: <a href="./climate-snap.html">snapclim, snapesm</a>, <a href="./flavor-esm.html">esm</a> or <a href="./flavor-rembo.html">rembo</a></td>
 <td><code>grid_clim</code></td>
 </tr>
 <tr class="even">
 <td>Surface mass balance</td>
-<td>smbpal (or <code>smb_simple</code>)</td>
+<td>smbpal, <code>smb_simple</code> or the climate’s own</td>
 <td><code>grid_smb</code></td>
 </tr>
 <tr class="odd">
@@ -256,26 +271,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="even">
 <td>Geometry hub</td>
 <td>htopo</td>
-<td><code>grid_name</code> (hi-res)</td>
+<td><code>grid_hub</code> (hi-res)</td>
 </tr>
 </tbody>
 </table>
-<p>Each module runs on its own configurable grid; the coupler remaps fields between grids at the moment of coupling. See <a href="./multigrid.html">Multigrid coupling</a>.</p>
+<p>Each module runs on its own grid, set in <code>[domain]</code>; the coupler remaps fields between grids at the moment of coupling. See <a href="./multigrid.html">Multigrid coupling</a>.</p>
 </section>
 <section id="stepping-order" class="level2">
 <h2 class="anchored" data-anchor-id="stepping-order">Stepping order</h2>
-<p>The driver owns the timeline (<code>ts</code>) and the shared sea level (<code>bsl</code>), and advances the domain once per step with <code>yelmox_step</code>, which fixes the coupling order:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">call step_optimize(dom, ts)      ! spinup relaxation + cb_ref/tf_corr tuning</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">call step_isostasy(dom, ts, bsl)</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">call step_icesheet(dom, ts)      ! couplers (smb/isos/marine) + yelmo_update</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">call refresh_htopo(dom)          ! hi-res geometry mirror, from the models</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">call step_climate(dom, ts, dTa, dTo, dSo)   ! climate/smb read geometry from the hub</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">call step_marine_shelf(dom, ts)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>step_icesheet</code> assembles the Yelmo boundary state from the module outputs of the <strong>previous</strong> step (a one-step coupling lag) and runs <code>yelmo_update</code>; <code>step_climate</code> and <code>step_marine_shelf</code> then produce the forcing consumed on the next step. snapclim is refreshed on the <code>coupling.dt_clim</code> cadence; smbpal every step.</p>
+<p>The driver owns the timeline (<code>ts</code>) and the shared sea level (<code>bsl</code>), and advances the domain once per step with the coupling sequence written out in the time loop:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">call step_icesheet(dom, ts)       ! yelmo_update</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">call step_smb(dom, ts)            ! surface mass balance</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">call step_marine_shelf(dom, ts)   ! shelf melt</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>couple_to_yelmo</code> assembles the Yelmo boundary state: isostasy from this step, smb and shelf melt from the <strong>previous</strong> step (a one-step coupling lag); <code>step_climate</code>, <code>step_smb</code> and <code>step_marine_shelf</code> then produce the forcing consumed on the next step. The climate is refreshed on the <code>coupling.dt_clim</code> cadence; the smb every step.</p>
 </section>
 <section id="transient-time-series-forcing-tsgen" class="level2">
 <h2 class="anchored" data-anchor-id="transient-time-series-forcing-tsgen">Transient time-series forcing (<code>tsgen</code>)</h2>
-<p><code>yelmox</code> can drive a spatially-homogeneous, time-varying anomaly into snapclim (atmosphere and/or ocean) from the <code>tsgen</code> time-series generator (the modern replacement for the legacy <code>hyster</code> module). It is <strong>driver-owned</strong>: the program holds a <code>tsgen_class</code>, advances it each step, and passes the result into <code>yelmox_step</code> as <code>dTa</code> / <code>dTo</code> / <code>dSo</code>.</p>
+<p><code>yelmox</code> can drive a spatially-homogeneous, time-varying anomaly into the climate (atmosphere and/or ocean) from the <code>tsgen</code> time-series generator (the modern replacement for the legacy <code>hyster</code> module). It is <strong>driver-owned</strong>: the program holds a <code>tsforcing_class</code> (<code>tsf</code>), advances it each step, and passes it to <code>step_climate</code> (and the cold start), which apply its <code>dTa</code> / <code>dTo</code> / <code>dSo</code>.</p>
 <p>Two namelist groups control it:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>tsforcing</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    active <span class="kw">=</span> True     <span class="co">! turn transient forcing on</span></span>
@@ -291,21 +308,185 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    dt_ramp   <span class="kw">=</span> <span class="fl">200.0</span></span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">! ... (see tsgen.f90 for the full parameter set)</span></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>tsgen</code> produces a single scalar <code>f_now</code>, which the <code>[tsforcing]</code> gains map onto the three snapclim anomalies. Time-driven methods (<code>ramp-*</code>, <code>sin</code>, <code>const</code>) are analytic; feedback methods (<code>exp</code>, PI/PID controllers) modulate the forcing rate from the model response — the response variable passed to <code>tsgen</code> is total ice volume (Gt).</p>
-<div class="callout callout-style-default callout-important callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span><code>dTa</code>/<code>dTo</code>/<code>dSo</code> require snapclim’s <code>"anom"</code> mode
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The anomalies are only consumed when <code>snap.atm_type = "anom"</code> (for <code>dTa</code>) and <code>snap.ocn_type = "anom"</code> (for <code>dTo</code>/<code>dSo</code>). In snapclim’s index-based modes (<code>snap_1ind_new</code>, <code>snap_2ind</code>, <code>hybrid</code>, …) the passed anomalies are <strong>ignored</strong> — the forcing there comes from the index time-series files instead. This matches the legacy <code>hyster</code> contract.</p>
-</div>
-</div>
-<p>With <code>active = False</code> (the default in the shipped configs) the driver calls <code>yelmox_step</code> without anomalies and snapclim behaves exactly as before.</p>
+<p><code>tsgen</code> produces a single scalar <code>f_now</code>, which the <code>[tsforcing]</code> gains map onto the three anomalies. Time-driven methods (<code>ramp-*</code>, <code>sin</code>, <code>const</code>) are analytic; feedback methods (<code>exp</code>, PI/PID controllers) modulate the forcing rate from the model response — the response variable passed to <code>tsgen</code> is total ice volume (Gt).</p>
+<p>How the anomalies reach the climate depends on the backend:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Backend</th>
+<th><code>dTa</code> / <code>dTo</code> / <code>dSo</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>snapclim</td>
+<td>used only in the <code>"anom"</code> methods (<code>snap.atm_type</code> for <code>dTa</code>, <code>snap.ocn_type</code> for <code>dTo</code>/<code>dSo</code>); ignored in the index-based methods (<code>snap_1ind_new</code>, <code>snap_2ind</code>, <code>hybrid</code>, …), as in the legacy <code>hyster</code> contract</td>
+</tr>
+<tr class="even">
+<td>snapesm</td>
+<td>added on top in every configuration</td>
+</tr>
+<tr class="odd">
+<td>esm</td>
+<td>not used: the backend has its own forcing</td>
+</tr>
+<tr class="even">
+<td>rembo</td>
+<td>mapped onto REMBO’s summer, annual and ocean anomalies (see <a href="./flavor-rembo.html">REMBO</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>With <code>active = False</code> (the default in the shipped configs) <code>step_climate</code> applies no anomalies.</p>
+</section>
+<section id="configuration" class="level2">
+<h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
+<p>Besides <code>[domain]</code> (the domain definition, see <a href="./multigrid.html">Multigrid coupling</a>), a run is set by <code>[coupling]</code> and <code>[output]</code>. In <code>yelmox_bipolar</code> each group carries the hemisphere suffix (<code>[coupling_north]</code>, …). Every key is required (a missing key stops the run), except the keys of an unselected <code>init_method</code>.</p>
+<section id="coupling" class="level3">
+<h3 class="anchored" data-anchor-id="coupling"><code>[coupling]</code></h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Values</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>with_ice_sheet</code>, <code>with_isostasy</code>, <code>with_climate</code>, <code>with_marine_shelf</code></td>
+<td>bool</td>
+<td>components in the coupling sequence; <code>with_climate</code> covers climate and smb</td>
+</tr>
+<tr class="even">
+<td><code>climate</code></td>
+<td><code>snapclim</code>, <code>snapesm</code>, <code>esm</code>, <code>rembo</code></td>
+<td>the climate backend</td>
+</tr>
+<tr class="odd">
+<td><code>smb_method</code></td>
+<td><code>smbpal</code>, <code>smb_simple</code>, <code>climate</code></td>
+<td>smbpal (from the climate’s temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate’s own smb (esm, rembo; required by rembo)</td>
+</tr>
+<tr class="even">
+<td><code>dt_clim</code></td>
+<td>[yr]</td>
+<td>climate update interval; <code>&lt;= 0</code>: updated only at the cold start</td>
+</tr>
+<tr class="odd">
+<td><code>equil_method</code></td>
+<td><code>none</code>, <code>opt</code></td>
+<td><code>opt</code>: spin-up optimization of the basal friction and the thermal-forcing correction (<code>[opt]</code>)</td>
+</tr>
+<tr class="even">
+<td><code>restart</code></td>
+<td>folder, <code>"None"</code></td>
+<td>restart bundle to start from; <code>"None"</code> = cold start</td>
+</tr>
+<tr class="odd">
+<td><code>init_method</code></td>
+<td><code>none</code>, <code>equil</code>, <code>recon</code>, <code>recon_ref</code></td>
+<td>cold-start ice state: as initialized; a short equilibration with constant boundaries; the reconstruction <code>recon_path</code> as initial ice on the <code>recon_codes</code> regions; the reconstruction as reference ice only</td>
+</tr>
+<tr class="even">
+<td><code>init_equil_time</code></td>
+<td>[yr]</td>
+<td><code>equil</code>: equilibration time</td>
+</tr>
+<tr class="odd">
+<td><code>recon_path</code>, <code>recon_var</code></td>
+<td>path, name</td>
+<td><code>recon</code>, <code>recon_ref</code>: the reconstruction file (<code>{domain}</code>, <code>{grid_name}</code> = <code>grid_ice</code>) and its ice-thickness variable</td>
+</tr>
+<tr class="even">
+<td><code>recon_codes</code></td>
+<td>codes</td>
+<td><code>recon</code>: the regions where its ice is imposed</td>
+</tr>
+<tr class="odd">
+<td><code>init_marine_H</code></td>
+<td>bool</td>
+<td>cold start: LGM-like marine ice, before <code>init_method</code></td>
+</tr>
+<tr class="even">
+<td><code>kill_shelves</code></td>
+<td>bool</td>
+<td>cold start: no ice where the present-day bed is ocean</td>
+</tr>
+<tr class="odd">
+<td><code>time_equil_thrm</code></td>
+<td>[yr]</td>
+<td>cold start: then equilibrate with topography fixed (<code>0</code> = off)</td>
+</tr>
+<tr class="even">
+<td><code>scale_glacial_smb</code></td>
+<td>bool</td>
+<td>reduce negative glacial smb (<code>[glacial_smb]</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>lim_pd_ice</code></td>
+<td>bool</td>
+<td>extra melt (4 m/yr) outside the present-day ice extent</td>
+</tr>
+<tr class="even">
+<td><code>use_negis</code></td>
+<td>bool</td>
+<td>NEGIS basal-friction modification (<code>[negis]</code>)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="output" class="level3">
+<h3 class="anchored" data-anchor-id="output"><code>[output]</code></h3>
+<p>Each module writes its own files, on its own grid, at the <code>[tm_2D]</code> (2D), <code>[tm_2Dsm]</code> (small 2D) and <code>[tm_1D]</code> (time series) intervals:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>write_yelmo</code></td>
+<td><code>yelmo.nc</code>, <code>yelmo_sm.nc</code>, <code>yelmo_ts.nc</code> (and <code>yelmo_ts_&lt;region&gt;.nc</code> for the named regions of <code>[domain]</code>)</td>
+</tr>
+<tr class="even">
+<td><code>write_isos</code></td>
+<td><code>isos.nc</code>, <code>isos_ts.nc</code></td>
+</tr>
+<tr class="odd">
+<td><code>write_mshlf</code></td>
+<td><code>mshlf.nc</code></td>
+</tr>
+<tr class="even">
+<td><code>write_smb</code></td>
+<td><code>smbpal.nc</code></td>
+</tr>
+<tr class="odd">
+<td><code>write_clim</code></td>
+<td>the backend’s file: <code>snap.nc</code> (snapclim, snapesm), <code>esm.nc</code> + <code>esm_ts.nc</code>, <code>rembo.nc</code> + <code>rembo_ts.nc</code></td>
+</tr>
+<tr class="even">
+<td><code>write_htopo</code></td>
+<td><code>htopo.nc</code> (the hub)</td>
+</tr>
+<tr class="odd">
+<td><code>write_cmip</code>, <code>dt_cmip</code></td>
+<td><code>yelmo_cmip.nc</code>, <code>yelmo_ts_cmip.nc</code>, every <code>dt_cmip</code> years (marine-shelf fields need <code>grid_mshlf = grid_ice</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Restart bundles follow <code>[tm_rst]</code>, plus one at <code>time_end</code>.</p>
+</section>
 </section>
 <section id="also-built-from-this-driver" class="level2">
 <h2 class="anchored" data-anchor-id="also-built-from-this-driver">Also built from this driver</h2>

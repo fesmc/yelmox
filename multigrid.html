@@ -131,10 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-flavors" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Flavors</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Programs</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-flavors">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
         <li>
     <a class="dropdown-item" href="./flavors.html">
  <span class="dropdown-text">Overview</span></a>
@@ -147,19 +147,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./flavor-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-climate-backends" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Climate backends</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
+        <li>
+    <a class="dropdown-item" href="./climate-snap.html">
+ <span class="dropdown-text">snapclim and snapesm</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="./flavor-esm.html">
- <span class="dropdown-text">yelmox_esm</span></a>
+ <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./flavor-rembo.html">
- <span class="dropdown-text">yelmox_rembo</span></a>
+ <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
+    <a class="nav-link" href="./database-namelists.html"> 
+<span class="menu-text">Database namelists</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link active" href="./multigrid.html" aria-current="page"> 
-<span class="menu-text">Multigrid design</span></a>
+<span class="menu-text">Multigrid coupling</span></a>
   </li>  
 </ul>
           </div> <!-- /navcollapse -->
@@ -177,21 +192,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#multigrid-coupling-yelmox" id="toc-multigrid-coupling-yelmox" class="nav-link active" data-scroll-target="#multigrid-coupling-yelmox">Multigrid coupling (<code>yelmox</code>)</a>
+  <li><a href="#multigrid-coupling" id="toc-multigrid-coupling" class="nav-link active" data-scroll-target="#multigrid-coupling">Multigrid coupling</a>
   <ul class="collapse">
-  <li><a href="#motivation" id="toc-motivation" class="nav-link" data-scroll-target="#motivation">Motivation</a></li>
-  <li><a href="#key-observations-from-the-current-code" id="toc-key-observations-from-the-current-code" class="nav-link" data-scroll-target="#key-observations-from-the-current-code">Key observations from the current code</a></li>
+  <li><a href="#building-blocks" id="toc-building-blocks" class="nav-link" data-scroll-target="#building-blocks">Building blocks</a></li>
   <li><a href="#conceptual-model" id="toc-conceptual-model" class="nav-link" data-scroll-target="#conceptual-model">Conceptual model</a></li>
   <li><a href="#layering" id="toc-layering" class="nav-link" data-scroll-target="#layering">Layering</a></li>
-  <li><a href="#coupler-in-fesm-utils-coords-library" id="toc-coupler-in-fesm-utils-coords-library" class="nav-link" data-scroll-target="#coupler-in-fesm-utils-coords-library">Coupler (in fesm-utils, <code>coords</code> library)</a></li>
-  <li><a href="#domain-coupling-steps-in-yelmoxlibs" id="toc-domain-coupling-steps-in-yelmoxlibs" class="nav-link" data-scroll-target="#domain-coupling-steps-in-yelmoxlibs">Domain + coupling steps (in <code>yelmox/libs</code>)</a>
+  <li><a href="#coupler-fesm-utils" id="toc-coupler-fesm-utils" class="nav-link" data-scroll-target="#coupler-fesm-utils">Coupler (fesm-utils)</a></li>
+  <li><a href="#the-domain-kryos_domain" id="toc-the-domain-kryos_domain" class="nav-link" data-scroll-target="#the-domain-kryos_domain">The domain (<code>kryos_domain</code>)</a>
   <ul class="collapse">
-  <li><a href="#hi-res-topography-hub-htopo" id="toc-hi-res-topography-hub-htopo" class="nav-link" data-scroll-target="#hi-res-topography-hub-htopo">Hi-res topography hub (htopo)</a></li>
+  <li><a href="#domain-definition-domain-and-the-hi-res-hub-htopo" id="toc-domain-definition-domain-and-the-hi-res-hub-htopo" class="nav-link" data-scroll-target="#domain-definition-domain-and-the-hi-res-hub-htopo">Domain definition (<code>[domain]</code>) and the hi-res hub (htopo)</a></li>
   <li><a href="#buffers" id="toc-buffers" class="nav-link" data-scroll-target="#buffers">Buffers</a></li>
   </ul></li>
   <li><a href="#drivers" id="toc-drivers" class="nav-link" data-scroll-target="#drivers">Drivers</a></li>
-  <li><a href="#integration-gaps-to-resolve-during-the-build" id="toc-integration-gaps-to-resolve-during-the-build" class="nav-link" data-scroll-target="#integration-gaps-to-resolve-during-the-build">Integration gaps to resolve during the build</a></li>
-  <li><a href="#commit-order" id="toc-commit-order" class="nav-link" data-scroll-target="#commit-order">Commit order</a></li>
+  <li><a href="#open-issues" id="toc-open-issues" class="nav-link" data-scroll-target="#open-issues">Open issues</a></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/multigrid.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -202,24 +215,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="multigrid-coupling-yelmox" class="level1">
-<h1>Multigrid coupling (<code>yelmox</code>)</h1>
-<p>Design doc for a multigrid rewrite of the yelmox driver. Status: <strong>implemented</strong> (<code>yelmox.f90</code> + <code>libs/yelmox_domain.f90</code>); single-domain parity with <code>yelmox.f90</code> validated, multi-domain (bipolar) runs, optimization + smb_simple + domain-specific startups ported. The bipolar driver (<code>yelmox_bipolar.f90</code>) also carries the full <code>yelmox_bipolar</code> ocean coupling: a shared barystatic sea level and a shared Ocean Box Model exchanging freshwater flux / ocean temperature between hemispheres (<code>yelmox_bipolar/obm_coupling.f90</code>). A third driver (<code>yelmox_esm.f90</code>) swaps snapclim for ESM climatic forcing (<code>libs/esm.f90</code>), running esm as a first-class component on its own grid (<code>grid_clim</code>) and remapping its outputs to the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy hi-res output (below).</p>
-<section id="motivation" class="level2">
-<h2 class="anchored" data-anchor-id="motivation">Motivation</h2>
-<p>Today every helper module (<code>marine_shelf</code>, <code>snapclim</code>, <code>smbpal</code>, FastIsostasy) is initialized on, and operates on, the Yelmo grid. Fields are passed between modules as bare <code>(nx,ny)</code> 2D arrays shaped to that single grid. There is no inter-module remapping in the main loop — remapping (<code>map_class</code> from the <code>coords</code> library in fesm-utils) is used only for restart I/O.</p>
-<p>We want each module to be able to work on its own grid/resolution and be remapped to Yelmo (or any other module) at the moment of coupling. Example workflow for Antarctica with Yelmo on <code>ANT-16KM</code> and a hi-res topo/working grid <code>ANT-2KM</code>:</p>
+<section id="multigrid-coupling" class="level1">
+<h1>Multigrid coupling</h1>
+<p>Architecture of the two YelmoX programs, <code>yelmox</code> and <code>yelmox_bipolar</code>. Each component of a domain (Yelmo, isostasy, climate, smb, marine shelf) runs on its own grid, and fields are remapped between grids at the moment of coupling. The domain is defined around a hi-resolution geometry hub (htopo), the finest grid of the setup, from which every component, Yelmo included, is populated.</p>
+<p>Example for Antarctica with Yelmo on <code>ANT-16KM</code> and a hi-res hub on <code>ANT-2KM</code>:</p>
 <ul>
 <li><code>H_ice</code> (Yelmo <code>ANT-16KM</code>) → bilin → <code>ANT-2KM</code> for the marine-shelf calc.</li>
 <li><code>z_bed</code>/<code>z_ss</code> from FastIsostasy → conservatively aggregated to Yelmo’s grid, set as BCs.</li>
 <li>marine_shelf computed at <code>ANT-2KM</code>; <code>bmb_shlf</code>/<code>T_shlf</code> → conservatively aggregated → <code>ANT-16KM</code> → passed to Yelmo as forcing.</li>
 </ul>
-<p>The bookkeeping of many remapping steps is the thing to tame.</p>
-</section>
-<section id="key-observations-from-the-current-code" class="level2">
-<h2 class="anchored" data-anchor-id="key-observations-from-the-current-code">Key observations from the current code</h2>
+<p>The bookkeeping of the remapping steps lives in a coupler (fesm-utils) and in the domain’s coupling steps (yelmox), not in the component modules.</p>
+<section id="building-blocks" class="level2">
+<h2 class="anchored" data-anchor-id="building-blocks">Building blocks</h2>
 <ul>
-<li><strong>Helper modules are already grid-agnostic.</strong> <code>marshelf_update</code>, <code>isos_update</code>, <code>snapclim_update</code>, <code>smbpal_update</code> all take/return plain <code>(nx,ny)</code> arrays. They are tied to the Yelmo grid only because the <em>caller</em> feeds them Yelmo-shaped arrays. Moving a module onto another grid is a caller-side change, not a module change.</li>
+<li><strong>Component modules are grid-agnostic.</strong> <code>marshelf_update</code>, <code>isos_update</code>, <code>snapclim_update</code>, <code>smbpal_update</code> all take/return plain <code>(nx,ny)</code> arrays; the grid is the caller’s choice. Moving a module onto another grid is a caller-side change, not a module change.</li>
 <li><strong><code>map_class</code> self-identifies and self-caches.</strong> It stores <code>name1</code>, <code>name2</code>, <code>method</code>, and <code>map_init</code> loads from / saves to a <code>maps/</code> folder on disk. A map object already carries its own identity key; disk caching across runs is free.</li>
 <li><strong><code>method</code> is baked into the map</strong> at <code>map_init</code> time (<code>"con"</code> = area weights, <code>"bilin"</code> = neighbor weights). So <code>method</code> is part of the map cache key. <strong><code>stat</code></strong> (<code>mean</code>/<code>count</code>/<code>stdev</code>) is applied at <code>map_field</code> time and does not change the map — it is a per-call pass-through, not a key.</li>
 <li><strong><code>map_field</code> is generic over kind.</strong> The interface already covers <code>dp</code>, <code>sp</code> (<code>map_field_grid_grid_sp</code>) and <code>int</code> (<code>map_field_grid_grid_int</code>); the sp/int variants accumulate in <code>dp</code> internally. So <code>remap</code> never converts precision outside — it calls the generic <code>map_field</code> and lets it dispatch by kind.</li>
@@ -231,301 +240,120 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="layering" class="level2">
 <h2 class="anchored" data-anchor-id="layering">Layering</h2>
-<pre><code>fesm-utils/utils/src/coords/coupler.f90    coupler_class + remap
-        │  use coords  (grid_class, grid_init, map_class, map_init, map_field)
+<pre><code>fesm-utils/src/coupler.f90        coupler_class + remap (grids, map cache)
+        │
         ▼
-yelmox/libs/yelmox_domain.f90              ice_domain + step_* + yelmox_step
-        │  use coupler, yelmo, marine_shelf, fastisostasy, snapclim, smbpal, bsl
+yelmox/libs/
+  kryos.f90             kryos_domain, domain_ctl, domain_init, remap
+  kryos_coupling.f90    step_* and couple_* primitives
+  kryos_startup.f90     cold start, restart bundles (domain_startup, ...)
+  kryos_output.f90      per-module 2D/1D output, CMIP output
+  kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
+  kryos_forcing.f90     driver-owned transient forcing (tsgen)
+  htopo.f90             the hi-res geometry hub
+  yelmox_climate.f90    climate backends behind one interface (climate_out)
+        │
         ▼
-yelmox/yelmox.f90                        thin driver: init → time loop → I/O</code></pre>
-<p>Dependency flow is one-directional. The coupler is pure grid/map machinery and knows nothing about yelmox. <code>step_*</code> and <code>ice_domain</code> know the physics modules but stay flavor-agnostic, so other yelmox variants can reuse them.</p>
+yelmox/yelmox.f90                 single domain
+yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></pre>
+<p>Dependency flow is one-directional. The coupler is pure grid/map machinery and knows nothing about yelmox. The Kryos modules know the physics modules but no driver, so both programs share them.</p>
 </section>
-<section id="coupler-in-fesm-utils-coords-library" class="level2">
-<h2 class="anchored" data-anchor-id="coupler-in-fesm-utils-coords-library">Coupler (in fesm-utils, <code>coords</code> library)</h2>
-<p>Grids are identified by <strong>string name</strong> in every <code>remap</code> call. A name resolves to its grid definition <strong>from disk by default</strong> — <code>grid_&lt;name&gt;.txt</code> in the map folder, read via <code>grid_cdo_read_desc</code> (extended to parse both the fesm-utils <code>#</code> header and cdo-native CF projection keys, so the existing <code>maps/grid_*.txt</code> are used directly). An in-memory registry (<code>coupler_add_grid</code>) is an optional override that wins when a name is registered. So nothing is hardcoded (no <code>grid_select</code>): the available grids are whatever <code>grid_*.txt</code> files live in <code>maps/</code>.</p>
-<p>Fixed-capacity arrays + counters (not growable allocatables): appending to an allocatable array of <code>map_class</code> would deep-copy every existing (large) map on each add. Fixed shells cost nothing until <code>map_init</code> fills a map’s allocatable weight components.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> coupler</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> coords, <span class="kw">only</span> : grid_class, map_class, map_init, map_field, grid_<span class="co">cdo_read_desc</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">! remap mirrors map_field's kind coverage (dp/sp/int); no wp&lt;-&gt;dp conversion</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">implicit</span> <span class="kw">none</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">private</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">integer</span>, <span class="dt">parameter</span> <span class="dt">::</span> GRID_MAX <span class="kw">=</span> <span class="dv">16</span>, MAP_MAX <span class="kw">=</span> <span class="dv">64</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type</span> grid_entry</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=256)</span> <span class="dt">::</span> name</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(grid_class)</span>   <span class="dt">::</span> grid          <span class="co">! coords grid, what map_init consumes</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="dt">end type</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type</span> coupler_class</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(grid_entry)</span> <span class="dt">::</span> grids(GRID_MAX);  <span class="dt">integer</span> <span class="dt">::</span> ngrids <span class="kw">=</span> <span class="dv">0</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(map_class)</span>  <span class="dt">::</span> maps(MAP_MAX);     <span class="dt">integer</span> <span class="dt">::</span> nmaps  <span class="kw">=</span> <span class="dv">0</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=512)</span> <span class="dt">::</span> map_fldr <span class="kw">=</span> <span class="st">"maps"</span>   <span class="co">! disk cache dir for map_init</span></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    <span class="dt">end type</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="kw">interface</span> remap</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        <span class="co">! mirror map_field's kind coverage; each wrapper allocates var_dst and</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="co">! calls the generic map_field (which dispatches by kind).</span></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="kw">module procedure</span> remap_2d_dp, remap_2d_sp, remap_2d_int</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="kw">module procedure</span> remap_3d_dp, remap_3d_sp, remap_3d_int</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end interface</span></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="dt">public</span> <span class="dt">::</span> coupler_class, coupler_init, coupler_add_grid, coupler_prime, remap</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="co">contains</span></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> coupler_init(cpl, map_fldr)</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="co">! reset counters, set map_fldr</span></span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> coupler_add_grid(cpl, name, grid)</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        <span class="co">! cpl%ngrids += 1; cpl%grids(cpl%ngrids) = grid_entry(name, grid)</span></span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>        <span class="co">! error on duplicate name or capacity overflow</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(coupler_class)</span>, <span class="dt">intent(inout)</span> <span class="dt">::</span> cpl</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=*)</span>,    <span class="dt">intent(in)</span>    <span class="dt">::</span> name</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(grid_class)</span>,    <span class="dt">intent(in)</span>    <span class="dt">::</span> grid</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> coupler_prime(cpl, src, dst, method)</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>        <span class="co">! eager warm-up: force-build a map up front (fail fast, cost up front).</span></span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>        <span class="co">! integer :: im; im = get_map(cpl, src, dst, method)   ! discard index</span></span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>    <span class="co">! --- private: find-or-build the directed, method-typed map ---</span></span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>    <span class="kw">function</span> get_map(cpl, src, dst, method) <span class="kw">result</span>(im)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>        <span class="co">! 1. linear-search cpl%maps(1:nmaps) for (name1==src, name2==dst, method)</span></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>        <span class="co">! 2. on miss: resolve src/dst grids (in-memory registry, else read</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>        <span class="co">!    grid_&lt;name&gt;.txt from cpl%map_fldr); nmaps += 1;</span></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>        <span class="co">!    call map_init(cpl%maps(nmaps), grid_src, grid_dst, method=method,</span></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>        <span class="co">!                  fldr=cpl%map_fldr, load=.true.)   ! hits disk cache</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>        <span class="co">!    return nmaps</span></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>        <span class="dt">integer</span> <span class="dt">::</span> im</span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end function</span></span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>    <span class="co">! One wrapper per (kind x rank); dp shown, sp/int identical bar the type.</span></span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> remap_2d_dp(cpl, var_src, src, var_dst, dst, method, stat<span class="co">)</span></span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(coupler_class)</span>,   <span class="dt">intent(inout)</span> <span class="dt">::</span> cpl</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>        <span class="dt">real(dp)</span>,              <span class="dt">intent(in)</span>    <span class="dt">::</span> var_src(:,:)</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=*)</span>,      <span class="dt">intent(in)</span>    <span class="dt">::</span> src, dst</span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>        <span class="dt">real(dp)</span>, <span class="dt">allocatable</span>, <span class="dt">intent(inout)</span> <span class="dt">::</span> var_dst(:,:)     <span class="co">! sized here</span></span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=*)</span>, <span class="dt">optional</span>, <span class="dt">intent(in)</span> <span class="dt">::</span> method         <span class="co">! default "con"</span></span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=*)</span>, <span class="dt">optional</span>, <span class="dt">intent(in)</span> <span class="dt">::</span> stat           <span class="co">! e.g. "mean"</span></span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>        <span class="co">! im = get_map(cpl, src, dst, method_or_default)</span></span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>        <span class="co">! allocate/re-shape var_dst to (nx_dst,ny_dst) if needed</span></span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>        <span class="co">! call map_field(cpl%maps(im), name, var_src, var_dst, stat=stat, method=method)</span></span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> remap_3d_dp(cpl, var_src, src, var_dst, dst, method, stat<span class="co">)</span></span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>        <span class="dt">real(dp)</span>,              <span class="dt">intent(in)</span>    <span class="dt">::</span> var_src(:,:,:)</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>        <span class="dt">real(dp)</span>, <span class="dt">allocatable</span>, <span class="dt">intent(inout)</span> <span class="dt">::</span> var_dst(:,:,:)   <span class="co">! (nx,ny,nz_src)</span></span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a>        <span class="co">! reshape var_dst to (nx_dst,ny_dst,size(var_src,3));</span></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a>        <span class="co">! loop trailing dim, apply the same 2D map per level</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a><span class="kw">end module</span> coupler</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>method</code> defaults to <code>"con"</code>; <code>"bilin"</code> is passed explicitly (CDO-consistent spelling). <code>stat</code> is optional and forwarded to <code>map_field</code>.</p>
+<section id="coupler-fesm-utils" class="level2">
+<h2 class="anchored" data-anchor-id="coupler-fesm-utils">Coupler (fesm-utils)</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">call coupler_init(cpl, map_fldr, gen)               ! map folder, default map generator</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">call coupler_add_grid(cpl, name, grid)              ! optional in-memory grid</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">call coupler_prime(cpl, src, dst, method, gen)      ! build a map up front</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">call remap(cpl, var_src, src, var_dst, dst, method, stat)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Grids are identified by <strong>string name</strong> in every <code>remap</code> call. A name resolves to its grid definition <strong>from disk by default</strong> — <code>grid_&lt;name&gt;.txt</code> in the map folder (<code>maps/</code>), read via <code>grid_cdo_read_desc</code> (both the fesm-utils <code>#</code> header and cdo-native CF projection keys). <code>coupler_add_grid</code> registers an in-memory grid that wins over the disk definition. Nothing is hardcoded: the available grids are the <code>grid_*.txt</code> files in <code>maps/</code>.</p>
+<p><code>remap</code> finds the map for <code>(src, dst, method)</code> in the cache, or builds it (from its disk cache when present) and stores it. <code>method</code> is <code>"con"</code> (conservative, the default) or a distance kernel (<code>"nn"</code>, <code>"shepard"</code>, <code>"quadrant"</code>, <code>"bilin"</code>); <code>stat</code> (<code>mean</code>/<code>count</code>/<code>stdev</code>) is forwarded per call. <code>gen</code> (<code>"coords"</code>, the default, or <code>"cdo"</code>) only selects how the weights are built. <code>remap</code> covers <code>dp</code>/<code>sp</code>/<code>int</code> × 2D/3D, and sizes the destination itself. The maps live in fixed-capacity storage, so adding a map never deep-copies the (large) maps already built.</p>
+<p>The domain wraps it as <code>remap(dom, var_src, src, var_dst, dst, method)</code> (<code>kryos</code>), which copies when <code>src == dst</code>, so a component on Yelmo’s grid costs nothing.</p>
 </section>
-<section id="domain-coupling-steps-in-yelmoxlibs" class="level2">
-<h2 class="anchored" data-anchor-id="domain-coupling-steps-in-yelmoxlibs">Domain + coupling steps (in <code>yelmox/libs</code>)</h2>
-<p>The whole state of one region is bundled into <code>ice_domain</code>. This makes the two awkward requirements fall out naturally:</p>
-<ul>
-<li><strong>Coupling strategies</strong> (which components are on/off): each component update is a reusable <code>step_*</code> primitive guarded internally by its <code>ctl</code> flag; the sequence is thin composition in <code>yelmox_step</code>.</li>
-<li><strong>Bipolar</strong> (north + south): two explicit <code>type(ice_domain) :: dom_north, dom_south</code>. Each domain carries its own coupler/grids, so north and south never collide. Buffers are step-local allocatables (see below), inherently reentrant across domains. The single-domain driver runs the whole <code>yelmox_step</code>; the bipolar driver breaks it into its <code>step_*</code> primitives and interleaves them with the shared Ocean Box Model (see Drivers). Cross-hemisphere state — the barystatic sea level and the OBM — is driver-owned and shared, not per-domain.</li>
-</ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">module</span> yelmox_domain</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> coupler</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> yelmo_defs,    <span class="kw">only</span> : yelmo_class</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> marine_shelf,  <span class="kw">only</span> : marshelf_class, marshelf_update, marshelf_<span class="co">update_shelf</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> fastisostasy,  <span class="kw">only</span> : isos_class, isos_update</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> snapclim,      <span class="kw">only</span> : snapclim_class, snapclim_update</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> smbpal,        <span class="kw">only</span> : smbpal_class, smbpal_update_monthly</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> barysealevel,  <span class="kw">only</span> : bsl_class, bsl_update</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> htopo,         <span class="kw">only</span> : htopo_class, htopo_init</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type</span> domain_ctl</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        <span class="dt">logical</span> <span class="dt">::</span> with_ice_sheet, with_isostasy, with_marine_shelf, with_climate</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=256)</span> <span class="dt">::</span> domain       <span class="co">! e.g. "Antarctica"</span></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=256)</span> <span class="dt">::</span> grid_name    <span class="co">! highest-res reference grid = htopo,</span></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>                                           <span class="co">!   e.g. "ANT-16KM" (ctl's top level)</span></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=256)</span> <span class="dt">::</span> grid_yelmo   <span class="co">! Yelmo grid, e.g. "ANT-32KM"</span></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        <span class="dt">character(len=256)</span> <span class="dt">::</span> grid_mshlf   <span class="co">! marine-shelf grid (may equal grid_name)</span></span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        <span class="co">! ... time control, output config</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    <span class="dt">end type</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type</span> ice_domain</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(yelmo_class)</span>    <span class="dt">::</span> yelmo</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(marshelf_class)</span> <span class="dt">::</span> mshlf</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(isos_class)</span>     <span class="dt">::</span> isos</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(snapclim_class)</span> <span class="dt">::</span> snp</span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(smbpal_class)</span>   <span class="dt">::</span> smb</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>        <span class="co">! NB: bsl (barystatic sea level) is NOT here -- it is a shared,</span></span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>        <span class="co">!     driver-owned bsl_class, passed into the isostasy steps.</span></span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(htopo_class)</span>    <span class="dt">::</span> topo       <span class="co">! hi-res geometry reference hub</span></span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(coupler_class)</span>  <span class="dt">::</span> cpl        <span class="co">! this region's grids + maps</span></span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>        <span class="dt">type(domain_ctl)</span>     <span class="dt">::</span> ctl</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    <span class="dt">end type</span></span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="co">contains</span></span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> domain_init(dom, path_par, ...)</span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        <span class="co">! 1. init sub-models (Yelmo etc. on their own grids)</span></span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>        <span class="co">! 2. htopo_init(dom%topo, path_par, "htopo")   ! hi-res reference hub</span></span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>        <span class="co">! 3. coupler_init(dom%cpl)                      ! grids resolve from maps/*.txt</span></span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        <span class="co">! 4. prime known maps (fail fast, cost up front):</span></span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>        <span class="co">!      coupler_prime(dom%cpl, ctl%grid_yelmo, ctl%grid_name, "bilin")</span></span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>        <span class="co">!      coupler_prime(dom%cpl, ctl%grid_name, ctl%grid_yelmo, "con")</span></span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>        <span class="co">! No coupler_add_grid needed: names resolve from grid_&lt;name&gt;.txt on disk.</span></span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> yelmox_step(dom, time, bsl)  <span class="co">! bsl: shared, driver-owned</span></span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_isostasy(dom, time, bsl)  <span class="co">! guarded by ctl%with_isostasy</span></span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_icesheet(dom, time)       <span class="co">! guarded by ctl%with_ice_sheet</span></span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_climate(dom, time)        <span class="co">! guarded by ctl%with_climate</span></span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf(dom, time)   <span class="co">! guarded by ctl%with_marine_shelf</span></span>
-<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>    <span class="kw">subroutine</span> step_marine_shelf(dom, time)</span>
-<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>        <span class="dt">real(wp)</span>, <span class="dt">allocatable</span> <span class="dt">::</span> H_ice(:,:), z_bed(:,:), z_sl(:,:), f_grnd(:,:)</span>
-<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>        <span class="dt">real(wp)</span>, <span class="dt">allocatable</span> <span class="dt">::</span> bmb(:,:), T_shlf(:,:)</span>
-<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> (<span class="op">.not.</span> dom<span class="op">%</span>ctl<span class="op">%</span>with_marine_shelf) <span class="kw">return</span></span>
-<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>        <span class="co">! remap Yelmo -&gt; mshlf grid (bilin)</span></span>
-<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> remap(dom<span class="op">%</span>cpl, dom<span class="op">%</span>yelmo<span class="op">%</span>tpo<span class="op">%</span>now<span class="op">%</span>H_ice, dom<span class="op">%</span>ctl<span class="op">%</span>grid_yelmo,<span class="co"> &amp;</span></span>
-<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>                   H_ice, dom<span class="op">%</span>ctl<span class="op">%</span>grid_mshlf, method<span class="kw">=</span><span class="st">"bilin"</span>)</span>
-<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> remap(dom<span class="op">%</span>cpl, dom<span class="op">%</span>yelmo<span class="op">%</span>bnd<span class="op">%</span>z_bed, dom<span class="op">%</span>ctl<span class="op">%</span>grid_yelmo, <span class="kw">&amp;</span></span>
-<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>                   z_bed, dom<span class="op">%</span>ctl<span class="op">%</span>grid_mshlf, method<span class="kw">=</span><span class="st">"bilin"</span>)</span>
-<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a>        <span class="co">! ... remaining inputs; unit-convert in place (newfield = f(buf))</span></span>
-<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> marshelf_update_shelf(dom<span class="op">%</span>mshlf, H_ice, z_bed, f_grnd, ...,<span class="co"> dx=dx_mshlf)</span></span>
-<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> marshelf_update(dom<span class="op">%</span>mshlf, H_ice, z_bed, f_grnd, ..., dx<span class="kw">=</span>dx<span class="co">_mshlf)</span></span>
-<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a>        <span class="co">! aggregate outputs back to Yelmo (con is the default)</span></span>
-<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> remap(dom<span class="op">%</span>cpl, dom<span class="op">%</span>mshlf<span class="op">%</span>now<span class="op">%</span>bmb_shlf, dom<span class="op">%</span>ctl<span class="op">%</span>grid_mshlf, <span class="co">&amp;</span></span>
-<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a>                   bmb, dom<span class="op">%</span>ctl<span class="op">%</span>grid_yelmo, stat<span class="kw">=</span><span class="st">"mean"</span>)</span>
-<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> remap(dom<span class="op">%</span>cpl, dom<span class="op">%</span>mshlf<span class="op">%</span>now<span class="op">%</span>T_shlf, dom<span class="op">%</span>ctl<span class="op">%</span>grid_mshlf, <span class="kw">&amp;</span></span>
-<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>                   T_shlf, dom<span class="op">%</span>ctl<span class="op">%</span>grid_yelmo, stat<span class="kw">=</span><span class="st">"mean"</span>)</span>
-<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>        dom<span class="op">%</span>yelmo<span class="op">%</span>bnd<span class="op">%</span>bmb_shlf <span class="kw">=</span> bmb</span>
-<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>        dom<span class="op">%</span>yelmo<span class="op">%</span>bnd<span class="op">%</span>T_shlf   <span class="kw">=</span> T_shlf</span>
-<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end subroutine</span></span>
-<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a>    <span class="co">! step_isostasy, step_climate, step_smb, step_icesheet — same shape</span></span>
-<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a><span class="kw">end module</span> yelmox_domain</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<section id="hi-res-topography-hub-htopo" class="level3">
-<h3 class="anchored" data-anchor-id="hi-res-topography-hub-htopo">Hi-res topography hub (htopo)</h3>
-<p><code>htopo</code> sits <em>above</em> every physics module (including Yelmo): its grid is the finest resolution in the setup, and it is the reference geometry the coupler remaps <em>from</em>. On the topo grid it holds static masks <code>regions</code>/<code>basins</code> (loaded once) and geometry <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code> (initial reference, later refreshed each step from Yelmo/isostasy). It is configured by its own <code>[htopo]</code> namelist group, whose <code>domain</code>/<code>grid_name</code> name the highest-res level and drive the <code>{domain}/{grid_name}</code> path templating (<code>ctl%grid_name</code> mirrors <code>[htopo] grid_name</code>):</p>
-<pre><code>&amp;htopo
-    domain       = "Antarctica"
-    grid_name    = "ANT-16KM"
+<section id="the-domain-kryos_domain" class="level2">
+<h2 class="anchored" data-anchor-id="the-domain-kryos_domain">The domain (<code>kryos_domain</code>)</h2>
+<p>The whole state of one region is bundled into <code>kryos_domain</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="dt">type</span> kryos_domain</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(yelmo_class)</span>          <span class="dt">::</span> yelmo</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(marshelf_class)</span>       <span class="dt">::</span> mshlf</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(isos_class)</span>           <span class="dt">::</span> isos</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(yelmox_climate_class)</span> <span class="dt">::</span> cl     <span class="co">! climate backend ([coupling] climate)</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(climate_out_class)</span>    <span class="dt">::</span> clim   <span class="co">! backend-agnostic climate output (now/ref)</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(smbpal_class)</span>         <span class="dt">::</span> smb</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(smb_simple_class)</span>     <span class="dt">::</span> smbs   <span class="co">! smb_method = "smb_simple"</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(sediments_class)</span>      <span class="dt">::</span> sed</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(geothermal_class)</span>     <span class="dt">::</span> gthrm</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(phys_const_class)</span>     <span class="dt">::</span> cnst   <span class="co">! physical constants, shared by every component</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(htopo_class)</span>          <span class="dt">::</span> topo   <span class="co">! hi-res geometry hub</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(coupler_class)</span>        <span class="dt">::</span> cpl    <span class="co">! this region's grids + map cache</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(ice_opt_params)</span>       <span class="dt">::</span> opt    <span class="co">! spin-up optimization</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(negis_params)</span>         <span class="dt">::</span> ngs</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(glacial_smb_params)</span>   <span class="dt">::</span> gsmb</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(domain_ctl)</span>           <span class="dt">::</span> ctl    <span class="co">! [domain], [coupling], [output]</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="dt">end type</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The barystatic sea level (<code>bsl</code>) and the transient forcing (<code>tsf</code>) are not part of the domain: they are driver-owned, so a multi-domain driver shares them (or not). Each <code>step_*</code> primitive advances one component on its own grid and is a no-op when that component is inactive (<code>with_*</code>); each <code>couple_*_to_yelmo</code> lands one component’s output on Yelmo’s grid. Two domains (bipolar) carry their own coupler and grids, so they never collide.</p>
+<p>The climate reaches the rest of the domain only through <code>climate_out_class</code> (<code>now</code> and <code>ref</code>): the atmosphere, the ocean as depth profiles or at the shelf base, and, when the backend has them, the surface mass balance and subglacial discharge. Nothing downstream depends on which backend produced them.</p>
+<section id="domain-definition-domain-and-the-hi-res-hub-htopo" class="level3">
+<h3 class="anchored" data-anchor-id="domain-definition-domain-and-the-hi-res-hub-htopo">Domain definition (<code>[domain]</code>) and the hi-res hub (htopo)</h3>
+<p>One <code>[domain]</code> group (<code>[domain_north]</code>/<code>[domain_south]</code> in bipolar) defines the domain: its name, its physical constants, the grid of every component, and the hub’s topography and code masks. Yelmo takes the domain name and its grid from it (<code>[yelmo]</code> no longer sets <code>domain</code>/<code>grid_name</code>). A blank component grid takes its default:</p>
+<pre><code>&amp;domain
+    name         = "Antarctica"
+    phys_const   = "Earth"      ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "ANT-16KM"   ! hi-res geometry hub
+    grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
+    grid_isos    = ""           ! isostasy                             [grid_ice]
+    grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
+    grid_smb     = ""           ! surface mass balance                 [grid_clim]
+    grid_mshlf   = ""           ! marine shelf                         [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    name_z_bed   = "z_bed"   name_H_ice = "H_ice"   name_z_srf = "z_srf"
+    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
+    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
+    regions_var  = "mask"
     basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+    basins_var   = "basin"
+    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"   ! "" = none (1)
+    sectors_var  = "mask_regions"
+    ice_codes_mode = "exclude"      ! where ice is allowed: all | include | exclude (ice_codes)
+    ice_codes    = 2.0              ! codes of regions ("" = none)
+    region_names = "APIS" "WAIS" "EAIS"   ! named regions for 1D output ("" = none)
+    region_mask  = "sectors"        ! regions | basins | sectors
+    region_codes = 3.0 1.0 2.0
+    relax_codes_mode = "none"       ! where ice relaxes to the reference: none | all | include | exclude
+    relax_codes  = ""               ! codes of regions ("" = none)
+    relax_tau    = 0.0              ! [yr] relaxation timescale there
 /</code></pre>
-<p><code>htopo_init</code> resolves the grid from <code>grid_&lt;name&gt;.txt</code> (the disk grid table) and reads the fields onto it — validated by <code>tests/test_htopo.f90</code> against the real ANT-16KM data.</p>
+<p>The domain loads its physical constants once (<code>phys_const_load</code>, the group <code>phys_const</code> of <code>input/yelmo_phys_const.nml</code>) and hands the same record to every component: the hub, Yelmo (<code>yelmo_init</code> <code>cnst</code>), isostasy, the marine shelf and <code>smb_simple</code>. Yelmo’s own <code>yelmo.phys_const</code> then only selects its calendar year (<code>sec_year</code>).</p>
+<p><code>htopo</code> holds the hub. It sits <em>above</em> every physics module (including Yelmo): its grid (<code>grid_hub</code>) is the finest resolution in the setup, and it is the reference geometry the coupler remaps <em>from</em>. On the hub grid it holds static fields (the code masks <code>regions</code>/<code>basins</code>/<code>sectors</code> and the bed roughness <code>z_bed_sd</code>, loaded once), the reference geometry <code>z_bed_ref</code>/<code>H_ice_ref</code>/<code>z_srf_ref</code> (loaded once) and the current geometry <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>f_grnd</code>/<code>z_sl</code> (refreshed each step, see below). <code>{domain}/{grid_name}</code> in the paths resolve to <code>name</code>/<code>grid_hub</code>. <code>htopo_init</code> resolves the grid from <code>grid_&lt;name&gt;.txt</code> (the disk grid table) and reads the fields onto it — validated by <code>tests/test_htopo.f90</code> against the real ANT-16KM data. A blank mask path (e.g.&nbsp;paleo domains without mask files) leaves the mask at <code>1.0</code> (single region/basin/sector); a blank <code>z_bed_sd</code> name leaves it at <code>0</code>. Gaps in the topography file (missing values, e.g.&nbsp;outside the coverage of the source dataset) are filled: no ice, the bed from the nearest valid cell, the surface from the bed and the ice thickness (sea level 0), and no bed roughness.</p>
+<p>Yelmo is populated from the domain like the other components. Its grid comes from <code>maps/grid_&lt;grid_ice&gt;.txt</code> (<code>yelmo_init_grid</code>, <code>grid_def="none"</code>), and the hub’s <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>z_bed_sd</code>, remapped conservatively to <code>grid_ice</code>, are both its initial topography and its present-day reference (<code>yelmo_init</code> <code>topo_init</code>/<code>topo_pd</code>). Yelmo then processes them as it would its own files (<code>[yelmo_init_topo]</code> keeps <code>init_topo_state</code>, <code>z_bed_f_sd</code>, smoothing; its <code>grad_lim_zb</code> applies). Where <code>grid_ice = grid_hub</code> the remap is a copy.</p>
+<p>The hub follows the models each step (<code>couple_yelmo_to_htopo</code>, after Yelmo). On Yelmo’s grid it mirrors Yelmo, fractional grounding included. On a finer hub it keeps its hi-res reference and adds Yelmo’s anomalies, refined bilinearly: the bed displacement <code>z_bed - z_bed_ref</code>, and the change in ice thickness from the hub reference as Yelmo received it (remapped conservatively), clipped at zero thickness. <code>htopo_update</code> then recomputes on the hub the grounding (0 or 1, from flotation) and the surface elevation, with Yelmo’s densities; sea level is refined bilinearly. The hi-res bed and ice therefore reach the marine shelf and the climate’s surface elevation, instead of a refined copy of Yelmo’s fields.</p>
+<p>The code masks reach Yelmo the same way (nearest neighbour): <code>regions</code> and <code>basins</code> are Yelmo’s (<code>yelmo_init</code> <code>regions</code>/<code>basins</code>), and every component uses this one set. Where ice is allowed follows from <code>ice_codes_mode</code> and <code>ice_codes</code> (codes of <code>regions</code>; <code>yelmo_init</code> <code>mask_ice</code>); Yelmo’s <code>mask_border</code> (<code>[yelmo]</code>, default <code>"auto"</code>) then sets the domain border. Where the ice relaxes to the reference follows from <code>relax_codes_mode</code> and <code>relax_codes</code> (codes of <code>regions</code>): Yelmo’s <code>tau_relax</code> is <code>relax_tau</code> there and -1 (free) elsewhere, used with <code>ytopo.topo_rel = -1</code>. The named regions (<code>region_names</code>, one code each of <code>region_mask</code>) get their own 1D output, <code>yelmo_ts_&lt;name&gt;.nc</code>.</p>
 </section>
 <section id="buffers" class="level3">
 <h3 class="anchored" data-anchor-id="buffers">Buffers</h3>
-<p>Fields that cross a grid boundary land in <strong>step-local allocatables</strong> (e.g. <code>H_ice</code> above), not a coupler-owned pool. <code>remap</code> takes the destination as <code>intent(inout), allocatable</code> and sizes it itself (allocate-on-demand, reshape if wrong), so callers never hand-compute <code>nx,ny</code>. Unit conversions are done in place on the buffer (<code>newfield = f(buf)</code>); they are caller concerns, kept out of the coupler. 3D (e.g.&nbsp;monthly) fields use the <code>remap_3d</code> overload. Step-local allocatables are reentrant, which is what bipolar needs; per-timestep reallocation cost is negligible against the physics.</p>
+<p>Fields that cross a grid boundary land in <strong>step-local allocatables</strong>, not a coupler-owned pool. <code>remap</code> takes the destination as <code>intent(inout), allocatable</code> and sizes it itself (allocate-on-demand, reshape if wrong), so callers never hand-compute <code>nx,ny</code>. Unit conversions are done in place on the buffer (<code>newfield = f(buf)</code>); they are caller concerns, kept out of the coupler. 3D (e.g.&nbsp;monthly) fields use the <code>remap_3d</code> overload. Step-local allocatables are reentrant, which is what bipolar needs; per-timestep reallocation cost is negligible against the physics.</p>
 </section>
 </section>
 <section id="drivers" class="level2">
 <h2 class="anchored" data-anchor-id="drivers">Drivers</h2>
-<p>Three thin programs share <code>yelmox_domain</code> (all per-domain physics/coupling lives there, so the drivers only differ in config parsing + the loop over domains).</p>
-<p>Common driver plumbing also lives in <code>yelmox_domain</code>, so every flavor uses the same handful of calls:</p>
+<p>Both programs use the same driver plumbing:</p>
 <ul>
-<li><strong><code>timeline_init(ts, dtt, path_par, group [, time_ref, cal])</code></strong> — reads the run’s timeline group (<code>[ctrl]</code>, or the esm <code>run_step</code> group) and initializes the driver-owned timestepper. <code>domain_init</code> takes the same group name (<code>timeline_group</code>, default <code>"ctrl"</code>) and reads the values the domain logic needs (<code>tstep_method</code>, <code>dtt</code>) itself — nothing is injected after init.</li>
-<li><strong><code>domain_startup(dom, ts, bsl [, restore_bsl])</code></strong> — cold start (<code>domain_init_state</code>) or restart-bundle restore + hub rebuild. Single-domain drivers restore the shared bsl from the same bundle; multi-domain drivers restore it once via <strong><code>bsl_startup(bsl, ts, fldr)</code></strong> and pass <code>restore_bsl=.false.</code>. Flavors with their own cold start (esm, rembo) keep their cold branch and call this on the restart branch only.</li>
-<li><strong><code>run_restart_write(dom, bsl, time)</code></strong> — the single-domain restart bundle (domain sub-models + run-level <code>bsl_restart.nc</code>, one auto-named folder).</li>
-<li><strong><code>tstep_due(time, dt)</code></strong> — the shared cadence predicate (restart, <code>dt_clim</code>, CMIP output); <code>dt &lt;= 0</code> disables a cadence.</li>
+<li><strong><code>tstep_init(ts, path_par, group, dtt [, time_ref, cal])</code></strong> (fesm-utils <code>timestepping</code>) — reads the run’s timeline group (<code>[ctrl] run_step</code>: <code>"ctrl"</code> for <code>[ctrl]</code> itself, or a phase group such as <code>[spinup]</code>/<code>[transient]</code>) and initializes the driver-owned timestepper; <code>[ctrl] calendar</code> / <code>calendar_ref</code> give <code>cal</code> / <code>time_ref</code> (calendar years, e.g.&nbsp;ESM runs). <code>domain_init</code> takes the same group name (<code>timeline_group</code>) and reads the values the domain needs (<code>tstep_method</code>, <code>dtt</code>) itself.</li>
+<li><strong><code>domain_startup(dom, ts, bsl [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>domain_init_state</code>) or restart-bundle restore + hub rebuild. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, ts, fldr)</code></strong> and passes <code>restore_bsl=.false.</code>.</li>
+<li><strong><code>domain_init_ice(dom, ts)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[coupling]</code> <code>kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>time_equil_thrm</code>; see <a href="./flavor-yelmox.html#configuration">yelmox</a>).</li>
+<li><strong><code>run_restart_write(dom, bsl, time [, tsf])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + the tsforcing state, one auto-named folder).</li>
+<li><strong><code>cadence_due(time, dt)</code></strong> (<code>kryos</code>) — the cadence predicate for <code>dt_clim</code> and <code>dt_cmip</code>; <code>dt &lt;= 0</code> disables a cadence. Output and restart bundles follow fesm-utils <code>timeout</code> schedules (<code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, <code>[tm_rst]</code>); a restart bundle is always written at <code>time_end</code>.</li>
 </ul>
-<p>The <code>[coupling&lt;suffix&gt;]</code> group is the single, complete description of a domain: every <code>domain_ctl</code> switch is a required key there (<code>with_ice_sheet</code>, <code>with_isostasy</code>, <code>with_climate</code>, <code>with_marine_shelf</code>, methods, cadences, per-component grids, restart, and the Greenland-specific startup switches – <code>use_negis=True</code> additionally loads a <code>[negis&lt;suffix&gt;]</code> group).</p>
+<p>Every driver loop has the same shape: output and restarts are written at the top of the loop for the current time (<code>time_init</code> on the first pass), then the loop exits if the run is finished (<code>time_end</code>, or a tripped kill switch), else <code>tstep_update</code> advances the time and the domain is stepped with the coupling sequence written out inline. Each output call appears once, and the final state + restart bundle are written on the last pass (<code>timeout_check(...) .or. ts%is_finished</code>).</p>
 <ul>
-<li><p><strong><code>yelmox</code></strong> (single domain) — argument is one domain nml; one <code>ice_domain</code>, output to the run dir.</p></li>
-<li><p><strong><code>yelmox_bipolar</code></strong> (bipolar, in <code>yelmox_bipolar/</code>) — argument is a single parameter file holding both hemispheres, in the original <code>yelmox_bipolar</code> convention: each domain’s instance groups carry a hemisphere suffix (<code>yelmo_south</code>, <code>coupling_north</code>, <code>snap_south</code>, …), while <code>[ctrl]</code>, <code>[barysealevel]</code>, the <code>[nautilus]</code>/<code>[stommel]</code> OBM block and the yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared. <code>[ctrl] active_north</code>/<code>active_south</code> select the hemispheres (hardcoded <code>_north</code>/<code>_south</code> suffixes threaded into every <code>group=</code> via <code>domain_init(..., group_suffix=…)</code>). Distinct group names also let <code>runme -p group.name=val</code> target one hemisphere unambiguously. Each domain writes to a subfolder named after its domain; invoke with <code>runme -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml</code>.</p>
-<p>A bipolar run is never more than north + south, so the two domains are explicit variables, not an array — the ocean coupling is asymmetric (north ↔︎ <code>obm%fn/thetan/tn</code>, south ↔︎ <code>obm%fs/thetas/ts</code>). The driver owns the shared <code>bsl</code> and <code>obm</code>, breaks <code>yelmox_step</code> into its <code>step_*</code> primitives, and interleaves the OBM exactly as in <code>yelmox_bipolar</code> (below). The ocean coupling is fully contained in <code>yelmox_bipolar/obm_coupling.f90</code>: the module owns its control (<code>obm_coupling_ctl</code>: exchange switches, freshwater-flux masks, nautilus hysteresis forcing; <code>obm_ctl_load</code> + <code>obm_masks_init</code>) and exposes one <code>obm_exchange</code> call per step. It and the OBM default off (<code>[ctrl] active_obm=False</code>), so the config runs as two independent domains until enabled.</p></li>
+<li><strong><code>yelmox</code></strong> — argument is one parameter file; one <code>kryos_domain</code>, output to the run dir. The climate backend is chosen at runtime (<code>[coupling] climate</code>), so ESM and REMBO runs use this program too. See <a href="./flavor-yelmox.html">yelmox</a>.</li>
+<li><strong><code>yelmox_bipolar</code></strong> — argument is one parameter file holding both hemispheres. Each domain’s groups carry a hemisphere suffix (<code>yelmo_south</code>, <code>domain_north</code>, <code>coupling_north</code>, <code>snap_south</code>, …), threaded into every group via <code>domain_init(..., group_suffix=…)</code>; <code>[ctrl]</code>, <code>[barysealevel]</code>, the OBM groups and the Yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared. Distinct group names also let <code>runme -p group.name=val</code> target one hemisphere. The two domains are explicit variables (<code>dom_north</code>, <code>dom_south</code>), not an array: the ocean coupling is asymmetric. The driver owns the shared <code>bsl</code> and Ocean Box Model and interleaves them with the per-domain steps; the ocean coupling lives in <code>yelmox_bipolar/obm_coupling.f90</code>. Each domain writes to a subfolder named after it. See <a href="./flavor-bipolar.html">yelmox_bipolar</a>.</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">program</span> yelmox_bipolar</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> yelmox_domain</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> obm, <span class="kw">only</span> : obm_update</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> obm_coupling</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(ice_domain)</span>       <span class="dt">::</span> dom_north, dom_south</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(bsl_class)</span>        <span class="dt">::</span> bsl      <span class="co">! shared, driver-owned</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(obm_class)</span>        <span class="dt">::</span> obm      <span class="co">! shared, driver-owned</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(obm_coupling_ctl)</span> <span class="dt">::</span> oc       <span class="co">! obm_coupling's own control</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> timeline_init(ts, dtt, path_par, <span class="st">"ctrl"</span>)          <span class="co">! shared timeline</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> obm_ctl_load(oc, path_par)                        <span class="co">! [ctrl] exchange switches</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> bsl_startup(bsl, ts, restart_bsl)                 <span class="co">! run-level bsl restore</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">! per domain: domain_init(group_suffix) + domain_startup(restore_bsl=.false.)</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> obm_masks_init(oc, dom_north, dom_south, active_north, active_south)</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">do</span> <span class="kw">while</span> (<span class="op">.not.</span> ts<span class="op">%</span>is_finished)</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> bsl_update(bsl, ts<span class="op">%</span>time_rel)                  <span class="co">! once, shared</span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> advance_isostasy(dom_north); <span class="kw">call</span> advance_isostasy(dom_south)</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> (oc<span class="op">%</span>active_obm) <span class="kw">call</span> obm_update(obm, dtt, oc<span class="op">%</span>obm_name)</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> advance_dynamics(dom_north); <span class="kw">call</span> advance_dynamics(dom_south)</span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> obm_exchange(oc, obm, dom_north, dom_south, ...)   <span class="co">! atm2obm, fwf, hyster, obm2ism</span></span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf(dom_north, ...); <span class="kw">call</span> step_marine_shelf(dom_south, ...)</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        <span class="co">! per-domain output/restart (subfolder each) + shared bsl/obm restart</span></span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end do</span></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="kw">end program</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<ul>
-<li><strong><code>yelmox_esm</code></strong> (single domain, in <code>yelmox_esm/</code>) — ESM climatic forcing in place of snapclim. Reuses <code>domain_init</code> (with <code>init_climate=.false.</code>, so snapclim is skipped) plus the shared <code>step_optimize/step_isostasy/step_icesheet/ refresh_htopo</code> primitives and the restart bundle, but the driver owns an <code>esm_forcing_class</code> and calls its own <code>step_climate_esm</code> / <code>step_marine_shelf_esm</code> (contained in the program) instead of the snapclim-based steps. esm is a first-class multigrid component: it runs entirely on its own grid (<em>esm grid</em> = <code>grid_clim</code>, exactly like snapclim), and each output is remapped to the consumer module’s grid at coupling time — atmosphere to <code>grid_smb</code> (smbpal), the depth-interpolated ocean forcing to <code>grid_mshlf</code> (marine_shelf). This works because <code>marshelf_interp_shelf</code> reads only <code>mshlf%par</code> (grid-agnostic), so the ESM ocean interpolation runs on <code>grid_clim</code> and the resulting <code>T_shlf</code>/<code>S_shlf</code> are remapped to <code>grid_mshlf</code> before <code>marshelf_update</code>; <code>esm.f90</code> is untouched. Geometry comes from the hub, remapped to whichever grid a step needs; SMB / ocean BCs aggregate back to Yelmo. With <code>grid_clim == grid_smb == grid_mshlf == grid_name == grid_yelmo</code> every remap is an identity copy, reproducing <code>yelmox_esm.f90</code>; set <code>grid_clim</code> to a coarse ESM grid and it genuinely fans out. Config splits ESM-specific control ([esm] + the run_step group [spinup]/[transient]: <code>time_ref/hist/proj/esm_ref</code>, <code>use_*</code>, CMIP output) from the shared mg groups ([coupling]/[output]/[htopo]). Output (incl.&nbsp;the CMIP-formatted files) is kept identical to <code>yelmox_esm.f90</code> via the <code>yelmox_esm_output</code> module (in the same folder). Invoke with <code>runme -e esm -n yelmox_esm/yelmox_esm_Antarctica.nml</code>.</li>
-</ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">program</span> yelmox_esm</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> yelmox_domain</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> esm</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">use</span> yelmox_esm_output</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(ice_domain)</span>        <span class="dt">::</span> dom</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(bsl_class)</span>         <span class="dt">::</span> bsl    <span class="co">! shared, driver-owned</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(esm_forcing_class)</span> <span class="dt">::</span> esm    <span class="co">! driver-owned climate (replaces snapclim)</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> esm_ctl_load(ec, esm, path_par)      <span class="co">! [ctrl] run_step + [esm] + [run_step]</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> timeline_init(ts, ec<span class="op">%</span>dtt, path_par, <span class="fu">trim</span>(ec<span class="op">%</span>run_step), <span class="kw">&amp;</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>                       time_ref<span class="kw">=</span><span class="fl">2000.0_wp</span>, cal<span class="kw">=</span><span class="cn">.true.</span>)   <span class="co">! per-phase timeline</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> domain_init(dom, path_par, ts<span class="op">%</span>time, init_climate<span class="kw">=</span><span class="cn">.false.</span>, <span class="kw">&amp;</span>   <span class="co">! skip snapclim</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                     timeline_group<span class="kw">=</span><span class="fu">trim</span>(ec<span class="op">%</span>run_step))</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">call</span> esm_forcing_init(esm, ..., grid_name<span class="kw">=</span>dom<span class="op">%</span>ctl<span class="op">%</span>grid_clim)      <span class="co">! on esm's own grid</span></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">! cold: esm_cold_start (contained); restart: domain_startup + re-forcing</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">do</span> <span class="kw">while</span> (<span class="op">.not.</span> ts<span class="op">%</span>is_finished)</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> bsl_update(bsl, ...)                       <span class="co">! once, shared</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_optimize(dom, ts); <span class="kw">call</span> step_isostasy(dom, ts, bsl)</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_icesheet(dom, ts); <span class="kw">call</span> refresh_htopo(dom)</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_climate_esm(dom, esm, ec, ts)         <span class="co">! esm + smbpal (contained)</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>        <span class="kw">call</span> step_marine_shelf_esm(dom, esm, ec, ts)    <span class="co">! esm ocean BCs (contained)</span></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        <span class="co">! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on tstep_due</span></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end do</span></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="kw">end program</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="integration-gaps-to-resolve-during-the-build" class="level2">
-<h2 class="anchored" data-anchor-id="integration-gaps-to-resolve-during-the-build">Integration gaps to resolve during the build</h2>
+<section id="open-issues" class="level2">
+<h2 class="anchored" data-anchor-id="open-issues">Open issues</h2>
 <ol type="1">
-<li><strong>Grid definitions come from disk.</strong> <code>grid_&lt;name&gt;.txt</code> in <code>maps/</code> (parsed by <code>grid_cdo_read_desc</code>, incl.&nbsp;cdo-native CF keys) — no <code>grid_select</code>, no <code>ygrid_class</code>→<code>grid_class</code> conversion. Assumes <code>grid_&lt;yelmo&gt;.txt</code> matches Yelmo’s runtime grid (true for standard full-domain runs); the in-memory registry override is the escape hatch otherwise. <em>(Done.)</em></li>
-<li><strong>Precision.</strong> No external conversion needed — <code>map_field</code> already has <code>dp</code>/<code>sp</code>/<code>int</code> variants. <code>remap</code> provides matching <code>dp</code>/<code>sp</code>/<code>int</code> × 2d/3d wrappers under one generic interface, each calling the generic <code>map_field</code>. <em>(Done.)</em></li>
-<li><strong>Grid names</strong> are sourced from <code>domain_ctl</code> (and <code>[htopo]</code>) as the source of truth for <code>remap</code> keys.</li>
-<li><strong>Conservative area basis.</strong> <code>"con"</code> weights on projected cell area — sanity check mass conservation of <code>z_bed</code>/<code>bmb</code> aggregation on a real grid pair before trusting it as a BC.</li>
-<li><strong>FastIsostasy hi-res output</strong> — deferred. Lean toward the coupler upscaling the 16KM isostasy output rather than making the solver grid-aware. Not in the first skeleton.</li>
+<li><strong>Conservative area basis.</strong> <code>"con"</code> weights use projected cell area — sanity check mass conservation of <code>z_bed</code>/<code>bmb</code> aggregation on a real grid pair before trusting it as a BC.</li>
+<li><strong>FastIsostasy hi-res output</strong> — deferred. Lean toward the coupler refining the isostasy output rather than making the solver grid-aware.</li>
+<li><strong>One grid for reference climate and transient forcing.</strong> <code>grid_clim</code> sets the grid of both the reference climatology (often from a high-resolution regional model) and the transient forcing (often from a coarser climate model). A coarse <code>grid_clim</code> matches the forcing but loses the detail of the high-res reference. Giving the two their own grids is a candidate for future work; until then, set <code>grid_clim</code> to the highest-resolution climate input.</li>
 </ol>
-</section>
-<section id="commit-order" class="level2">
-<h2 class="anchored" data-anchor-id="commit-order">Commit order</h2>
-<ol type="1">
-<li><code>coupler.f90</code> in fesm-utils + <code>test_coupler</code> (remap 16↔︎2KM both directions, <code>con</code> conservation, cache/prime, disk-driven resolution). <em>(Done.)</em></li>
-<li><code>grid_cdo_read_desc</code> cdo-native CF-key parsing + <code>test_grid_cf_read</code>; coupler disk resolution of <code>grid_&lt;name&gt;.txt</code>. <em>(Done.)</em></li>
-<li><code>yelmox_domain.f90</code> skeleton: <code>ice_domain</code>, <code>domain_ctl</code>, empty <code>step_*</code>. <em>(Done.)</em></li>
-<li><code>htopo.f90</code> hi-res reference hub + <code>test_htopo</code> (load ANT-16KM fields). <em>(Done.)</em></li>
-<li><code>domain_init</code> (sub-model init on their grids + htopo + map priming). <em>(Done.)</em></li>
-<li>Fill <code>step_*</code> one module at a time (marine_shelf first); diff vs <code>yelmox.f90</code>. <em>(Done: isostasy, ice sheet, climate, smb, marine_shelf, optimization.)</em></li>
-<li><code>yelmox.f90</code> driver; validate single-domain parity with <code>yelmox.f90</code>. <em>(Done: identity-grid parity tracks the reference; the residual is a small deterministic startup offset, independent of isostasy — bit parity not required for the move.)</em></li>
-<li>Enable <code>nd=2</code> bipolar. <em>(Done: driver takes one par file per domain; AIS+GRL runs on a shared timeline to per-domain subfolders.)</em></li>
-</ol>
-<p>Also ported from <code>yelmox.f90</code>: <code>equil_method="opt"</code> (basal-friction + thermal-forcing optimization, <code>step_optimize</code>), <code>smb_method="smb_simple"</code> + <code>calc_glacial_smb</code>, and domain-specific cold-start setup (Antarctica equilibration, Greenland masks/marine-ice/ NEGIS, Laurentide/North LGM initialization).</p>
 
 
 </section>
