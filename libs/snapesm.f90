@@ -13,9 +13,8 @@ module snapesm
     ! the group(s) supplying each field (1 = monthly, 2 = [ann, sum] -> synthesized).
     !
     ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
-    ! checked against snapclim (tests/test_snapesm_ref.f90). The module's own
-    ! output and restart (snapesm_write_*, snapesm_restart_*) are stubs; yelmox
-    ! writes snap.nc from the climate output.
+    ! checked against snapclim (tests/test_snapesm_ref.f90); output and restart
+    ! (snapesm_write_*, snapesm_restart_*) are in place; snapesm_end is a stub.
 
     use precision, only : wp, sp, dp
     use ncio
@@ -618,28 +617,75 @@ contains
     ! Restart (+ provenance record)
     ! =====================================================================
 
-    subroutine snapesm_restart_write(sc, filename, time)
+    subroutine snapesm_restart_write(sc, fldr, time)
+        ! The prognostic state of snapesm: its driving indices, one tsgen restart
+        ! file per index in the bundle folder fldr (snapesm_idx_<name>_restart.nc).
+        ! Each file also carries a provenance record of the configuration as
+        ! global attributes (documentation only: the fields are recomputed from
+        ! time on the next update).
         implicit none
         type(snapesm_class), intent(IN) :: sc
-        character(len=*),      intent(IN) :: filename
+        character(len=*),      intent(IN) :: fldr
         real(wp),              intent(IN) :: time
 
-        ! TODO: tsgen_restart_write per index (real prognostic state) + a provenance
-        !       record documenting snapshots/registry/weights (documentation only).
+        character(len=512)  :: fnm
+        character(len=1024) :: snaps, fields
+        integer :: k
+
+        snaps = ""
+        do k = 1, sc%par%n_snap
+            snaps = trim(snaps)//" "//trim(sc%snap(k)%spec%name)
+        end do
+        fields = ""
+        do k = 1, sc%par%n_field
+            fields = trim(fields)//" "//trim(sc%registry(k)%name)
+        end do
+
+        do k = 1, sc%par%n_idx
+            fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
+            call tsgen_restart_write(trim(fnm), sc%idx(k), time)
+            call nc_write_attr(trim(fnm), "snapesm_index",     trim(sc%idx_name(k)))
+            call nc_write_attr(trim(fnm), "snapesm_var_defs",  trim(sc%par%var_defs))
+            call nc_write_attr(trim(fnm), "snapesm_ref_name",  trim(sc%par%ref_name))
+            call nc_write_attr(trim(fnm), "snapesm_snapshots", trim(adjustl(snaps)))
+            call nc_write_attr(trim(fnm), "snapesm_fields",    trim(adjustl(fields)))
+        end do
 
         return
     end subroutine snapesm_restart_write
 
-    subroutine snapesm_restart_read(sc, filename)
+    subroutine snapesm_restart_read(sc, fldr)
+        ! Restore the driving indices written by snapesm_restart_write (after
+        ! snapesm_init). An index without a restart file (a bundle written
+        ! before snapesm had one) keeps its cold-start state.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        character(len=*),      intent(IN)    :: filename
+        character(len=*),      intent(IN)    :: fldr
 
-        ! TODO: tsgen_restart_read per index; fields are recomputed from time on the
-        !       next update, so the provenance record is not reloaded to drive the run.
+        character(len=512) :: fnm
+        logical :: found
+        integer :: k
+
+        do k = 1, sc%par%n_idx
+            fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
+            inquire(file=trim(fnm), exist=found)
+            if (found) then
+                call tsgen_restart_read(sc%idx(k), trim(fnm))
+            else
+                write(*,*) "snapesm_restart_read:: WARNING: no restart file "//trim(fnm)// &
+                           "; keeping the cold-start state of index "//trim(sc%idx_name(k))//"."
+            end if
+        end do
 
         return
     end subroutine snapesm_restart_read
+
+    function snapesm_idx_restart_file(fldr, name) result(fnm)
+        ! Restart file of one driving index in the bundle folder fldr.
+        character(len=*), intent(IN) :: fldr, name
+        character(len=512) :: fnm
+        fnm = trim(fldr)//"/snapesm_idx_"//trim(name)//"_restart.nc"
+    end function snapesm_idx_restart_file
 
     ! =====================================================================
     ! Parameter loading & setup

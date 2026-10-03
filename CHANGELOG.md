@@ -16,6 +16,10 @@ annotated git tag. Dates are release (tag) dates.
 - snapesm writes its state to `snap.nc` (`[output] write_clim`): the driving
   indices `idx_<name>`, `z_srf`, monthly `tas`/`tsl`/`pr`, `ta_sum`, `tsl_ann`
   and the ocean profiles `to_ann`/`so_ann` (before only `t2m_ann`, `pr_ann`).
+- snapesm restarts: restart bundles hold the state of each driving index
+  (`snapesm_idx_<name>_restart.nc`, with the snapesm configuration as
+  attributes), restored on restart; bundles without them keep the cold-start
+  indices.
 - `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`;
   the originals are in `scripts/ismip7/legacy/`.

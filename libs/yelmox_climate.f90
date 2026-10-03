@@ -19,7 +19,8 @@ module yelmox_climate
     use climate_out,   only : climate_out_class
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom
     use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
-                              snapesm_write_init, snapesm_write_step
+                              snapesm_write_init, snapesm_write_step, &
+                              snapesm_restart_write, snapesm_restart_read
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
                               esm_forcing_update, esm_variability_update, esm_summer_mean
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
@@ -67,7 +68,7 @@ module yelmox_climate
     public :: climate_update
     public :: climate_air_anom
     public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
-    public :: climate_restart_write
+    public :: climate_restart_write, climate_restart_read
 
 contains
 
@@ -491,17 +492,36 @@ contains
 
     subroutine climate_restart_write(cl, fldr, time, z_srf, H_ice, z_sl)
         ! The backend's own restart in the bundle folder `fldr`, with the
-        ! geometry on the climate grid: REMBO's (rembo_restart.nc); the other
-        ! backends hold no state.
+        ! geometry on the climate grid: snapesm's driving indices
+        ! (snapesm_idx_<name>_restart.nc) or REMBO's (rembo_restart.nc); snapclim
+        ! and esm hold no state.
         type(yelmox_climate_class), intent(in) :: cl
         character(len=*),           intent(in) :: fldr
         real(wp),                   intent(in) :: time
         real(wp),                   intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
 
-        if (trim(cl%method) == "rembo") &
-            call rembo_clim_restart_write(trim(fldr)//"/rembo_restart.nc", time, z_srf, H_ice, z_sl)
+        select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_restart_write(cl%snapesm, trim(fldr), time)
+            case("rembo")
+                call rembo_clim_restart_write(trim(fldr)//"/rembo_restart.nc", time, z_srf, H_ice, z_sl)
+        end select
 
     end subroutine climate_restart_write
+
+    subroutine climate_restart_read(cl, fldr)
+        ! Restore the backend's own state from the bundle folder `fldr`:
+        ! snapesm's driving indices. REMBO reads its restart itself, as set in
+        ! its own parameter file.
+        type(yelmox_climate_class), intent(inout) :: cl
+        character(len=*),           intent(in)    :: fldr
+
+        select case(trim(cl%method))
+            case("snapesm")
+                call snapesm_restart_read(cl%snapesm, trim(fldr))
+        end select
+
+    end subroutine climate_restart_read
 
     ! ===== esm backend =====================================================
 

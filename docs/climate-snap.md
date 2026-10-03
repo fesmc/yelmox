@@ -72,4 +72,7 @@ Three kinds of group follow:
 - **Indices**, `[snap_idx_<name>]`: a `tsgen` series (`method`, `series_file`,
   `sigma`).
 
+Restart bundles hold the state of each index, `snapesm_idx_<name>_restart.nc`,
+with the configuration (snapshots, fields, reference) as attributes.
+
 The transient forcing is added on top in every configuration.
