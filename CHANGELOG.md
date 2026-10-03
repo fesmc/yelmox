@@ -257,6 +257,12 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- Restarts continue the run exactly (bit-identical to the continuous run; needs
+  FastIsostasy dev with restart-dt): the isostasy restart carries the ODE
+  solver's time step and state (`ode_dt`, `ode_x`), and the sea level is restored
+  as saved (`bsl_startup` no longer calls `bsl_update`; `A_ocean` restored).
+  Before, the solver restarted from `dt_init`, giving tolerance-level differences
+  that grew through the ice sheet.
 - `esm_forcing`: in the historical period the direct-SMB anomaly is the ESM's SMB
   minus its own reference-period mean (`smb_esm_ref`), as for temperature,
   precipitation and the projection period. It subtracted the observed reference
