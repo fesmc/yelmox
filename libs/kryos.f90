@@ -180,7 +180,7 @@ contains
         if (dt > 0.0_wp) due = (mod(nint(time*100), nint(dt*100)) == 0)
     end function cadence_due
 
-    subroutine domain_init(dom, path_par, time, group_suffix, init_climate, timeline_group)
+    subroutine domain_init(dom, path_par, time, group_suffix, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
@@ -199,12 +199,6 @@ contains
         ! ytopo, ...) stay shared: they are named by pointer fields inside the
         ! [yelmo<suffix>] block, so the nml decides whether they are shared.
         !
-        ! init_climate (optional, default .TRUE.) initializes the snapclim climate
-        ! sub-model. Variants that supply their own climate forcing (e.g. the ESM
-        ! driver, which owns an esm_forcing_class in place of dom%snp) pass .FALSE.
-        ! to skip snapclim_init; grid_clim is still resolved so grid_smb can default
-        ! to it.
-        !
         ! timeline_group (optional, default "ctrl") names the group holding the
         ! run's shared timeline -- the same group the driver passes to
         ! tstep_init -- from which the domain reads tstep_method/dtt itself.
@@ -212,12 +206,10 @@ contains
         character(len=*), intent(in)    :: path_par
         real(wp),         intent(in)    :: time       ! model time
         character(len=*), intent(in), optional :: group_suffix
-        logical,          intent(in), optional :: init_climate
         character(len=*), intent(in), optional :: timeline_group
 
         character(len=256)    :: domain, tgroup
         character(len=64)     :: sfx
-        logical               :: do_climate
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
@@ -228,9 +220,6 @@ contains
 
         sfx = ""
         if (present(group_suffix)) sfx = trim(group_suffix)
-
-        do_climate = .TRUE.
-        if (present(init_climate)) do_climate = init_climate
 
         tgroup = "ctrl"
         if (present(timeline_group)) tgroup = trim(timeline_group)
@@ -304,12 +293,10 @@ contains
         nx_c = grid_c%G%nx
         ny_c = grid_c%G%ny
         dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
-        if (do_climate) then
-            call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
-            call climate_init(dom%cl, dom%ctl%climate, path_par, domain, trim(dom%ctl%grid_clim), &
-                              nx_c, ny_c, time, basins_c, sfx=trim(sfx), timeline_group=trim(tgroup), &
-                              smb_direct=(trim(dom%ctl%smb_method) == "climate"))
-        end if
+        call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
+        call climate_init(dom%cl, dom%ctl%climate, path_par, domain, trim(dom%ctl%grid_clim), &
+                          nx_c, ny_c, time, basins_c, sfx=trim(sfx), timeline_group=trim(tgroup), &
+                          smb_direct=(trim(dom%ctl%smb_method) == "climate"))
 
         ! --- smb on its configured grid (grid_smb) ---
         ! smbpal reads no grid-specific data; only lats (insolation) is physical.
