@@ -223,7 +223,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>), backends in <code>libs/snapclim.f90</code> and <code>libs/snapesm.f90</code>, behind <code>libs/yelmox_climate.f90</code>.</li>
 <li><strong>Select:</strong> <code>[coupling] climate = "snapclim"</code> or <code>"snapesm"</code>.</li>
-<li><strong>Output:</strong> with <code>[output] write_clim</code>, <code>snap.nc</code>.</li>
+<li><strong>Output:</strong> with <code>[output] write_clim</code>, <code>snap.nc</code>: the annual air temperature and precipitation; with snapesm also its driving indices (<code>idx_&lt;name&gt;</code>), the surface elevation, the monthly atmosphere (<code>tas</code>, <code>tsl</code>, <code>pr</code>), <code>ta_sum</code>, <code>tsl_ann</code> and the ocean profiles (<code>to_ann</code>, <code>so_ann</code> on <code>depth</code>).</li>
 </ul>
 <section id="snapclim" class="level2">
 <h2 class="anchored" data-anchor-id="snapclim">snapclim</h2>
@@ -292,6 +292,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Snapshots</strong>, <code>[snap_&lt;name&gt;]</code>: <code>monthly</code>, <code>time</code>, <code>idx_coord</code> (the snapshot’s position on the index manifold) and, per field, the <code>var_defs</code> group(s) holding it (one = monthly; two = annual + summer, from which the seasonal cycle is built). See <a href="./database-namelists.html">Database namelists</a>.</li>
 <li><strong>Indices</strong>, <code>[snap_idx_&lt;name&gt;]</code>: a <code>tsgen</code> series (<code>method</code>, <code>series_file</code>, <code>sigma</code>).</li>
 </ul>
+<p>Restart bundles hold the state of each index, <code>snapesm_idx_&lt;name&gt;_restart.nc</code>, with the configuration (snapshots, fields, reference) as attributes.</p>
 <p>The transient forcing is added on top in every configuration.</p>
 
 
