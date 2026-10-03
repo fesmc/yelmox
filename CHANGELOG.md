@@ -18,6 +18,10 @@ annotated git tag. Dates are release (tag) dates.
   the originals are in `scripts/ismip7/legacy/`.
 
 ### Changed
+- Follows yelmo dev (2c3d3449; needs yelmo dev at or after 9e93696d): `input/yelmo_defaults.nml`
+  gains `ydyn.ssa_vel_lim_method` (default `"drag"`, a smooth speed-limit drag) and
+  `ssa_vel_lim_tau`; all par files take `ssa_vel_max = 10000` (was 5000) and
+  `pc_eps = 0.02` (was 1.0). Ice-sheet results change.
 - `yelmox_rembo` is removed: REMBO runs use `yelmox` with `climate = "rembo"`
   and `smb_method = "climate"`, built with `make yelmox rembo=1` (without it, a
   stub stops the run). REMBO supplies the atmosphere and smb, snapclim the ocean.

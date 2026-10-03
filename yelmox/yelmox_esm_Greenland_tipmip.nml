@@ -186,7 +186,7 @@
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
     pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1.0               ! Predictor-corrector tolerance
+    pc_eps          = 0.02               ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
 
 /
 
@@ -282,7 +282,7 @@
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_lis_opt_energy   = "-i cg -p jacobi -maxiter 200 -tol 1.0e-4 -initx_zeros false"       ! SPD => CG (matches Yelmo.jl default)
     ssa_lat_bc          = "all"           ! "all", "marine", "floating", "none", "slab"
-    ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results
+    ssa_vel_max         = 10000.0          ! [m a-1] Velocity limit: clip value ("clip"), or speed at which the limit drag reaches ssa_vel_lim_tau ("drag")
     ssa_iter_max        = 5               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
