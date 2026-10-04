@@ -6,6 +6,10 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- Greenland ISMIP7 setup with the K24 basal hydrology: `yelmox/yelmox_esm_Greenland_k24.nml`
+  (`yelmox_esm_Greenland.nml` with `method_transport = 1`, so K24 sets N_eff, and
+  `k24_sliding_law = 4`, so K24 takes Yelmo's basal stress and its water source includes
+  the frictional heat that `q_T` already contains) and the spin-up `scripts/ismip7/opt_grl_k24.sh`.
 - Antarctic paleo setup (32 km): `yelmox/yelmox_Antarctica_paleo_spinup.nml`
   (15 kyr optimization spin-up) and `yelmox_Antarctica_paleo_lgp.nml` (-130 kyr to
   +10 kyr, climate from the glacial index `input/alpha_combined_125kyr_interp.dat`,
