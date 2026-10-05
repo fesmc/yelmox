@@ -33,6 +33,12 @@ website:
             href: flavor-esm.md
           - text: "REMBO climate"
             href: flavor-rembo.md
+      - text: "Experiments"
+        menu:
+          - text: "ISMIP7 projections"
+            href: experiment-ismip7.md
+          - text: "Antarctic paleo"
+            href: experiment-ant-paleo.md
       - text: "Database namelists"
         href: database-namelists.md
       - text: "Multigrid coupling"

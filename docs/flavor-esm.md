@@ -10,8 +10,8 @@ projection periods, optional climate variability and subglacial discharge.
 
 - **Program:** `yelmox/yelmox.f90` (`make yelmox`), backend in `libs/yelmox_climate.f90`.
 - **Config:** `yelmox/yelmox_esm_*.nml` (Antarctica ISMIP7, Greenland, 1pctCO2, TIPMIP).
-- **Scripts:** `scripts/ismip7/` (spin-ups `opt_*.sh`, workflows `run_ismip7_*.sh`),
-  `scripts/tipmip/`, `scripts/1pctCO2/`.
+- **Scripts:** `scripts/ismip7/` (spin-ups `opt_*.sh`, workflows `run_ismip7_*.sh`;
+  see [ISMIP7 projections](experiment-ismip7.md)), `scripts/tipmip/`, `scripts/1pctCO2/`.
 
 ## Configuration
 
