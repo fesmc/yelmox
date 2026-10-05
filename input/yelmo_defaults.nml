@@ -227,6 +227,7 @@
     k24_friction_quadrature          = False    ! STAGGERED only: Yelmo's qb_method=2 Gauss-point heat
     k24_friction_u_floor             = 3.168808781402895e-11 ! [m/s] = 1e-3 m/yr, STAGGERED beta floor
     k24_toposort_allow_cycles        = False    ! TopologicalPsiOut(allow_cycles=...)
+    k24_ub_hook                      = True     ! DIVA velocity iteration re-evaluates K24 N from u_b (yelmo#13, FastHydrology#11); False = N once per step
     k24_drainage_mode                = 0        ! 0=BOTH 1=EFFICIENT_ONLY 2=INEFFICIENT_ONLY
     k24_water_thickness_algorithm    = 0        ! 0=DARCY_WEISBACH 1=LAMINAR 2=AREAL_CONDUIT
     k24_gradient_convention          = 0        ! 0=MEAN 1=LOCAL (Darcy-Weisbach / laminar closures only)

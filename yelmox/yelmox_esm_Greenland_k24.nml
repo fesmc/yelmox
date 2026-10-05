@@ -335,6 +335,7 @@
     k24_bed_friction_exponent        = 1.5
     k24_friction_factor              = 0.1
     k24_sliding_law                  = 4      ! 4 = Yelmo tau_b: frictional heat enters the K24 water source, consistent with q_T (0 = none: its source then sees -Q_b/L at cold bases)
+    k24_ub_hook                      = True   ! re-evaluate N from u_b inside the DIVA iteration (needs yelmo#13); False = N once per step (2-step N/velocity cycle)
     k24_till_factor                  = 1.1
     k24_critical_discharge           = 1.0
     k24_initial_cavity_height        = 0.1
