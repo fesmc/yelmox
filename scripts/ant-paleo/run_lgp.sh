@@ -9,5 +9,13 @@
 spinup_path=${1:-output/ant-paleo/spinup}
 output_path=${2:-output/ant-paleo/lgp}
 
+# Absolute path: the executable runs from inside the run dir, so a
+# repo-root-relative path would not resolve.
+restart="$(realpath -m "${spinup_path}")/restart-15.000-kyr"
+if [ ! -d "${restart}" ]; then
+    echo "run_lgp.sh: spin-up restart bundle not found: ${restart}" >&2
+    exit 1
+fi
+
 runme -rs -q shared -e yelmox -w 2-00:00:00 -m 10G -n yelmox/yelmox_Antarctica_paleo_lgp.nml -o "${output_path}" \
-      -p coupling.restart="${spinup_path}/restart-15.000-kyr"
+      -p coupling.restart="${restart}"

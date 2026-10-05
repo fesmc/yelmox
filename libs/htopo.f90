@@ -323,8 +323,11 @@ contains
         ! entries not given keep mv / "".
         par%topo_names   = ""
         par%regions_path = ""
+        par%regions_var  = ""
         par%basins_path  = ""
+        par%basins_var   = ""
         par%sectors_path = ""
+        par%sectors_var  = ""
         par%ice_codes    = mv
         par%region_names = ""
         par%region_codes = mv
