@@ -133,6 +133,21 @@ ul.task-list li input[type="checkbox"] {
   </li>  
     </ul>
   </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-experiments" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Experiments</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
+        <li>
+    <a class="dropdown-item" href="./experiment-ismip7.html">
+ <span class="dropdown-text">ISMIP7 projections</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-ant-paleo.html">
+ <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="./database-namelists.html"> 
 <span class="menu-text">Database namelists</span></a>
@@ -189,7 +204,7 @@ ul.task-list li input[type="checkbox"] {
 <ul>
 <li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (<code>make yelmox</code>), backend in <code>libs/yelmox_climate.f90</code>.</li>
 <li><strong>Config:</strong> <code>yelmox/yelmox_esm_*.nml</code> (Antarctica ISMIP7, Greenland, 1pctCO2, TIPMIP).</li>
-<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> (spin-ups <code>opt_*.sh</code>, workflows <code>run_ismip7_*.sh</code>), <code>scripts/tipmip/</code>, <code>scripts/1pctCO2/</code>.</li>
+<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> (spin-ups <code>opt_*.sh</code>, workflows <code>run_ismip7_*.sh</code>; see <a href="./experiment-ismip7.html">ISMIP7 projections</a>), <code>scripts/tipmip/</code>, <code>scripts/1pctCO2/</code>.</li>
 </ul>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>

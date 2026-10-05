@@ -175,6 +175,41 @@
     "text": "Output\nThe shared per-module files (yelmo.nc, isos.nc, mshlf.nc, smbpal.nc, …), plus, with [output] write_clim, esm.nc (the ESM fields on the climate grid) and esm_ts.nc (the forcing averaged over the ice and the floating ice), and, with [output] write_cmip (every dt_cmip), the CMIP-formatted yelmo_cmip.nc and yelmo_ts_cmip.nc."
   },
   {
+    "objectID": "experiment-ismip7.html",
+    "href": "experiment-ismip7.html",
+    "title": "ISMIP7 projections",
+    "section": "",
+    "text": "Greenland and Antarctic projections for ISMIP7 run in two steps: a present-day optimization spin-up, which fits the basal friction (cb_ref) and an ocean thermal-forcing correction (tf_corr) to the observed ice thickness and writes a restart bundle, then the scenarios, which start from that bundle in 2015 and run under the ESM forcing (historical + projection) to 2300.\nThe par files on their own run a 10-yr forcing-only smoke test (equil_method = \"none\", [spinup] time_end = 10); the scripts set the run phase and length."
+  },
+  {
+    "objectID": "experiment-ismip7.html#running-the-workflow",
+    "href": "experiment-ismip7.html#running-the-workflow",
+    "title": "ISMIP7 projections",
+    "section": "Running the workflow",
+    "text": "Running the workflow\nRun from the yelmox root, one step after the other: the scenarios read the spin-up’s last restart bundle.\nscripts/ismip7/run_ismip7_greenland.sh spinup\nscripts/ismip7/run_ismip7_greenland.sh scenarios\nSTAGE=1 creates the run folders and the SLURM script without submitting them (a dry run). The settings are at the top of each script:\n\n\n\n\n\n\n\n\n\nSetting\nGreenland\nAntarctica\n\n\n\n\n\nGRID\nGRL-8KM\nANT-8KM\n[domain] grid_hub\n\n\nGCM\nCESM2-WACCM\nCESM2-WACCM\n[esm] esm_name\n\n\nSCENARIOS\nssp126 ssp370 ssp585\nssp585\n[esm] experiment\n\n\nSPINUP_YEARS\n15000\n20000\n[spinup] time_end, matches [opt] cf/tf_time_end\n\n\nPROJ_END\n2300\n2300\n[transient] time_end\n\n\nOUTROOT\noutput/ismip7_grl\noutput/ismip7_ant\nspin-up in spinup/, scenarios in &lt;ssp&gt;/\n\n\n\nThe spin-up passes ctrl.run_step=spinup coupling.equil_method=\"opt\"; each scenario passes ctrl.run_step=transient, esm.use_esm/use_hist/use_proj=True and coupling.restart = the bundle &lt;OUTROOT&gt;/spinup/restart-&lt;SPINUP_YEARS/1e3&gt;-kyr as an absolute path (the run starts inside its own folder).\nOther grids. The full input set exists for GRL-8KM, GRL-16KM and ANT-8KM, ANT-16KM, ANT-32KM (GRL-4KM lacks the ORAS4 reference ocean). The Antarctic par file reads the Earth structure of ANT-8KM ([isos] rheology_file): with another grid, also pass isos.rheology_file=isostasy_data/earth_structure/yelmo/&lt;GRID&gt;_GIA_HR24.nc (as opt_ant.sh does).\nShort spin-ups. The optimization relaxes the ice thickness towards the observations at first ([opt] rel_tau1/2, until rel_time2: 6 kyr for Greenland). A spin-up that ends before then hands the scenarios ice that the relaxation was holding in place, e.g. thin margin ice under negative SMB, which is then lost within the first years."
+  },
+  {
+    "objectID": "experiment-ismip7.html#tuned-spin-ups",
+    "href": "experiment-ismip7.html#tuned-spin-ups",
+    "title": "ISMIP7 projections",
+    "section": "Tuned spin-ups",
+    "text": "Tuned spin-ups\nopt_grl.sh, opt_grl_ismip.sh (L. Gutierrez Gonzalez) and opt_ant.sh are 15-kyr optimization spin-ups with tuned parameters on top of the par files: the SMB taken from the ESM (coupling.smb_method=climate), cb_ref started from the till friction of the bed (opt.cf_init=-1, the ytill parameters), a short relaxation (opt.rel_time1/2 = 100), equilibrium calving, DIVA dynamics and shelf enhancement 0.5; opt_grl_ismip.sh uses von Mises calving (vm-l19) and a linear melt law. Their originals are in scripts/ismip7/legacy/. To run the scenarios from one of them, set BUNDLE in the workflow script to its last restart bundle."
+  },
+  {
+    "objectID": "experiment-ismip7.html#forcing",
+    "href": "experiment-ismip7.html#forcing",
+    "title": "ISMIP7 projections",
+    "section": "Forcing",
+    "text": "Forcing\nThe atmosphere and ocean are a reference climatology plus ESM anomalies relative to time_esm_ref (1960–1989), applied over time_hist (1850–2014) and time_proj (2015–2300).\n\n\n\n\n\n\n\n\n\nGreenland\nAntarctica\n\n\n\n\nReference atmosphere\nMAR v3.11 (ERA), 1961–1990 monthly\nRACMO2.3p2 (ERA5), 1985–2014 (time_ref)\n\n\nReference ocean\nORAS4 1981–2010 annual mean\nmeltMIP observational climatology (extrapolated)\n\n\nESM atmosphere\nISMIP7 SDBN1 tas, pr, acabf, dacabfdz\nsame, v2\n\n\nESM ocean\nISMIP7 tf, so (2D)\nISMIP7 thetao, so (3D, v3)\n\n\nSubglacial discharge\nISMIP7 sgd\n–\n\n\nShelf melt\nbmb_method = \"anom\", tf_method = 2\nbmb_method = \"quad-nl\", tf_method = 1\n\n\nTopography, basins\nISMIP7 obs v1.3 (GrIMP surface)\nISMIP7 obs v1.1 (Bedmap3)\n\n\n\nESMs and scenarios on Levante (ice_data/ISMIP7/&lt;domain&gt;/&lt;grid&gt;/):\n\n\n\n\n\n\n\n\nESM\nGreenland\nAntarctica\n\n\n\n\nCESM2-WACCM\nctrl, historical, ssp126, ssp370, ssp534-over, ssp585\nhistorical, ssp585\n\n\nMRI-ESM2-0\nhistorical, ssp126, ssp370, ssp585\nhistorical, ssp126, ssp370, ssp585"
+  },
+  {
+    "objectID": "experiment-ismip7.html#output",
+    "href": "experiment-ismip7.html#output",
+    "title": "ISMIP7 projections",
+    "section": "Output",
+    "text": "Output\nThe shared per-module files (yelmo.nc, yelmo_ts.nc, isos.nc, mshlf.nc, smbpal.nc, htopo.nc; Antarctica also yelmo_ts_APIS/WAIS/EAIS.nc) and the restart bundles restart-&lt;kyr&gt;-kyr/. For ISMIP7 submissions, [output] write_cmip = True writes yelmo_cmip.nc and yelmo_ts_cmip.nc every dt_cmip; write_clim = True adds the ESM forcing (esm.nc, esm_ts.nc)."
+  },
+  {
     "objectID": "database-namelists.html",
     "href": "database-namelists.html",
     "title": "Database namelists (varslice)",
@@ -250,6 +285,41 @@
     "title": "What configme install yelmox does",
     "section": "",
     "text": "What configme install yelmox does\nThis page is for context only. The recommended way to install YelmoX is to run configme install yelmox (see the Quick start); you do not need to run any of the commands below by hand. They are reproduced here so you can see exactly what configme clones, configures, links, and builds on your behalf.\nconfigme install performs the following phases:\n\nClone the YelmoX checkout and each component repository it needs (fesm-utils, yelmo, FastIsostasy, rembo1).\nManifest — write .configme/manifest.toml so the checkout is self-describing regardless of its directory name.\nLink each component into the directories where the build expects it.\nConfigure — generate a system-specific Makefile for every package from shared machine/compiler fragments, with the netCDF paths detected automatically.\nBuild fesm-utils (LIS + FFTW + utils). This is the slow step (~10-30 min), which is why it is folded into the install rather than run separately.\nExtras — install runme if it is missing, create .runme_config, and link the external data paths (ice_data, isostasy_data).\n\nEach run also writes the exact commands it executed to a .install.sh script in the checkout, so any install is reproducible. The script below is the equivalent for the dkrz_levante machine with the ifx compiler; substitute your own machine and compiler, and note that the netCDF paths (NC_FROOT / NC_CROOT) and the install root are filled in automatically for your system.\n#!/usr/bin/env bash\n# Generated by `configme install` — reproduces this install.\nset -euo pipefail\n# target=yelmox  machine=dkrz_levante  compiler=ifx\n\n# --- clone ---\ngit clone git@github.com:fesmc/yelmox.git $YELMOXROOT\ngit clone git@github.com:fesmc/fesm-utils.git $YELMOXROOT/fesm-utils\ngit clone git@github.com:fesmc/yelmo.git $YELMOXROOT/yelmo\ngit clone git@github.com:palma-ice/FastIsostasy.git $YELMOXROOT/FastIsostasy\ngit clone git@github.com:alex-robinson/rembo1.git $YELMOXROOT/rembo1\n\n# --- manifest ---\nmkdir -p $YELMOXROOT/.configme  # write .configme/manifest.toml\n\n# --- links ---\nln -s ../fesm-utils $YELMOXROOT/yelmo/fesm-utils\nln -s ../fesm-utils $YELMOXROOT/FastIsostasy/fesm-utils\nln -s ../fesm-utils $YELMOXROOT/rembo1/fesm-utils\n\n# --- configure (per package) ---\n# fesm-utils: build with autotools (slow, ~10-30 min):\n(cd $YELMOXROOT/fesm-utils && NC_FROOT=&lt;auto-detected&gt; NC_CROOT=&lt;auto-detected&gt; ./build.py --variant both -m dkrz_levante -c ifx)\n(cd $YELMOXROOT/fesm-utils/utils && configme config fesm-utils/utils -m dkrz_levante -c ifx)\n# fesm-utils/utils: build (serial, omp):\n(cd $YELMOXROOT/fesm-utils/utils && make openmp=0 fesmutils-static)\n(cd $YELMOXROOT/fesm-utils/utils && make openmp=1 fesmutils-static)\n(cd $YELMOXROOT/yelmo && configme config yelmo -m dkrz_levante -c ifx)\n(cd $YELMOXROOT/FastIsostasy && configme config FastIsostasy -m dkrz_levante -c ifx)\n(cd $YELMOXROOT/rembo1 && configme config rembo1 -m dkrz_levante -c ifx)\n(cd $YELMOXROOT && configme config yelmox -m dkrz_levante -c ifx)\n\n# --- extras ---\ncommand -v runme &gt;/dev/null 2&gt;&1 || pip install git+https://github.com/fesmc/runme\n# runme_config: create .runme_config and set hpc/account\nrunme --config  # or: cp .runme/runme_config .runme_config\n# data_link ice_data: ln -s &lt;path&gt; ice_data\n# data_link isostasy_data: ln -s &lt;path&gt; isostasy_data"
+  },
+  {
+    "objectID": "experiment-ant-paleo.html",
+    "href": "experiment-ant-paleo.html",
+    "title": "Antarctic paleo",
+    "section": "",
+    "text": "An Antarctic simulation of the last glacial period at 32 km, in two steps: a 15-kyr present-day spin-up that optimizes the basal friction (cb_ref) and the ocean thermal-forcing correction (tf_corr), then a transient from 130 kyr ago to 10 kyr in the future, restarted from the spin-up, with the climate scaled by a glacial index and the sea level following a reconstruction."
+  },
+  {
+    "objectID": "experiment-ant-paleo.html#running",
+    "href": "experiment-ant-paleo.html#running",
+    "title": "Antarctic paleo",
+    "section": "Running",
+    "text": "Running\nRun from the yelmox root; the transient needs the spin-up’s last restart bundle.\nscripts/ant-paleo/run_spinup.sh\nscripts/ant-paleo/run_lgp.sh\nrun_spinup.sh [output_path] writes to output/ant-paleo/spinup by default. run_lgp.sh [spinup_path] [output_path] restarts from &lt;spinup_path&gt;/restart-15.000-kyr (passed as an absolute path; the script stops if the bundle is missing) and writes to output/ant-paleo/lgp. Both submit to the shared queue (2 days, 10 GB, no OpenMP)."
+  },
+  {
+    "objectID": "experiment-ant-paleo.html#spin-up",
+    "href": "experiment-ant-paleo.html#spin-up",
+    "title": "Antarctic paleo",
+    "section": "Spin-up",
+    "text": "Spin-up\n\nTimeline: [ctrl] 0 to 15 kyr, dtt = 5 yr, constant insolation; the sea level follows the model’s own ice-volume change ([barysealevel] method = \"fastiso\").\nOptimization ([coupling] equil_method = \"opt\"): cb_ref and tf_corr until 7.5 kyr ([opt] cf_time_end, tf_time_end), starting from the till friction of the bed (cf_init = -1); the ice thickness relaxes towards the observations until 3 kyr (rel_time2).\nClimate: present day ([snap] atm_type = \"anom\" with zero anomaly, and so a zero ocean anomaly).\nOutput: restart bundles every 15 kyr, so restart-0.000-kyr and restart-15.000-kyr; 2D output every 5 kyr."
+  },
+  {
+    "objectID": "experiment-ant-paleo.html#transient",
+    "href": "experiment-ant-paleo.html#transient",
+    "title": "Antarctic paleo",
+    "section": "Transient",
+    "text": "Transient\n\nTimeline: [ctrl] -130 kyr to +10 kyr, dtt = 5 yr, on relative time (tstep_method = \"rel\"), so that the sea level and the index follow the records. [coupling] equil_method = \"none\": cb_ref and tf_corr come from the restart.\nClimate: [snap] atm_type = \"snap_1ind\": the present-day reference plus the PMIP3 LGM – piControl anomaly, scaled by the glacial index input/alpha_combined_125kyr_interp.dat (0 = present day, 1 = LGM; -0.2 in the last interglacial). The ocean anomaly is f_to = 0.25 times the mean atmospheric one (ocn_type = \"fraction\"). Insolation varies in time ([smbpal] const_insol = False).\nSea level: [barysealevel] method = \"file\", input/sealevel_rohling_450kyr.dat.\nIce age: isochrones with elsa ([ytrc] use_elsa, [elsa_ant_paleo]): one layer every 1 kyr, coupled every 50 yr.\nOutput: 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr."
+  },
+  {
+    "objectID": "experiment-ant-paleo.html#configuration-common-to-both",
+    "href": "experiment-ant-paleo.html#configuration-common-to-both",
+    "title": "Antarctic paleo",
+    "section": "Configuration common to both",
+    "text": "Configuration common to both\n\n\n\n\n\n\n\nGrids\nANT-32KM for every component (single-grid setup)\n\n\nTopography\nBedMachine (ANT-32KM_TOPO-BedMachine.nc)\n\n\nReference climate (snap_clim0)\nRACMO2.3–ERA-Interim hybrid 1981–2010; ocean ISMIP6 (Jourdain et al. 2020)\n\n\nSnapshots (snap_clim1, snap_clim2)\nPMIP3 piControl and LGM means (atmosphere only; the ocean follows fraction)\n\n\nSurface mass balance\nsmbpal ([coupling] smb_method = \"smbpal\")\n\n\nShelf melt\nbmb_method = \"quad-nl\", tf_method = 1\n\n\nCalving\ncalv_flt_method = \"vm-m16\"\n\n\nDynamics\nDIVA\n\n\nIsostasy\nFastIsostasy LV-ELVA, Earth structure ANT-32KM_GIA_HR24.nc (mantle viscosity + lithosphere)\n\n\nNamed regions\nyelmo_ts_APIS/WAIS/EAIS.nc"
   },
   {
     "objectID": "flavor-bipolar.html",
