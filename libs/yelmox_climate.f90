@@ -1,5 +1,5 @@
 module yelmox_climate
-    ! Climate backend of a domain, chosen at runtime ([coupling] climate):
+    ! Climate backend of a domain, chosen at runtime ([comps] climate):
     !   "snapclim" -- snapshot/anomaly climate (snapclim)
     !   "snapesm"  -- snapshots blended by indices (snapesm)
     !   "esm"      -- reference climatology plus Earth-system-model anomalies over
@@ -76,7 +76,7 @@ contains
                             south, sfx, timeline_group, smb_direct)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
         ! smb_direct: the surface mass balance is taken from the climate
-        ! ([coupling] smb_method = "climate"); the esm backend supplies it, and
+        ! ([comps] smb_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
         type(yelmox_climate_class), intent(inout) :: cl
         character(len=*), intent(in) :: method

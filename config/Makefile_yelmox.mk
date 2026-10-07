@@ -56,7 +56,7 @@ $(objdir)/climate_rembo.o: $(libdir)/climate_rembo.f90
 $(objdir)/climate_rembo_stub.o: $(libdir)/climate_rembo_stub.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# The climate backend of a domain ([coupling] climate = snapclim | snapesm | esm
+# The climate backend of a domain ([comps] climate = snapclim | snapesm | esm
 # | rembo), chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
 $(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o \
 						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/esm_forcing.o \

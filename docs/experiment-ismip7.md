@@ -9,7 +9,7 @@ restart bundle, then the **scenarios**, which start from that bundle in 2015 and
 run under the ESM forcing (historical + projection) to 2300.
 
 - **Program:** `yelmox` (`make yelmox`) with the ESM climate backend
-  (`[coupling] climate = "esm"`, see [ESM forcing](flavor-esm.md)).
+  (`[comps] climate = "esm"`, see [ESM forcing](flavor-esm.md)).
 - **Config:** `yelmox/yelmox_esm_Greenland.nml`, `yelmox/yelmox_esm_Antarctica_ismip7.nml`.
 - **Forcing data:** `input/esm/esm_grl_ismip7.nml`, `input/esm/esm_ant_ismip7.nml`
   (see [Database namelists](database-namelists.md)).
@@ -17,8 +17,8 @@ run under the ESM forcing (historical + projection) to 2300.
   `run_ismip7_antarctica.sh`; tuned spin-ups `opt_grl.sh`, `opt_grl_ismip.sh`,
   `opt_ant.sh`.
 
-The par files on their own run a 10-yr forcing-only smoke test (`equil_method =
-"none"`, `[spinup] time_end = 10`); the scripts set the run phase and length.
+The par files on their own run a 10-yr forcing-only smoke test (`[sim] opt =
+False`, `[spinup] time_end = 10`); the scripts set the run phase and length.
 
 ## Running the workflow
 
@@ -45,7 +45,7 @@ scripts/ismip7/run_ismip7_greenland.sh scenarios
 | `PROJ_END` | 2300 | 2300 | `[transient] time_end` |
 | `OUTROOT` | `output/ismip7_grl` | `output/ismip7_ant` | spin-up in `spinup/`, scenarios in `<ssp>/` |
 
-The spin-up passes `ctrl.run_step=spinup coupling.equil_method="opt"`; each
+The spin-up passes `ctrl.run_step=spinup sim.opt=True`; each
 scenario passes `ctrl.run_step=transient`, `esm.use_esm/use_hist/use_proj=True`
 and `ctrl.restart` = the bundle `<OUTROOT>/spinup/restart-<SPINUP_YEARS/1e3>-kyr`
 as an absolute path (the run starts inside its own folder).
@@ -66,7 +66,7 @@ is then lost within the first years.
 
 `opt_grl.sh`, `opt_grl_ismip.sh` (L. Gutierrez Gonzalez) and `opt_ant.sh` are
 15-kyr optimization spin-ups with tuned parameters on top of the par files:
-the SMB taken from the ESM (`coupling.smb_method=climate`), `cb_ref` started from
+the SMB taken from the ESM (`comps.smb_method=climate`), `cb_ref` started from
 the till friction of the bed (`opt.cf_init=-1`, the `ytill` parameters), a short
 relaxation (`opt.rel_time1/2 = 100`), equilibrium calving, DIVA dynamics and
 shelf enhancement 0.5; `opt_grl_ismip.sh` uses von Mises calving (`vm-l19`) and a

@@ -4,7 +4,7 @@ title: "REMBO climate"
 
 Runs with **REMBOv1**, an energy/moisture-balance regional atmosphere with an
 integrated surface-mass-balance scheme, use the `yelmox` program with the REMBO
-climate backend: `[coupling] climate = "rembo"`. REMBO supplies the atmosphere and
+climate backend: `[comps] climate = "rembo"`. REMBO supplies the atmosphere and
 the surface mass balance; the ocean comes from snapclim.
 
 - **Program:** `yelmox/yelmox.f90`, backend in `libs/yelmox_climate.f90`, with the
@@ -20,10 +20,10 @@ the surface mass balance; the ocean comes from snapclim.
 
 - **Grid.** REMBO runs on the grid it was compiled for (Greenland, GRL-16KM),
   which must be `grid_clim`; the backend checks this at start-up.
-- **Surface mass balance.** `[coupling] smb_method = "climate"`: REMBO's smb and
+- **Surface mass balance.** `[comps] smb_method = "climate"`: REMBO's smb and
   surface temperature, at the current surface. REMBO gives annual fields only, so
   smbpal and smb_simple are not available with it.
-- **Update cadence.** `[coupling] dt_clim = dtt`: REMBO updates its energy balance
+- **Update cadence.** `[comps] dt_clim = dtt`: REMBO updates its energy balance
   and its smb on its own intervals (`dtime_emb`, `dtime_smb`).
 - **Ocean.** The `[snap]` group, as for snapclim.
 - **Transient forcing.** `[tsforcing]` maps the tsgen value `f_now` onto REMBO's

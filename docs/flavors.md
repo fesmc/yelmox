@@ -7,11 +7,11 @@ coupling primitives of the Kryos modules (`libs/kryos*.f90`):
 
 | Program | Build | Domains | Climate | Ocean |
 |---|---|---|---|---|
-| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[coupling] climate`) | the climate (depth profiles or shelf base) |
+| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[comps] climate`) | the climate (depth profiles or shelf base) |
 | [`yelmox_bipolar`](flavor-bipolar.md) | `make yelmox_bipolar` | north + south | snapclim (×2) | snapclim + shared Ocean Box Model |
 
 The forcing of a `yelmox` run is set at runtime by its **climate backend**,
-`[coupling] climate`:
+`[comps] climate`:
 
 | Backend | Supplies | Page |
 |---|---|---|

@@ -5,7 +5,7 @@
 # yelmox (climate = esm) and yelmox/yelmox_esm_Greenland.nml. Only the
 # overrides of the original are carried over; the base configuration is the
 # current par file. Key changes:
-#   spinup.equil_method       -> coupling.equil_method
+#   spinup.equil_method       -> sim.opt
 #   opt.opt_cf_min=0.002      -> ytill.cf_min=0.002 (one lower bound for the
 #                                optimization and cb_tgt; was ytill.cf_min=1e-1)
 #   opt.use_yelmo_cf_min      -> removed
@@ -26,10 +26,10 @@ res_params=(
 
 ctrl_params=(
     "ctrl.run_step=spinup"
-    "coupling.smb_method=climate"
-    "coupling.equil_method=opt"
+    "comps.smb_method=climate"
+    "sim.opt=True"
     "spinup.time_end=15e3"
-    "coupling.kill_shelves=True"
+    "sim.init_kill_shelves=True"
     "tm_1D.dt=1.0"
     "tm_2Dsm.dt=500"
     "tm_2D.dt=15e3"

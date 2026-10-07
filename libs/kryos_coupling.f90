@@ -30,7 +30,7 @@ module kryos_coupling
 contains
 
     subroutine step_spinup_tuning(dom, ts)
-        ! Spin-up tuning (equil_method == "opt"): ramp the topography relaxation
+        ! Spin-up tuning ([sim] opt): ramp the topography relaxation
         ! timescale, then nudge the basal-friction field cb_ref and the marine
         ! thermal-forcing correction tf_corr toward present-day observations.
         !
@@ -45,7 +45,7 @@ contains
         real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
         character(len=256) :: gm, gy
 
-        if (trim(dom%ctl%equil_method) /= "opt") return
+        if (.not. dom%ctl%opt) return
 
         gm = trim(dom%ctl%grid_mshlf)
         gy = trim(dom%ctl%grid_ice)

@@ -11,7 +11,7 @@ base. Both run on `grid_clim` and read the `[snap]` group.
 
 - **Program:** `yelmox` (`make yelmox`), backends in `libs/snapclim.f90` and
   `libs/snapesm.f90`, behind `libs/yelmox_climate.f90`.
-- **Select:** `[coupling] climate = "snapclim"` or `"snapesm"`.
+- **Select:** `[comps] climate = "snapclim"` or `"snapesm"`.
 - **Output:** with `[output] write_clim`, `snap.nc`: the annual air temperature
   and precipitation; with snapesm also its driving indices (`idx_<name>`), the
   surface elevation, the monthly atmosphere (`tas`, `tsl`, `pr`), `ta_sum`,

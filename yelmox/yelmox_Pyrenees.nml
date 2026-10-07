@@ -1,5 +1,5 @@
 &ctrl
-    ! Shared timeline (driver-owned). Domain component choices live in [coupling].
+    ! Shared timeline + restart (driver-owned). Domain components live in [comps], simulation conditions in [sim].
     run_step        = "ctrl"            ! group holding the timeline ("ctrl" = this group)
     calendar        = False             ! timeline in calendar years (tstep_const = calendar time)
     calendar_ref    = 1950.0            ! [yr CE] calendar reference
@@ -11,7 +11,8 @@
     restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
 
-&coupling
+&comps
+    ! Components: which are active, with which model, how often.
     ! Pyrenees is single-grid (PYR-1KM): every component runs on the Yelmo grid.
     ! NOTE: ported to the multigrid driver but UNTESTED -- the PYR-1KM data are
     ! no longer available on this machine, so the htopo paths below are the
@@ -20,20 +21,25 @@
     with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Are climate + surface mass balance active?
     with_marine_shelf = False  ! Ocean forcing off (mountain glacier: no ocean)
-    equil_method    = "none"   ! "none" or "opt"
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+/
 
-    ! Optional switches.
-    scale_glacial_smb       = False
-    lim_pd_ice              = False
-    use_negis               = False
+&sim
+    ! Conditions of this simulation: cold-start ice state (init_*),
+    ! optimization, regional modifications.
     init_method             = "equil"
     init_equil_time         = 10.0
     init_marine_H           = False
-    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
-    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
+    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+
+    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
+
+    use_negis               = False
+    scale_glacial_smb       = False
+    lim_pd_ice              = False
 /
 
 &output

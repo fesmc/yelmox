@@ -24,6 +24,14 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- `[coupling]` is split into `[comps]` (`with_*`, `climate`, `smb_method`,
+  `dt_clim`: which components are active, with which model, how often) and
+  `[sim]` (the conditions of the simulation: cold-start ice state, optimization,
+  regional modifications); in `yelmox_bipolar` `[comps_<sfx>]`, `[sim_<sfx>]`.
+  Renamed in `[sim]`: `equil_method = "none"/"opt"` -> `opt = False/True` (the
+  optimization runs within the `[opt]` time windows, on a cold start or a
+  restart), `kill_shelves` -> `init_kill_shelves`, `time_equil_thrm` ->
+  `init_time_thrm`. Old par files stop with "parameter not found".
 - The restart bundle to start from is `[ctrl] restart` (was `[coupling] restart`;
   in `yelmox_bipolar`, `[ctrl] restart_bsl` and `[coupling_<sfx>] restart`). The
   driver reads it and passes it to `domain_startup(dom, ts, bsl, restart, ...)`.

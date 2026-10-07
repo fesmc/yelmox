@@ -8,7 +8,7 @@
 #   - three multigrid runs: marine_shelf on a grid FINER than Yelmo
 #       (Yelmo 32KM + mshlf 8KM / 16KM, Yelmo 16KM + mshlf 8KM).
 #
-# All runs use equil_method=opt (the nml default): basal friction (cf_ref) and
+# All runs use sim.opt=True (the nml default): basal friction (cf_ref) and
 # thermal forcing (tf_corr) are optimized toward the PD target over the default
 # 0-15 kyr windows, then free-evolve to time_end=25 kyr as a relaxation tail.
 # The pmpt grounding-zone bmb scaling uses H_t=100 (gz_Hg1=100). 2D output every

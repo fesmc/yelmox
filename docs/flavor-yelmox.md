@@ -21,7 +21,7 @@ balance and the marine shelf. It is the reference implementation of the multigri
 |---|---|---|
 | Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
-| Climate (atmosphere + ocean) | backend of `[coupling] climate`: [snapclim, snapesm](climate-snap.md), [esm](flavor-esm.md) or [rembo](flavor-rembo.md) | `grid_clim` |
+| Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](flavor-esm.md) or [rembo](flavor-rembo.md) | `grid_clim` |
 | Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_smb` |
 | Sub-shelf melt | marine_shelf | `grid_mshlf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
@@ -49,7 +49,7 @@ call step_marine_shelf(dom, ts)   ! shelf melt
 smb and shelf melt from the **previous** step (a one-step coupling lag);
 `step_climate`, `step_smb` and `step_marine_shelf` then produce the forcing
 consumed on the next step.
-The climate is refreshed on the `coupling.dt_clim` cadence; the smb every step.
+The climate is refreshed on the `comps.dt_clim` cadence; the smb every step.
 
 ## Transient time-series forcing (`tsgen`)
 
@@ -99,11 +99,13 @@ applies no anomalies.
 ## Configuration
 
 Besides `[domain]` (the domain definition, see [Multigrid coupling](multigrid.md)),
-a run is set by `[coupling]` and `[output]`. In `yelmox_bipolar` each group
-carries the hemisphere suffix (`[coupling_north]`, ...). Every key is required (a
+a run is set by `[comps]`, `[sim]` and `[output]`. In `yelmox_bipolar` each group
+carries the hemisphere suffix (`[comps_north]`, ...). Every key is required (a
 missing key stops the run), except the keys of an unselected `init_method`.
 
-### `[coupling]`
+### `[comps]`
+
+The components: which are active, with which model, how often.
 
 | Key | Values | |
 |---|---|---|
@@ -111,14 +113,22 @@ missing key stops the run), except the keys of an unselected `init_method`.
 | `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
 | `smb_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
-| `equil_method` | `none`, `opt` | `opt`: spin-up optimization of the basal friction and the thermal-forcing correction (`[opt]`) |
+
+### `[sim]`
+
+The conditions of this simulation: the cold-start ice state (`init_*`), the
+optimization and regional modifications.
+
+| Key | Values | |
+|---|---|---|
 | `init_method` | `none`, `equil`, `recon`, `recon_ref` | cold-start ice state: as initialized; a short equilibration with constant boundaries; the reconstruction `recon_path` as initial ice on the `recon_codes` regions; the reconstruction as reference ice only |
 | `init_equil_time` | [yr] | `equil`: equilibration time |
 | `recon_path`, `recon_var` | path, name | `recon`, `recon_ref`: the reconstruction file (`{domain}`, `{grid_name}` = `grid_ice`) and its ice-thickness variable |
 | `recon_codes` | codes | `recon`: the regions where its ice is imposed |
 | `init_marine_H` | bool | cold start: LGM-like marine ice, before `init_method` |
-| `kill_shelves` | bool | cold start: no ice where the present-day bed is ocean |
-| `time_equil_thrm` | [yr] | cold start: then equilibrate with topography fixed (`0` = off) |
+| `init_kill_shelves` | bool | cold start: no ice where the present-day bed is ocean |
+| `init_time_thrm` | [yr] | cold start: then equilibrate with topography fixed (`0` = off) |
+| `opt` | bool | optimization of the basal friction and the thermal-forcing correction (`[opt]`, within its `cf_time_*`/`tf_time_*` windows); on a cold start or a restart |
 | `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |
 | `use_negis` | bool | NEGIS basal-friction modification (`[negis]`) |

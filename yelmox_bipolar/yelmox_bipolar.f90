@@ -4,7 +4,7 @@ program yelmox_bipolar
     ! Advances a Northern- and a Southern-Hemisphere kryos_domain on a shared
     ! timeline, coupled through a shared Ocean Box Model (OBM), following the
     ! original yelmox_bipolar convention: one parameter file holds both domains,
-    ! each domain's groups carry a hemisphere suffix (yelmo_north, coupling_south,
+    ! each domain's groups carry a hemisphere suffix (yelmo_north, comps_south,
     ! snap_north, ...), while shared blocks ([ctrl], [barysealevel], the [obm]
     ! parameter block, the yelmo physics groups ydyn/ytopo/...) have no suffix.
     ! Distinct group names also let `runme -p group.name=val` target one

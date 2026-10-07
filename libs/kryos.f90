@@ -52,33 +52,33 @@ module kryos
         ! Shared timeline (read from the driver's timeline group, e.g. [ctrl]).
         character(len=56) :: tstep_method = "const"
         real(wp) :: dtt         = 10.0_wp
-        ! Cadences + methods ([coupling]).
-        real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
-        character(len=56) :: equil_method = "none"
-        character(len=56) :: smb_method   = "smbpal"      ! smbpal | smb_simple | climate (from the backend)
-        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm | esm | rembo
-
-        ! Cold-start ice state ([coupling]): init_marine_H first, then init_method.
-        character(len=56)  :: init_method     = "equil"   ! none | equil | recon | recon_ref
-        logical            :: init_marine_H   = .false.   ! impose LGM-like marine ice
-        real(wp)           :: init_equil_time = 10.0_wp   ! [yr] equil: equilibration time
-        logical            :: kill_shelves    = .false.   ! no ice where the present-day bed is ocean
-        real(wp)           :: time_equil_thrm = 0.0_wp    ! [yr] then equilibrate with topography fixed
-        character(len=512) :: recon_path = ""             ! recon*: ice reconstruction file
-        character(len=56)  :: recon_var  = ""             ! recon*: its ice-thickness variable
-        real(wp)           :: recon_codes(20)             ! recon: regions where its ice is imposed
-        integer            :: n_recon_codes = 0
-
-        ! Optional physics switches ([coupling]).
-        logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb ([glacial_smb] group)
-        logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent
-        logical :: use_negis               = .false.   ! NEGIS cb_ref modification ([negis] group)
-
-        ! Which components are active in this domain's coupling sequence.
+        ! Components ([comps]): which are active in the coupling sequence, with
+        ! which model, how often.
         logical :: with_ice_sheet    = .true.
         logical :: with_isostasy     = .true.
         logical :: with_marine_shelf = .true.
         logical :: with_climate      = .true.
+        character(len=56) :: climate      = ""          ! climate backend: snapclim | snapesm | esm | rembo
+        character(len=56) :: smb_method   = "smbpal"      ! smbpal | smb_simple | climate (from the backend)
+        real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
+
+        ! Simulation conditions ([sim]). Cold-start ice state: init_kill_shelves,
+        ! then init_marine_H, then init_method, then init_time_thrm.
+        character(len=56)  :: init_method       = "equil"   ! none | equil | recon | recon_ref
+        real(wp)           :: init_equil_time   = 10.0_wp   ! [yr] equil: equilibration time
+        character(len=512) :: recon_path = ""               ! recon*: ice reconstruction file
+        character(len=56)  :: recon_var  = ""               ! recon*: its ice-thickness variable
+        real(wp)           :: recon_codes(20)               ! recon: regions where its ice is imposed
+        integer            :: n_recon_codes = 0
+        logical            :: init_marine_H     = .false.   ! impose LGM-like marine ice
+        logical            :: init_kill_shelves = .false.   ! no ice where the present-day bed is ocean
+        real(wp)           :: init_time_thrm    = 0.0_wp    ! [yr] then equilibrate with topography fixed
+        ! Optimization of cb_ref and tf_corr ([opt] group), within its own time windows.
+        logical :: opt = .false.
+        ! Regional modifications.
+        logical :: use_negis               = .false.   ! NEGIS cb_ref modification ([negis] group)
+        logical :: scale_glacial_smb       = .false.   ! reduce negative glacial smb ([glacial_smb] group)
+        logical :: lim_pd_ice              = .false.   ! extra melt outside PD ice extent
 
         ! Domain name + grid of every component ([domain]; the source of truth
         ! for remap keys). A blank component grid takes its default.
@@ -139,7 +139,7 @@ module kryos
         type(yelmo_class)      :: yelmo
         type(marshelf_class)   :: mshlf
         type(isos_class)       :: isos
-        type(yelmox_climate_class) :: cl    ! climate backend ([coupling] climate)
+        type(yelmox_climate_class) :: cl    ! climate backend ([comps] climate)
         type(climate_out_class)    :: clim  ! backend-agnostic climate output (now/ref)
         type(smbpal_class)     :: smb
         type(smb_simple_class) :: smbs    ! alternative SMB (smb_method="smb_simple")
@@ -191,7 +191,7 @@ contains
         ! and present-day topography remapped from the hub.
         !
         ! group_suffix (optional, default "") is appended to every namelist group
-        ! name (yelmo -> yelmo<suffix>, coupling -> coupling<suffix>, ...), so
+        ! name (yelmo -> yelmo<suffix>, comps -> comps<suffix>, ...), so
         ! several domains can share one parameter file with disjoint group names
         ! (the multi-domain / bipolar convention). Yelmo physics sub-groups (ydyn,
         ! ytopo, ...) stay shared: they are named by pointer fields inside the
@@ -340,7 +340,7 @@ contains
                            cnst=dom%cnst)
 
         ! Optimization state (basal friction + thermal forcing); no-op unless
-        ! equil_method == "opt". Must follow yelmo_init (grid + till params known).
+        ! [sim] opt. Must follow yelmo_init (grid + till params known).
         call domain_opt_init(dom, path_par, trim(sfx))
 
         ! NEGIS cb_ref modification and glacial smb scaling: load their groups
@@ -352,7 +352,7 @@ contains
 
     subroutine negis_par_load(ngs, path_par, suffix)
         ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]). Only read
-        ! when [coupling] use_negis is set.
+        ! when [sim] use_negis is set.
         type(negis_params), intent(inout) :: ngs
         character(len=*),   intent(in)    :: path_par
         character(len=*),   intent(in)    :: suffix
@@ -370,7 +370,7 @@ contains
 
     subroutine glacial_smb_par_load(gsmb, path_par, suffix)
         ! Load the glacial smb scaling parameters ([glacial_smb<suffix>]). Only
-        ! read when [coupling] scale_glacial_smb is set.
+        ! read when [sim] scale_glacial_smb is set.
         type(glacial_smb_params), intent(inout) :: gsmb
         character(len=*),         intent(in)    :: path_par
         character(len=*),         intent(in)    :: suffix
@@ -386,14 +386,14 @@ contains
         ! switch till_method to external (-1) so yelmo_update uses the optimized
         ! cb_ref. The initial cb_ref guess (cold start) is set by
         ! domain_opt_init_cb_ref; on restart cb_ref is restored from the bundle.
-        ! No-op unless equil_method == "opt".
+        ! No-op unless [sim] opt.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         character(len=*), intent(in)    :: suffix
 
         integer :: nx, ny
 
-        if (trim(dom%ctl%equil_method) /= "opt") return
+        if (.not. dom%ctl%opt) return
 
         dom%opt%tf_basins = 0
         call optimize_par_load(dom%opt, path_par, "opt"//trim(suffix))
@@ -409,7 +409,8 @@ contains
     end subroutine domain_opt_init
 
     subroutine domain_ctl_load(ctl, path_par, suffix, timeline_group)
-        ! Load this domain's definition + coupling + output config. All groups
+        ! Load this domain's definition, components, simulation conditions and
+        ! output config ([domain], [comps], [sim], [output]). All groups
         ! carry an optional domain suffix (e.g. "_north"), so several domains can
         ! coexist in one parameter file without group.name collisions (matters
         ! for runme -p). The shared timeline is driver-owned (tstep_init); the
@@ -420,7 +421,7 @@ contains
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(in)    :: timeline_group
 
-        character(len=256) :: gd, gc, go
+        character(len=256) :: gd, gc, gs, go
 
         ctl%path_par = trim(path_par)
 
@@ -453,14 +454,12 @@ contains
         if (len_trim(ctl%grid_smb)   == 0) ctl%grid_smb   = trim(ctl%grid_clim)
         if (len_trim(ctl%grid_mshlf) == 0) ctl%grid_mshlf = trim(ctl%grid_hub)
 
-        ! Coupling ([coupling<suffix>]): active components, methods, restart
-        ! bundle. The restart cadence is the driver's [tm_rst] timeout.
-        gc = "coupling"//trim(suffix)
+        ! Components ([comps<suffix>]): which are active, with which model, how often.
+        gc = "comps"//trim(suffix)
         call nml_read(path_par, gc, "with_ice_sheet",    ctl%with_ice_sheet)
         call nml_read(path_par, gc, "with_isostasy",     ctl%with_isostasy)
         call nml_read(path_par, gc, "with_climate",      ctl%with_climate)
         call nml_read(path_par, gc, "with_marine_shelf", ctl%with_marine_shelf)
-        call nml_read(path_par, gc, "equil_method",   ctl%equil_method)
         call nml_read(path_par, gc, "climate",        ctl%climate)
         ctl%smb_method = "smbpal"
         call nml_read(path_par, gc, "smb_method",     ctl%smb_method)
@@ -479,41 +478,47 @@ contains
         end select
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
 
-        ! Optional physics switches. use_negis and scale_glacial_smb
-        ! additionally require a [negis<suffix>] / [glacial_smb<suffix>] group.
-        call nml_read(path_par, gc, "scale_glacial_smb",       ctl%scale_glacial_smb)
-        call nml_read(path_par, gc, "lim_pd_ice",              ctl%lim_pd_ice)
-        call nml_read(path_par, gc, "use_negis",               ctl%use_negis)
+        ! Simulation conditions ([sim<suffix>]).
+        gs = "sim"//trim(suffix)
 
         ! Cold-start ice state. The keys of the selected init_method are required.
-        call nml_read(path_par, gc, "init_method",   ctl%init_method)
-        call nml_read(path_par, gc, "init_marine_H", ctl%init_marine_H)
-        call nml_read(path_par, gc, "kill_shelves",    ctl%kill_shelves)
-        call nml_read(path_par, gc, "time_equil_thrm", ctl%time_equil_thrm)
+        call nml_read(path_par, gs, "init_method",       ctl%init_method)
+        call nml_read(path_par, gs, "init_marine_H",     ctl%init_marine_H)
+        call nml_read(path_par, gs, "init_kill_shelves", ctl%init_kill_shelves)
+        call nml_read(path_par, gs, "init_time_thrm",    ctl%init_time_thrm)
         select case(trim(ctl%init_method))
             case("none")
             case("equil")
-                call nml_read(path_par, gc, "init_equil_time", ctl%init_equil_time)
+                call nml_read(path_par, gs, "init_equil_time", ctl%init_equil_time)
             case("recon", "recon_ref")
-                call nml_read(path_par, gc, "recon_path", ctl%recon_path)
-                call nml_read(path_par, gc, "recon_var",  ctl%recon_var)
+                call nml_read(path_par, gs, "recon_path", ctl%recon_path)
+                call nml_read(path_par, gs, "recon_var",  ctl%recon_var)
                 ! {domain}/{grid_name} resolve to the domain name and grid_ice.
                 call nml_replace(ctl%recon_path, "{domain}",    trim(ctl%domain))
                 call nml_replace(ctl%recon_path, "{grid_name}", trim(ctl%grid_ice))
                 if (trim(ctl%init_method) == "recon") then
                     ctl%recon_codes = -9999.0_wp
-                    call nml_read(path_par, gc, "recon_codes", ctl%recon_codes)
+                    call nml_read(path_par, gs, "recon_codes", ctl%recon_codes)
                     ctl%n_recon_codes = count(ctl%recon_codes /= -9999.0_wp)
                     if (ctl%n_recon_codes == 0) then
-                        write(*,*) "domain_ctl_load:: error: "//trim(gc)//".init_method = recon needs recon_codes."
+                        write(*,*) "domain_ctl_load:: error: "//trim(gs)//".init_method = recon needs recon_codes."
                         stop 1
                     end if
                 end if
             case default
-                write(*,*) "domain_ctl_load:: error: "//trim(gc)//".init_method must be none, equil, &
+                write(*,*) "domain_ctl_load:: error: "//trim(gs)//".init_method must be none, equil, &
                            &recon or recon_ref; got "//trim(ctl%init_method)
                 stop 1
         end select
+
+        ! Optimization of cb_ref and tf_corr ([opt<suffix>] group).
+        call nml_read(path_par, gs, "opt", ctl%opt)
+
+        ! Regional modifications. use_negis and scale_glacial_smb additionally
+        ! require a [negis<suffix>] / [glacial_smb<suffix>] group.
+        call nml_read(path_par, gs, "use_negis",         ctl%use_negis)
+        call nml_read(path_par, gs, "scale_glacial_smb", ctl%scale_glacial_smb)
+        call nml_read(path_par, gs, "lim_pd_ice",        ctl%lim_pd_ice)
 
         ! Per-module output switches ([output<suffix>]); default = write everything.
         go = "output"//trim(suffix)

@@ -3,10 +3,10 @@
 # ISMIP7 workflow for Greenland (yelmox, climate = esm).
 #
 #   Step 1  spinup     15-kyr present-day OPTIMIZED ice-sheet spin-up
-#                      (coupling.equil_method=opt) -> writes a restart bundle
+#                      (sim.opt=True) -> writes a restart bundle
 #   Step 2  scenarios  ssp126 / ssp370 / ssp585, each branched off that bundle
 #
-# The ice sheet + isostasy are ACTIVE (coupling.with_ice_sheet/with_isostasy=True in
+# The ice sheet + isostasy are ACTIVE (comps.with_ice_sheet/with_isostasy=True in
 # yelmox_esm_Greenland.nml). The spin-up optimizes basal friction + thermal forcing to
 # present day (&opt cf/tf_time_end=15e3), and the scenarios evolve the ice sheet under
 # ISMIP7 climate/ocean forcing.
@@ -56,7 +56,7 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup coupling.equil_method="opt" \
+      -p ctrl.run_step=spinup sim.opt=True \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;

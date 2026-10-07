@@ -107,7 +107,7 @@ type kryos_domain
     type(yelmo_class)          :: yelmo
     type(marshelf_class)       :: mshlf
     type(isos_class)           :: isos
-    type(yelmox_climate_class) :: cl     ! climate backend ([coupling] climate)
+    type(yelmox_climate_class) :: cl     ! climate backend ([comps] climate)
     type(climate_out_class)    :: clim   ! backend-agnostic climate output (now/ref)
     type(smbpal_class)         :: smb
     type(smb_simple_class)     :: smbs   ! smb_method = "smb_simple"
@@ -119,7 +119,7 @@ type kryos_domain
     type(ice_opt_params)       :: opt    ! spin-up optimization
     type(negis_params)         :: ngs
     type(glacial_smb_params)   :: gsmb
-    type(domain_ctl)           :: ctl    ! [domain], [coupling], [output]
+    type(domain_ctl)           :: ctl    ! [domain], [comps], [sim], [output]
 end type
 ```
 
@@ -252,8 +252,8 @@ Both programs use the same driver plumbing:
   `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
   each domain its subfolder of the bundle and `restore_bsl=.false.`.
 - **`domain_init_ice(dom, ts)`** — the cold-start ice state after
-  `yelmo_init_state` (`[coupling]` `kill_shelves`, `init_marine_H`,
-  `init_method`, `time_equil_thrm`; see [yelmox](flavor-yelmox.md#configuration)).
+  `yelmo_init_state` (`[sim]` `init_kill_shelves`, `init_marine_H`,
+  `init_method`, `init_time_thrm`; see [yelmox](flavor-yelmox.md#configuration)).
 - **`run_restart_write(dom, bsl, time [, tsf])`** — the single-domain restart
   bundle (domain sub-models + `bsl_restart.nc` + the tsforcing state, one
   auto-named folder).
@@ -271,11 +271,11 @@ sequence written out inline. Each output call appears once, and the final state
 ts%is_finished`).
 
 - **`yelmox`** — argument is one parameter file; one `kryos_domain`, output to
-  the run dir. The climate backend is chosen at runtime (`[coupling] climate`),
+  the run dir. The climate backend is chosen at runtime (`[comps] climate`),
   so ESM and REMBO runs use this program too. See [yelmox](flavor-yelmox.md).
 - **`yelmox_bipolar`** — argument is one parameter file holding both
   hemispheres. Each domain's groups carry a hemisphere suffix (`yelmo_south`,
-  `domain_north`, `coupling_north`, `snap_south`, …), threaded into every group
+  `domain_north`, `comps_north`, `snap_south`, …), threaded into every group
   via `domain_init(..., group_suffix=…)`; `[ctrl]`, `[barysealevel]`, the OBM
   groups and the Yelmo physics groups (`ydyn`, `ytopo`, …) are shared. Distinct
   group names also let `runme -p group.name=val` target one hemisphere. The two

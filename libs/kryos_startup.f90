@@ -150,8 +150,7 @@ contains
         call yelmo_print_bound(dom%yelmo%bnd)
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
-        ! Cold-start ice state ([coupling] init_marine_H, init_method). Cold
-        ! start only; restart skips it.
+        ! Cold-start ice state ([sim] init_*). Cold start only; restart skips it.
         call domain_init_ice(dom, ts)
 
         ! The hub follows the initialized ice state, so the initial output and
@@ -161,13 +160,13 @@ contains
     end subroutine domain_init_state
 
     subroutine domain_opt_init_cb_ref(dom)
-        ! Cold-start basal friction of the optimization (equil_method == "opt"; a
+        ! Cold-start basal friction of the optimization ([sim] opt; a
         ! restart restores cb_ref instead): opt.cf_init > 0 sets a uniform cb_ref,
         ! cf_init <= 0 starts from the till friction of the bed (cb_tgt, from the
         ! ytill parameters).
         type(kryos_domain), intent(inout) :: dom
 
-        if (trim(dom%ctl%equil_method) /= "opt") return
+        if (.not. dom%ctl%opt) return
 
         if (dom%opt%cf_init > 0.0_wp) then
             dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
@@ -210,16 +209,16 @@ contains
     end subroutine domain_init_isostasy
 
     subroutine domain_init_ice(dom, ts)
-        ! Cold-start ice state, after yelmo_init_state ([coupling]): no ice where
-        ! the present-day bed is ocean (kill_shelves), LGM-like marine ice
+        ! Cold-start ice state, after yelmo_init_state ([sim]): no ice where
+        ! the present-day bed is ocean (init_kill_shelves), LGM-like marine ice
         ! (init_marine_H), then init_method -- none, a short equilibration with
         ! constant boundaries (equil), or the ice reconstruction recon_path as the
         ! initial ice (recon) or only as the reference ice (recon_ref) -- and last
-        ! an equilibration with topography fixed (time_equil_thrm > 0).
+        ! an equilibration with topography fixed (init_time_thrm > 0).
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
 
-        if (dom%ctl%kill_shelves) then
+        if (dom%ctl%init_kill_shelves) then
             where (dom%yelmo%dta%pd%mask_bed == mask_bed_ocean) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
         end if
 
@@ -236,8 +235,8 @@ contains
                 call domain_init_recon(dom, ts)
         end select
 
-        if (dom%ctl%with_ice_sheet .and. dom%ctl%time_equil_thrm > 0.0_wp) &
-            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%time_equil_thrm, &
+        if (dom%ctl%with_ice_sheet .and. dom%ctl%init_time_thrm > 0.0_wp) &
+            call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%init_time_thrm, &
                                     dt=dom%ctl%dtt, topo_fixed=.TRUE.)
 
     end subroutine domain_init_ice
