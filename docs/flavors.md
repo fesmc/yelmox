@@ -26,7 +26,8 @@ See [Multigrid coupling](multigrid.md) for the architecture shared by both progr
 
 Both programs advance a domain with these primitives (from `kryos_coupling`):
 
-- `step_optimize` — relaxation ramp + basal-friction / thermal-forcing optimization (`[sim] opt`).
+- `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
+- `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`).
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.

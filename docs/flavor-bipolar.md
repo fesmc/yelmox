@@ -41,7 +41,8 @@ Main loop (per timestep):
 ```fortran
 call bsl_update(bsl, ts%time_rel)              ! shared sea level, once
 
-if (active_north) then                         ! optimization + isostasy, per domain
+if (active_north) then                         ! relaxation + optimization + isostasy, per domain
+    call step_relax(dom_north, ts)
     call step_optimize(dom_north, ts)
     call step_isostasy(dom_north, ts, bsl)
 end if
@@ -73,7 +74,7 @@ Key ordering points:
   one-step lag), then `obm_exchange` distributes the fresh OBM state back to the
   domains before the marine-shelf melt is computed.
 - The per-domain primitives are the same as in the single-domain `yelmox`; only
-  the optimization + isostasy part is split off so it runs before the OBM step.
+  the relaxation + optimization + isostasy part is split off so it runs before the OBM step.
 
 ## Forcing
 

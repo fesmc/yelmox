@@ -59,7 +59,7 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup sim.opt=True \
+      -p ctrl.run_step=spinup sim.relax=True sim.opt=True \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;

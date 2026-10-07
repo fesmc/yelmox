@@ -31,7 +31,7 @@ module kryos
     use yelmox_climate, only : yelmox_climate_class, climate_init
     use smbpal,       only : smbpal_class, smbpal_init
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask
-    use ice_optimization, only : ice_opt_params, optimize_par_load
+    use ice_optimization, only : ice_opt_params, optimize_par_load, relax_params, relax_par_load
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
     use htopo,        only : htopo_class, htopo_init, htopo_ice_allowed, htopo_relax_tau
@@ -74,6 +74,8 @@ module kryos
         logical            :: init_marine_H     = .false.   ! impose LGM-like marine ice
         logical            :: init_kill_shelves = .false.   ! no ice where the present-day bed is ocean
         real(wp)           :: init_time_thrm    = 0.0_wp    ! [yr] then equilibrate with topography fixed
+        ! Relaxation of the topography ([relax] group), until relax.time2.
+        logical :: relax = .false.
         ! Optimization of cb_ref and tf_corr ([opt] group), within its own time windows.
         logical :: opt = .false.
         ! Regional modifications.
@@ -136,6 +138,14 @@ module kryos
         real(wp) :: fac_lim = 0.9_wp     ! [1] maximum reduction of negative smb
     end type glacial_smb_params
 
+    ! Relaxation of the topography ([sim] relax): its parameters ([relax]) and
+    ! the par-file ytopo values, restored once it ends.
+    type domain_relax
+        type(relax_params) :: par
+        integer  :: topo_rel0     = 0
+        real(wp) :: topo_rel_tau0 = 0.0_wp
+    end type domain_relax
+
     type kryos_domain
         type(yelmo_class)      :: yelmo
         type(marshelf_class)   :: mshlf
@@ -149,6 +159,7 @@ module kryos
         type(phys_const_class) :: cnst    ! physical constants, shared by every component
         type(htopo_class)      :: topo    ! hi-res geometry reference hub
         type(coupler_class)    :: cpl     ! this region's grid resolution + map cache
+        type(domain_relax)     :: rlx     ! topography relaxation
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
         type(negis_params)     :: ngs     ! NEGIS cb_ref modification
         type(glacial_smb_params) :: gsmb  ! glacial smb scaling
@@ -156,7 +167,7 @@ module kryos
     end type kryos_domain
 
     public :: MAP_FLDR
-    public :: domain_ctl, negis_params, glacial_smb_params, kryos_domain
+    public :: domain_ctl, negis_params, glacial_smb_params, domain_relax, kryos_domain
     public :: domain_init
     public :: cadence_due
     ! remap is used by every coupling step, and by drivers to move fields
@@ -340,6 +351,10 @@ contains
                            domain, trim(dom%ctl%grid_shelf), regions_m, basins_m, &
                            cnst=dom%cnst)
 
+        ! Relaxation parameters + the par-file ytopo values it restores; no-op
+        ! unless [sim] relax. Must follow yelmo_init (ytopo params known).
+        call domain_relax_init(dom, path_par, trim(sfx))
+
         ! Optimization state (basal friction + thermal forcing); no-op unless
         ! [sim] opt. Must follow yelmo_init (grid + till params known).
         call domain_opt_init(dom, path_par, trim(sfx))
@@ -380,6 +395,21 @@ contains
         call nml_read(path_par, "glacial_smb"//trim(suffix), "lat_lim", gsmb%lat_lim)
         call nml_read(path_par, "glacial_smb"//trim(suffix), "fac_lim", gsmb%fac_lim)
     end subroutine glacial_smb_par_load
+
+    subroutine domain_relax_init(dom, path_par, suffix)
+        ! Load the relaxation parameters ([relax<suffix>]) and keep the par-file
+        ! ytopo.topo_rel / topo_rel_tau, which apply again after relax.time2.
+        ! No-op unless [sim] relax.
+        type(kryos_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: path_par
+        character(len=*), intent(in)    :: suffix
+
+        if (.not. dom%ctl%relax) return
+
+        call relax_par_load(dom%rlx%par, path_par, "relax"//trim(suffix))
+        dom%rlx%topo_rel0     = dom%yelmo%tpo%par%topo_rel
+        dom%rlx%topo_rel_tau0 = dom%yelmo%tpo%par%topo_rel_tau
+    end subroutine domain_relax_init
 
     subroutine domain_opt_init(dom, path_par, suffix)
         ! Load optimization parameters and prepare Yelmo for external cb_ref:
@@ -518,8 +548,10 @@ contains
                 stop 1
         end select
 
-        ! Optimization of cb_ref and tf_corr ([opt<suffix>] group).
-        call nml_read(path_par, gs, "opt", ctl%opt)
+        ! Relaxation of the topography ([relax<suffix>] group) and optimization
+        ! of cb_ref and tf_corr ([opt<suffix>] group).
+        call nml_read(path_par, gs, "relax", ctl%relax)
+        call nml_read(path_par, gs, "opt",   ctl%opt)
 
         ! Regional modifications. use_negis and scale_glacial_smb additionally
         ! require a [negis<suffix>] / [glacial_smb<suffix>] group.

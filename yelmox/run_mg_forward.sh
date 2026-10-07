@@ -56,7 +56,7 @@ run_fwd() {
         -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
            domain.grid_shelf="$mgrid" domain.grid_isos="$ygrid" \
            domain.grid_clim=ANT-32KM domain.grid_surface="$ygrid" \
-           ctrl.restart="$restart" sim.opt=False \
+           ctrl.restart="$restart" sim.relax=False sim.opt=False \
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \
            tm_2D.dt=100 ytopo.gz_Hg1=100 \

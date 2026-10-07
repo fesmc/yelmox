@@ -41,7 +41,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 - **Optimization** (`[sim] opt = True`): `cb_ref` and `tf_corr`
   until 7.5 kyr (`[opt] cf_time_end`, `tf_time_end`), starting from the till
   friction of the bed (`cf_init = -1`); the ice thickness relaxes towards the
-  observations until 3 kyr (`rel_time2`).
+  observations until 3 kyr (`[sim] relax = True`, `[relax] time2`).
 - **Climate:** present day (`[snap] atm_type = "anom"` with zero anomaly, and
   so a zero ocean anomaly).
 - **Output:** restart bundles every 15 kyr, so `restart-0.000-kyr` and
@@ -51,8 +51,8 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 
 - **Timeline:** `[ctrl]` -130 kyr to +10 kyr, `dtt = 5` yr, on relative time
   (`tstep_method = "rel"`), so that the sea level and the index follow the
-  records. `[sim] opt = False`: `cb_ref` and `tf_corr` come from
-  the restart.
+  records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
+  from the restart.
 - **Climate:** `[snap] atm_type = "snap_1ind"`: the present-day reference plus
   the PMIP3 LGM -- piControl anomaly, scaled by the glacial index
   `input/alpha_combined_125kyr_interp.dat` (0 = present day, 1 = LGM; -0.2 in the

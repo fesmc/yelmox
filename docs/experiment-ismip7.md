@@ -45,7 +45,7 @@ scripts/ismip7/run_ismip7_greenland.sh scenarios
 | `PROJ_END` | 2300 | 2300 | `[transient] time_end` |
 | `OUTROOT` | `output/ismip7_grl` | `output/ismip7_ant` | spin-up in `spinup/`, scenarios in `<ssp>/` |
 
-The spin-up passes `ctrl.run_step=spinup sim.opt=True`; each
+The spin-up passes `ctrl.run_step=spinup sim.relax=True sim.opt=True`; each
 scenario passes `ctrl.run_step=transient`, `esm.use_esm/use_hist/use_proj=True`
 and `ctrl.restart` = the bundle `<OUTROOT>/spinup/restart-<SPINUP_YEARS/1e3>-kyr`
 as an absolute path (the run starts inside its own folder).
@@ -56,8 +56,8 @@ of ANT-8KM (`[isos] rheology_file`): with another grid, also pass
 `isos.rheology_file=isostasy_data/earth_structure/yelmo/<GRID>_GIA_HR24.nc`
 (as `opt_ant.sh` does).
 
-**Short spin-ups.** The optimization relaxes the ice thickness towards the
-observations at first (`[opt] rel_tau1/2`, until `rel_time2`: 6 kyr for
+**Short spin-ups.** The spin-up relaxes the ice thickness towards the
+observations at first (`[relax] tau1/2`, until `time2`: 6 kyr for
 Greenland). A spin-up that ends before then hands the scenarios ice that the
 relaxation was holding in place, e.g. thin margin ice under negative SMB, which
 is then lost within the first years.
@@ -68,7 +68,7 @@ is then lost within the first years.
 15-kyr optimization spin-ups with tuned parameters on top of the par files:
 the SMB taken from the ESM (`comps.surface_method=climate`), `cb_ref` started from
 the till friction of the bed (`opt.cf_init=-1`, the `ytill` parameters), a short
-relaxation (`opt.rel_time1/2 = 100`), equilibrium calving, DIVA dynamics and
+relaxation (`relax.time1/2 = 100`), equilibrium calving, DIVA dynamics and
 shelf enhancement 0.5; `opt_grl_ismip.sh` uses von Mises calving (`vm-l19`) and a
 linear melt law. To run the scenarios from one of them, set `BUNDLE` in the
 workflow script to its last restart bundle.

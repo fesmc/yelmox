@@ -136,12 +136,6 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    rel_tau1        = 100               ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
-    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2
-
     opt_tf          = True              ! Should thermal forcing be optimized?
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
@@ -153,6 +147,16 @@
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value
     tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False
+/
+
+&relax
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100               ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2e3               ! [yr] End of the tau1 period
+    time2           = 6e3               ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
 /
 
 &yelmo
@@ -697,13 +701,14 @@
 
 &sim
     ! Conditions of this simulation: cold-start ice state (init_*),
-    ! optimization, regional modifications.
+    ! relaxation, optimization, regional modifications.
     init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     init_equil_time         = 1.0       ! [yr] equil: equilibration time
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
     init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 
+    relax                   = False     ! relax the topography towards the reference ([relax])
     opt                     = False     ! optimize cb_ref and tf_corr ([opt])
 
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)

@@ -24,6 +24,14 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- The topography relaxation of a spin-up is its own switch, `[sim] relax`, with
+  the group `[relax]` (`topo_rel`, `tau1`, `tau2`, `time1`, `time2`, `m`; was
+  `[opt] rel_tau1/2`, `rel_time1/2`, `rel_m` with `topo_rel = 4` fixed), applied
+  by `step_relax` before `step_optimize`. After `time2` the `[ytopo]` values of
+  `topo_rel` and `topo_rel_tau` apply again (was `topo_rel = 0`). `step_optimize`
+  only optimizes `cb_ref` and `tf_corr`, so `opt` can run without relaxation.
+  The par files set `relax` as their `opt`; the scripts pass `sim.relax=True`
+  with `sim.opt=True`. Needs yelmo with `relax_params` (`libs/ice_optimization.f90`).
 - Components named by the boundary they supply: `surface` (mass balance +
   temperature) and `shelf` (shelf-base melt + temperature). Keys:
   `with_marine_shelf` -> `with_shelf`, `smb_method` -> `surface_method` (values

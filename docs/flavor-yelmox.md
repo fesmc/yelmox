@@ -35,7 +35,8 @@ The driver owns the timeline (`ts`) and the shared sea level (`bsl`), and advanc
 the domain once per step with the coupling sequence written out in the time loop:
 
 ```fortran
-call step_optimize(dom, ts)       ! relaxation ramp + cb_ref/tf_corr optimization (opt)
+call step_relax(dom, ts)          ! topography relaxation (relax)
+call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
@@ -117,7 +118,8 @@ The components: which are active, with which model, how often.
 ### `[sim]`
 
 The conditions of this simulation: the cold-start ice state (`init_*`), the
-optimization and regional modifications.
+relaxation, the optimization and regional modifications. The `[relax]` and
+`[opt]` times count from the start of the run (`time_init`), also after a restart.
 
 | Key | Values | |
 |---|---|---|
@@ -128,6 +130,7 @@ optimization and regional modifications.
 | `init_marine_H` | bool | cold start: LGM-like marine ice, before `init_method` |
 | `init_kill_shelves` | bool | cold start: no ice where the present-day bed is ocean |
 | `init_time_thrm` | [yr] | cold start: then equilibrate with topography fixed (`0` = off) |
+| `relax` | bool | relaxation of the topography towards the reference (`[relax]`: `ytopo.topo_rel` mode `topo_rel` with the timescale ramp `tau1` -> `tau2` until `time2`, then the `[ytopo]` values); on a cold start or a restart |
 | `opt` | bool | optimization of the basal friction and the thermal-forcing correction (`[opt]`, within its `cf_time_*`/`tf_time_*` windows); on a cold start or a restart |
 | `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |

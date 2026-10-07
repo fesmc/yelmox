@@ -710,7 +710,7 @@
 
 &sim
     ! Conditions of this simulation: cold-start ice state (init_*),
-    ! optimization, regional modifications.
+    ! relaxation, optimization, regional modifications.
     init_method             = "recon"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     recon_path              = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-ICE-6G_C.nc"   ! {grid_name} = grid_ice
     recon_var               = "dz"      ! ice thickness in recon_path
@@ -719,6 +719,7 @@
     init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 
+    relax                   = False     ! relax the topography towards the reference ([relax])
     opt                     = False     ! optimize cb_ref and tf_corr ([opt])
 
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)

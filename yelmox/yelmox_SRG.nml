@@ -26,13 +26,14 @@
 
 &sim
     ! Conditions of this simulation: cold-start ice state (init_*),
-    ! optimization, regional modifications.
+    ! relaxation, optimization, regional modifications.
     init_method             = "equil"
     init_equil_time         = 10.0
     init_marine_H           = False
     init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 
+    relax                   = False     ! relax the topography towards the reference ([relax])
     opt                     = False     ! optimize cb_ref and tf_corr ([opt])
 
     use_negis               = False
@@ -122,12 +123,6 @@
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
-    
-    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
-    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = False             ! Should thermal forcing be optimized too?
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
@@ -142,6 +137,16 @@
     tf_basins       = -1.               ! Basin numbers to optimize (-1 for all basins)
 
     cf_ref_wais     = 0.01
+/
+
+&relax
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100.0             ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2e3               ! [yr] End of the tau1 period
+    time2           = 6e3               ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
 /
 
 &yelmo

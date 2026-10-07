@@ -12,7 +12,7 @@ module kryos_coupling
     use smbpal,       only : smbpal_update_monthly, smbpal_update_monthly_equil
     use smb_simple_m, only : smb_simple_set_mask, smb_simple_update
     use htopo,        only : htopo_update
-    use ice_optimization, only : optimize_set_transient_param, optimize_cb_ref, optimize_tf_corr
+    use ice_optimization, only : relax_update, optimize_cb_ref, optimize_tf_corr
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
     use kryos_forcing, only : tsforcing_class
@@ -20,7 +20,7 @@ module kryos_coupling
     implicit none
     private
 
-    public :: step_optimize, step_isostasy, step_icesheet, step_climate, step_shelf
+    public :: step_relax, step_optimize, step_isostasy, step_icesheet, step_climate, step_shelf
     public :: step_surface, couple_yelmo_to_htopo
     public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_surface_to_yelmo, couple_shelf_to_yelmo
@@ -29,11 +29,23 @@ module kryos_coupling
 
 contains
 
+    subroutine step_relax(dom, ts)
+        ! Relaxation of the topography ([sim] relax): ytopo.topo_rel is
+        ! relax.topo_rel with the timescale ramp tau1 -> tau2 until relax.time2
+        ! (time elapsed since the start of the run), then the par-file values.
+        type(kryos_domain), intent(inout) :: dom
+        type(tstep_class),  intent(in)    :: ts
+
+        if (.not. dom%ctl%relax) return
+
+        call relax_update(dom%rlx%par, dom%yelmo%tpo%par, ts%time_elapsed, &
+                          dom%rlx%topo_rel0, dom%rlx%topo_rel_tau0)
+    end subroutine step_relax
+
     subroutine step_optimize(dom, ts)
-        ! Optimization ([sim] opt), within the [opt] time windows: ramp the
-        ! topography relaxation timescale, then nudge the basal-friction field
-        ! cb_ref and the marine thermal-forcing correction tf_corr toward
-        ! present-day observations.
+        ! Optimization ([sim] opt), within the [opt] time windows: nudge the
+        ! basal-friction field cb_ref and the marine thermal-forcing correction
+        ! tf_corr toward present-day observations.
         !
         ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr lives on the
         ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
@@ -50,17 +62,6 @@ contains
 
         gm = trim(dom%ctl%grid_shelf)
         gy = trim(dom%ctl%grid_ice)
-
-        ! Topography relaxation ramp (gl + grounding-zone relaxing while active).
-        if (ts%time_elapsed <= dom%opt%rel_time2) then
-            call optimize_set_transient_param(dom%opt%rel_tau, ts%time_elapsed, &
-                    time1=dom%opt%rel_time1, time2=dom%opt%rel_time2, &
-                    p1=dom%opt%rel_tau1, p2=dom%opt%rel_tau2, m=dom%opt%rel_m)
-            dom%yelmo%tpo%par%topo_rel_tau = dom%opt%rel_tau
-            dom%yelmo%tpo%par%topo_rel     = 4
-        else
-            dom%yelmo%tpo%par%topo_rel = 0
-        end if
 
         ! Basal friction (cb_ref) optimization -- Yelmo grid, in place.
         if (dom%opt%opt_cf .and. ts%time_elapsed >= dom%opt%cf_time_init &
