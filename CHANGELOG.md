@@ -10,8 +10,8 @@ annotated git tag. Dates are release (tag) dates.
   (15 kyr optimization spin-up) and `yelmox_Antarctica_paleo_lgp.nml` (-130 kyr to
   +10 kyr, climate from the glacial index `input/alpha_combined_125kyr_interp.dat`,
   sea level from `sealevel_rohling_450kyr.dat`, ages traced with elsa), with run
-  scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files kept
-  in `scripts/ant-paleo/legacy/`; the transient now runs on relative time so that
+  scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files; the
+  transient now runs on relative time so that
   sea level follows the record (it stayed at present day before).
 - snapesm writes its state to `snap.nc` (`[output] write_clim`): the driving
   indices `idx_<name>`, `z_srf`, monthly `tas`/`tsl`/`pr`, `ta_sum`, `tsl_ann`
@@ -21,8 +21,7 @@ annotated git tag. Dates are release (tag) dates.
   attributes), restored on restart; bundles without them keep the cold-start
   indices.
 - `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
-  and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`;
-  the originals are in `scripts/ismip7/legacy/`.
+  and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
 - Follows yelmo dev (2c3d3449; needs yelmo dev at or after 9e93696d): `input/yelmo_defaults.nml`
@@ -359,6 +358,8 @@ annotated git tag. Dates are release (tag) dates.
   retired flavors (`retired/`: `yelmox_ismip6`, `yelmox_nahosmip`,
   `yelmox_rtip`), with their par files, make targets, runme aliases and
   `scripts/ismip6-2300.md`. They no longer ran against yelmo:dev.
+- The original single-grid scripts and par files kept for the ports
+  (`scripts/ant-paleo/legacy/`, `scripts/ismip7/legacy/`).
 
 ## [v2.3] - 2026-07-15
 

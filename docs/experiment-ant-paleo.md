@@ -13,7 +13,7 @@ by a glacial index and the sea level following a reconstruction.
 - **Config:** `yelmox/yelmox_Antarctica_paleo_spinup.nml`,
   `yelmox/yelmox_Antarctica_paleo_lgp.nml`.
 - **Scripts:** `scripts/ant-paleo/run_spinup.sh`, `scripts/ant-paleo/run_lgp.sh`.
-  Ported from the old single-grid par files kept in `scripts/ant-paleo/legacy/`.
+  Ported from the old single-grid par files.
 
 ## Running
 

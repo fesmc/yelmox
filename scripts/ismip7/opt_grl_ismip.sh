@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # ISMIP7 Greenland optimization spin-up (L. Gutierrez Gonzalez), ported from
-# legacy/opt_grl_ismip.sh (yelmox v2.2, par/yelmo_Greenland_esm_ismip7.nml) to
+# opt_grl_ismip.sh of yelmox v2.2 (par/yelmo_Greenland_esm_ismip7.nml) to
 # yelmox (climate = esm) and yelmox/yelmox_esm_Greenland.nml. Only the
 # overrides of the original are carried over; the base configuration is the
 # current par file. Key changes:

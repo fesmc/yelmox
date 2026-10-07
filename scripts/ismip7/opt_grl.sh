@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# ISMIP7 Greenland optimization spin-up. Same as legacy/opt_grl.sh: all its
-# overrides are valid for the current yelmox (climate = esm). opt.cf_init=-1 starts
+# ISMIP7 Greenland optimization spin-up (climate = esm). opt.cf_init=-1 starts
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
 
 resolution=GRL-8KM

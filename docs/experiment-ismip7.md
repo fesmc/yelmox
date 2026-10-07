@@ -70,9 +70,8 @@ the SMB taken from the ESM (`coupling.smb_method=climate`), `cb_ref` started fro
 the till friction of the bed (`opt.cf_init=-1`, the `ytill` parameters), a short
 relaxation (`opt.rel_time1/2 = 100`), equilibrium calving, DIVA dynamics and
 shelf enhancement 0.5; `opt_grl_ismip.sh` uses von Mises calving (`vm-l19`) and a
-linear melt law. Their originals are in `scripts/ismip7/legacy/`. To run the
-scenarios from one of them, set `BUNDLE` in the workflow script to its last
-restart bundle.
+linear melt law. To run the scenarios from one of them, set `BUNDLE` in the
+workflow script to its last restart bundle.
 
 ## Forcing
 
