@@ -28,6 +28,12 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- `[opt] opt_cf` and `opt_tf` are methods instead of switches: `opt_cf = "none" | "L21"`,
+  `opt_tf = "none" | "L21" | "L21-points"`. `"L21"` optimizes one `tf_corr` per basin
+  (`optimize_tf_corr_basin`, `tf_basins`), `"L21-points"` each point (`optimize_tf_corr`,
+  `tf_sigma`, `basin_fill`; the method used so far). Par files: `True` -> `"L21"`
+  (`opt_cf`) / `"L21-points"` (`opt_tf`), `False` -> `"none"`. Logical values stop the
+  model. Needs yelmo with string `opt_cf`/`opt_tf` (`libs/ice_optimization.f90`).
 - The topography relaxation of a spin-up is its own switch, `[sim] relax`, with
   the group `[relax]` (`topo_rel`, `tau1`, `tau2`, `time1`, `time2`, `m`; was
   `[opt] rel_tau1/2`, `rel_time1/2`, `rel_m` with `topo_rel = 4` fixed), applied

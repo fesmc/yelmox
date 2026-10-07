@@ -118,7 +118,7 @@
 /
 
 &opt
-    opt_cf          = True              ! Should basal friction be optimized?
+    opt_cf          = "L21"             ! Basal friction optimization: "none", "L21"
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 20e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 5e-3              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
@@ -129,17 +129,17 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    opt_tf          = True              ! Should thermal forcing be optimized?
+    opt_tf          = "L21-points"      ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 20e3               ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
-    tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
+    tf_sigma        = 10e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 10.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -1.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  1.0              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
-    basin_fill      = False    
+    tf_basins       = -1                ! L21: Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 /
 
 &relax

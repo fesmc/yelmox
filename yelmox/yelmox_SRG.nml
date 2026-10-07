@@ -113,7 +113,7 @@
 /
 
 &opt
-    opt_cf          = True              ! Should basal friction be optimized?
+    opt_cf          = "L21"             ! Basal friction optimization: "none", "L21"
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 8e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = -1.0              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
@@ -124,17 +124,17 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    opt_tf          = False             ! Should thermal forcing be optimized too?
+    opt_tf          = "none"            ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 25e3              ! [yr] When should optimization of thermal forcing stop?
     tf_time         = 25e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
-    tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
+    tf_sigma        = 50e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -0.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = -1.               ! Basin numbers to optimize (-1 for all basins)
+    tf_basins       = -1.               ! L21: Basin numbers to optimize (-1 for all basins)
 
     cf_ref_wais     = 0.01
 /
