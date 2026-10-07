@@ -99,10 +99,83 @@ applies no anomalies.
 
 ## Configuration
 
-Besides `[domain]` (the domain definition, see [Multigrid coupling](multigrid.md)),
-a run is set by `[comps]`, `[sim]` and `[output]`. In `yelmox_bipolar` each group
-carries the hemisphere suffix (`[comps_north]`, ...). Every key is required (a
-missing key stops the run), except the keys of an unselected `init_method`.
+A run is set by these namelist groups. Every key is required (a missing key stops
+the run), except the keys of an unselected `init_method` and the `[relax]` and
+`[opt]` groups when their switch in `[sim]` is off.
+
+| Group | Sets |
+|---|---|
+| `[ctrl]` | the run: its timeline group, calendar years, the restart bundle to start from |
+| timeline group (`[ctrl] run_step`) | the timeline: `tstep_method`, `tstep_const`, `time_init`, `time_end`, `dtt` |
+| `[domain]` | the domain: name, grid of every component, hub topography and masks (see [Multigrid coupling](multigrid.md)) |
+| `[comps]` | the components: which are active, with which model, how often |
+| `[sim]` | the conditions of this simulation: cold-start ice state, relaxation, optimization, regional modifications |
+| `[relax]`, `[opt]` | the parameters of the relaxation and the optimization switched on in `[sim]` |
+| `[output]` | the output files; their intervals are `[tm_1D]`, `[tm_2D]`, `[tm_2Dsm]`, and `[tm_rst]` for restarts |
+
+The models have their own groups (`[yelmo]` and the Yelmo physics groups,
+`[isos]`, `[barysealevel]`, `[marine_shelf]`, `[smbpal]`, the climate backend's,
+...). In `yelmox_bipolar` the domain groups carry the hemisphere suffix
+(`[domain_north]`, `[comps_north]`, `[sim_north]`, `[relax_north]`,
+`[opt_north]`, `[output_north]`, ...); `[ctrl]` and the timeline are shared.
+
+A minimal skeleton:
+
+```fortran
+&ctrl
+    run_step        = "ctrl"            ! timeline group ("ctrl" = this group)
+    calendar        = False
+    calendar_ref    = 1950.0
+    restart         = "None"            ! restart bundle folder, or "None" for a cold start
+    tstep_method    = "const"
+    tstep_const     = 0.0
+    time_init       = 0.0
+    time_end        = 15e3
+    dtt             = 10.0
+/
+
+&comps
+    with_ice_sheet  = True
+    with_isostasy   = True
+    with_climate    = True
+    with_surface    = True
+    with_shelf      = True
+    climate         = "snapclim"
+    surface_method  = "smbpal"
+    dt_clim         = 10.0
+/
+
+&sim
+    init_method       = "none"
+    init_marine_H     = False
+    init_kill_shelves = False
+    init_time_thrm    = 0.0
+    relax             = True            ! uses [relax]
+    opt               = True            ! uses [opt]
+    use_negis         = False
+    scale_glacial_smb = False
+    lim_pd_ice        = False
+/
+```
+
+### `[ctrl]`
+
+| Key | Values | |
+|---|---|---|
+| `run_step` | group name | the group holding the timeline: `"ctrl"` for `[ctrl]` itself, or a phase group such as `[spinup]` or `[transient]`, so one par file can hold several run phases |
+| `calendar`, `calendar_ref` | bool, [yr CE] | timeline in calendar years, against the reference year `calendar_ref` (ESM runs) |
+| `restart` | folder, `"None"` | the restart bundle to start from; `"None"` = cold start |
+
+The timeline group holds `tstep_method` (`"const"`: the time advances and the
+forcing time stays at `tstep_const`; `"rel"`: the forcing follows the time, e.g.
+for paleo records; `"cal"`: calendar time), `tstep_const`, `time_init`,
+`time_end` and the main time step `dtt` [yr].
+
+A restart bundle is a folder `restart-<kyr>-kyr/`, written on the `[tm_rst]`
+schedule and always at `time_end`. It holds one restart file per stateful model,
+the shared sea level and the transient-forcing state (in `yelmox_bipolar` also the
+ocean box model, with each domain in a subfolder named after it). Pass `restart`
+as an absolute path: the run starts inside its own folder.
 
 ### `[comps]`
 
@@ -118,8 +191,9 @@ The components: which are active, with which model, how often.
 ### `[sim]`
 
 The conditions of this simulation: the cold-start ice state (`init_*`), the
-relaxation, the optimization and regional modifications. The `[relax]` and
-`[opt]` times count from the start of the run (`time_init`), also after a restart.
+relaxation, the optimization and regional modifications. The `init_*` keys act on
+a cold start only; `relax` and `opt` act on a cold start or a restart, with their
+times counted from the start of the run (`time_init`).
 
 | Key | Values | |
 |---|---|---|
@@ -127,14 +201,42 @@ relaxation, the optimization and regional modifications. The `[relax]` and
 | `init_equil_time` | [yr] | `equil`: equilibration time |
 | `recon_path`, `recon_var` | path, name | `recon`, `recon_ref`: the reconstruction file (`{domain}`, `{grid_name}` = `grid_ice`) and its ice-thickness variable |
 | `recon_codes` | codes | `recon`: the regions where its ice is imposed |
-| `init_marine_H` | bool | cold start: LGM-like marine ice, before `init_method` |
-| `init_kill_shelves` | bool | cold start: no ice where the present-day bed is ocean |
-| `init_time_thrm` | [yr] | cold start: then equilibrate with topography fixed (`0` = off) |
-| `relax` | bool | relaxation of the topography towards the reference (`[relax]`: `ytopo.topo_rel` mode `topo_rel` with the timescale ramp `tau1` -> `tau2` until `time2`, then the `[ytopo]` values); on a cold start or a restart |
-| `opt` | bool | optimization of the basal friction and the thermal-forcing correction (`[opt]`, within its `cf_time_*`/`tf_time_*` windows); on a cold start or a restart |
+| `init_marine_H` | bool | LGM-like marine ice, before `init_method` |
+| `init_kill_shelves` | bool | no ice where the present-day bed is ocean |
+| `init_time_thrm` | [yr] | then equilibrate with the topography fixed (`0` = off) |
+| `relax` | bool | relax the topography towards the reference (`[relax]`) |
+| `opt` | bool | optimize the basal friction and the thermal-forcing correction (`[opt]`) |
+| `use_negis` | bool | NEGIS basal-friction modification (`[negis]`) |
 | `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |
-| `use_negis` | bool | NEGIS basal-friction modification (`[negis]`) |
+
+A spin-up usually sets `relax` and `opt` together: the relaxation holds the
+floating ice and the grounding zone near the observations while the optimization
+adjusts the basal friction, and then releases them gradually. A run restarted from
+a spin-up sets both to `False` to keep the optimized fields fixed.
+
+### `[relax]`
+
+The relaxation of the topography (`step_relax`). While active, `ytopo.topo_rel`
+is `topo_rel` and its timescale ramps from `tau1` to `tau2`; after `time2`, the
+`[ytopo]` values of `topo_rel` and `topo_rel_tau` apply again.
+
+| Key | Values | |
+|---|---|---|
+| `topo_rel` | `ytopo.topo_rel` mode | where the ice relaxes while active (`3`: all points, `4`: the grounding line and grounding zone) |
+| `tau1`, `tau2` | [yr] | relaxation timescale until `time1`, and at `time2` |
+| `time1`, `time2` | [yr] | end of the `tau1` period, and end of the relaxation |
+| `m` | [-] | exponent of the ramp from `tau1` to `tau2` |
+
+### `[opt]`
+
+The optimization (`step_optimize`) of the basal-friction coefficient `cb_ref`
+(between `cf_time_init` and `cf_time_end`, `opt_cf`) and of the thermal-forcing
+correction `tf_corr` of the marine shelf (between `tf_time_init` and
+`tf_time_end`, `opt_tf`), towards the observed ice thickness. `cf_init` is the
+initial `cb_ref` on a cold start (`<= 0`: the till friction of the bed, `cb_tgt`).
+The method and its parameters are described in the Yelmo docs,
+[Basal friction optimization](https://fesmc.github.io/yelmo/optimization.html).
 
 ### `[output]`
 
@@ -150,9 +252,6 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 | `write_clim` | the backend's file: `snap.nc` (snapclim, snapesm), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
 | `write_htopo` | `htopo.nc` (the hub) |
 | `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_shelf = grid_ice`) |
-
-Restart bundles follow `[tm_rst]`, plus one at `time_end`. `[ctrl] restart` is
-the bundle to start from (`"None"` = cold start).
 
 ## Also built from this driver
 
