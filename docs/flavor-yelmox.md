@@ -21,9 +21,9 @@ balance and the marine shelf. It is the reference implementation of the multigri
 |---|---|---|
 | Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
-| Climate (atmosphere + ocean) | backend of `[coupling] climate`: [snapclim, snapesm](climate-snap.md), [esm](flavor-esm.md) or [rembo](flavor-rembo.md) | `grid_clim` |
-| Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_smb` |
-| Sub-shelf melt | marine_shelf | `grid_mshlf` |
+| Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](flavor-esm.md) or [rembo](flavor-rembo.md) | `grid_clim` |
+| Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_surface` |
+| Sub-shelf melt | marine_shelf | `grid_shelf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
 
 Each module runs on its own grid, set in `[domain]`; the coupler remaps fields between
@@ -35,21 +35,22 @@ The driver owns the timeline (`ts`) and the shared sea level (`bsl`), and advanc
 the domain once per step with the coupling sequence written out in the time loop:
 
 ```fortran
-call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+call step_relax(dom, ts)          ! topography relaxation (relax)
+call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
 call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
-call step_smb(dom, ts)            ! surface mass balance
-call step_marine_shelf(dom, ts)   ! shelf melt
+call step_surface(dom, ts)        ! surface mass balance + temperature
+call step_shelf(dom, ts)          ! shelf-base melt + temperature
 ```
 
 `couple_to_yelmo` assembles the Yelmo boundary state: isostasy from this step,
 smb and shelf melt from the **previous** step (a one-step coupling lag);
-`step_climate`, `step_smb` and `step_marine_shelf` then produce the forcing
+`step_climate`, `step_surface` and `step_shelf` then produce the forcing
 consumed on the next step.
-The climate is refreshed on the `coupling.dt_clim` cadence; the smb every step.
+The climate is refreshed on the `comps.dt_clim` cadence; the smb every step.
 
 ## Transient time-series forcing (`tsgen`)
 
@@ -99,27 +100,38 @@ applies no anomalies.
 ## Configuration
 
 Besides `[domain]` (the domain definition, see [Multigrid coupling](multigrid.md)),
-a run is set by `[coupling]` and `[output]`. In `yelmox_bipolar` each group
-carries the hemisphere suffix (`[coupling_north]`, ...). Every key is required (a
+a run is set by `[comps]`, `[sim]` and `[output]`. In `yelmox_bipolar` each group
+carries the hemisphere suffix (`[comps_north]`, ...). Every key is required (a
 missing key stops the run), except the keys of an unselected `init_method`.
 
-### `[coupling]`
+### `[comps]`
+
+The components: which are active, with which model, how often.
 
 | Key | Values | |
 |---|---|---|
-| `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_marine_shelf` | bool | components in the coupling sequence; `with_climate` covers climate and smb |
+| `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
 | `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
-| `smb_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
+| `surface_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
-| `equil_method` | `none`, `opt` | `opt`: spin-up optimization of the basal friction and the thermal-forcing correction (`[opt]`) |
-| `restart` | folder, `"None"` | restart bundle to start from; `"None"` = cold start |
+
+### `[sim]`
+
+The conditions of this simulation: the cold-start ice state (`init_*`), the
+relaxation, the optimization and regional modifications. The `[relax]` and
+`[opt]` times count from the start of the run (`time_init`), also after a restart.
+
+| Key | Values | |
+|---|---|---|
 | `init_method` | `none`, `equil`, `recon`, `recon_ref` | cold-start ice state: as initialized; a short equilibration with constant boundaries; the reconstruction `recon_path` as initial ice on the `recon_codes` regions; the reconstruction as reference ice only |
 | `init_equil_time` | [yr] | `equil`: equilibration time |
 | `recon_path`, `recon_var` | path, name | `recon`, `recon_ref`: the reconstruction file (`{domain}`, `{grid_name}` = `grid_ice`) and its ice-thickness variable |
 | `recon_codes` | codes | `recon`: the regions where its ice is imposed |
 | `init_marine_H` | bool | cold start: LGM-like marine ice, before `init_method` |
-| `kill_shelves` | bool | cold start: no ice where the present-day bed is ocean |
-| `time_equil_thrm` | [yr] | cold start: then equilibrate with topography fixed (`0` = off) |
+| `init_kill_shelves` | bool | cold start: no ice where the present-day bed is ocean |
+| `init_time_thrm` | [yr] | cold start: then equilibrate with topography fixed (`0` = off) |
+| `relax` | bool | relaxation of the topography towards the reference (`[relax]`: `ytopo.topo_rel` mode `topo_rel` with the timescale ramp `tau1` -> `tau2` until `time2`, then the `[ytopo]` values); on a cold start or a restart |
+| `opt` | bool | optimization of the basal friction and the thermal-forcing correction (`[opt]`, within its `cf_time_*`/`tf_time_*` windows); on a cold start or a restart |
 | `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |
 | `use_negis` | bool | NEGIS basal-friction modification (`[negis]`) |
@@ -133,13 +145,14 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 |---|---|
 | `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<region>.nc` for the named regions of `[domain]`) |
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
-| `write_mshlf` | `mshlf.nc` |
-| `write_smb` | `smbpal.nc` |
+| `write_shelf` | `mshlf.nc` |
+| `write_surface` | `smbpal.nc` |
 | `write_clim` | the backend's file: `snap.nc` (snapclim, snapesm), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
 | `write_htopo` | `htopo.nc` (the hub) |
-| `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_mshlf = grid_ice`) |
+| `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_shelf = grid_ice`) |
 
-Restart bundles follow `[tm_rst]`, plus one at `time_end`.
+Restart bundles follow `[tm_rst]`, plus one at `time_end`. `[ctrl] restart` is
+the bundle to start from (`"None"` = cold start).
 
 ## Also built from this driver
 

@@ -5,7 +5,7 @@
 #   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
 #   Step 2  scenarios  TIPMIP experiment(s), each branched off that bundle
 #
-# All runs are forcing-only (coupling.with_ice_sheet=False, with_isostasy=False):
+# All runs are forcing-only (comps.with_ice_sheet=False, with_isostasy=False):
 # they produce climate + ocean forcing from the TIPMIP piControl anomalies
 # (tas_anomaly / pr_ratio / TF_anomaly). See input/esm/esm_grl_tipmip.nml and its
 # header for the anomaly-referencing assumptions and scaffold caveats.
@@ -92,7 +92,7 @@ case "${1:-}" in
            esm.par_file="$par" esm.use_esm=True esm.use_hist=False esm.use_proj=True \
            domain.grid_hub="$GRID" \
            transient.time_end="$tend" \
-           coupling.restart="$BUNDLE"
+           ctrl.restart="$BUNDLE"
     done
     ;;
   *)

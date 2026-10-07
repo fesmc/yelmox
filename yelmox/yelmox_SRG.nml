@@ -1,5 +1,5 @@
 &ctrl
-    ! Shared timeline (driver-owned). Domain component choices live in [coupling].
+    ! Shared timeline + restart (driver-owned). Domain components live in [comps], simulation conditions in [sim].
     run_step        = "ctrl"            ! group holding the timeline ("ctrl" = this group)
     calendar        = False             ! timeline in calendar years (tstep_const = calendar time)
     calendar_ref    = 1950.0            ! [yr CE] calendar reference
@@ -8,40 +8,48 @@
     time_init       = 0.0               ! [yr] Starting time
     time_end        = 200.0             ! [yr] Ending time
     dtt             = 5.0               ! [yr] Main loop timestep
+    restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
 
-&coupling
+&comps
+    ! Components: which are active, with which model, how often.
     ! SRG runs on the Yelmo grid (SRG-250M), isostasy on SRG-16KM.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = False  ! Is isostasy active? (SRG-16KM grid when on)
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = False  ! Ocean forcing off for now (imposed constant / none)
-    equil_method    = "none"   ! "none" or "opt"
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = False  ! Ocean forcing off for now (imposed constant / none)
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
+    surface_method  = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
-    restart    = "None"        ! restart bundle folder, or "None" for a cold start
+/
 
-    ! Optional switches.
-    scale_glacial_smb       = False
-    lim_pd_ice              = False
-    use_negis               = False
+&sim
+    ! Conditions of this simulation: cold-start ice state (init_*),
+    ! relaxation, optimization, regional modifications.
     init_method             = "equil"
     init_equil_time         = 10.0
     init_marine_H           = False
-    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
-    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
+    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+
+    relax                   = False     ! relax the topography towards the reference ([relax])
+    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
+
+    use_negis               = False
+    scale_glacial_smb       = False
+    lim_pd_ice              = False
 /
 
 &output
-    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
-    write_isos  = True
-    write_mshlf = False        ! marine shelf is off (with_marine_shelf=False)
-    write_smb   = True
-    write_clim  = True
-    write_htopo = True
-    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip     = 1.0          ! [yr] its interval
+    write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos    = True
+    write_shelf   = False        ! marine shelf is off (with_shelf=False)
+    write_surface = True
+    write_clim    = True
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
 /
 
 &domain
@@ -54,8 +62,8 @@
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = "SRG-16KM"         ! isostasy [grid_ice] (coarse: the glacier grid is not needed)
     grid_clim    = "SRG-250M"         ! reference climate + transient forcing [grid_ice]
-    grid_smb     = "SRG-250M"         ! surface mass balance [grid_clim]
-    grid_mshlf   = "SRG-250M"         ! marine shelf [grid_hub]
+    grid_surface = "SRG-250M"         ! surface mass balance [grid_clim]
+    grid_shelf   = "SRG-250M"         ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_err"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
@@ -115,12 +123,6 @@
     sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
-    
-    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
-    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
 
     opt_tf          = False             ! Should thermal forcing be optimized too?
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
@@ -135,6 +137,16 @@
     tf_basins       = -1.               ! Basin numbers to optimize (-1 for all basins)
 
     cf_ref_wais     = 0.01
+/
+
+&relax
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100.0             ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2e3               ! [yr] End of the tau1 period
+    time2           = 6e3               ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
 /
 
 &yelmo

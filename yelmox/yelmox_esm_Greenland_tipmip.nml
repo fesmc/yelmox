@@ -2,6 +2,7 @@
     run_step        = "spinup"
     calendar        = True              ! timeline in calendar years (tstep_const = calendar time)
     calendar_ref    = 2000.0            ! [yr CE] calendar reference
+    restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
 
 &esm
@@ -11,7 +12,7 @@
     use_esm         = False             ! use ESM snapshots? (scenario step sets True)
     esm_name        = "IPSL-CM6-ESMCO2" ! TIPMIP forcing model (also: EC-Earth3-ESM-1, GRL-4KM only)
 
-    ! Forcing switches (the smb source is [coupling] smb_method)
+    ! Forcing switches (the smb source is [comps] surface_method)
     use_var         = False             ! include climate variability
     use_hist        = False             ! load historical period
     use_proj        = False             ! load projection period
@@ -135,12 +136,6 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    rel_tau1        = 100               ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
-    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2
-
     opt_tf          = True              ! Should thermal forcing be optimized?
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
@@ -152,6 +147,16 @@
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value
     tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
     basin_fill      = False
+/
+
+&relax
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100               ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2e3               ! [yr] End of the tau1 period
+    time2           = 6e3               ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
 /
 
 &yelmo
@@ -658,8 +663,8 @@
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = ""                 ! isostasy [grid_ice]
     grid_clim    = ""                 ! reference climate + transient forcing [grid_ice]
-    grid_smb     = ""                 ! surface mass balance [grid_clim]
-    grid_mshlf   = ""                 ! marine shelf [grid_hub]
+    grid_surface = ""                 ! surface mass balance [grid_clim]
+    grid_shelf   = ""                 ! marine shelf [grid_hub]
     topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
     topo_names   = "bed" "thickness" "surface_grimp" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
@@ -678,40 +683,46 @@
     relax_tau    = 0.0               ! [yr] relaxation timescale there
 /
 
-&coupling
-    ! Coupling: active components + methods, restart.
+&comps
+    ! Components: which are active, with which model, how often.
     ! Empty grids default to the Yelmo grid, so esm (grid_clim), smbpal
-    ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
+    ! (grid_surface) and marine_shelf (grid_shelf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
     with_ice_sheet    = False  ! Is the ice sheet active? (OFF: forcing-only test)
     with_isostasy     = False  ! Is isostasy active? (OFF: forcing-only test)
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
-    equil_method    = "none"   ! "none" or "opt" (opt OFF: forcing-only test)
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
     climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
+    surface_method  = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
-    restart    = "None"        ! restart bundle folder, or "None" for a cold start
+/
 
-    ! Optional switches.
-    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
-    lim_pd_ice              = False   ! Extra melt outside PD ice extent
-    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
+&sim
+    ! Conditions of this simulation: cold-start ice state (init_*),
+    ! relaxation, optimization, regional modifications.
     init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     init_equil_time         = 1.0       ! [yr] equil: equilibration time
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
-    kill_shelves            = False     ! cold start: no ice where the present-day bed is ocean
-    time_equil_thrm         = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
+    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+
+    relax                   = False     ! relax the topography towards the reference ([relax])
+    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
+
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
 /
 
 &output
-    write_yelmo = True
-    write_isos  = True
-    write_mshlf = True
-    write_smb   = True
-    write_clim  = False        ! the climate's file (snap.nc; esm.nc + esm_ts.nc)
-    write_htopo = True
-    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip     = 1.0          ! [yr] its interval
+    write_yelmo   = True
+    write_isos    = True
+    write_shelf   = True
+    write_surface = True
+    write_clim    = False        ! the climate's file (snap.nc; esm.nc + esm_ts.nc)
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
 /

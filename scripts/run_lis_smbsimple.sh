@@ -15,7 +15,7 @@
 set -euo pipefail
 
 # ---- configuration -----------------------------------------------------------
-NML=yelmox/yelmox_LIS.nml                 # LIS namelist (smb_method="smb_simple" default)
+NML=yelmox/yelmox_LIS.nml                 # LIS namelist (surface_method="smb_simple" default)
 EXE=yelmox                                # runme exe alias -> libyelmox/bin/yelmox.x
 RUNOPT="-rs -q 12h -w 10:00:00"           # SLURM submit; tune queue/walltime
 OUTROOT="tmp/lischeck/$(date +%Y-%m-%d)"  # base output dir

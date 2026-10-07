@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# ISMIP7 Antarctica optimization spin-up. Same as legacy/opt_ant.sh: all its
-# overrides are valid for the current yelmox (climate = esm). opt.cf_init=-1 starts
+# ISMIP7 Antarctica optimization spin-up (climate = esm). opt.cf_init=-1 starts
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
 
 resolution=ANT-16KM
@@ -11,10 +10,11 @@ ctrl_params=(
     "domain.grid_hub=${resolution}"
     "isos.rheology_file=isostasy_data/earth_structure/yelmo/${resolution}_GIA_HR24.nc"
     "ctrl.run_step=spinup"
-    "coupling.smb_method=climate"
-    "coupling.equil_method=opt"
+    "comps.surface_method=climate"
+    "sim.relax=True"
+    "sim.opt=True"
     "spinup.time_end=15.0e3"
-    "coupling.kill_shelves=True"
+    "sim.init_kill_shelves=True"
     "yelmo.nz_aa=11"
     "yelmo.dt_min=0.1"
     "tm_1D.dt=1.0"
@@ -28,10 +28,10 @@ opt_params=(
     "opt.cf_time_end=15e3"
     "opt.tf_time_end=15e3"
     "opt.tau_c=500.0"
-    "opt.rel_tau1=100.0"
-    "opt.rel_time1=100.0"
-    "opt.rel_tau2=100.0"
-    "opt.rel_time2=100.0"
+    "relax.tau1=100.0"
+    "relax.time1=100.0"
+    "relax.tau2=100.0"
+    "relax.time2=100.0"
     "opt.cf_init=-1"
     "opt.H_grnd_lim=500.0"
     "ytill.scale_zb=1"

@@ -2,8 +2,7 @@
 #
 # Antarctic paleo transient, last glacial period (-130 kyr to +10 kyr, 32 km),
 # restarting from the spin-up bundle at 15 kyr. Climate follows the glacial
-# index input/alpha_combined_125kyr_interp.dat (snapclim "snap_1ind"). Ported
-# from legacy/ (yelmo_Antarctica_lgp_32KM_good.nml) to
+# index input/alpha_combined_125kyr_interp.dat (snapclim "snap_1ind"). Par file:
 # yelmox/yelmox_Antarctica_paleo_lgp.nml. Run from the yelmox root.
 
 spinup_path=${1:-output/ant-paleo/spinup}
@@ -18,4 +17,4 @@ if [ ! -d "${restart}" ]; then
 fi
 
 runme -rs -q shared -e yelmox -w 2-00:00:00 -m 10G -n yelmox/yelmox_Antarctica_paleo_lgp.nml -o "${output_path}" \
-      -p coupling.restart="${restart}"
+      -p ctrl.restart="${restart}"

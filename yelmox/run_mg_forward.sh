@@ -16,8 +16,8 @@
 # present-day spin-up.
 #
 # Each run restarts from the parent's restart bundle folder via
-# coupling.restart, with:
-#   - coupling.equil_method=none : freeze the optimized cf_ref / tf_corr that
+# ctrl.restart, with:
+#   - sim.opt=False              : freeze the optimized cf_ref / tf_corr that
 #       were loaded from the restart (no further optimization);
 #   - yelmo.restart_relax=0      : free evolution from the spun-up state (do NOT
 #       relax H_ice back toward the input PD topography). *** Sanity-check this:
@@ -54,9 +54,9 @@ run_fwd() {
 
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
         -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
-           domain.grid_mshlf="$mgrid" domain.grid_isos="$ygrid" \
-           domain.grid_clim=ANT-32KM domain.grid_smb="$ygrid" \
-           coupling.restart="$restart" coupling.equil_method=none \
+           domain.grid_shelf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_surface="$ygrid" \
+           ctrl.restart="$restart" sim.relax=False sim.opt=False \
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \
            tm_2D.dt=100 ytopo.gz_Hg1=100 \

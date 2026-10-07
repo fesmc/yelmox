@@ -107,10 +107,10 @@ type kryos_domain
     type(yelmo_class)          :: yelmo
     type(marshelf_class)       :: mshlf
     type(isos_class)           :: isos
-    type(yelmox_climate_class) :: cl     ! climate backend ([coupling] climate)
+    type(yelmox_climate_class) :: cl     ! climate backend ([comps] climate)
     type(climate_out_class)    :: clim   ! backend-agnostic climate output (now/ref)
     type(smbpal_class)         :: smb
-    type(smb_simple_class)     :: smbs   ! smb_method = "smb_simple"
+    type(smb_simple_class)     :: smbs   ! surface_method = "smb_simple"
     type(sediments_class)      :: sed
     type(geothermal_class)     :: gthrm
     type(phys_const_class)     :: cnst   ! physical constants, shared by every component
@@ -119,7 +119,7 @@ type kryos_domain
     type(ice_opt_params)       :: opt    ! spin-up optimization
     type(negis_params)         :: ngs
     type(glacial_smb_params)   :: gsmb
-    type(domain_ctl)           :: ctl    ! [domain], [coupling], [output]
+    type(domain_ctl)           :: ctl    ! [domain], [comps], [sim], [output]
 end type
 ```
 
@@ -151,8 +151,8 @@ default:
     grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
     grid_isos    = ""           ! isostasy                             [grid_ice]
     grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
-    grid_smb     = ""           ! surface mass balance                 [grid_clim]
-    grid_mshlf   = ""           ! marine shelf                         [grid_hub]
+    grid_surface = ""           ! surface mass balance                 [grid_clim]
+    grid_shelf   = ""           ! marine shelf                         [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
@@ -245,14 +245,15 @@ Both programs use the same driver plumbing:
   give `cal` / `time_ref` (calendar years, e.g. ESM runs). `domain_init` takes
   the same group name (`timeline_group`) and reads the values the domain needs
   (`tstep_method`, `dtt`) itself.
-- **`domain_startup(dom, ts, bsl [, restore_bsl, tsf])`** (`kryos_startup`) —
-  cold start (`domain_init_state`) or restart-bundle restore + hub rebuild.
-  `yelmox` restores the shared bsl from the same bundle; `yelmox_bipolar`
-  restores it once via **`bsl_startup(bsl, fldr)`** and passes
-  `restore_bsl=.false.`.
+- **`domain_startup(dom, ts, bsl, restart [, restore_bsl, tsf])`**
+  (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
+  restore of the domain bundle `restart` + hub rebuild. The driver reads
+  `[ctrl] restart`. `yelmox` restores the shared bsl from the same bundle;
+  `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
+  each domain its subfolder of the bundle and `restore_bsl=.false.`.
 - **`domain_init_ice(dom, ts)`** — the cold-start ice state after
-  `yelmo_init_state` (`[coupling]` `kill_shelves`, `init_marine_H`,
-  `init_method`, `time_equil_thrm`; see [yelmox](flavor-yelmox.md#configuration)).
+  `yelmo_init_state` (`[sim]` `init_kill_shelves`, `init_marine_H`,
+  `init_method`, `init_time_thrm`; see [yelmox](flavor-yelmox.md#configuration)).
 - **`run_restart_write(dom, bsl, time [, tsf])`** — the single-domain restart
   bundle (domain sub-models + `bsl_restart.nc` + the tsforcing state, one
   auto-named folder).
@@ -270,11 +271,11 @@ sequence written out inline. Each output call appears once, and the final state
 ts%is_finished`).
 
 - **`yelmox`** — argument is one parameter file; one `kryos_domain`, output to
-  the run dir. The climate backend is chosen at runtime (`[coupling] climate`),
+  the run dir. The climate backend is chosen at runtime (`[comps] climate`),
   so ESM and REMBO runs use this program too. See [yelmox](flavor-yelmox.md).
 - **`yelmox_bipolar`** — argument is one parameter file holding both
   hemispheres. Each domain's groups carry a hemisphere suffix (`yelmo_south`,
-  `domain_north`, `coupling_north`, `snap_south`, …), threaded into every group
+  `domain_north`, `comps_north`, `snap_south`, …), threaded into every group
   via `domain_init(..., group_suffix=…)`; `[ctrl]`, `[barysealevel]`, the OBM
   groups and the Yelmo physics groups (`ydyn`, `ytopo`, …) are shared. Distinct
   group names also let `runme -p group.name=val` target one hemisphere. The two

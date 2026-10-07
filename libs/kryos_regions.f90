@@ -78,7 +78,7 @@ contains
         ! Northeast Greenland Ice Stream cb_ref modification: recompute cb_ref from
         ! bed properties (calc_cb_ref), then scale the NEGIS basins
         ! (basin_centre/south/north) by time-dependent factors. Requires the [negis] cf_* parameters, loaded
-        ! in domain_init when [coupling] use_negis is set.
+        ! in domain_init when [sim] use_negis is set.
         type(yelmo_class),  intent(inout) :: ylmo
         type(negis_params), intent(inout) :: ngs
         real(wp),           intent(in)    :: time

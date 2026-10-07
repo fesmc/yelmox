@@ -1,11 +1,11 @@
 #!/bin/bash
 #
 # ISMIP7 Greenland optimization spin-up (L. Gutierrez Gonzalez), ported from
-# legacy/opt_grl_ismip.sh (yelmox v2.2, par/yelmo_Greenland_esm_ismip7.nml) to
+# opt_grl_ismip.sh of yelmox v2.2 (par/yelmo_Greenland_esm_ismip7.nml) to
 # yelmox (climate = esm) and yelmox/yelmox_esm_Greenland.nml. Only the
 # overrides of the original are carried over; the base configuration is the
 # current par file. Key changes:
-#   spinup.equil_method       -> coupling.equil_method
+#   spinup.equil_method       -> sim.opt
 #   opt.opt_cf_min=0.002      -> ytill.cf_min=0.002 (one lower bound for the
 #                                optimization and cb_tgt; was ytill.cf_min=1e-1)
 #   opt.use_yelmo_cf_min      -> removed
@@ -26,10 +26,11 @@ res_params=(
 
 ctrl_params=(
     "ctrl.run_step=spinup"
-    "coupling.smb_method=climate"
-    "coupling.equil_method=opt"
+    "comps.surface_method=climate"
+    "sim.relax=True"
+    "sim.opt=True"
     "spinup.time_end=15e3"
-    "coupling.kill_shelves=True"
+    "sim.init_kill_shelves=True"
     "tm_1D.dt=1.0"
     "tm_2Dsm.dt=500"
     "tm_2D.dt=15e3"
@@ -44,10 +45,10 @@ opt_params=(
     "opt.cf_time_end=15e3"
     "opt.tf_time_end=15e3"
     "opt.tau_c=500"
-    "opt.rel_tau1=100.0"
-    "opt.rel_time1=100.0"
-    "opt.rel_tau2=100.0"
-    "opt.rel_time2=100.0"
+    "relax.tau1=100.0"
+    "relax.time1=100.0"
+    "relax.tau2=100.0"
+    "relax.time2=100.0"
     "opt.sigma_vel=100"
     "opt.cf_init=-1"
     "opt.H_grnd_lim=500.0"

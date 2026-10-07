@@ -7,11 +7,11 @@ coupling primitives of the Kryos modules (`libs/kryos*.f90`):
 
 | Program | Build | Domains | Climate | Ocean |
 |---|---|---|---|---|
-| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[coupling] climate`) | the climate (depth profiles or shelf base) |
+| [`yelmox`](flavor-yelmox.md) | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[comps] climate`) | the climate (depth profiles or shelf base) |
 | [`yelmox_bipolar`](flavor-bipolar.md) | `make yelmox_bipolar` | north + south | snapclim (×2) | snapclim + shared Ocean Box Model |
 
 The forcing of a `yelmox` run is set at runtime by its **climate backend**,
-`[coupling] climate`:
+`[comps] climate`:
 
 | Backend | Supplies | Page |
 |---|---|---|
@@ -26,14 +26,15 @@ See [Multigrid coupling](multigrid.md) for the architecture shared by both progr
 
 Both programs advance a domain with these primitives (from `kryos_coupling`):
 
-- `step_spinup_tuning` — spinup relaxation + basal-friction / thermal-forcing tuning.
+- `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
+- `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`).
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
 - `step_climate` — climate on `grid_clim` from the backend, with the transient forcing, on the `dt_clim` cadence.
-- `step_smb` — surface mass balance on `grid_smb` (`smb_method`: smbpal, smb_simple, or the climate's own, `climate`).
-- `step_marine_shelf` — sub-shelf melt on `grid_mshlf`, from the climate's ocean as depth profiles or at the shelf base.
+- `step_surface` — surface mass balance on `grid_surface` (`surface_method`: smbpal, smb_simple, or the climate's own, `climate`).
+- `step_shelf` — sub-shelf melt on `grid_shelf`, from the climate's ocean as depth profiles or at the shelf base.
 
 Every driver writes the sequence out in its time loop, so the coupling order can
 be read directly from the program; `yelmox_bipolar` interleaves the second domain

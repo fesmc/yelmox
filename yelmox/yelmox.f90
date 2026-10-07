@@ -14,9 +14,9 @@ program yelmox
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
+    use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
-                               step_smb, step_marine_shelf
+                               step_surface, step_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_due, &
@@ -44,6 +44,9 @@ program yelmox
     logical            :: calendar
     real(wp)           :: calendar_ref
 
+    ! Restart bundle folder to start from ([ctrl]); "None" = cold start.
+    character(len=512) :: restart
+
     ! Transient time-series forcing (tsgen), owned by the driver. The single
     ! forcing value f_now is mapped onto the climate anomalies via per-channel
     ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
@@ -59,6 +62,7 @@ program yelmox
     call nml_read(path_par, "ctrl", "run_step",     run_step)
     call nml_read(path_par, "ctrl", "calendar",     calendar)
     call nml_read(path_par, "ctrl", "calendar_ref", calendar_ref)
+    call nml_read(path_par, "ctrl", "restart",      restart)
     call tstep_init(ts, path_par, trim(run_step), dtt, time_ref=calendar_ref, cal=calendar)
 
     ! Single-domain runs write to the run dir.
@@ -80,18 +84,18 @@ program yelmox
     ! anomalies as the time loop. tsforcing reads [tsforcing] + [tsgen]; on a
     ! restart run, resume the series from the saved tsgen state in the bundle.
     call tsforcing_init(tsf, path_par, ts%time)
-    if (trim(dom%ctl%restart) /= "None") call tsforcing_restart_read(tsf, trim(dom%ctl%restart))
+    if (trim(restart) /= "None") call tsforcing_restart_read(tsf, trim(restart))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
     ! then re-establish the climate/smb and marine-shelf forcing from the
     ! restored state (the bundle does not hold them), so the first step and the
     ! first output see a valid boundary state.
-    call domain_startup(dom, ts, bsl, tsf=tsf)
-    if (trim(dom%ctl%restart) /= "None") then
+    call domain_startup(dom, ts, bsl, trim(restart), tsf=tsf)
+    if (trim(restart) /= "None") then
         call step_climate(dom, ts, tsf)
-        call step_smb(dom, ts)
-        call step_marine_shelf(dom, ts)
+        call step_surface(dom, ts)
+        call step_shelf(dom, ts)
     end if
 
     write(*,*)
@@ -161,14 +165,15 @@ program yelmox
         end if
 
         ! === coupling sequence ===
-        call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+        call step_relax(dom, ts)          ! topography relaxation (relax)
+        call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
         call step_icesheet(dom, ts)       ! yelmo_update
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
-        call step_smb(dom, ts)            ! surface mass balance
-        call step_marine_shelf(dom, ts)   ! shelf melt
+        call step_surface(dom, ts)        ! surface mass balance + temperature
+        call step_shelf(dom, ts)          ! shelf-base melt + temperature
 
         ! Forcing-increment restart each |Δf| > restart_every_df (folders
         ! restart-<n>), so a ramp can be branched at fixed forcing levels.

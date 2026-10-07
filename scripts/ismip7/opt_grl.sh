@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# ISMIP7 Greenland optimization spin-up. Same as legacy/opt_grl.sh: all its
-# overrides are valid for the current yelmox (climate = esm). opt.cf_init=-1 starts
+# ISMIP7 Greenland optimization spin-up (climate = esm). opt.cf_init=-1 starts
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
 
 resolution=GRL-8KM
@@ -10,10 +9,11 @@ output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp
 ctrl_params=(
     "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
-    "coupling.smb_method=climate"
-    "coupling.equil_method=opt"
+    "comps.surface_method=climate"
+    "sim.relax=True"
+    "sim.opt=True"
     "spinup.time_end=15.0e3"
-    "coupling.kill_shelves=True"
+    "sim.init_kill_shelves=True"
     "tm_1D.dt=1.0"
     "tm_2Dsm.dt=2.5e3"
     "tm_2D.dt=15e3"
@@ -27,10 +27,10 @@ opt_params=(
     "opt.cf_time_end=15e3"
     "opt.tf_time_end=15e3"
     "opt.tau_c=500.0"
-    "opt.rel_tau1=100.0"
-    "opt.rel_time1=100.0"
-    "opt.rel_tau2=100.0"
-    "opt.rel_time2=100.0"
+    "relax.tau1=100.0"
+    "relax.time1=100.0"
+    "relax.tau2=100.0"
+    "relax.time2=100.0"
     "opt.cf_init=-1"
     "opt.H_grnd_lim=500.0"
     "ytill.scale_zb=1"

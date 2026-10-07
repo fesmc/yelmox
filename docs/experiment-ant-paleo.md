@@ -9,11 +9,11 @@ ago to 10 kyr in the future, restarted from the spin-up, with the climate scaled
 by a glacial index and the sea level following a reconstruction.
 
 - **Program:** `yelmox` (`make yelmox`) with the snapclim backend
-  (`[coupling] climate = "snapclim"`, see [snapclim and snapesm](climate-snap.md)).
+  (`[comps] climate = "snapclim"`, see [snapclim and snapesm](climate-snap.md)).
 - **Config:** `yelmox/yelmox_Antarctica_paleo_spinup.nml`,
   `yelmox/yelmox_Antarctica_paleo_lgp.nml`.
 - **Scripts:** `scripts/ant-paleo/run_spinup.sh`, `scripts/ant-paleo/run_lgp.sh`.
-  Ported from the old single-grid par files kept in `scripts/ant-paleo/legacy/`.
+  Ported from the old single-grid par files.
 
 ## Running
 
@@ -38,10 +38,10 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 - **Timeline:** `[ctrl]` 0 to 15 kyr, `dtt = 5` yr, constant insolation; the
   sea level follows the model's own ice-volume change (`[barysealevel] method =
   "fastiso"`).
-- **Optimization** (`[coupling] equil_method = "opt"`): `cb_ref` and `tf_corr`
+- **Optimization** (`[sim] opt = True`): `cb_ref` and `tf_corr`
   until 7.5 kyr (`[opt] cf_time_end`, `tf_time_end`), starting from the till
   friction of the bed (`cf_init = -1`); the ice thickness relaxes towards the
-  observations until 3 kyr (`rel_time2`).
+  observations until 3 kyr (`[sim] relax = True`, `[relax] time2`).
 - **Climate:** present day (`[snap] atm_type = "anom"` with zero anomaly, and
   so a zero ocean anomaly).
 - **Output:** restart bundles every 15 kyr, so `restart-0.000-kyr` and
@@ -51,8 +51,8 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 
 - **Timeline:** `[ctrl]` -130 kyr to +10 kyr, `dtt = 5` yr, on relative time
   (`tstep_method = "rel"`), so that the sea level and the index follow the
-  records. `[coupling] equil_method = "none"`: `cb_ref` and `tf_corr` come from
-  the restart.
+  records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
+  from the restart.
 - **Climate:** `[snap] atm_type = "snap_1ind"`: the present-day reference plus
   the PMIP3 LGM -- piControl anomaly, scaled by the glacial index
   `input/alpha_combined_125kyr_interp.dat` (0 = present day, 1 = LGM; -0.2 in the
@@ -72,7 +72,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 | Topography | BedMachine (`ANT-32KM_TOPO-BedMachine.nc`) |
 | Reference climate (`snap_clim0`) | RACMO2.3--ERA-Interim hybrid 1981--2010; ocean ISMIP6 (Jourdain et al. 2020) |
 | Snapshots (`snap_clim1`, `snap_clim2`) | PMIP3 piControl and LGM means (atmosphere only; the ocean follows `fraction`) |
-| Surface mass balance | smbpal (`[coupling] smb_method = "smbpal"`) |
+| Surface mass balance | smbpal (`[comps] surface_method = "smbpal"`) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |
 | Dynamics | DIVA |

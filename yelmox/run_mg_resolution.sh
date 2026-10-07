@@ -8,7 +8,7 @@
 #   - three multigrid runs: marine_shelf on a grid FINER than Yelmo
 #       (Yelmo 32KM + mshlf 8KM / 16KM, Yelmo 16KM + mshlf 8KM).
 #
-# All runs use equil_method=opt (the nml default): basal friction (cf_ref) and
+# All runs use sim.opt=True (the nml default): basal friction (cf_ref) and
 # thermal forcing (tf_corr) are optimized toward the PD target over the default
 # 0-15 kyr windows, then free-evolve to time_end=25 kyr as a relaxation tail.
 # The pmpt grounding-zone bmb scaling uses H_t=100 (gz_Hg1=100). 2D output every
@@ -39,8 +39,8 @@ run_case() {
     local out="$OUTROOT/y${ygrid#ANT-}_m${mgrid#ANT-}"
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
         -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
-           domain.grid_mshlf="$mgrid" domain.grid_isos="$ygrid" \
-           domain.grid_clim=ANT-32KM domain.grid_smb="$ygrid" \
+           domain.grid_shelf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_surface="$ygrid" \
            ctrl.time_end=25e3 \
            tm_2D.dt=1000 ytopo.gz_Hg1=100
 }

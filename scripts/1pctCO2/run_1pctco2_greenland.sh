@@ -5,7 +5,7 @@
 #   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
 #   Step 2  scenarios  the 1pctCO2 run, branched off that bundle
 #
-# All runs are forcing-only (coupling.with_ice_sheet=False, with_isostasy=False):
+# All runs are forcing-only (comps.with_ice_sheet=False, with_isostasy=False):
 # they produce climate + ocean forcing from the 1pctCO2 CMIP fields, no ice dynamics.
 # 1pctCO2 = idealized CMIP experiment, atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140.
 # Forcing is ABSOLUTE tas/pr/thetao/so, self-referenced to the run start (~1xCO2);
@@ -68,7 +68,7 @@ case "${1:-}" in
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.use_esm=True esm.use_hist=False esm.use_proj=True \
            domain.grid_hub="$GRID" \
-           coupling.restart="$BUNDLE" \
+           ctrl.restart="$BUNDLE" \
            transient.time_init="$PROJ_INIT" transient.time_end="$PROJ_END"
     done
     ;;

@@ -3,7 +3,7 @@ title: "ESM forcing"
 ---
 
 Runs forced by **Earth-System-Model (ESM) output** (ISMIP7, TIPMIP, 1pctCO2) use
-the `yelmox` program with the ESM climate backend: `[coupling] climate = "esm"`.
+the `yelmox` program with the ESM climate backend: `[comps] climate = "esm"`.
 The backend wraps `libs/esm_forcing.f90`: a reference climatology at the current
 surface (lapse rate, precipitation scaling), plus ESM anomalies over historical and
 projection periods, optional climate variability and subglacial discharge.
@@ -24,13 +24,13 @@ projection periods, optional climate variability and subglacial discharge.
   `experiment`, `esm_name`, `use_esm` / `use_var` / `use_hist` / `use_proj`, and
   the physical parameters `lapse`, `f_p`, `f_ocn`, `f_polar`, `dT_threshold`,
   `grid_src`.
-- **Surface mass balance.** `[coupling] smb_method = "climate"` takes the ESM's
+- **Surface mass balance.** `[comps] surface_method = "climate"` takes the ESM's
   own SMB (reference + anomaly, corrected from the present-day surface with the SMB
   elevation gradient); `"smbpal"` computes it from the ESM temperature and
   precipitation.
-- **Update cadence.** `[coupling] dt_clim = 1.0`: the forcing is updated every step.
-- **Cold start.** `[coupling] kill_shelves` (no ice where the present-day bed is
-  ocean) and `time_equil_thrm` (equilibration with topography fixed), shared with
+- **Update cadence.** `[comps] dt_clim = 1.0`: the forcing is updated every step.
+- **Cold start.** `[sim] init_kill_shelves` (no ice where the present-day bed is
+  ocean) and `init_time_thrm` (equilibration with topography fixed), shared with
   the other configurations.
 
 ## What the backend supplies
@@ -38,7 +38,7 @@ projection periods, optional climate variability and subglacial discharge.
 - the atmosphere (`tas`, `pr`) for smbpal, or the surface mass balance directly;
 - the ocean **at the shelf base** (`T_shlf`, `S_shlf` and their anomalies),
   interpolated from the reference ocean with the marine-shelf parameters, so
-  `step_marine_shelf` passes it straight to the marine shelf;
+  `step_shelf` passes it straight to the marine shelf;
 - subglacial discharge `Qd`, landed on Yelmo by `couple_to_yelmo`.
 
 ## Output

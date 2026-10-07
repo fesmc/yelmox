@@ -19,12 +19,15 @@ across both domains plus the OBM.
   → `domain_startup`. Either can be individually deactivated (`active_north` /
   `active_south`).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup
-  (`bsl_startup`) and written to the run-root restart bundle.
+  (`bsl_startup`) and written to the run restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
   (`obm_masks_init`, `obm_exchange`). The OBM writes its own 1D output; its restart
-  (`obm_restart.nc`) goes into the run-root restart bundle next to `bsl_restart.nc`
-  and is read back from `[ctrl] restart_bsl`.
+  (`obm_restart.nc`) goes into the run restart bundle next to `bsl_restart.nc`.
+- **One restart bundle per run** — `restart-<kyr>-kyr/` holds the shared
+  `bsl_restart.nc` and `obm_restart.nc`, and each domain in a subfolder named
+  after it (`Greenland/`, `Antarctica/`). `[ctrl] restart` is the bundle to start
+  from.
 
 Climate/SMB per domain is still **snapclim + smbpal**, exactly as in the
 single-domain driver; the OBM's contribution is folded into the ocean forcing —
@@ -38,8 +41,9 @@ Main loop (per timestep):
 ```fortran
 call bsl_update(bsl, ts%time_rel)              ! shared sea level, once
 
-if (active_north) then                         ! spin-up tuning + isostasy, per domain
-    call step_spinup_tuning(dom_north, ts)
+if (active_north) then                         ! relaxation + optimization + isostasy, per domain
+    call step_relax(dom_north, ts)
+    call step_optimize(dom_north, ts)
     call step_isostasy(dom_north, ts, bsl)
 end if
 (same for dom_south)
@@ -51,15 +55,15 @@ if (active_north) then                         ! ice sheet, hub, climate + smb, 
     call step_icesheet(dom_north, ts)
     call couple_yelmo_to_htopo(dom_north)
     call step_climate(dom_north, ts)
-    call step_smb(dom_north, ts)
+    call step_surface(dom_north, ts)
 end if
 (same for dom_south)
 
 call obm_exchange(oc, obox, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
                                                        ! hysteresis forcing, obm->ism ocean temp
 
-if (active_north) call step_marine_shelf(dom_north, ts)  ! reads the obm-updated to_ann
-if (active_south) call step_marine_shelf(dom_south, ts)
+if (active_north) call step_shelf(dom_north, ts)  ! reads the obm-updated to_ann
+if (active_south) call step_shelf(dom_south, ts)
 ```
 
 Key ordering points:
@@ -70,7 +74,7 @@ Key ordering points:
   one-step lag), then `obm_exchange` distributes the fresh OBM state back to the
   domains before the marine-shelf melt is computed.
 - The per-domain primitives are the same as in the single-domain `yelmox`; only
-  the spin-up tuning + isostasy part is split off so it runs before the OBM step.
+  the relaxation + optimization + isostasy part is split off so it runs before the OBM step.
 
 ## Forcing
 

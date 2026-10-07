@@ -10,8 +10,8 @@ annotated git tag. Dates are release (tag) dates.
   (15 kyr optimization spin-up) and `yelmox_Antarctica_paleo_lgp.nml` (-130 kyr to
   +10 kyr, climate from the glacial index `input/alpha_combined_125kyr_interp.dat`,
   sea level from `sealevel_rohling_450kyr.dat`, ages traced with elsa), with run
-  scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files kept
-  in `scripts/ant-paleo/legacy/`; the transient now runs on relative time so that
+  scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files; the
+  transient now runs on relative time so that
   sea level follows the record (it stayed at present day before).
 - snapesm writes its state to `snap.nc` (`[output] write_clim`): the driving
   indices `idx_<name>`, `z_srf`, monthly `tas`/`tsl`/`pr`, `ta_sum`, `tsl_ann`
@@ -21,10 +21,42 @@ annotated git tag. Dates are release (tag) dates.
   attributes), restored on restart; bundles without them keep the cold-start
   indices.
 - `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
-  and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`;
-  the originals are in `scripts/ismip7/legacy/`.
+  and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- The topography relaxation of a spin-up is its own switch, `[sim] relax`, with
+  the group `[relax]` (`topo_rel`, `tau1`, `tau2`, `time1`, `time2`, `m`; was
+  `[opt] rel_tau1/2`, `rel_time1/2`, `rel_m` with `topo_rel = 4` fixed), applied
+  by `step_relax` before `step_optimize`. After `time2` the `[ytopo]` values of
+  `topo_rel` and `topo_rel_tau` apply again (was `topo_rel = 0`). `step_optimize`
+  only optimizes `cb_ref` and `tf_corr`, so `opt` can run without relaxation.
+  The par files set `relax` as their `opt`; the scripts pass `sim.relax=True`
+  with `sim.opt=True`. Needs yelmo with `relax_params` (`libs/ice_optimization.f90`).
+- Components named by the boundary they supply: `surface` (mass balance +
+  temperature) and `shelf` (shelf-base melt + temperature). Keys:
+  `with_marine_shelf` -> `with_shelf`, `smb_method` -> `surface_method` (values
+  unchanged), `grid_smb` -> `grid_surface`, `grid_mshlf` -> `grid_shelf`,
+  `write_smb` -> `write_surface`, `write_mshlf` -> `write_shelf`; new
+  `[comps] with_surface` (the surface was switched by `with_climate` before).
+  `with_surface` and `with_shelf` need `with_climate` (else the run stops).
+  Routines: `step_smb` -> `step_surface`, `step_marine_shelf` -> `step_shelf`,
+  `couple_smb_to_yelmo` -> `couple_surface_to_yelmo`, `couple_marine_to_yelmo`
+  -> `couple_shelf_to_yelmo`. Output files keep the model names (`smbpal.nc`,
+  `mshlf.nc`).
+- `[coupling]` is split into `[comps]` (`with_*`, `climate`, `smb_method`,
+  `dt_clim`: which components are active, with which model, how often) and
+  `[sim]` (the conditions of the simulation: cold-start ice state, optimization,
+  regional modifications); in `yelmox_bipolar` `[comps_<sfx>]`, `[sim_<sfx>]`.
+  Renamed in `[sim]`: `equil_method = "none"/"opt"` -> `opt = False/True` (the
+  optimization runs within the `[opt]` time windows, on a cold start or a
+  restart), `kill_shelves` -> `init_kill_shelves`, `time_equil_thrm` ->
+  `init_time_thrm`. Old par files stop with "parameter not found".
+- The restart bundle to start from is `[ctrl] restart` (was `[coupling] restart`;
+  in `yelmox_bipolar`, `[ctrl] restart_bsl` and `[coupling_<sfx>] restart`). The
+  driver reads it and passes it to `domain_startup(dom, ts, bsl, restart, ...)`.
+  `yelmox_bipolar` writes one bundle per run: `restart-<kyr>-kyr/` holds the
+  shared bsl and obm restarts and each domain in a subfolder named after it
+  (was `<domain>/restart-<kyr>-kyr/`).
 - Follows yelmo dev (2c3d3449; needs yelmo dev at or after 9e93696d): `input/yelmo_defaults.nml`
   gains `ydyn.ssa_vel_lim_method` (default `"drag"`, a smooth speed-limit drag) and
   `ssa_vel_lim_tau`; all par files take `ssa_vel_max = 10000` (was 5000) and
@@ -195,8 +227,7 @@ annotated git tag. Dates are release (tag) dates.
   physics), `kryos_coupling` (`step_*`, `couple_*_to_yelmo`), `kryos_startup`
   (cold start, restart bundles), `kryos_output` and `kryos_forcing` (`tsforcing`).
   Code is moved unchanged; drivers import each name explicitly.
-- Renamed coupling primitives: `step_optimize` -> `step_spinup_tuning` (it also
-  ramps the relaxation timescale), `refresh_htopo` -> `couple_yelmo_to_htopo`,
+- Renamed coupling primitives: `refresh_htopo` -> `couple_yelmo_to_htopo`,
   `domain_update_smb` -> `step_smb`.
 - `couple_to_yelmo` assembles the Yelmo boundary state as its own step, called
   by the drivers before `step_icesheet` (which no longer runs the couplers).
@@ -208,8 +239,10 @@ annotated git tag. Dates are release (tag) dates.
   time loop; `yelmox_step` and the bipolar `advance_isostasy`/`advance_dynamics`
   wrappers are gone.
 - `step_climate` and `domain_startup` take the transient forcing object (`tsf`)
-  as one optional argument instead of `dTa`/`dTo`/`dSo`; `update_climate` applies
+  as one optional argument instead of `dTa`/`dTo`/`dSo`; the backend applies
   its anomalies only when it is active.
+- `update_climate` is folded into `step_climate(dom, ts, tsf, init)`; `init=.true.`
+  (the cold start) runs the update regardless of the `dt_clim` cadence.
 - `domain_ctl` grid names: `grid_name` -> `grid_hub` (the hi-res hub),
   `grid_yelmo` -> `grid_ice` (Yelmo).
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`
@@ -359,6 +392,8 @@ annotated git tag. Dates are release (tag) dates.
   retired flavors (`retired/`: `yelmox_ismip6`, `yelmox_nahosmip`,
   `yelmox_rtip`), with their par files, make targets, runme aliases and
   `scripts/ismip6-2300.md`. They no longer ran against yelmo:dev.
+- The original single-grid scripts and par files kept for the ports
+  (`scripts/ant-paleo/legacy/`, `scripts/ismip7/legacy/`).
 
 ## [v2.3] - 2026-07-15
 
