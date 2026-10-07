@@ -15,7 +15,7 @@ program yelmox_bipolar
     ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
-    ! Per-step coupling order: shared sea level, then per domain spin-up tuning +
+    ! Per-step coupling order: shared sea level, then per domain optimization +
     ! isostasy, then one OBM step, then per domain ice sheet + climate + smb,
     ! then the ocean exchanges (atm->obm, ism->obm freshwater flux, hysteresis
     ! forcing, obm->ism ocean temperature), then per domain marine shelf (which
@@ -30,7 +30,7 @@ program yelmox_bipolar
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
+    use kryos_coupling, only : step_optimize, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf
     use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
@@ -151,13 +151,13 @@ program yelmox_bipolar
         ! Shared sea level: update once per step, before either domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        ! Spin-up tuning + isostasy (each domain), before the OBM step.
+        ! Optimization + isostasy (each domain), before the OBM step.
         if (active_north) then
-            call step_spinup_tuning(dom_north, ts)
+            call step_optimize(dom_north, ts)
             call step_isostasy(dom_north, ts, bsl)
         end if
         if (active_south) then
-            call step_spinup_tuning(dom_south, ts)
+            call step_optimize(dom_south, ts)
             call step_isostasy(dom_south, ts, bsl)
         end if
 

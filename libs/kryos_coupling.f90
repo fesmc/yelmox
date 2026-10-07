@@ -20,7 +20,7 @@ module kryos_coupling
     implicit none
     private
 
-    public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_shelf
+    public :: step_optimize, step_isostasy, step_icesheet, step_climate, step_shelf
     public :: step_surface, couple_yelmo_to_htopo
     public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_surface_to_yelmo, couple_shelf_to_yelmo
@@ -29,10 +29,11 @@ module kryos_coupling
 
 contains
 
-    subroutine step_spinup_tuning(dom, ts)
-        ! Spin-up tuning ([sim] opt): ramp the topography relaxation
-        ! timescale, then nudge the basal-friction field cb_ref and the marine
-        ! thermal-forcing correction tf_corr toward present-day observations.
+    subroutine step_optimize(dom, ts)
+        ! Optimization ([sim] opt), within the [opt] time windows: ramp the
+        ! topography relaxation timescale, then nudge the basal-friction field
+        ! cb_ref and the marine thermal-forcing correction tf_corr toward
+        ! present-day observations.
         !
         ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr lives on the
         ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
@@ -88,7 +89,7 @@ contains
             call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
             dom%mshlf%now%tf_corr = tf_corr_m
         end if
-    end subroutine step_spinup_tuning
+    end subroutine step_optimize
 
     subroutine step_isostasy(dom, ts, bsl)
         ! Run isostasy on its own grid: ice load from Yelmo (bilin). The bedrock /

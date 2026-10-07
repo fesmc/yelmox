@@ -14,7 +14,7 @@ program yelmox
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use kryos,          only : kryos_domain, domain_init
     use kryos_regions,  only : domain_regions_init
-    use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
+    use kryos_coupling, only : step_optimize, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
@@ -165,7 +165,7 @@ program yelmox
         end if
 
         ! === coupling sequence ===
-        call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+        call step_optimize(dom, ts)       ! relaxation ramp + cb_ref/tf_corr optimization (opt)
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
         call step_icesheet(dom, ts)       ! yelmo_update

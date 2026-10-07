@@ -219,8 +219,7 @@ annotated git tag. Dates are release (tag) dates.
   physics), `kryos_coupling` (`step_*`, `couple_*_to_yelmo`), `kryos_startup`
   (cold start, restart bundles), `kryos_output` and `kryos_forcing` (`tsforcing`).
   Code is moved unchanged; drivers import each name explicitly.
-- Renamed coupling primitives: `step_optimize` -> `step_spinup_tuning` (it also
-  ramps the relaxation timescale), `refresh_htopo` -> `couple_yelmo_to_htopo`,
+- Renamed coupling primitives: `refresh_htopo` -> `couple_yelmo_to_htopo`,
   `domain_update_smb` -> `step_smb`.
 - `couple_to_yelmo` assembles the Yelmo boundary state as its own step, called
   by the drivers before `step_icesheet` (which no longer runs the couplers).

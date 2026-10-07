@@ -35,7 +35,7 @@ The driver owns the timeline (`ts`) and the shared sea level (`bsl`), and advanc
 the domain once per step with the coupling sequence written out in the time loop:
 
 ```fortran
-call step_spinup_tuning(dom, ts)  ! relaxation ramp + cb_ref/tf_corr tuning (opt)
+call step_optimize(dom, ts)       ! relaxation ramp + cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
