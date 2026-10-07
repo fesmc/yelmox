@@ -19,7 +19,7 @@ module kryos_startup
     use smbpal,       only : smbpal_restart_write, smbpal_restart_read
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
-    use kryos_coupling, only : couple_yelmo_to_htopo, step_climate, update_climate, &
+    use kryos_coupling, only : couple_yelmo_to_htopo, step_climate, &
                                step_smb, step_marine_shelf, couple_to_yelmo, &
                                couple_isostasy_to_yelmo, couple_smb_to_yelmo, &
                                check_isostasy_reference
@@ -130,7 +130,7 @@ contains
         ! surface mass balance on grid_smb (init=.true. runs the smbpal ITM
         ! equilibration before the first update).
         if (dom%ctl%with_climate) then
-            call update_climate(dom, ts, tsf=tsf, init=.true.)
+            call step_climate(dom, ts, tsf=tsf, init=.true.)
             call step_smb(dom, ts, init=.true.)
         end if
 

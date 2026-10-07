@@ -207,8 +207,10 @@ annotated git tag. Dates are release (tag) dates.
   time loop; `yelmox_step` and the bipolar `advance_isostasy`/`advance_dynamics`
   wrappers are gone.
 - `step_climate` and `domain_startup` take the transient forcing object (`tsf`)
-  as one optional argument instead of `dTa`/`dTo`/`dSo`; `update_climate` applies
+  as one optional argument instead of `dTa`/`dTo`/`dSo`; the backend applies
   its anomalies only when it is active.
+- `update_climate` is folded into `step_climate(dom, ts, tsf, init)`; `init=.true.`
+  (the cold start) runs the update regardless of the `dt_clim` cadence.
 - `domain_ctl` grid names: `grid_name` -> `grid_hub` (the hi-res hub),
   `grid_yelmo` -> `grid_ice` (Yelmo).
 - Cold starts made consistent across drivers. `yelmox_esm` and `yelmox_rembo`

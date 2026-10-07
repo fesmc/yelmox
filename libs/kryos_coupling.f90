@@ -21,7 +21,7 @@ module kryos_coupling
     private
 
     public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
-    public :: step_smb, couple_yelmo_to_htopo, update_climate
+    public :: step_smb, couple_yelmo_to_htopo
     public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
     public :: couple_climate_to_yelmo
@@ -330,25 +330,14 @@ contains
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, tsf)
-        ! Run climate on grid_clim, on the dt_clim cadence: geometry from the hub,
-        ! atmosphere/ocean (and, by backend, surface mass balance and discharge)
-        ! produced by the climate backend into dom%clim, read by step_smb,
-        ! step_marine_shelf and couple_climate_to_yelmo. tsf (optional) is the
-        ! driver-owned transient forcing; see update_climate.
-        type(kryos_domain),  intent(inout) :: dom
-        type(tstep_class), intent(in)    :: ts
-        type(tsforcing_class), intent(in), optional :: tsf
-
-        if (.not. dom%ctl%with_climate) return
-
-        if (cadence_due(ts%time_elapsed, dom%ctl%dt_clim)) call update_climate(dom, ts, tsf=tsf)
-    end subroutine step_climate
-
-    subroutine update_climate(dom, ts, tsf, init)
-        ! One climate-backend update on grid_clim: the hub geometry remapped to
-        ! grid_clim, with the transient forcing (tsf) when given; the backend
-        ! applies it in its own way. init marks the cold start.
+    subroutine step_climate(dom, ts, tsf, init)
+        ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
+        ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
+        ! balance and discharge) produced by the climate backend into dom%clim,
+        ! read by step_smb, step_marine_shelf and couple_climate_to_yelmo. tsf
+        ! (optional) is the driver-owned transient forcing; the backend applies
+        ! it in its own way. init=.true. marks the cold start: the update runs
+        ! regardless of the cadence.
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
         type(tsforcing_class), intent(in), optional :: tsf
@@ -357,6 +346,14 @@ contains
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
         real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:), basins_c(:,:)
         character(len=256) :: gc, gh
+        logical :: is_init
+
+        if (.not. dom%ctl%with_climate) return
+
+        is_init = .false.
+        if (present(init)) is_init = init
+
+        if (.not. (is_init .or. cadence_due(ts%time_elapsed, dom%ctl%dt_clim))) return
 
         gc = trim(dom%ctl%grid_clim)
         gh = trim(dom%ctl%grid_hub)
@@ -371,8 +368,8 @@ contains
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
                             z_srf_ref_c, basins_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
-                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, tsf=tsf, init=init)
-    end subroutine update_climate
+                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, tsf=tsf, init=is_init)
+    end subroutine step_climate
 
     subroutine step_smb(dom, ts, init)
         ! Surface mass balance on grid_smb. Three methods: smbpal (default; monthly,
