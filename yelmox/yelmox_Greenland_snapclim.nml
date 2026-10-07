@@ -104,7 +104,7 @@
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 1.0               ! [m/a] Tolerance threshold to redo timestep
+    pc_tol          = 1.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
     pc_eps          = 0.02               ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
 
 /

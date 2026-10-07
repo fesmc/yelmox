@@ -143,7 +143,7 @@
     pc_use_H_pred   = .true.     
     pc_filter_vel   = .true.     
     pc_n_redo       = 5          
-    pc_tol          = 1.0        
+    pc_tol          = 1.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
     pc_eps          = 0.02              ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
 /
 
