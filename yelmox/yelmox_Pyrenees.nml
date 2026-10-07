@@ -125,7 +125,7 @@
     sigma_vel       = 200.0             ! [m/a] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, cf_min
 
-    opt_tf          = False             ! Should thermal forcing be optimized too?
+    opt_tf          = "none"            ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value

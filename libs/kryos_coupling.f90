@@ -12,7 +12,8 @@ module kryos_coupling
     use smbpal,       only : smbpal_update_monthly, smbpal_update_monthly_equil
     use smb_simple_m, only : smb_simple_set_mask, smb_simple_update
     use htopo,        only : htopo_update
-    use ice_optimization, only : relax_update, optimize_cb_ref, optimize_tf_corr
+    use ice_optimization, only : relax_update, optimize_cb_ref, optimize_tf_corr, &
+                                 optimize_tf_corr_basin
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
     use kryos_forcing, only : tsforcing_class
@@ -64,7 +65,7 @@ contains
         gy = trim(dom%ctl%grid_ice)
 
         ! Basal friction (cb_ref) optimization -- Yelmo grid, in place.
-        if (dom%opt%opt_cf .and. ts%time_elapsed >= dom%opt%cf_time_init &
+        if (trim(dom%opt%opt_cf) == "L21" .and. ts%time_elapsed >= dom%opt%cf_time_init &
                             .and. ts%time_elapsed <= dom%opt%cf_time_end) then
             call optimize_cb_ref(dom%yelmo%dyn%now%cb_ref, dom%yelmo%tpo%now%H_ice, &
                     dom%yelmo%tpo%now%dHidt, dom%yelmo%bnd%z_bed, dom%yelmo%bnd%z_sl, &
@@ -79,14 +80,23 @@ contains
         ! Thermal-forcing correction (tf_corr) optimization -- lift shelf-grid
         ! correction to the Yelmo grid, optimize against Yelmo-grid targets, remap
         ! back. tf_corr persists on the shelf grid (in mshlf, incl. its restart).
-        if (dom%opt%opt_tf .and. ts%time_elapsed >= dom%opt%tf_time_init &
+        ! Method: "L21" (one correction per basin) or "L21-points".
+        if (trim(dom%opt%opt_tf) /= "none" .and. ts%time_elapsed >= dom%opt%tf_time_init &
                             .and. ts%time_elapsed <= dom%opt%tf_time_end) then
             call remap(dom, dom%mshlf%now%tf_corr, gm, tf_corr_y, gy, "con")
-            call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
-                    dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
-                    dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
-                    dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                    dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+            select case (trim(dom%opt%opt_tf))
+            case ("L21")
+                call optimize_tf_corr_basin(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
+                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%bnd%basins, &
+                        dom%opt%H_grnd_lim, dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
+                        dom%opt%tf_basins, dt=dom%ctl%dtt)
+            case ("L21-points")
+                call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
+                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
+                        dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
+                        dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
+                        dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+            end select
             call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
             dom%mshlf%now%tf_corr = tf_corr_m
         end if
