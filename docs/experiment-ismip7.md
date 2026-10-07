@@ -66,7 +66,7 @@ is then lost within the first years.
 
 `opt_grl.sh`, `opt_grl_ismip.sh` (L. Gutierrez Gonzalez) and `opt_ant.sh` are
 15-kyr optimization spin-ups with tuned parameters on top of the par files:
-the SMB taken from the ESM (`comps.smb_method=climate`), `cb_ref` started from
+the SMB taken from the ESM (`comps.surface_method=climate`), `cb_ref` started from
 the till friction of the bed (`opt.cf_init=-1`, the `ytill` parameters), a short
 relaxation (`opt.rel_time1/2 = 100`), equilibrium calving, DIVA dynamics and
 shelf enhancement 0.5; `opt_grl_ismip.sh` uses von Mises calving (`vm-l19`) and a

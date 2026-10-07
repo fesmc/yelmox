@@ -34,8 +34,8 @@ run_case() {
     local out="$OUTROOT/y${ygrid#ANT-}_m${mgrid#ANT-}"
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
         -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
-           domain.grid_mshlf="$mgrid" domain.grid_isos="$ygrid" \
-           domain.grid_clim=ANT-32KM domain.grid_smb="$ygrid" \
+           domain.grid_shelf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_surface="$ygrid" \
            ctrl.time_end=25e3 \
            tm_2D.dt=1000 ytopo.gz_Hg1=100 \
            ytill.cf_min="$CFMIN"

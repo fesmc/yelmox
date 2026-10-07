@@ -19,10 +19,11 @@
     ! standard templates, not verified against real files.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = False  ! Ocean forcing off (mountain glacier: no ocean)
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = False  ! Ocean forcing off (mountain glacier: no ocean)
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
+    surface_method  = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
 /
 
@@ -43,14 +44,14 @@
 /
 
 &output
-    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
-    write_isos  = True
-    write_mshlf = False        ! marine shelf is off (with_marine_shelf=False)
-    write_smb   = True
-    write_clim  = True
-    write_htopo = True
-    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip     = 1.0          ! [yr] its interval
+    write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos    = True
+    write_shelf   = False        ! marine shelf is off (with_shelf=False)
+    write_surface = True
+    write_clim    = True
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
 /
 
 &domain
@@ -63,8 +64,8 @@
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = "PYR-1KM"          ! isostasy [grid_ice]
     grid_clim    = "PYR-1KM"          ! reference climate + transient forcing [grid_ice]
-    grid_smb     = "PYR-1KM"          ! surface mass balance [grid_clim]
-    grid_mshlf   = "PYR-1KM"          ! marine shelf [grid_hub]
+    grid_surface = "PYR-1KM"          ! surface mass balance [grid_clim]
+    grid_shelf   = "PYR-1KM"          ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
@@ -534,7 +535,7 @@
 /
 
 &smb_simple
-    ! Alternative surface mass balance method (ctrl: smb_method = "smb_simple").
+    ! Alternative surface mass balance method (ctrl: surface_method = "smb_simple").
     ! Synthetic-elevation piecewise-linear scheme. Output is mm w.e./yr.
     scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
     co2_const   = 280.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
@@ -607,7 +608,7 @@
 
 /
 
-! marine_shelf is OFF for Pyrenees (with_marine_shelf=False), but the domain
+! marine_shelf is OFF for Pyrenees (with_shelf=False), but the domain
 ! still initializes it (marshelf_init), so a valid group must be present. Params
 ! are inert here; use_obs / tf_correction are False so no data files are read.
 &marine_shelf

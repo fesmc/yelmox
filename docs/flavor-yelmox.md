@@ -22,8 +22,8 @@ balance and the marine shelf. It is the reference implementation of the multigri
 | Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
 | Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](flavor-esm.md) or [rembo](flavor-rembo.md) | `grid_clim` |
-| Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_smb` |
-| Sub-shelf melt | marine_shelf | `grid_mshlf` |
+| Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_surface` |
+| Sub-shelf melt | marine_shelf | `grid_shelf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
 
 Each module runs on its own grid, set in `[domain]`; the coupler remaps fields between
@@ -41,13 +41,13 @@ call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
 call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
-call step_smb(dom, ts)            ! surface mass balance
-call step_marine_shelf(dom, ts)   ! shelf melt
+call step_surface(dom, ts)        ! surface mass balance + temperature
+call step_shelf(dom, ts)          ! shelf-base melt + temperature
 ```
 
 `couple_to_yelmo` assembles the Yelmo boundary state: isostasy from this step,
 smb and shelf melt from the **previous** step (a one-step coupling lag);
-`step_climate`, `step_smb` and `step_marine_shelf` then produce the forcing
+`step_climate`, `step_surface` and `step_shelf` then produce the forcing
 consumed on the next step.
 The climate is refreshed on the `comps.dt_clim` cadence; the smb every step.
 
@@ -109,9 +109,9 @@ The components: which are active, with which model, how often.
 
 | Key | Values | |
 |---|---|---|
-| `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_marine_shelf` | bool | components in the coupling sequence; `with_climate` covers climate and smb |
+| `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
 | `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
-| `smb_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
+| `surface_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
 
 ### `[sim]`
@@ -142,11 +142,11 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 |---|---|
 | `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<region>.nc` for the named regions of `[domain]`) |
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
-| `write_mshlf` | `mshlf.nc` |
-| `write_smb` | `smbpal.nc` |
+| `write_shelf` | `mshlf.nc` |
+| `write_surface` | `smbpal.nc` |
 | `write_clim` | the backend's file: `snap.nc` (snapclim, snapesm), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
 | `write_htopo` | `htopo.nc` (the hub) |
-| `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_mshlf = grid_ice`) |
+| `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_shelf = grid_ice`) |
 
 Restart bundles follow `[tm_rst]`, plus one at `time_end`. `[ctrl] restart` is
 the bundle to start from (`"None"` = cold start).

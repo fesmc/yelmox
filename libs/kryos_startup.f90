@@ -20,8 +20,8 @@ module kryos_startup
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
     use kryos_coupling, only : couple_yelmo_to_htopo, step_climate, &
-                               step_smb, step_marine_shelf, couple_to_yelmo, &
-                               couple_isostasy_to_yelmo, couple_smb_to_yelmo, &
+                               step_surface, step_shelf, couple_to_yelmo, &
+                               couple_isostasy_to_yelmo, couple_surface_to_yelmo, &
                                check_isostasy_reference
     use kryos_forcing,  only : tsforcing_class, tsforcing_restart_write
     use yelmox_climate, only : climate_restart_write, climate_restart_read
@@ -129,15 +129,13 @@ contains
         call couple_yelmo_to_htopo(dom)
 
         ! Climate on grid_clim (init: snapclim/snapesm at time_rel), then the
-        ! surface mass balance on grid_smb (init=.true. runs the smbpal ITM
+        ! surface mass balance on grid_surface (init=.true. runs the smbpal ITM
         ! equilibration before the first update).
-        if (dom%ctl%with_climate) then
-            call step_climate(dom, ts, tsf=tsf, init=.true.)
-            call step_smb(dom, ts, init=.true.)
-        end if
+        call step_climate(dom, ts, tsf=tsf, init=.true.)
+        call step_surface(dom, ts, init=.true.)
 
         ! Marine shelf through the (already refreshed) hub.
-        call step_marine_shelf(dom, ts)
+        call step_shelf(dom, ts)
 
         ! Assemble the Yelmo boundary state from the freshly produced outputs.
         call couple_to_yelmo(dom)
@@ -289,8 +287,8 @@ contains
         ! the smb on the Yelmo grid for the stabilization below.
         call couple_yelmo_to_htopo(dom)
         call step_climate(dom, ts)
-        call step_smb(dom, ts)
-        call couple_smb_to_yelmo(dom)
+        call step_surface(dom, ts)
+        call couple_surface_to_yelmo(dom)
 
         ! Stabilize the dynamic fields with a raised beta_min.
         if (dom%ctl%with_ice_sheet) then

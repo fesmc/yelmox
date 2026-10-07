@@ -54,15 +54,15 @@ if (active_north) then                         ! ice sheet, hub, climate + smb, 
     call step_icesheet(dom_north, ts)
     call couple_yelmo_to_htopo(dom_north)
     call step_climate(dom_north, ts)
-    call step_smb(dom_north, ts)
+    call step_surface(dom_north, ts)
 end if
 (same for dom_south)
 
 call obm_exchange(oc, obox, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
                                                        ! hysteresis forcing, obm->ism ocean temp
 
-if (active_north) call step_marine_shelf(dom_north, ts)  ! reads the obm-updated to_ann
-if (active_south) call step_marine_shelf(dom_south, ts)
+if (active_north) call step_shelf(dom_north, ts)  ! reads the obm-updated to_ann
+if (active_south) call step_shelf(dom_south, ts)
 ```
 
 Key ordering points:

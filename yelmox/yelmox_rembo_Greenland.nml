@@ -16,10 +16,11 @@
     ! REMBO runs on its compiled grid (GRL-16KM), which must be grid_clim.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
     climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapclim ocean
-    smb_method      = "climate" ! the smb from the climate (REMBO)
+    surface_method  = "climate" ! the smb from the climate (REMBO)
     dt_clim         = 10.0     ! [yr] climate update interval (= dtt: REMBO has its own intervals)
 /
 
@@ -49,8 +50,8 @@
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = "GRL-16KM"         ! isostasy [grid_ice]
     grid_clim    = "GRL-16KM"         ! reference climate + transient forcing [grid_ice]
-    grid_smb     = "GRL-16KM"         ! surface mass balance [grid_clim]
-    grid_mshlf   = "GRL-16KM"         ! marine shelf [grid_hub]
+    grid_surface = "GRL-16KM"         ! surface mass balance [grid_clim]
+    grid_shelf   = "GRL-16KM"         ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17-v5.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
@@ -70,14 +71,14 @@
 /
 
 &output
-    write_yelmo = True         ! per-module 2D + 1D output switches
-    write_isos  = True
-    write_mshlf = True
-    write_smb   = False        ! smbpal.nc (unused with REMBO: its smb is in rembo.nc)
-    write_clim  = True         ! the climate's files (rembo.nc + rembo_ts.nc)
-    write_htopo = True
-    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip     = 1.0          ! [yr] its interval
+    write_yelmo   = True         ! per-module 2D + 1D output switches
+    write_isos    = True
+    write_shelf   = True
+    write_surface = False        ! smbpal.nc (unused with REMBO: its smb is in rembo.nc)
+    write_clim    = True         ! the climate's files (rembo.nc + rembo_ts.nc)
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
 /
 
 &tm_1D

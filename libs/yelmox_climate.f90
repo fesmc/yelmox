@@ -76,7 +76,7 @@ contains
                             south, sfx, timeline_group, smb_direct)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
         ! smb_direct: the surface mass balance is taken from the climate
-        ! ([comps] smb_method = "climate"); the esm backend supplies it, and
+        ! ([comps] surface_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
         type(yelmox_climate_class), intent(inout) :: cl
         character(len=*), intent(in) :: method
@@ -94,13 +94,13 @@ contains
         cl%south     = south
 
         if (smb_direct .and. trim(cl%method) /= "esm" .and. trim(cl%method) /= "rembo") then
-            write(*,*) "climate_init:: error: smb_method = climate needs a climate that supplies &
+            write(*,*) "climate_init:: error: surface_method = climate needs a climate that supplies &
                        &the surface mass balance (esm, rembo); got climate = ", trim(cl%method)
             error stop 1
         end if
         if (.not. smb_direct .and. trim(cl%method) == "rembo") then
             write(*,*) "climate_init:: error: climate = rembo supplies the surface mass balance &
-                       &only; set smb_method = climate."
+                       &only; set surface_method = climate."
             error stop 1
         end if
 
@@ -577,7 +577,7 @@ contains
                           basins, domain, mshlf)
         ! The reference climatology at the current surface, the esm anomalies
         ! (historical / projection / homogeneous) and the variability, then the
-        ! products: atmosphere, the surface mass balance (smb_method = climate),
+        ! products: atmosphere, the surface mass balance (surface_method = climate),
         ! the ocean at the shelf base and subglacial discharge.
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out

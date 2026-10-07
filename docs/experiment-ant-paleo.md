@@ -72,7 +72,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 | Topography | BedMachine (`ANT-32KM_TOPO-BedMachine.nc`) |
 | Reference climate (`snap_clim0`) | RACMO2.3--ERA-Interim hybrid 1981--2010; ocean ISMIP6 (Jourdain et al. 2020) |
 | Snapshots (`snap_clim1`, `snap_clim2`) | PMIP3 piControl and LGM means (atmosphere only; the ocean follows `fraction`) |
-| Surface mass balance | smbpal (`[comps] smb_method = "smbpal"`) |
+| Surface mass balance | smbpal (`[comps] surface_method = "smbpal"`) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |
 | Dynamics | DIVA |

@@ -16,7 +16,7 @@ program yelmox
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
-                               step_smb, step_marine_shelf
+                               step_surface, step_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
                                tsforcing_kill, tsforcing_restart_due, &
@@ -94,8 +94,8 @@ program yelmox
     call domain_startup(dom, ts, bsl, trim(restart), tsf=tsf)
     if (trim(restart) /= "None") then
         call step_climate(dom, ts, tsf)
-        call step_smb(dom, ts)
-        call step_marine_shelf(dom, ts)
+        call step_surface(dom, ts)
+        call step_shelf(dom, ts)
     end if
 
     write(*,*)
@@ -171,8 +171,8 @@ program yelmox
         call step_icesheet(dom, ts)       ! yelmo_update
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
-        call step_smb(dom, ts)            ! surface mass balance
-        call step_marine_shelf(dom, ts)   ! shelf melt
+        call step_surface(dom, ts)        ! surface mass balance + temperature
+        call step_shelf(dom, ts)          ! shelf-base melt + temperature
 
         ! Forcing-increment restart each |Δf| > restart_every_df (folders
         ! restart-<n>), so a ramp can be branched at fixed forcing levels.

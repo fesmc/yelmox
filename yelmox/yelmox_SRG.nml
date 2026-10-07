@@ -16,10 +16,11 @@
     ! SRG runs on the Yelmo grid (SRG-250M), isostasy on SRG-16KM.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = False  ! Is isostasy active? (SRG-16KM grid when on)
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = False  ! Ocean forcing off for now (imposed constant / none)
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = False  ! Ocean forcing off for now (imposed constant / none)
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
+    surface_method  = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
 /
 
@@ -40,14 +41,14 @@
 /
 
 &output
-    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
-    write_isos  = True
-    write_mshlf = False        ! marine shelf is off (with_marine_shelf=False)
-    write_smb   = True
-    write_clim  = True
-    write_htopo = True
-    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip     = 1.0          ! [yr] its interval
+    write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos    = True
+    write_shelf   = False        ! marine shelf is off (with_shelf=False)
+    write_surface = True
+    write_clim    = True
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
 /
 
 &domain
@@ -60,8 +61,8 @@
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = "SRG-16KM"         ! isostasy [grid_ice] (coarse: the glacier grid is not needed)
     grid_clim    = "SRG-250M"         ! reference climate + transient forcing [grid_ice]
-    grid_smb     = "SRG-250M"         ! surface mass balance [grid_clim]
-    grid_mshlf   = "SRG-250M"         ! marine shelf [grid_hub]
+    grid_surface = "SRG-250M"         ! surface mass balance [grid_clim]
+    grid_shelf   = "SRG-250M"         ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_err"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)

@@ -12,7 +12,7 @@
     use_esm         = True             ! use ESM snapshots?   
     esm_name        = "UKESM"           ! esm model, if homogeneous: applied homogeneous forcing
 
-    ! Forcing switches (the smb source is [comps] smb_method)
+    ! Forcing switches (the smb source is [comps] surface_method)
     use_var         = False             ! include climate variability
     use_hist        = False             ! load historical period
     use_proj        = False             ! load projection period
@@ -652,8 +652,8 @@
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = ""                 ! isostasy [grid_ice]
     grid_clim    = ""                 ! reference climate + transient forcing [grid_ice]
-    grid_smb     = ""                 ! surface mass balance [grid_clim]
-    grid_mshlf   = ""                 ! marine shelf [grid_hub]
+    grid_surface = ""                 ! surface mass balance [grid_clim]
+    grid_shelf   = ""                 ! marine shelf [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
@@ -675,15 +675,16 @@
 &comps
     ! Components: which are active, with which model, how often.
     ! Empty grids default to the Yelmo grid, so esm (grid_clim), smbpal
-    ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
+    ! (grid_surface) and marine_shelf (grid_shelf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
     climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
+    surface_method  = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
 /
 
@@ -704,12 +705,12 @@
 /
 
 &output
-    write_yelmo = True
-    write_isos  = True
-    write_mshlf = True
-    write_smb   = True
-    write_clim  = False        ! the climate's file (snap.nc; esm.nc + esm_ts.nc)
-    write_htopo = True
-    write_cmip  = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip     = 1.0          ! [yr] its interval
+    write_yelmo   = True
+    write_isos    = True
+    write_shelf   = True
+    write_surface = True
+    write_clim    = False        ! the climate's file (snap.nc; esm.nc + esm_ts.nc)
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
 /

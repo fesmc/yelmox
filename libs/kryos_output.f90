@@ -63,10 +63,10 @@ contains
             call htopo_write_init(dom%topo, trim(io_fname(outfldr,"htopo")), time_init=time)
         if (dom%ctl%write_isos) &
             call io_dims_init(trim(io_fname(outfldr,"isos")),   dom%ctl%grid_isos,  time)
-        if (dom%ctl%write_mshlf) &
-            call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_mshlf, time)
-        if (dom%ctl%write_smb) &
-            call io_dims_init(trim(io_fname(outfldr,"smbpal")), dom%ctl%grid_smb,   time)
+        if (dom%ctl%write_shelf) &
+            call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_shelf, time)
+        if (dom%ctl%write_surface) &
+            call io_dims_init(trim(io_fname(outfldr,"smbpal")), dom%ctl%grid_surface,   time)
         if (dom%ctl%write_clim) then
             call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
             call climate_write_init(dom%cl, trim(io_fname(outfldr,climate_file_base(dom%cl))))
@@ -97,9 +97,9 @@ contains
             call htopo_write_step(dom%topo, trim(io_fname(outfldr,"htopo")), time)
         if (dom%ctl%write_isos) &
             call isos_write_step(dom%isos, trim(io_fname(outfldr,"isos")), time)
-        if (dom%ctl%write_mshlf) &
+        if (dom%ctl%write_shelf) &
             call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf")), time)
-        if (dom%ctl%write_smb) &
+        if (dom%ctl%write_surface) &
             call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
         if (dom%ctl%write_clim) &
             call clim_write_step(dom, trim(io_fname(outfldr,climate_file_base(dom%cl))), time)

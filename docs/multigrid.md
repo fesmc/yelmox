@@ -110,7 +110,7 @@ type kryos_domain
     type(yelmox_climate_class) :: cl     ! climate backend ([comps] climate)
     type(climate_out_class)    :: clim   ! backend-agnostic climate output (now/ref)
     type(smbpal_class)         :: smb
-    type(smb_simple_class)     :: smbs   ! smb_method = "smb_simple"
+    type(smb_simple_class)     :: smbs   ! surface_method = "smb_simple"
     type(sediments_class)      :: sed
     type(geothermal_class)     :: gthrm
     type(phys_const_class)     :: cnst   ! physical constants, shared by every component
@@ -151,8 +151,8 @@ default:
     grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
     grid_isos    = ""           ! isostasy                             [grid_ice]
     grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
-    grid_smb     = ""           ! surface mass balance                 [grid_clim]
-    grid_mshlf   = ""           ! marine shelf                         [grid_hub]
+    grid_surface = ""           ! surface mass balance                 [grid_clim]
+    grid_shelf   = ""           ! marine shelf                         [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)

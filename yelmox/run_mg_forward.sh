@@ -54,8 +54,8 @@ run_fwd() {
 
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
         -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
-           domain.grid_mshlf="$mgrid" domain.grid_isos="$ygrid" \
-           domain.grid_clim=ANT-32KM domain.grid_smb="$ygrid" \
+           domain.grid_shelf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_surface="$ygrid" \
            ctrl.restart="$restart" sim.opt=False \
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \

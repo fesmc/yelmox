@@ -26,7 +26,7 @@ res_params=(
 
 ctrl_params=(
     "ctrl.run_step=spinup"
-    "comps.smb_method=climate"
+    "comps.surface_method=climate"
     "sim.opt=True"
     "spinup.time_end=15e3"
     "sim.init_kill_shelves=True"

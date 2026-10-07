@@ -24,6 +24,17 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- Components named by the boundary they supply: `surface` (mass balance +
+  temperature) and `shelf` (shelf-base melt + temperature). Keys:
+  `with_marine_shelf` -> `with_shelf`, `smb_method` -> `surface_method` (values
+  unchanged), `grid_smb` -> `grid_surface`, `grid_mshlf` -> `grid_shelf`,
+  `write_smb` -> `write_surface`, `write_mshlf` -> `write_shelf`; new
+  `[comps] with_surface` (the surface was switched by `with_climate` before).
+  `with_surface` and `with_shelf` need `with_climate` (else the run stops).
+  Routines: `step_smb` -> `step_surface`, `step_marine_shelf` -> `step_shelf`,
+  `couple_smb_to_yelmo` -> `couple_surface_to_yelmo`, `couple_marine_to_yelmo`
+  -> `couple_shelf_to_yelmo`. Output files keep the model names (`smbpal.nc`,
+  `mshlf.nc`).
 - `[coupling]` is split into `[comps]` (`with_*`, `climate`, `smb_method`,
   `dt_clim`: which components are active, with which model, how often) and
   `[sim]` (the conditions of the simulation: cold-start ice state, optimization,

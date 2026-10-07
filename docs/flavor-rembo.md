@@ -20,7 +20,7 @@ the surface mass balance; the ocean comes from snapclim.
 
 - **Grid.** REMBO runs on the grid it was compiled for (Greenland, GRL-16KM),
   which must be `grid_clim`; the backend checks this at start-up.
-- **Surface mass balance.** `[comps] smb_method = "climate"`: REMBO's smb and
+- **Surface mass balance.** `[comps] surface_method = "climate"`: REMBO's smb and
   surface temperature, at the current surface. REMBO gives annual fields only, so
   smbpal and smb_simple are not available with it.
 - **Update cadence.** `[comps] dt_clim = dtt`: REMBO updates its energy balance

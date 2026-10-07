@@ -2,7 +2,7 @@ module cmip_output
     ! CMIP/ISMIP-formatted output of the ice sheet ([output] write_cmip, every
     ! dt_cmip): 2D fields (yelmo_cmip.nc) and 1D integrals (yelmo_ts_cmip.nc),
     ! from Yelmo and the marine shelf. The marine-shelf fields are read on the
-    ! Yelmo grid (grid_mshlf == grid_ice).
+    ! Yelmo grid (grid_shelf == grid_ice).
     !
     !   cmip_write_init      create both files
     !   write_step_2D_cmip   CMIP/ISMIP-formatted 2D output

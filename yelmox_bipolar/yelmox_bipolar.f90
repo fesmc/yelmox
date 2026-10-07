@@ -32,7 +32,7 @@ program yelmox_bipolar
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_spinup_tuning, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
-                               step_smb, step_marine_shelf
+                               step_surface, step_shelf
     use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
                                restart_bundle_dir, restart_bundle_mkdir
     use kryos_output,   only : domain_write_init, domain_write_step, &
@@ -170,14 +170,14 @@ program yelmox_bipolar
             call step_icesheet(dom_north, ts)
             call couple_yelmo_to_htopo(dom_north)
             call step_climate(dom_north, ts)
-            call step_smb(dom_north, ts)
+            call step_surface(dom_north, ts)
         end if
         if (active_south) then
             call couple_to_yelmo(dom_south)
             call step_icesheet(dom_south, ts)
             call couple_yelmo_to_htopo(dom_south)
             call step_climate(dom_south, ts)
-            call step_smb(dom_south, ts)
+            call step_surface(dom_south, ts)
         end if
 
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
@@ -186,8 +186,8 @@ program yelmox_bipolar
                           ts%time, ts%time_init, dtt)
 
         ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.
-        if (active_north) call step_marine_shelf(dom_north, ts)
-        if (active_south) call step_marine_shelf(dom_south, ts)
+        if (active_north) call step_shelf(dom_north, ts)
+        if (active_south) call step_shelf(dom_south, ts)
     end do
 
     write(*,*)
@@ -229,8 +229,8 @@ contains
             call domain_startup(dom, ts, bsl, trim(restart)//"/"//trim(dom%ctl%domain), &
                                 restore_bsl=.false.)
             call step_climate(dom, ts)
-            call step_smb(dom, ts)
-            call step_marine_shelf(dom, ts)
+            call step_surface(dom, ts)
+            call step_shelf(dom, ts)
         end if
 
         write(*,*)

@@ -20,10 +20,10 @@ module kryos_coupling
     implicit none
     private
 
-    public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_marine_shelf
-    public :: step_smb, couple_yelmo_to_htopo
+    public :: step_spinup_tuning, step_isostasy, step_icesheet, step_climate, step_shelf
+    public :: step_surface, couple_yelmo_to_htopo
     public :: couple_to_yelmo
-    public :: couple_isostasy_to_yelmo, couple_smb_to_yelmo, couple_marine_to_yelmo
+    public :: couple_isostasy_to_yelmo, couple_surface_to_yelmo, couple_shelf_to_yelmo
     public :: couple_climate_to_yelmo
     public :: check_isostasy_reference
 
@@ -47,7 +47,7 @@ contains
 
         if (.not. dom%ctl%opt) return
 
-        gm = trim(dom%ctl%grid_mshlf)
+        gm = trim(dom%ctl%grid_shelf)
         gy = trim(dom%ctl%grid_ice)
 
         ! Topography relaxation ramp (gl + grounding-zone relaxing while active).
@@ -135,8 +135,8 @@ contains
         type(kryos_domain), intent(inout) :: dom
 
         call couple_isostasy_to_yelmo(dom)
-        call couple_smb_to_yelmo(dom)
-        call couple_marine_to_yelmo(dom)
+        call couple_surface_to_yelmo(dom)
+        call couple_shelf_to_yelmo(dom)
         call couple_climate_to_yelmo(dom)
     end subroutine couple_to_yelmo
 
@@ -251,24 +251,24 @@ contains
         end if
     end subroutine check_isostasy_reference
 
-    subroutine couple_smb_to_yelmo(dom)
+    subroutine couple_surface_to_yelmo(dom)
         ! Surface mass balance + surface temperature from the active SMB model
-        ! (grid_smb -> Yelmo, conservative), with the we->ie unit scaling and the
-        ! optional Greenland modifications. The producing step (step_smb,
-        ! or a flavor climate step) leaves smb/tsrf on grid_smb in the SMB model's
+        ! (grid_surface -> Yelmo, conservative), with the we->ie unit scaling and the
+        ! optional Greenland modifications. The producing step (step_surface,
+        ! or a flavor climate step) leaves smb/tsrf on grid_surface in the SMB model's
         ! own fields; this coupler is the single place that lands them on Yelmo.
         type(kryos_domain), intent(inout) :: dom
 
         real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:), ta_y(:,:), ta_pd_y(:,:)
         character(len=256) :: gs, gc, gy
 
-        if (.not. dom%ctl%with_climate) return
+        if (.not. dom%ctl%with_surface) return
 
-        gs = trim(dom%ctl%grid_smb)
+        gs = trim(dom%ctl%grid_surface)
         gc = trim(dom%ctl%grid_clim)
         gy = trim(dom%ctl%grid_ice)
 
-        if (trim(dom%ctl%smb_method) == "smb_simple") then
+        if (trim(dom%ctl%surface_method) == "smb_simple") then
             call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
             call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
         else
@@ -293,26 +293,26 @@ contains
             where(dom%yelmo%dta%pd%H_ice <= 0.0_wp) &
                 dom%yelmo%bnd%smb = dom%yelmo%bnd%smb - 4.0_wp
         end if
-    end subroutine couple_smb_to_yelmo
+    end subroutine couple_surface_to_yelmo
 
-    subroutine couple_marine_to_yelmo(dom)
-        ! Basal mass balance + shelf temperature from marine_shelf (grid_mshlf ->
+    subroutine couple_shelf_to_yelmo(dom)
+        ! Basal mass balance + shelf temperature from marine_shelf (grid_shelf ->
         ! Yelmo, conservative).
         type(kryos_domain), intent(inout) :: dom
 
         real(wp), allocatable :: bmb_y(:,:), Tshlf_y(:,:)
         character(len=256) :: gm, gy
 
-        if (.not. dom%ctl%with_marine_shelf) return
+        if (.not. dom%ctl%with_shelf) return
 
-        gm = trim(dom%ctl%grid_mshlf)
+        gm = trim(dom%ctl%grid_shelf)
         gy = trim(dom%ctl%grid_ice)
 
         call remap(dom, dom%mshlf%now%bmb_shlf, gm, bmb_y,   gy, "con")
         call remap(dom, dom%mshlf%now%T_shlf,   gm, Tshlf_y, gy, "con")
         dom%yelmo%bnd%bmb_shlf = bmb_y
         dom%yelmo%bnd%T_shlf   = Tshlf_y
-    end subroutine couple_marine_to_yelmo
+    end subroutine couple_shelf_to_yelmo
 
     subroutine step_icesheet(dom, ts)
         ! Advance Yelmo one coupling step on the boundary state assembled by
@@ -334,7 +334,7 @@ contains
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend into dom%clim,
-        ! read by step_smb, step_marine_shelf and couple_climate_to_yelmo. tsf
+        ! read by step_surface, step_shelf and couple_climate_to_yelmo. tsf
         ! (optional) is the driver-owned transient forcing; the backend applies
         ! it in its own way. init=.true. marks the cold start: the update runs
         ! regardless of the cadence.
@@ -371,13 +371,13 @@ contains
                             dtt=dom%ctl%dtt, mshlf=dom%mshlf, tsf=tsf, init=is_init)
     end subroutine step_climate
 
-    subroutine step_smb(dom, ts, init)
-        ! Surface mass balance on grid_smb. Three methods: smbpal (default; monthly,
+    subroutine step_surface(dom, ts, init)
+        ! Surface mass balance on grid_surface. Three methods: smbpal (default; monthly,
         ! needs tas/pr + geometry), smb_simple (needs z_srf + sea-level
         ! temperature) or the climate's own (climate: esm, rembo). Geometry comes from the hi-res hub, atmospheric forcing from
         ! the climate (grid_clim). init=.true. runs the smbpal ITM equilibration before
-        ! the first update. The result stays on grid_smb in the SMB model's fields
-        ! (dom%smb%ann or dom%smbs); couple_smb_to_yelmo lands it on the Yelmo grid.
+        ! the first update. The result stays on grid_surface in the SMB model's fields
+        ! (dom%smb%ann or dom%smbs); couple_surface_to_yelmo lands it on the Yelmo grid.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         logical, intent(in), optional    :: init
@@ -388,24 +388,24 @@ contains
         character(len=256) :: gc, gs, gh, gy
         logical :: is_init
 
-        if (.not. dom%ctl%with_climate) return
+        if (.not. dom%ctl%with_surface) return
 
         is_init = .false.
         if (present(init)) is_init = init
 
         gc = trim(dom%ctl%grid_clim)
-        gs = trim(dom%ctl%grid_smb)
+        gs = trim(dom%ctl%grid_surface)
         gh = trim(dom%ctl%grid_hub)
         gy = trim(dom%ctl%grid_ice)
 
-        if (trim(dom%ctl%smb_method) == "climate") then
+        if (trim(dom%ctl%surface_method) == "climate") then
             ! The climate's own surface mass balance and surface temperature, at
             ! the current surface.
             call remap(dom, dom%clim%now%smb,  gc, smb_s,  gs, "bilin")
             call remap(dom, dom%clim%now%tsrf, gc, tsrf_s, gs, "bilin")
             dom%smb%ann%smb  = smb_s
             dom%smb%ann%tsrf = tsrf_s
-        else if (trim(dom%ctl%smb_method) == "smb_simple") then
+        else if (trim(dom%ctl%surface_method) == "smb_simple") then
             ! smb_simple: surface elevation + sea-level temperature, masked to the
             ! reference ice extent (refreshed each call in case H_ice_ref changed).
             call remap(dom, dom%topo%z_srf,          gh, z_srf_s, gs, "bilin")
@@ -425,7 +425,7 @@ contains
             end if
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if
-    end subroutine step_smb
+    end subroutine step_surface
 
     subroutine couple_yelmo_to_htopo(dom)
         ! Land Yelmo's state on the hub's current geometry. On the Yelmo grid
@@ -458,11 +458,11 @@ contains
         end if
     end subroutine couple_yelmo_to_htopo
 
-    subroutine step_marine_shelf(dom, ts)
+    subroutine step_shelf(dom, ts)
         ! Run marine_shelf on its own grid: geometry/masks from the hub, ocean
         ! forcing from the climate, as depth profiles (interpolated to the shelf
-        ! base here) or already at the shelf base (has_ocn_shelf). The outputs stay on grid_mshlf (in dom%mshlf%now);
-        ! couple_marine_to_yelmo lands bmb_shlf / T_shlf on the Yelmo grid.
+        ! base here) or already at the shelf base (has_ocn_shelf). The outputs stay on grid_shelf (in dom%mshlf%now);
+        ! couple_shelf_to_yelmo lands bmb_shlf / T_shlf on the Yelmo grid.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
@@ -472,9 +472,9 @@ contains
         real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
         character(len=256) :: gm, gh, gc
 
-        if (.not. dom%ctl%with_marine_shelf) return
+        if (.not. dom%ctl%with_shelf) return
 
-        gm = trim(dom%ctl%grid_mshlf)
+        gm = trim(dom%ctl%grid_shelf)
         gh = trim(dom%ctl%grid_hub)
         gc = trim(dom%ctl%grid_clim)
 
@@ -494,7 +494,7 @@ contains
             call remap(dom, dom%clim%now%dT_shlf, gc, dom%mshlf%now%dT_shlf, gm, "bilin")
             call remap(dom, dom%clim%now%dS_shlf, gc, dom%mshlf%now%dS_shlf, gm, "bilin")
             call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
-                    z_sl_m, dx=dom%ctl%dx_mshlf, z_srf=z_srf_m)
+                    z_sl_m, dx=dom%ctl%dx_shelf, z_srf=z_srf_m)
             return
         end if
 
@@ -504,11 +504,11 @@ contains
         dto_y = dom%clim%now%to_ann - dom%clim%ref%to_ann
         call remap(dom, dto_y, gc, dto_m, gm, "bilin")
 
-        ! run marine_shelf on grid_mshlf
+        ! run marine_shelf on grid_shelf
         call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
-                dom%ctl%dx_mshlf, dom%clim%now%depth, to_m, so_m, dto_ann=dto_m)
+                dom%ctl%dx_shelf, dom%clim%now%depth, to_m, so_m, dto_ann=dto_m)
         call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
-                z_sl_m, dx=dom%ctl%dx_mshlf, z_srf=z_srf_m)
-    end subroutine step_marine_shelf
+                z_sl_m, dx=dom%ctl%dx_shelf, z_srf=z_srf_m)
+    end subroutine step_shelf
 
 end module kryos_coupling
