@@ -34,6 +34,10 @@ annotated git tag. Dates are release (tag) dates.
   `beta_q = 0.2`) and `ytherm.use_strain_sia` by `strain_heating = "full"`. All par files
   take `pc_tol = 1` (was 5), `bkt_floating_mode = 0` (was 1) and the default `de_max = 100`
   (was 0.5). Ice-sheet results change.
+- Follows yelmo dev (6fad9a11): `&yhyd` K24 keys renamed as in FastHydrology dev
+  (fesmc/FastHydrology#14), e.g. `k24_ub_hook` -> `k24_N_ub_coupled`, `k24_eta_w` ->
+  `k24_water_viscosity` (full list in the yelmo changelog); new `k24_kappa_z_hard` /
+  `k24_kappa_z_soft`. Values unchanged. Needs FastHydrology dev 8e681d0 or later.
 - `[opt] opt_cf` and `opt_tf` are methods instead of switches: `opt_cf = "none" | "L21"`,
   `opt_tf = "none" | "L21" | "L21-points"`. `"L21"` optimizes one `tf_corr` per basin
   (`optimize_tf_corr_basin`, `tf_basins`), `"L21-points"` each point (`optimize_tf_corr`,

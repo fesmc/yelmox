@@ -216,7 +216,9 @@
     ! each key maps to is named in the trailing comment.
 
     ! -- mode selectors --
-    k24_substrate_type               = 2        ! 0=HARD 1=SOFT 2=MIXED (Fortran-only; builds kappa)
+    k24_substrate_type               = 2        ! 0=HARD 1=SOFT 2=MIXED (binary, z_bed<-1000) 3=MIXED_SMOOTH (ramp); 4=EXTERNAL not supported by yelmo (Fortran-only; builds kappa)
+    k24_kappa_z_hard                 = -500.0   ! MIXED_SMOOTH: z_bed at/above which the bed is hard, kappa = 0 [m]
+    k24_kappa_z_soft                 = -1500.0  ! MIXED_SMOOTH: z_bed at/below which the bed is soft, kappa = 1 [m]
     k24_flux_solver                  = 3        ! 0=RECURSIVE 1=ITERATIVE 2=TOPOSORT (GDS_WARNER only) 3=TAPED (default)
     k24_routing_scheme               = 0        ! 0=WARNER 1=GDS_WARNER (original K24) 2=QUINN 3=TARBOTON 4=MODIFIED_TARBOTON 5=GDS_TARBOTON
     k24_quinn_original               = False    ! QUINN only: Quinn et al.'s own slope x contour-length weights
@@ -228,25 +230,25 @@
     k24_friction_quadrature          = False    ! STAGGERED only: Yelmo's qb_method=2 Gauss-point heat
     k24_friction_u_floor             = 3.168808781402895e-11 ! [m/s] = 1e-3 m/yr, STAGGERED beta floor
     k24_toposort_allow_cycles        = False    ! TopologicalPsiOut(allow_cycles=...)
-    k24_ub_hook                      = True     ! DIVA velocity iteration re-evaluates K24 N from u_b (hydro_N_from_ub); False = N once per step
+    k24_N_ub_coupled                 = True     ! DIVA velocity iteration re-evaluates K24 N from u_b (hydro_N_from_ub); False = N once per step
     k24_drainage_mode                = 0        ! 0=BOTH 1=EFFICIENT_ONLY 2=INEFFICIENT_ONLY
     k24_water_thickness_algorithm    = 0        ! 0=DARCY_WEISBACH 1=LAMINAR 2=AREAL_CONDUIT
     k24_gradient_convention          = 0        ! 0=MEAN 1=LOCAL (Darcy-Weisbach / laminar closures only)
     k24_sliding_law                  = 0        ! 0=NO_FRICTION 1=WEERTMAN 2=POWER_PLASTIC 3=REG_COULOMB 4=PRESCRIBED_FIELD 5=REG_COULOMB_FIELD 6=SHAKTI_REG_COULOMB
 
     ! -- physical constants --
-    k24_manning_exponent             = 3.0      ! n, Glen's flow-law exponent
+    k24_glen_n                       = 3.0      ! n, Glen's flow-law exponent
     k24_latent_heat_water            = 3.335e5  ! L_w [J/kg]; overridden by yelmo L_ice (phys_const)
-    k24_bed_thickness                = 0.1      ! h_b, bed obstacle height [m]
-    k24_manning_coefficient_exponent = 1.25     ! alpha = 5/4
-    k24_bed_friction_exponent        = 1.5      ! beta  = 3/2
+    k24_bed_bump_height              = 0.1      ! h_b, bed obstacle height [m]
+    k24_flux_W_exponent              = 1.25     ! alpha = 5/4
+    k24_flux_grad_exponent           = 1.5      ! beta  = 3/2
     k24_friction_factor              = 0.1      ! f, Darcy-Weisbach friction factor
     k24_till_factor                  = 1.1      ! F_till
     k24_critical_discharge           = 1.0      ! Q_c [m3/s]
-    k24_initial_cavity_height        = 0.1      ! H_0 [m]
-    k24_coupling_length              = 1.0e4    ! l_c, conduit spacing [m]
+    k24_H0_efficient                 = 0.1      ! H_0 [m]
+    k24_conduit_spacing              = 1.0e4    ! l_c, conduit spacing [m]
     k24_coupling_length_kamb86       = 10.0     ! Kamb & Echelmeyer (1986) coupling length / ice thickness; 0 disables the smoothing entirely
-    k24_eta_w                        = 5.703855806525211e-11 ! eta_w [Pa s] = 1.8e-3 per year
+    k24_water_viscosity              = 5.703855806525211e-11 ! water_viscosity [Pa s] = 1.8e-3 per year
 
     ! -- clamps. Julia's constructor leaves all of these OFF; KORI-ULB's own
     !    values are given in the comments if you want that fidelity back.
@@ -263,9 +265,9 @@
     k24_max_dissipation_iters        = 20       ! max_dissipation_iters
     k24_dissipation_rtol             = 1.0e-12  ! dissipation_rtol
     k24_dissipation_verbose          = True     ! dissipation_verbose
-    k24_max_coupling_iters           = 20       ! max_coupling_iters  (N-dependent sliding laws)
-    k24_coupling_rtol                = 1.0e-8   ! coupling_rtol
-    k24_coupling_verbose             = True     ! coupling_verbose
+    k24_max_qN_iters                 = 20       ! max_qN_iters        (N-dependent sliding laws)
+    k24_qN_rtol                      = 1.0e-8   ! qN_rtol
+    k24_qN_verbose                   = True     ! qN_verbose
 
     ! -- sliding-law parameters. Only the set belonging to k24_sliding_law is
     !    read; C / c_till are mandatory keywords in Julia and default to 0 here,

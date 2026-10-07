@@ -252,19 +252,19 @@
     ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
     k24_flux_solver                  = 3
-    k24_manning_exponent             = 3.0
+    k24_glen_n                       = 3.0
     k24_latent_heat_water            = 3.35e5
-    k24_bed_thickness                = 0.1
-    k24_manning_coefficient_exponent = 1.25
-    k24_bed_friction_exponent        = 1.5
+    k24_bed_bump_height              = 0.1
+    k24_flux_W_exponent              = 1.25
+    k24_flux_grad_exponent           = 1.5
     k24_friction_factor              = 0.1
     k24_till_factor                  = 1.1
     k24_critical_discharge           = 1.0
-    k24_initial_cavity_height        = 0.1
-    k24_coupling_length              = 1.0e4
+    k24_H0_efficient                 = 0.1
+    k24_conduit_spacing              = 1.0e4
     k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
-    k24_eta_w                        = 1.8e-3
+    k24_water_viscosity              = 1.8e-3
     k24_W_min                        = 1.0e-8
     k24_W_max                        = 0.015
 /
