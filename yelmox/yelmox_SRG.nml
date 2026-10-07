@@ -8,6 +8,7 @@
     time_init       = 0.0               ! [yr] Starting time
     time_end        = 200.0             ! [yr] Ending time
     dtt             = 5.0               ! [yr] Main loop timestep
+    restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
 
 &coupling
@@ -20,7 +21,6 @@
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
-    restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
     ! Optional switches.
     scale_glacial_smb       = False

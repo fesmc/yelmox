@@ -2,6 +2,7 @@
     run_step        = "spinup"
     calendar        = True              ! timeline in calendar years (tstep_const = calendar time)
     calendar_ref    = 2000.0            ! [yr CE] calendar reference
+    restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
 
 &esm
@@ -674,7 +675,7 @@
 /
 
 &coupling
-    ! Coupling: active components + methods, restart.
+    ! Coupling: active components + methods.
     ! Empty grids default to the Yelmo grid, so esm (grid_clim), smbpal
     ! (grid_smb) and marine_shelf (grid_mshlf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
@@ -687,7 +688,6 @@
     climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     smb_method      = "smbpal" ! "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
-    restart    = "None"        ! restart bundle folder, or "None" for a cold start
 
     ! Optional switches.
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)

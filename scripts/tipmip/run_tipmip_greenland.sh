@@ -92,7 +92,7 @@ case "${1:-}" in
            esm.par_file="$par" esm.use_esm=True esm.use_hist=False esm.use_proj=True \
            domain.grid_hub="$GRID" \
            transient.time_end="$tend" \
-           coupling.restart="$BUNDLE"
+           ctrl.restart="$BUNDLE"
     done
     ;;
   *)

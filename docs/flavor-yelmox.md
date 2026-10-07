@@ -112,7 +112,6 @@ missing key stops the run), except the keys of an unselected `init_method`.
 | `smb_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
 | `equil_method` | `none`, `opt` | `opt`: spin-up optimization of the basal friction and the thermal-forcing correction (`[opt]`) |
-| `restart` | folder, `"None"` | restart bundle to start from; `"None"` = cold start |
 | `init_method` | `none`, `equil`, `recon`, `recon_ref` | cold-start ice state: as initialized; a short equilibration with constant boundaries; the reconstruction `recon_path` as initial ice on the `recon_codes` regions; the reconstruction as reference ice only |
 | `init_equil_time` | [yr] | `equil`: equilibration time |
 | `recon_path`, `recon_var` | path, name | `recon`, `recon_ref`: the reconstruction file (`{domain}`, `{grid_name}` = `grid_ice`) and its ice-thickness variable |
@@ -139,7 +138,8 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 | `write_htopo` | `htopo.nc` (the hub) |
 | `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_mshlf = grid_ice`) |
 
-Restart bundles follow `[tm_rst]`, plus one at `time_end`.
+Restart bundles follow `[tm_rst]`, plus one at `time_end`. `[ctrl] restart` is
+the bundle to start from (`"None"` = cold start).
 
 ## Also built from this driver
 

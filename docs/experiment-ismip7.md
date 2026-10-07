@@ -47,7 +47,7 @@ scripts/ismip7/run_ismip7_greenland.sh scenarios
 
 The spin-up passes `ctrl.run_step=spinup coupling.equil_method="opt"`; each
 scenario passes `ctrl.run_step=transient`, `esm.use_esm/use_hist/use_proj=True`
-and `coupling.restart` = the bundle `<OUTROOT>/spinup/restart-<SPINUP_YEARS/1e3>-kyr`
+and `ctrl.restart` = the bundle `<OUTROOT>/spinup/restart-<SPINUP_YEARS/1e3>-kyr`
 as an absolute path (the run starts inside its own folder).
 
 **Other grids.** The full input set exists for `GRL-8KM`, `GRL-16KM` and

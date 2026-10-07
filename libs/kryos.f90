@@ -101,9 +101,6 @@ module kryos
         logical  :: south   = .false.           ! southern hemisphere (from the grid_clim latitude)
         character(len=256) :: grid_smb = ""     ! smb grid (default = grid_clim)
 
-        ! Restart bundle folder ([coupling]); "None" = cold start.
-        character(len=512) :: restart = "None"
-
         ! Per-module output switches ([output]); each module -> its own file.
         logical :: write_yelmo = .true.
         logical :: write_isos  = .true.
@@ -517,9 +514,6 @@ contains
                            &recon or recon_ref; got "//trim(ctl%init_method)
                 stop 1
         end select
-
-        ctl%restart = "None"
-        call nml_read(path_par, gc, "restart",        ctl%restart)
 
         ! Per-module output switches ([output<suffix>]); default = write everything.
         go = "output"//trim(suffix)

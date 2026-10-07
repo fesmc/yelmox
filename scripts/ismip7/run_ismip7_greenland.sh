@@ -66,7 +66,7 @@ case "${1:-}" in
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.use_esm=True esm.use_hist=True esm.use_proj=True \
            domain.grid_hub="$GRID" \
-           coupling.restart="$BUNDLE" \
+           ctrl.restart="$BUNDLE" \
            transient.time_init=2015 transient.time_end="$PROJ_END"
     done
     ;;

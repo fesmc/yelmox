@@ -19,12 +19,15 @@ across both domains plus the OBM.
   → `domain_startup`. Either can be individually deactivated (`active_north` /
   `active_south`).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup
-  (`bsl_startup`) and written to the run-root restart bundle.
+  (`bsl_startup`) and written to the run restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
   (`obm_masks_init`, `obm_exchange`). The OBM writes its own 1D output; its restart
-  (`obm_restart.nc`) goes into the run-root restart bundle next to `bsl_restart.nc`
-  and is read back from `[ctrl] restart_bsl`.
+  (`obm_restart.nc`) goes into the run restart bundle next to `bsl_restart.nc`.
+- **One restart bundle per run** — `restart-<kyr>-kyr/` holds the shared
+  `bsl_restart.nc` and `obm_restart.nc`, and each domain in a subfolder named
+  after it (`Greenland/`, `Antarctica/`). `[ctrl] restart` is the bundle to start
+  from.
 
 Climate/SMB per domain is still **snapclim + smbpal**, exactly as in the
 single-domain driver; the OBM's contribution is folded into the ocean forcing —

@@ -52,10 +52,11 @@ contains
         call bsl_restart_read(bsl, trim(fldr)//"/bsl_restart.nc")
     end subroutine bsl_startup
 
-    subroutine domain_startup(dom, ts, bsl, restore_bsl, tsf)
-        ! Establish the domain state after domain_init: cold start (ctl%restart
-        ! == "None") builds the initial boundary state; otherwise the restart
-        ! bundle is restored and the hi-res hub rebuilt from the restored models.
+    subroutine domain_startup(dom, ts, bsl, restart, restore_bsl, tsf)
+        ! Establish the domain state after domain_init: cold start (restart
+        ! == "None") builds the initial boundary state; otherwise the domain's
+        ! restart bundle (folder `restart`) is restored and the hi-res hub rebuilt
+        ! from the restored models.
         ! restore_bsl (default .true.) also restores the shared bsl from the same
         ! bundle folder -- the single-domain convention, where the run-level
         ! bsl_restart.nc lives in the domain's bundle. Multi-domain drivers
@@ -66,6 +67,7 @@ contains
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
+        character(len=*),  intent(in)    :: restart
         logical, intent(in), optional    :: restore_bsl
         type(tsforcing_class), intent(in), optional :: tsf   ! transient forcing (cold start)
 
@@ -74,11 +76,11 @@ contains
         do_bsl = .true.
         if (present(restore_bsl)) do_bsl = restore_bsl
 
-        if (trim(dom%ctl%restart) == "None") then
+        if (trim(restart) == "None") then
             call domain_init_state(dom, ts, bsl, tsf=tsf)
         else
-            if (do_bsl) call bsl_startup(bsl, trim(dom%ctl%restart))
-            call domain_restart_read(dom, trim(dom%ctl%restart), ts, bsl)
+            if (do_bsl) call bsl_startup(bsl, trim(restart))
+            call domain_restart_read(dom, trim(restart), ts, bsl)
             call couple_yelmo_to_htopo(dom)
         end if
     end subroutine domain_startup
@@ -88,7 +90,7 @@ contains
         ! restart (+ the driver-owned tsforcing state, when present) into one
         ! folder. By default the auto-named per-time folder; `fldr` overrides it
         ! (e.g. the forcing-increment "restart-<n>" folders). Multi-domain drivers
-        ! write per-domain bundles + one run-root bsl bundle themselves.
+        ! write the run-level files themselves, each domain into a subfolder.
         type(kryos_domain),      intent(inout)        :: dom
         type(bsl_class),       intent(inout)        :: bsl
         real(wp),              intent(in)           :: time
@@ -302,57 +304,43 @@ contains
 
     end subroutine domain_init_recon
 
-    function restart_bundle_dir(time, outfldr) result(bundle)
-        ! Auto-named per-time restart bundle folder: "<outfldr>restart-<kyr>-kyr".
-        ! Shared by domain_restart_write and the driver (for the shared bsl bundle)
-        ! so a domain's sub-model restarts and the run's bsl restart use identical
-        ! folder naming.
-        real(wp),         intent(in)           :: time
-        character(len=*), intent(in), optional :: outfldr
-        character(len=1024) :: bundle
+    function restart_bundle_dir(time) result(bundle)
+        ! Auto-named per-time restart bundle folder of the run: "restart-<kyr>-kyr".
+        ! A single-domain run writes the domain's files into it; a multi-domain
+        ! run writes each domain into a subfolder named after the domain.
+        real(wp), intent(in) :: time
+        character(len=1024)  :: bundle
 
-        character(len=1024) :: prefix
-        character(len=32)   :: time_str
+        character(len=32) :: time_str
 
-        prefix = ""
-        if (present(outfldr)) prefix = trim(outfldr)
         write(time_str,"(f20.3)") time*1e-3
-        bundle = trim(prefix)//"restart-"//trim(adjustl(time_str))//"-kyr"
+        bundle = "restart-"//trim(adjustl(time_str))//"-kyr"
     end function restart_bundle_dir
 
-    subroutine restart_bundle_mkdir(time, outfldr)
-        ! Create the auto-named restart bundle folder (mkdir -p). The driver uses
-        ! this for the shared bsl_restart.nc, which is written outside
-        ! domain_restart_write (which creates its own per-domain bundle folder) and
-        ! so needs its folder created explicitly.
-        real(wp),         intent(in)           :: time
-        character(len=*), intent(in), optional :: outfldr
-        call execute_command_line('mkdir -p "'//trim(restart_bundle_dir(time, outfldr))//'"')
+    subroutine restart_bundle_mkdir(time)
+        ! Create the auto-named restart bundle folder (mkdir -p). Multi-domain
+        ! drivers use this for the run-level files (bsl, obm), written outside
+        ! domain_restart_write (which creates its own folder).
+        real(wp), intent(in) :: time
+        call execute_command_line('mkdir -p "'//trim(restart_bundle_dir(time))//'"')
     end subroutine restart_bundle_mkdir
 
-    subroutine domain_restart_write(dom, time, fldr, outfldr)
-        ! Write a restart bundle: a folder (per time, or `fldr`) holding one
-        ! restart file per stateful sub-model with fixed names. The hi-res hub is
-        ! not written -- it is rebuilt by couple_yelmo_to_htopo from the restored
+    subroutine domain_restart_write(dom, time, fldr)
+        ! Write a domain restart bundle: the folder `fldr` holding one restart
+        ! file per stateful sub-model with fixed names. The hi-res hub is not
+        ! written -- it is rebuilt by couple_yelmo_to_htopo from the restored
         ! models.
         ! The shared barystatic sea level is NOT written here -- the driver owns it
         ! and writes a single bsl_restart.nc for the whole run.
-        ! `outfldr` (optional) prefixes the auto-named per-time folder, so each
-        ! domain of a multi-domain run writes into its own subfolder.
         type(kryos_domain), intent(inout) :: dom
         real(wp),         intent(in)    :: time
-        character(len=*), intent(in), optional :: fldr
-        character(len=*), intent(in), optional :: outfldr
+        character(len=*), intent(in)    :: fldr
 
         character(len=1024) :: bundle
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_sl_c(:,:)
         character(len=256) :: gc, gh
 
-        if (present(fldr)) then
-            bundle = trim(fldr)
-        else
-            bundle = restart_bundle_dir(time, outfldr)
-        end if
+        bundle = trim(fldr)
 
         call execute_command_line('mkdir -p "'//trim(bundle)//'"')
 

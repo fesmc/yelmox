@@ -17,4 +17,4 @@ if [ ! -d "${restart}" ]; then
 fi
 
 runme -rs -q shared -e yelmox -w 2-00:00:00 -m 10G -n yelmox/yelmox_Antarctica_paleo_lgp.nml -o "${output_path}" \
-      -p coupling.restart="${restart}"
+      -p ctrl.restart="${restart}"

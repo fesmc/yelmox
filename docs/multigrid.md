@@ -245,11 +245,12 @@ Both programs use the same driver plumbing:
   give `cal` / `time_ref` (calendar years, e.g. ESM runs). `domain_init` takes
   the same group name (`timeline_group`) and reads the values the domain needs
   (`tstep_method`, `dtt`) itself.
-- **`domain_startup(dom, ts, bsl [, restore_bsl, tsf])`** (`kryos_startup`) —
-  cold start (`domain_init_state`) or restart-bundle restore + hub rebuild.
-  `yelmox` restores the shared bsl from the same bundle; `yelmox_bipolar`
-  restores it once via **`bsl_startup(bsl, fldr)`** and passes
-  `restore_bsl=.false.`.
+- **`domain_startup(dom, ts, bsl, restart [, restore_bsl, tsf])`**
+  (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
+  restore of the domain bundle `restart` + hub rebuild. The driver reads
+  `[ctrl] restart`. `yelmox` restores the shared bsl from the same bundle;
+  `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
+  each domain its subfolder of the bundle and `restore_bsl=.false.`.
 - **`domain_init_ice(dom, ts)`** — the cold-start ice state after
   `yelmo_init_state` (`[coupling]` `kill_shelves`, `init_marine_H`,
   `init_method`, `time_equil_thrm`; see [yelmox](flavor-yelmox.md#configuration)).

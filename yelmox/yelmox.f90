@@ -44,6 +44,9 @@ program yelmox
     logical            :: calendar
     real(wp)           :: calendar_ref
 
+    ! Restart bundle folder to start from ([ctrl]); "None" = cold start.
+    character(len=512) :: restart
+
     ! Transient time-series forcing (tsgen), owned by the driver. The single
     ! forcing value f_now is mapped onto the climate anomalies via per-channel
     ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
@@ -59,6 +62,7 @@ program yelmox
     call nml_read(path_par, "ctrl", "run_step",     run_step)
     call nml_read(path_par, "ctrl", "calendar",     calendar)
     call nml_read(path_par, "ctrl", "calendar_ref", calendar_ref)
+    call nml_read(path_par, "ctrl", "restart",      restart)
     call tstep_init(ts, path_par, trim(run_step), dtt, time_ref=calendar_ref, cal=calendar)
 
     ! Single-domain runs write to the run dir.
@@ -80,15 +84,15 @@ program yelmox
     ! anomalies as the time loop. tsforcing reads [tsforcing] + [tsgen]; on a
     ! restart run, resume the series from the saved tsgen state in the bundle.
     call tsforcing_init(tsf, path_par, ts%time)
-    if (trim(dom%ctl%restart) /= "None") call tsforcing_restart_read(tsf, trim(dom%ctl%restart))
+    if (trim(restart) /= "None") call tsforcing_restart_read(tsf, trim(restart))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
     ! then re-establish the climate/smb and marine-shelf forcing from the
     ! restored state (the bundle does not hold them), so the first step and the
     ! first output see a valid boundary state.
-    call domain_startup(dom, ts, bsl, tsf=tsf)
-    if (trim(dom%ctl%restart) /= "None") then
+    call domain_startup(dom, ts, bsl, trim(restart), tsf=tsf)
+    if (trim(restart) /= "None") then
         call step_climate(dom, ts, tsf)
         call step_smb(dom, ts)
         call step_marine_shelf(dom, ts)

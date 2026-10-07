@@ -24,6 +24,12 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- The restart bundle to start from is `[ctrl] restart` (was `[coupling] restart`;
+  in `yelmox_bipolar`, `[ctrl] restart_bsl` and `[coupling_<sfx>] restart`). The
+  driver reads it and passes it to `domain_startup(dom, ts, bsl, restart, ...)`.
+  `yelmox_bipolar` writes one bundle per run: `restart-<kyr>-kyr/` holds the
+  shared bsl and obm restarts and each domain in a subfolder named after it
+  (was `<domain>/restart-<kyr>-kyr/`).
 - Follows yelmo dev (2c3d3449; needs yelmo dev at or after 9e93696d): `input/yelmo_defaults.nml`
   gains `ydyn.ssa_vel_lim_method` (default `"drag"`, a smooth speed-limit drag) and
   `ssa_vel_lim_tau`; all par files take `ssa_vel_max = 10000` (was 5000) and

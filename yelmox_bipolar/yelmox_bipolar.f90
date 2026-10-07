@@ -48,7 +48,7 @@ program yelmox_bipolar
     character(len=512) :: path_par
     type(tstep_class)  :: ts
     type(bsl_class)    :: bsl                 ! shared, driver-owned sea level
-    character(len=512) :: restart_bsl
+    character(len=512) :: restart             ! run restart bundle ([ctrl]), or "None"
 
     ! Two explicit hemispheric domains (bipolar: never more than north + south).
     type(kryos_domain)   :: dom_north, dom_south
@@ -83,12 +83,12 @@ program yelmox_bipolar
     call obm_ctl_load(oc, path_par)
 
     ! === Shared, driver-owned barystatic sea level (one per run, common to both
-    !     domains). Restored once from the run-level restart bundle ([ctrl]
-    !     restart_bsl, which also holds the OBM restart) when restarting. ===
+    !     domains). Restored once from the run restart bundle ([ctrl] restart,
+    !     which also holds the OBM restart and a subfolder per domain). ===
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
-    call nml_read(path_par, "ctrl", "restart_bsl", restart_bsl)
-    call bsl_startup(bsl, restart_bsl)
+    call nml_read(path_par, "ctrl", "restart", restart)
+    call bsl_startup(bsl, restart)
 
     ! === Per-domain initialization ===
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
@@ -102,7 +102,7 @@ program yelmox_bipolar
     if (oc%active_obm) then
         obm_file    = trim(oc%obm_name)//".nc"
         obm_restart = "None"
-        if (trim(restart_bsl) /= "None") obm_restart = trim(restart_bsl)//"/obm_restart.nc"
+        if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
         call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
     end if
@@ -134,8 +134,8 @@ program yelmox_bipolar
         if (active_south) call write_domain_step(dom_south, outfldr_south)
         if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
 
-        ! Run-level restart bundle at the run root (shared bsl + obm), next to
-        ! the per-domain bundles.
+        ! Run restart bundle: the shared bsl + obm here, each domain in its
+        ! subfolder (write_domain_step).
         if (do_rst) then
             call restart_bundle_mkdir(ts%time)
             call bsl_restart_write(bsl, trim(restart_bundle_dir(ts%time))//"/bsl_restart.nc", ts%time)
@@ -218,13 +218,16 @@ contains
 
         call domain_regions_init(dom, trim(outfldr))
 
-        ! Cold start or per-domain restart; the shared bsl was already
-        ! initialized/restored once by the driver (bsl_startup above). On a
-        ! restart, re-establish the climate/smb and marine-shelf forcing from the
-        ! restored state (the bundle does not hold them), so the first step and
-        ! the first output see a valid boundary state.
-        call domain_startup(dom, ts, bsl, restore_bsl=.false.)
-        if (trim(dom%ctl%restart) /= "None") then
+        ! Cold start or restart from the domain's subfolder of the run bundle;
+        ! the shared bsl was already initialized/restored once by the driver
+        ! (bsl_startup above). On a restart, re-establish the climate/smb and
+        ! marine-shelf forcing from the restored state (the bundle does not hold
+        ! them), so the first step and the first output see a valid boundary state.
+        if (trim(restart) == "None") then
+            call domain_startup(dom, ts, bsl, "None", restore_bsl=.false.)
+        else
+            call domain_startup(dom, ts, bsl, trim(restart)//"/"//trim(dom%ctl%domain), &
+                                restore_bsl=.false.)
             call step_climate(dom, ts)
             call step_smb(dom, ts)
             call step_marine_shelf(dom, ts)
@@ -251,16 +254,18 @@ contains
     end subroutine write_domain_init
 
     subroutine write_domain_step(dom, outfldr)
-        ! Append 2D/1D records and write the domain restart bundle on the shared
-        ! cadence (do_2D/do_2Dsm/do_1D/do_rst, set by the driver at the top of
-        ! the loop); the driver writes the single shared bsl (+ obm) restart.
+        ! Append 2D/1D records and write the domain into its subfolder of the run
+        ! restart bundle on the shared cadence (do_2D/do_2Dsm/do_1D/do_rst, set
+        ! by the driver at the top of the loop); the driver writes the single
+        ! shared bsl (+ obm) restart.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)
         if (do_2Dsm) call domain_write_step_sm(dom, trim(outfldr), ts%time)
         if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time)
-        if (do_rst)  call domain_restart_write(dom, ts%time, outfldr=trim(outfldr))
+        if (do_rst)  call domain_restart_write(dom, ts%time, &
+                         fldr=trim(restart_bundle_dir(ts%time))//"/"//trim(dom%ctl%domain))
     end subroutine write_domain_step
 
 end program yelmox_bipolar
