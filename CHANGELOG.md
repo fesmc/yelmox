@@ -28,6 +28,12 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- Follows yelmo dev (f78eaa91): `input/yelmo_defaults.nml` gains `yelmo.pc_rho_max` (2)
+  and `ytherm.gl_temperate` (True); `ydyn.slide_T`/`gamma_T`/`lambda_min` are replaced by
+  `frz_scale`/`frz_efold`/`frz_min` (3 K, 1e-3; sliding-speed e-fold, was ~0.2 K for
+  `beta_q = 0.2`) and `ytherm.use_strain_sia` by `strain_heating = "full"`. All par files
+  take `pc_tol = 1` (was 5), `bkt_floating_mode = 0` (was 1) and the default `de_max = 100`
+  (was 0.5). Ice-sheet results change.
 - `[opt] opt_cf` and `opt_tf` are methods instead of switches: `opt_cf = "none" | "L21"`,
   `opt_tf = "none" | "L21" | "L21-points"`. `"L21"` optimizes one `tf_corr` per basin
   (`optimize_tf_corr_basin`, `tf_basins`), `"L21-points"` each point (`optimize_tf_corr`,
