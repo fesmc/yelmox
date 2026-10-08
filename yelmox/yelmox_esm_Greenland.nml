@@ -481,8 +481,6 @@
 &chion
     model           = "itm"                          ! Snowpack model (surface_chion supports itm)
     nml_itm         = "itm"                          ! ITM parameters: shared with smbpal
-    phys_const_file = "input/chion_phys_const.nml"   ! Physical constants file
-    phys_const      = "Earth"                        ! Group within phys_const_file
 /
 
 &marine_shelf

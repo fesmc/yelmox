@@ -33,6 +33,7 @@ module surface_chion
     ! Only model = "itm" is supported: the host supplies ITM's forcing only.
 
     use nml,        only : nml_read
+    use phys_constants, only : phys_const_class, sec_day
     use insolation, only : calc_insol_day
     use chion,      only : wp, dp, wp_acc, MV, chion_class, chion_init, chion_init_state, &
                            chion_update, chion_end, chion_set_active_mask, &
@@ -107,13 +108,15 @@ module surface_chion
 
 contains
 
-    subroutine surface_chion_init(sc, filename, lats, group, chion_group)
+    subroutine surface_chion_init(sc, filename, lats, group, chion_group, cnst)
         ! Parameters, chion (cold state) and the annual fields on an (nx,ny) grid.
+        ! chion takes its shared physical constants from the domain's record.
         type(surface_chion_class), intent(inout) :: sc
         character(len=*),          intent(in)    :: filename
         real(wp),                  intent(in)    :: lats(:,:)      ! [deg N]
         character(len=*),          intent(in)    :: group          ! &surface_chion
         character(len=*),          intent(in)    :: chion_group    ! &chion
+        type(phys_const_class),    intent(in)    :: cnst
 
         call surface_chion_par_load(sc%par, filename, group)
 
@@ -121,7 +124,7 @@ contains
         sc%ny   = size(lats,2)
         sc%ncol = sc%nx*sc%ny
 
-        call chion_init(sc%chn, filename, sc%ncol, group=chion_group)
+        call chion_init(sc%chn, filename, sc%ncol, group=chion_group, cnst=cnst)
 
         if (trim(sc%chn%par%model) /= "itm") then
             write(*,*) "surface_chion_init:: error: only chion model = itm is supported &
@@ -186,7 +189,7 @@ contains
 
         nday = sc%md%nday_year
         dt   = real(sc%par%dt_days, wp)
-        spd  = sc%chn%c%seconds_per_day
+        spd  = real(sec_day, wp)
         T0   = sc%chn%c%T0
 
         ! Active columns, from the current geometry: land or ice.

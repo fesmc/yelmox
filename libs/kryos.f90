@@ -340,7 +340,8 @@ contains
         ! grid_surface point, latitude for the host-supplied insolation.
         if (trim(dom%ctl%surface_method) == "chion") then
             call surface_chion_init(dom%schn, path_par, lats_s, &
-                                    group="surface_chion"//trim(sfx), chion_group="chion"//trim(sfx))
+                                    group="surface_chion"//trim(sfx), chion_group="chion"//trim(sfx), &
+                                    cnst=dom%cnst)
         end if
 
         ! --- marine_shelf on its configured grid (grid_y already read above) ---
