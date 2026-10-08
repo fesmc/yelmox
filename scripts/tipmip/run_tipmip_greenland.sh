@@ -1,39 +1,40 @@
 #!/usr/bin/env bash
 #
-# TIPMIP forcing-only workflow for Greenland (yelmox, climate = esm) -- SCAFFOLD.
+# TIPMIP workflow for Greenland (yelmox, climate = esm).
 #
-#   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
-#   Step 2  scenarios  TIPMIP experiment(s), each branched off that bundle
+#   Step 1  spinup          15-kyr present-day OPTIMIZED ice-sheet spin-up
+#                           (sim.opt=True, as ISMIP7) -> writes a restart bundle
+#   Step 2  ramp            esm-up2p0 (232 yr), branched off the spin-up bundle;
+#                           also writes restart bundles at the stabilisation
+#                           branch years
+#   Step 3  stabilisations  esm-up2p0-gwl2p0 / -gwl4p0 (50 yr), each branched off
+#                           the ramp's bundle at its branch year
 #
-# All runs are forcing-only (comps.with_ice_sheet=False, with_isostasy=False):
-# they produce climate + ocean forcing from the TIPMIP piControl anomalies
-# (tas_anomaly / pr_ratio / TF_anomaly). See input/esm/esm_grl_tipmip.nml and its
-# header for the anomaly-referencing assumptions and scaffold caveats.
+# The ice sheet + isostasy are ACTIVE. The forcing is the TIPMIP piControl anomalies
+# (tas_anomaly / pr_ratio / TF_anomaly) on top of the MAR + ERA-INT-ORAS4 reference
+# climatology; TIPMIP has no salinity (dso = 0) or subglacial discharge (Qd = 0).
+# See input/esm/esm_grl_tipmip.nml (ramp) and esm_grl_tipmip_gwl.nml (stabilisations).
 #
-# Run the steps in order on the cluster; let the spin-up finish first:
+# Run the steps in order on the cluster; let each finish before the next (they read
+# the previous step's restart bundles):
 #
 #   scripts/tipmip/run_tipmip_greenland.sh spinup
-#   scripts/tipmip/run_tipmip_greenland.sh scenarios
+#   scripts/tipmip/run_tipmip_greenland.sh ramp
+#   scripts/tipmip/run_tipmip_greenland.sh stabilisations
 #
 # Stage only (create dirs + SLURM submit script, do NOT submit): STAGE=1
 #
 #   STAGE=1 scripts/tipmip/run_tipmip_greenland.sh spinup
 #
 # MODELS (select with the MODEL env var, default ipsl):
-#   MODEL=ipsl     IPSL-CM6-ESMCO2 @ GRL-8KM -- RAMP (esm-up2p0, 232 yr) + both
-#                  STABILISATIONS (esm-up2p0-gwl2p0/-gwl4p0, 50 yr). All verified.
-#   MODEL=ecearth  EC-Earth3-ESM-1 @ GRL-4KM -- RAMP only.  *** UNTESTED / DATA-PENDING ***
-#                  The EC-Earth TIPMIP anomaly files DO exist at GRL-4KM, but the
-#                  GRL-4KM reference climatology is not on this machine yet:
-#                  ice_data/Greenland/GRL-4KM/ERA-INT-ORAS4/ is EMPTY (no ocean ref)
-#                  and the GRL-4KM MAR file lacks a combined `pr` (sf/rf only, and a
-#                  filename without the _with_pr suffix). Once those are staged at the
-#                  conventional {grid_name} paths, this should run unchanged.
+#   MODEL=ipsl     IPSL-CM6-ESMCO2 @ GRL-8KM -- ramp + both stabilisations
+#   MODEL=ecearth  EC-Earth3-ESM-1 @ GRL-4KM -- ramp only (no stabilisations)
 #
 # The stabilisations start already warm, so they use a separate par_file
 # (esm_grl_tipmip_gwl.nml) that pins esm_ref to the ramp's piControl branch point
-# (zero reference) with a 50-yr projection clock; the scenarios step below overrides
-# esm.par_file + transient.time_end per experiment (see the per-model RUNS table).
+# (zero reference) with a 50-yr projection clock (years 0..49). They branch off the
+# ramp at the years their forcing continues from: gwl2p0 at ramp year 109,
+# gwl4p0 at ramp year 232 (the ramp's end).
 #
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
@@ -41,29 +42,27 @@ cd "$(dirname "$0")/../.." || exit 1               # repo root
 # ---- configuration ---------------------------------------------------------
 EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
 NML="yelmox/yelmox_esm_Greenland_tipmip.nml"
-SPINUP_YEARS=10                                    # forcing-only: short suffices
+SPINUP_YEARS=15000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=15e3)
+RAMP_YEARS=232                                     # esm-up2p0
+STAB_YEARS=50                                      # esm-up2p0-gwl*
 MODEL="${MODEL:-ipsl}"                             # ipsl | ecearth
 
-# Per-model config + scenario table (experiment | par_file -> esm.par_file | time_end).
-# Ramp uses the base par nml (232 yr); stabilisations use the gwl par nml (50 yr,
-# ramp-referenced zero baseline). See the esm_grl_tipmip*.nml headers.
+# Per-model config + stabilisation table (experiment | ramp branch year).
 case "$MODEL" in
   ipsl)
     GCM="IPSL-CM6-ESMCO2"; GRID="GRL-8KM"; OUTROOT="output/tipmip_grl_ipsl"
-    HPCOPT="-q compute -w 02:00:00 --omp 8"
-    RUNS=(
-      "esm-up2p0         input/esm/esm_grl_tipmip.nml      232"
-      "esm-up2p0-gwl2p0  input/esm/esm_grl_tipmip_gwl.nml   50"
-      "esm-up2p0-gwl4p0  input/esm/esm_grl_tipmip_gwl.nml   50"
+    HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 8"
+    HPCOPT_SCEN="-q compute -w 02:00:00 --omp 8"
+    STABS=(
+      "esm-up2p0-gwl2p0  109"
+      "esm-up2p0-gwl4p0  232"
     )
     ;;
   ecearth)
-    # UNTESTED / DATA-PENDING (see header): ramp only -- EC-Earth has no stabilisations.
     GCM="EC-Earth3-ESM-1"; GRID="GRL-4KM"; OUTROOT="output/tipmip_grl_ecearth"
-    HPCOPT="-q compute -w 08:00:00 --omp 16"        # GRL-4KM: larger grid
-    RUNS=(
-      "esm-up2p0  input/esm/esm_grl_tipmip.nml  232"
-    )
+    HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 32"   # GRL-4KM: verify the spin-up fits the queue limit
+    HPCOPT_SCEN="-q compute -w 08:00:00 --omp 16"
+    STABS=()
     ;;
   *) echo "unknown MODEL='$MODEL' (use: ipsl | ecearth)" >&2; exit 1 ;;
 esac
@@ -71,32 +70,55 @@ esac
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
 
+# yelmox names restart bundles restart-<time/1e3 %.3f>-kyr. Absolute paths: the
+# executable runs from inside the run dir, so a repo-root-relative path would not resolve.
+bundle() { echo "$(pwd)/$1/restart-$(awk "BEGIN{printf \"%.3f\", $2/1000}")-kyr"; }
 SPINUP_OUT="$OUTROOT/spinup"
-# Absolute path: the executable runs from inside the scenario's run dir.
-BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1000}")-kyr"
+RAMP_OUT="$OUTROOT/esm-up2p0"
+
+# Ramp restart times: every stabilisation branch year (the end is always written).
+RST_TIMES=""
+for row in ${STABS[@]+"${STABS[@]}"}; do
+  read -r _ yr <<<"$row"
+  RST_TIMES="${RST_TIMES:+$RST_TIMES,}$yr"
+done
 
 # ---- steps -----------------------------------------------------------------
 case "${1:-}" in
   spinup)
-    runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup esm.experiment=ctrl esm.esm_name="$GCM" \
+    runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
+      -p ctrl.run_step=spinup sim.relax=True sim.opt=True \
+         esm.experiment=ctrl esm.esm_name="$GCM" \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
-  scenarios)
-    # Ramp then both stabilisations, each restart-branched off the spin-up bundle.
-    for row in "${RUNS[@]}"; do
-      read -r exp par tend <<<"$row"
-      runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
+  ramp)
+    rst=()
+    # "==" passes the list as one vector value (a plain comma list is a runme ensemble)
+    [ -n "$RST_TIMES" ] && rst=(tm_rst.method=times "tm_rst.times==$RST_TIMES")
+    runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$RAMP_OUT" \
+      -p ctrl.run_step=transient esm.experiment=esm-up2p0 esm.esm_name="$GCM" \
+         esm.par_file=input/esm/esm_grl_tipmip.nml \
+         esm.use_esm=True esm.use_hist=False esm.use_proj=True \
+         domain.grid_hub="$GRID" \
+         transient.time_init=0 transient.time_end="$RAMP_YEARS" \
+         ctrl.restart="$(bundle "$SPINUP_OUT" "$SPINUP_YEARS")" ${rst[@]+"${rst[@]}"}
+    ;;
+  stabilisations)
+    if [ ${#STABS[@]} -eq 0 ]; then echo "MODEL=$MODEL has no stabilisations." >&2; exit 1; fi
+    for row in "${STABS[@]}"; do
+      read -r exp yr <<<"$row"
+      runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
         -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
-           esm.par_file="$par" esm.use_esm=True esm.use_hist=False esm.use_proj=True \
+           esm.par_file=input/esm/esm_grl_tipmip_gwl.nml \
+           esm.use_esm=True esm.use_hist=False esm.use_proj=True \
            domain.grid_hub="$GRID" \
-           transient.time_end="$tend" \
-           ctrl.restart="$BUNDLE"
+           transient.time_init=0 transient.time_end="$STAB_YEARS" \
+           ctrl.restart="$(bundle "$RAMP_OUT" "$yr")"
     done
     ;;
   *)
-    echo "usage: [MODEL=ipsl|ecearth] $0 {spinup|scenarios}   (prefix STAGE=1 to stage without submitting)" >&2
+    echo "usage: [MODEL=ipsl|ecearth] $0 {spinup|ramp|stabilisations}   (prefix STAGE=1 to stage without submitting)" >&2
     exit 1
     ;;
 esac

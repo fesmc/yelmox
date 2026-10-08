@@ -1,5 +1,5 @@
 ! ============================================================================
-! TIPMIP Greenland ESM forcing (SCAFFOLD) -- derived from esm_grl_ismip7.nml.
+! TIPMIP Greenland ESM forcing -- RAMP (esm-up2p0); derived from esm_grl_ismip7.nml.
 !
 ! TIPMIP provides forcing as monthly gridded ANOMALIES/RATIOS relative to the
 ! model's piControl baseline, not absolute fields:
@@ -12,17 +12,15 @@
 ! run's time_esm_ref set to the start of the ramp (anomaly ~ 0, ratio ~ 1) this
 ! recovers dts ~ tas_anomaly, dpr ~ pr_ratio directly.
 !
-! SCAFFOLD CAVEATS -- verify before scientific use:
-!  - Reference-at-start is clean for the RAMP (esm-up2p0, starts near 0). The
-!    STABILISATIONS (esm-up2p0-gwl2p0/gwl4p0) start already warm (+3.7/+6.3 K),
-!    so a start reference mis-references them; they need a true zero baseline
-!    (a zeros/ones esm_ref field, or an anomaly-direct code path).
-!  - Salinity (so_*) and subglacial discharge (sgd/Qd) have no TIPMIP field, so
-!    those groups still point at the ISMIP7 GRL data below (approximation).
+! Notes:
+!  - The stabilisations (esm-up2p0-gwl2p0/gwl4p0) start already warm; they use
+!    esm_grl_tipmip_gwl.nml, which keeps the ramp's zero reference.
+!  - Salinity (so_*) has no TIPMIP field: those groups point at the gcm-free ORAS4
+!    reference (dso = 0). Subglacial discharge has none either: sgd groups are
+!    "none" (Qd = 0).
 !  - TF_anomaly carries NaN fill in some ocean cells (as ISMIP7 tf does); the
 !    2D ocean forcing tolerates it and the 1D diagnostic masks it (ocn_mean).
-!  - time = 1,0,231,1,12 matches the 232-yr ramp; the 50-yr stabilisations need
-!    their own step count/range.
+!  - time = 1,0,231,1,12 matches the 232-yr ramp.
 ! ============================================================================
 
 ! =========== ATMOSPHERE ===========
@@ -209,7 +207,7 @@
 /
 
 &gcm_sgd_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/{grid_name}_{gcm}_historical_1850-2014_sgd.nc"
+    filename    = "none"                ! TIPMIP has no subglacial discharge: Qd = 0
     name        = "sgd"
     units       = "m3 s-1" "K"
     scaling     = 1.0 1
@@ -236,12 +234,8 @@
 /
 
 &gcm_sgd_proj
-    ! SCAFFOLD placeholder: TIPMIP has no subglacial-discharge field, so point at
-    ! a LITERAL existing ISMIP7 sgd file (CESM2-WACCM ssp585). Its 2015-2300 axis
-    ! sits entirely above the TIPMIP 0..232 run clock, so the "extrap" slice used
-    ! for Qd_proj clamps to the 2015 boundary slice (a constant). Qd is diagnostic
-    ! only here (forcing-only, with_ice_sheet=False); replace for scientific use.
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/CESM2-WACCM/ssp585/SDBN1/sgd/{grid_name}_CESM2-WACCM_ssp585_2015-2300_sgd.nc"
+    ! TIPMIP has no subglacial-discharge field: filename = "none" gives Qd = 0.
+    filename    = "none"
     name        = "sgd"
     units       = "m3 s-1" "K"
     scaling     = 1.0 1

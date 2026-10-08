@@ -18,9 +18,9 @@
 !   the reference the ramp uses for itself, so ramp and stabilisations are consistent.
 !   => *_esm_ref filenames hardcode .../esm-up2p0/... ; *_proj keep {experiment}.
 !
-! CAVEATS (same as ramp) -- verify before scientific use:
-!  - Salinity (so_*) and subglacial discharge (sgd/Qd) have no TIPMIP field, so
-!    those groups point at gcm-free ORAS4 (dso=0) / a literal ISMIP7 sgd placeholder.
+! Notes (as for the ramp):
+!  - Salinity (so_*) has no TIPMIP field: gcm-free ORAS4 (dso = 0). Subglacial
+!    discharge has none either: sgd groups are "none" (Qd = 0).
 !  - TF_anomaly carries NaN fill in some ocean cells (as ISMIP7 tf does); the
 !    2D ocean forcing tolerates it and the 1D diagnostic masks it (ocn_mean).
 !  - *_proj time = 1,0,49,1,12 matches the 50-yr stabilisation files; *_esm_ref
@@ -216,7 +216,7 @@
 /
 
 &gcm_sgd_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/{grid_name}_{gcm}_historical_1850-2014_sgd.nc"
+    filename    = "none"                ! TIPMIP has no subglacial discharge: Qd = 0
     name        = "sgd"
     units       = "m3 s-1" "K"
     scaling     = 1.0 1
@@ -243,12 +243,8 @@
 /
 
 &gcm_sgd_proj
-    ! SCAFFOLD placeholder: TIPMIP has no subglacial-discharge field, so point at
-    ! a LITERAL existing ISMIP7 sgd file (CESM2-WACCM ssp585). Its 2015-2300 axis
-    ! sits entirely above the TIPMIP 0..232 run clock, so the "extrap" slice used
-    ! for Qd_proj clamps to the 2015 boundary slice (a constant). Qd is diagnostic
-    ! only here (forcing-only, with_ice_sheet=False); replace for scientific use.
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/CESM2-WACCM/ssp585/SDBN1/sgd/{grid_name}_CESM2-WACCM_ssp585_2015-2300_sgd.nc"
+    ! TIPMIP has no subglacial-discharge field: filename = "none" gives Qd = 0.
+    filename    = "none"
     name        = "sgd"
     units       = "m3 s-1" "K"
     scaling     = 1.0 1
