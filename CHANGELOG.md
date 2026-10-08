@@ -34,6 +34,10 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- `scripts/check_par_nml.py` follows yelmo's defaults file: it reports keys of yelmo groups
+  missing from `input/yelmo_defaults.nml` (what `nml_validate` stops on) and duplicate
+  groups/keys, no longer omitted parameters; `--dead` also reports non-yelmo keys that no
+  source reads. Checks `yelmox/*.nml` and `yelmox_bipolar/*.nml` by default.
 - **ISMIP7 geothermal heat flux**: the ObsISMIP7 GHF (W/m2) was never converted and,
   with `obs_err_name` = the GHF itself, clamped to 0.1 mW/m2 everywhere. Fixed
   (`convert_ghf_units = True`, `obs_err_name = "none"`); ISMIP7 spin-ups must be redone.
