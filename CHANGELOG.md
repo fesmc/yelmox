@@ -28,6 +28,10 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- `ytopo.gl_sep = 3` instead of 2 in `yelmox_esm_Antarctica*.nml` and the ISMIP7/1pctCO2
+  optimization scripts (`opt_ant.sh`, `opt_grl*.sh`): yelmo (b7049784) removes `gl_sep = 2`,
+  which gave `f_grnd = 0` to cells grounded at their centre next to deep ocean (GRL-16KM
+  spin-up killed at t = 1 yr). Needs fesm-utils cc3f719.
 - Follows yelmo dev (f78eaa91): `input/yelmo_defaults.nml` gains `yelmo.pc_rho_max` (2)
   and `ytherm.gl_temperate` (True); `ydyn.slide_T`/`gamma_T`/`lambda_min` are replaced by
   `frz_scale`/`frz_efold`/`frz_min` (3 K, 1e-3; sliding-speed e-fold, was ~0.2 K for

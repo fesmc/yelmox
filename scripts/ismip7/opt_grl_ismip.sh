@@ -66,7 +66,7 @@ hyd_params=(
 
 topo_params=(
     "ytopo.bmb_gl_method=pmp"
-    "ytopo.gl_sep=2"
+    "ytopo.gl_sep=3"
     "ytopo.fmb_method=1"
     "ytopo.fmb_scale=10"
 )

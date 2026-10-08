@@ -222,8 +222,8 @@
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
-    gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    gl_sep              = 1                 ! 1: binary f_grnd, linear f_grnd_acx/acy; 3: grounded area of H_grnd bilinear between cell centres (Leguy et al., 2021)
+    gz_nx               = 15                ! [-] Subgrid points per side (gz_nx*gz_nx) of the grounding-zone melt, bmb_gl_method = "pmpt"
 
     ! bmb_gl_method = pmpt
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)

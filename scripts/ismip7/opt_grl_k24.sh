@@ -46,7 +46,7 @@ opt_params=(
 
 topo_params=(
     "ytopo.bmb_gl_method=pmp"
-    "ytopo.gl_sep=2"
+    "ytopo.gl_sep=3"
 )
 
 calv_params=(
