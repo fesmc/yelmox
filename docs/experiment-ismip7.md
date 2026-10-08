@@ -38,7 +38,7 @@ scripts/ismip7/run_ismip7_greenland.sh scenarios
 
 | Setting | Greenland | Antarctica | |
 |---|---|---|---|
-| `GRID` | `GRL-8KM` | `ANT-8KM` | `[domain] grid_hub` |
+| `GRID` | `GRL-8KM` | `ANT-16KM` | `[domain] grid_hub` |
 | `GCM` | `CESM2-WACCM` | `CESM2-WACCM` | `[esm] esm_name` |
 | `SCENARIOS` | `ssp126 ssp370 ssp585` | `ssp585` | `[esm] experiment` |
 | `SPINUP_YEARS` | 15000 | 20000 | `[spinup] time_end`, matches `[opt] cf/tf_time_end` |
@@ -51,8 +51,9 @@ and `ctrl.restart` = the bundle `<OUTROOT>/spinup/restart-<SPINUP_YEARS/1e3>-kyr
 as an absolute path (the run starts inside its own folder).
 
 **Other grids.** The full input set exists for `GRL-8KM`, `GRL-16KM` and
-`ANT-8KM`, `ANT-16KM`, `ANT-32KM` (GRL-4KM lacks the ORAS4 reference ocean). The Antarctic par file reads the Earth structure
-of ANT-8KM (`[isos] rheology_file`): with another grid, also pass
+`ANT-8KM`, `ANT-16KM`, `ANT-32KM` (GRL-4KM: inputs present since 2026-10, not yet
+tested). The Antarctic par file reads the Earth structure of ANT-16KM
+(`[isos] rheology_file`): with another grid, also pass
 `isos.rheology_file=isostasy_data/earth_structure/yelmo/<GRID>_GIA_HR24.nc`
 (as `opt_ant.sh` does).
 

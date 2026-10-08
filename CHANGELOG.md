@@ -6,6 +6,12 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- 1pctCO2 (Greenland, Antarctica) and TIPMIP (Greenland) finished: ice sheet and isostasy
+  on, ISMIP7-like optimization spin-up; TIPMIP stabilisations branch off the ramp's
+  restarts (years 109, 232). 1pctCO2 reads the global CMIP fields of `[esm] esm_name`
+  (default MPI-ESM1-2-LR) with online remapping (fesm-utils `varslice` `remap`/`grid_src`).
+- `[ghf] convert_ghf_units` (W/m2 -> mW/m2); missing (negative) GHF values are filled
+  from the nearest valid value.
 - Greenland ISMIP7 setup with the K24 basal hydrology: `yelmox/yelmox_esm_Greenland_k24.nml`
   (`yelmox_esm_Greenland.nml` with `method_transport = 1`, so K24 sets N_eff, and
   `k24_sliding_law = 4`, so K24 takes Yelmo's basal stress and its water source includes
@@ -28,6 +34,23 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- **ISMIP7 geothermal heat flux**: the ObsISMIP7 GHF (W/m2) was never converted and,
+  with `obs_err_name` = the GHF itself, clamped to 0.1 mW/m2 everywhere. Fixed
+  (`convert_ghf_units = True`, `obs_err_name = "none"`); ISMIP7 spin-ups must be redone.
+- `[esm]` subglacial discharge is read only if the sgd group's `filename` is not
+  `"none"` (Qd = 0), instead of always for Greenland; `[esm] grid_src` removed (unused).
+- `climate_init`/`esm_forcing_init` take the climate `grid_class` instead of its name and size.
+- `kryos` builds no Yelmo<->hub maps when the grids are the same.
+- `sed.method` is read (was uninitialised); `use_obs` keys replaced by `method`.
+- Greenland par files use `TOPO-M17-v5`; pd_Greenland/pd_Antarctica rebuilt from
+  yelmox_Greenland/Antarctica (present-day climate, 50 kyr); production run lengths
+  (Antarctica 15 kyr, ESM spin-ups 15/20 kyr) instead of bring-up values.
+- Par files: dead keys removed (timeline `use_hist`/`use_proj`, `snap_pd.is_ref`,
+  `opt.tf_time`, `opt.cf_ref_wais`, `marine_shelf.basin_name/basin_bmb`,
+  `isos.dt_prognostics`, Pyrenees `*_L21`); `opt.basin_fill` added where missing;
+  personal paths removed. `input/snap_index` (link into a home directory) removed.
+- `.runme/info.json`: the REMBO namelist is staged for `yelmox` runs (its key was
+  still the removed `yelmox_rembo` executable).
 - Build: yelmox objects depend on `libfesmutils.a`, `libyelmo.a` and `libisostasy.a`
   (`climate_rembo.o` also on `librembo.a`), so a type change in a dependency rebuilds
   them instead of leaving a stale layout (fesmc/FastHydrology#10). Needs fesm-utils,

@@ -326,7 +326,6 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
@@ -363,7 +362,6 @@
     opt_tf          = "L21-points"      ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 50e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
@@ -447,7 +445,7 @@
     pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
-    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_path       = "none"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /
@@ -640,7 +638,7 @@
     basin_number    = 1             ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
-    tf_correction   = False        ! yelmox bring-up: mshlf runs from remapped snapclim forcing (no grid-specific tf file)
+    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped snapclim forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  
@@ -676,8 +674,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
@@ -715,6 +711,7 @@
     obs_err_name = "ghf_sigma"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 /
 
@@ -1162,7 +1159,7 @@
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
     tf_correction   = False
-    tf_path         = "ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    tf_path         = "none"
     tf_name         = "dT_nl"
  
     bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
@@ -1197,8 +1194,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
@@ -1223,6 +1218,7 @@
     obs_err_name = "ghf_sigma"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 /
 
@@ -1296,7 +1292,7 @@
     grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
     grid_surface = "GRL-32KM"         ! surface mass balance [grid_clim]
     grid_shelf   = "GRL-32KM"         ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17-v5.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
     regions_var  = "mask"

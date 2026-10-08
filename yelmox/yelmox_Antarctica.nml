@@ -6,7 +6,7 @@
     tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
     tstep_const     = 0.0               ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time
-    time_end        = 20                ! [yr] Ending time (short, for yelmox bring-up)
+    time_end        = 15e3              ! [yr] Ending time
     dtt             = 10.0              ! [yr] Main loop timestep
     restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
@@ -54,7 +54,6 @@
     opt_tf          = "L21-points"      ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 50e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
@@ -291,7 +290,6 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
@@ -340,7 +338,7 @@
     pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
-    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_path       = "none"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /
@@ -559,7 +557,7 @@
     basin_number    = 1             ! 1 2 3
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
-    tf_correction   = False        ! yelmox bring-up: mshlf runs from remapped snapclim forcing (no grid-specific tf file)
+    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped snapclim forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  
@@ -595,8 +593,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
@@ -634,6 +630,7 @@
     obs_err_name = "ghf_sigma"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 /
 

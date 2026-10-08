@@ -24,8 +24,14 @@ projection periods, optional climate variability and subglacial discharge.
   variability switches (`clim_var`, `clim_seed`).
 - **Experiment.** `[esm]`: `par_file` (the ESM data configuration in `input/esm/`),
   `experiment`, `esm_name`, `use_esm` / `use_var` / `use_hist` / `use_proj`, and
-  the physical parameters `lapse`, `f_p`, `f_ocn`, `f_polar`, `dT_threshold`,
-  `grid_src`.
+  the physical parameters `lapse`, `f_p`, `f_ocn`, `f_polar`, `dT_threshold`.
+- **Forcing on other grids.** A field group of the `par_file` is normally read on
+  the climate grid. With `remap` (a kernel: `bilinear`, `shepard`, `nn`, `quadrant`,
+  `con`) and `grid_src` (a name for the file's grid, e.g. `"{gcm}-atm"`) it is read
+  on its own grid and remapped online: a regular lon-lat grid from its 1D axes (the
+  map is cached in `maps/`), or a curvilinear grid (e.g. a tripolar ocean) from the
+  2D lon/lat named in the variable's `coordinates` attribute. The 1pctCO2 configs
+  read the global CMIP fields this way.
 - **Surface mass balance.** `[comps] surface_method = "climate"` takes the ESM's
   own SMB (reference + anomaly, corrected from the present-day surface with the SMB
   elevation gradient); `"smbpal"` computes it from the ESM temperature and

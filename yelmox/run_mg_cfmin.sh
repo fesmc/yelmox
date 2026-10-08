@@ -17,11 +17,13 @@
 # Usage (from anywhere):
 #     yelmox/run_mg_cfmin.sh
 #
-# Submits to the queue by default. Set runopts='-r' to run locally instead.
+# Submits to the queue by default; set runopts to change that, e.g.
+#     runopts=-r yelmox/run_mg_cfmin.sh      # run locally
+#     runopts=-s yelmox/run_mg_cfmin.sh      # stage only
 
 cd "$(dirname "$0")/.." || exit 1        # repo root
 
-runopts='-rs -q compute -w 08:00:00'
+runopts="${runopts:--rs -q compute -w 08:00:00}"
 
 EXE="yelmox"
 NML="yelmox/yelmox_Antarctica.nml"

@@ -168,6 +168,7 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
         
+        call nml_read(filename,nml_group,"method",     par%method,      init=init_pars)
         call nml_read(filename,nml_group,"obs_path",   par%obs_path,    init=init_pars)
         call nml_read(filename,nml_group,"obs_name",   par%obs_name,    init=init_pars)
 

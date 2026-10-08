@@ -15,6 +15,7 @@ module yelmox_climate
     use precision,     only : wp
     use nml,           only : nml_read
     use ncio
+    use coordinates,   only : grid_class
     use timestepping,  only : tstep_class
     use climate_out,   only : climate_out_class
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom
@@ -72,7 +73,7 @@ module yelmox_climate
 
 contains
 
-    subroutine climate_init(cl, method, filename, domain, grid_name, nx, ny, time, basins, &
+    subroutine climate_init(cl, method, filename, domain, grid, time, basins, &
                             south, sfx, timeline_group, smb_direct)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
         ! smb_direct: the surface mass balance is taken from the climate
@@ -80,14 +81,21 @@ contains
         ! the rembo backend supplies nothing else (annual fields only).
         type(yelmox_climate_class), intent(inout) :: cl
         character(len=*), intent(in) :: method
-        character(len=*), intent(in) :: filename, domain, grid_name
-        integer,          intent(in) :: nx, ny
+        character(len=*), intent(in) :: filename, domain
+        type(grid_class), intent(in) :: grid             ! the climate grid
         real(wp),         intent(in) :: time
         real(wp),         intent(in) :: basins(:,:)
         logical,          intent(in) :: south
         character(len=*), intent(in) :: sfx              ! namelist group suffix of the domain
         character(len=*), intent(in) :: timeline_group   ! group of the run phase's timeline
         logical,          intent(in) :: smb_direct
+
+        character(len=256) :: grid_name
+        integer :: nx, ny
+
+        grid_name = trim(grid%name)
+        nx        = grid%G%nx
+        ny        = grid%G%ny
 
         cl%method    = trim(method)
         cl%grid_name = trim(grid_name)
@@ -112,7 +120,7 @@ contains
                 call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, time, basins, &
                                   south, group="snap"//trim(sfx))
             case("esm")
-                call esm_init(cl, filename, domain, grid_name, "esm"//trim(sfx), timeline_group, &
+                call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &
                               smb_direct)
             case("rembo")
                 ! REMBO for the atmosphere and smb, snapclim for the ocean.
@@ -227,7 +235,7 @@ contains
 
             case("esm")
                 call esm_update(cl, out, ts%time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, &
-                                z_srf_ref, basins, domain, mshlf)
+                                z_srf_ref, basins, mshlf)
 
             case("rembo")
                 call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, basins, domain, dx, &
@@ -525,12 +533,13 @@ contains
 
     ! ===== esm backend =====================================================
 
-    subroutine esm_init(cl, filename, domain, grid_name, group, timeline_group, use_smb)
+    subroutine esm_init(cl, filename, domain, grid, group, timeline_group, use_smb)
         ! Read [esm] (experiment + physics) and the esm periods of the run phase
         ! (timeline group), seed the random generator for the climate
         ! variability, and initialize esm_forcing on the climate grid.
         type(yelmox_climate_class), intent(inout) :: cl
-        character(len=*), intent(in) :: filename, domain, grid_name, group, timeline_group
+        character(len=*), intent(in) :: filename, domain, group, timeline_group
+        type(grid_class), intent(in) :: grid
         logical,          intent(in) :: use_smb
 
         integer :: n
@@ -551,7 +560,6 @@ contains
         call nml_read(filename, group, "f_ocn",        cl%esm%f_ocn)
         call nml_read(filename, group, "f_polar",      cl%esm%f_polar)
         call nml_read(filename, group, "dT_threshold", cl%esm%dT_lim)
-        call nml_read(filename, group, "grid_src",     cl%esm%grid_src)
 
         call nml_read(filename, timeline_group, "time_ref",     cl%esm_ctl%time_ref)
         call nml_read(filename, timeline_group, "time_hist",    cl%esm_ctl%time_hist)
@@ -565,7 +573,7 @@ contains
         seed = cl%esm_ctl%clim_seed
         call random_seed(put=seed)
 
-        call esm_forcing_init(cl%esm, trim(cl%esm_ctl%par_file), domain, grid_name, &
+        call esm_forcing_init(cl%esm, trim(cl%esm_ctl%par_file), domain, grid, &
                               run_type=cl%esm_ctl%run_type, gcm=cl%esm_ctl%esm_name, &
                               experiment=cl%esm_ctl%experiment, use_esm=cl%esm_ctl%use_esm, &
                               use_smb=cl%esm_ctl%use_smb, use_var=cl%esm_ctl%use_var, &
@@ -574,7 +582,7 @@ contains
     end subroutine esm_init
 
     subroutine esm_update(cl, out, time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
-                          basins, domain, mshlf)
+                          basins, mshlf)
         ! The reference climatology at the current surface, the esm anomalies
         ! (historical / projection / homogeneous) and the variability, then the
         ! products: atmosphere, the surface mass balance (surface_method = climate),
@@ -585,7 +593,6 @@ contains
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
         real(wp),         intent(in) :: z_srf_ref(:,:)
         real(wp),         intent(in) :: basins(:,:)
-        character(len=*), intent(in) :: domain
         type(marshelf_class), intent(in) :: mshlf
 
         associate(esm => cl%esm, ec => cl%esm_ctl)
@@ -599,7 +606,7 @@ contains
         end if
 
         call esm_forcing_update(esm, mshlf, time, ec%use_esm, ec%time_ref, ec%time_hist, &
-                                ec%time_proj, ec%time_esm_ref, domain, H_ice, basins, z_bed, &
+                                ec%time_proj, ec%time_esm_ref, H_ice, basins, z_bed, &
                                 f_grnd, z_sl, ec%use_smb, use_ref_atm=.false., use_ref_ocn=.false.)
 
         call esm_variability_update(esm, mshlf, time, dtt, ec%clim_var, ec%time_ref, H_ice, &

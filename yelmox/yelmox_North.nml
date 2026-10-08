@@ -52,7 +52,7 @@
     nml_masks       = "yelmo_masks"
     nml_init_topo   = "yelmo_init_topo"
     nml_data        = "yelmo_data"
-    restart         = "None"            !"/home/dmoren07/yelmo-model/yelmox/output/PMIP3/ensembles/exp_convergence/btmthd.2.cfstrm.20.sstrcnv.0.01.sstrmx.5"
+    restart         = "None"
     restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True              ! Take H_ice from restart file
     restart_relax   = 1e3               ! [yrs] Years to relax from restart=>input topography
@@ -254,7 +254,6 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
@@ -303,7 +302,7 @@
     pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
-    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
+    pd_age_path       = "none"
     pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
 
 /
@@ -524,7 +523,7 @@
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
     tf_correction   = False
-    tf_path         = "ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    tf_path         = "none"
     tf_name         = "dT_nl"
  
     bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
@@ -559,8 +558,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
@@ -591,6 +588,7 @@
     obs_err_name = "ghf_sigma"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 /
 
@@ -681,7 +679,7 @@
     topo_names   = "z_bed" "H_ice" "z_srf" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
     regions_var  = "mask"
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
+    basins_path  = ""  ! "" = none (basins = 1)
     basins_var   = "basin"
     sectors_path = ""                ! "" = none (sectors = 1)
     sectors_var  = ""

@@ -4,6 +4,7 @@ module geothermal
 
     use nml 
     use ncio 
+    use interp2D, only : fill_nearest
 
     implicit none 
 
@@ -23,6 +24,7 @@ module geothermal
         character(len=56)  :: obs_err_name
         real(wp)           :: f_stdev
         real(wp)           :: ghf_const 
+        logical            :: convert_ghf_units
     end type 
 
     type geothermal_state_class 
@@ -59,6 +61,7 @@ contains
         character(len=32) :: nml_group
         
         real(wp), parameter :: ghf_min = 0.1  ! [mW/m2] Minimum allowed ghf value
+        real(wp), parameter :: ghf_mv  = -9999.0_wp   ! missing value marker
 
         ! Load geothermal parameters
         call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.,group=group)
@@ -79,6 +82,22 @@ contains
             write(*,*) "geothermal_init:: geothermal heat flux loaded from: "
             write(*,*) trim(gthrm%par%obs_path)//" : "//trim(gthrm%par%obs_name)
 
+            ! A heat flux is never negative: negative values are the file's
+            ! missing values (e.g. -9999, or -9e33 over the ocean in the
+            ! ISMIP7 fields). Fill them from the nearest valid value, so that
+            ! cells that are (or become) ice covered get a real heat flux.
+            if (any(gthrm%now%ghf .lt. 0.0_wp)) then
+                where (gthrm%now%ghf .lt. 0.0_wp) gthrm%now%ghf = ghf_mv
+                call fill_nearest(gthrm%now%ghf,ghf_mv)
+                write(*,*) "geothermal_init:: missing values filled from the nearest valid value."
+            end if
+
+            ! The model needs mW/m2; some datasets (e.g. ISMIP7) are in W/m2.
+            if (gthrm%par%convert_ghf_units) then
+                gthrm%now%ghf = gthrm%now%ghf * 1000.0_wp
+                write(*,*) "geothermal_init:: ghf converted from W/m2 to mW/m2."
+            end if
+
             ! Also read it ghf error (e.g. standard deviation) if available
 
             if ( (.not.  trim(gthrm%par%obs_err_name) .eq. "None") .and. &
@@ -87,6 +106,7 @@ contains
                 ! Load stdev field too
 
                 call nc_read(gthrm%par%obs_path,gthrm%par%obs_err_name,gthrm%now%ghf_err)
+                if (gthrm%par%convert_ghf_units) gthrm%now%ghf_err = gthrm%now%ghf_err * 1000.0_wp
 
                 ! Offset GHF field by desired sigma level
                 gthrm%now%ghf = gthrm%now%ghf + gthrm%par%f_stdev*gthrm%now%ghf_err
@@ -183,6 +203,7 @@ contains
         call nml_read(filename,nml_group,"obs_err_name",    par%obs_err_name,   init=init_pars)
         call nml_read(filename,nml_group,"f_stdev",         par%f_stdev,        init=init_pars)
         call nml_read(filename,nml_group,"ghf_const",       par%ghf_const,      init=init_pars)
+        call nml_read(filename,nml_group,"convert_ghf_units", par%convert_ghf_units, init=init_pars)
 
         ! Replace gridding template values from path
         call parse_path(par%obs_path,domain,grid_name)

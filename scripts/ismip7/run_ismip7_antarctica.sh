@@ -23,8 +23,8 @@
 #   STAGE=1 scripts/ismip7/run_ismip7_antarctica.sh spinup
 #   STAGE=1 scripts/ismip7/run_ismip7_antarctica.sh scenarios
 #
-# NOTE: the ANT-8KM grid needs a large stack. The SLURM submit script sets it,
-# but for a local run first do:  ulimit -s unlimited
+# NOTE: large grids need a large stack. The SLURM submit script sets it, but for
+# a local run first do:  ulimit -s unlimited
 #
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
@@ -34,7 +34,7 @@ EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (
 NML="yelmox/yelmox_esm_Antarctica_ismip7.nml"
 OUTROOT="output/ismip7_ant"
 GCM="CESM2-WACCM"
-GRID="ANT-8KM"
+GRID="ANT-16KM"
 SCENARIOS=(ssp585)                                 # only ssp585 present on Levante
 
 SPINUP_YEARS=20000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=20e3)
@@ -42,11 +42,10 @@ PROJ_END=2300                                      # scenario end year (CE)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
-# Walltimes differ hugely: the 20-kyr opt spin-up is the long job; the ~285-yr
-# projection is short. A 20-kyr ANT-8KM opt spin-up is heavy and will very likely
-# EXCEED 8 h -- use a longer queue (cf. run_mg_resolution.sh -q 12h) and set the
-# walltime to your measured throughput.
-HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 16"    # ANT-8KM is heavy; likely needs > 8h + longer queue
+# Walltimes differ hugely: the 20-kyr opt spin-up is the long job (ANT-16KM, 16
+# threads: ~3 model-yr/min at the start, i.e. several days; shared queue, up to 7
+# days); the ~285-yr projection is short.
+HPCOPT_SPINUP="-q shared -w 7-00:00:00 -m 20G --omp 16"
 HPCOPT_SCEN="-q compute -w 08:00:00 --omp 16"
 
 SPINUP_OUT="$OUTROOT/spinup"

@@ -149,16 +149,15 @@
     opt_tf          = "none"            ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
     tf_sigma        = 50e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -3.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = 1, 12, 14, 15     ! L21: Basin numbers to optimize (-1 for all basins)
+    tf_basins       = -1                ! L21: Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 
-    cf_ref_wais     = 0.0
 /
 
 &relax
@@ -387,7 +386,6 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
@@ -592,7 +590,7 @@
     basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
     basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
     tf_correction   = False
-    tf_path         = "ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    tf_path         = "none"
     tf_name         = "dT_nl"
  
     bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
@@ -627,8 +625,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
@@ -646,6 +642,7 @@
     obs_err_name = "ghf_sigma"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 /
 

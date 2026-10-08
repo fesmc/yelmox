@@ -4,7 +4,7 @@
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
 
 resolution=GRL-8KM
-output_path=output_albedo/ismip7/${resolution}/opt-l21-grimp
+output_path=output/ismip7/${resolution}/opt-l21-grimp
 
 ctrl_params=(
     "domain.grid_hub=${resolution}"
@@ -66,5 +66,5 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
+runme -rs -q shared -w 2-00:00:00 -m 20G -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
       -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"

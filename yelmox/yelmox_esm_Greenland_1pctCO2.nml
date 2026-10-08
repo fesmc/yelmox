@@ -1,9 +1,8 @@
 ! ============================================================================
-! yelmox (climate = esm) main config -- 1pctCO2 Greenland, forcing-only SCAFFOLD.
-! UNTESTED / DATA-PENDING scenario: the 1pctCO2 forcing is not on this machine yet
-! (see input/esm/esm_grl_1pctCO2.nml header). The SPIN-UP can run (MAR + ORAS4
-! reference climatology are present). Derived from yelmox_esm_Greenland_tipmip.nml;
-! only &esm, &spinup, &transient differ. Run via scripts/1pctCO2/run_1pctco2_greenland.sh.
+! yelmox (climate = esm) main config -- 1pctCO2 Greenland.
+! As yelmox_esm_Greenland.nml except &esm and &transient: the 1pctCO2 forcing
+! (input/esm/esm_grl_1pctCO2.nml; global CMIP fields of [esm] esm_name, remapped
+! online). Run via scripts/1pctCO2/run_1pctco2_greenland.sh.
 ! ============================================================================
 &ctrl
     run_step        = "spinup"
@@ -15,9 +14,9 @@
 &esm
     ! Experiment  (1pctCO2: absolute CMIP fields, self-referenced -- see input/esm/esm_grl_1pctCO2.nml)
     par_file        = "input/esm/esm_grl_1pctCO2.nml"
-    experiment      = "1pctCO2"         ! spinup uses ctrl; scenarios step sets 1pctCO2
+    experiment      = "1pctCO2"         ! spinup uses ctrl; the scenario step sets 1pctCO2
     use_esm         = False             ! use ESM snapshots? (scenario step sets True)
-    esm_name        = "1pctCO2-r1i1p4f1" ! label only: the 1pctCO2 par nml has no {gcm} templating
+    esm_name        = "MPI-ESM1-2-LR"   ! {gcm} of the 1pctCO2 forcing files (see the par_file header)
 
     ! Forcing switches (the smb source is [comps] surface_method)
     use_var         = False             ! include climate variability
@@ -30,26 +29,23 @@
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
     f_polar         = 1.8               ! Polar amplification
     dT_threshold    = 0.0               ! Only the homogeneous use_esm=False analytic path uses this;
-                                        ! UNUSED on the gridded use_esm=True path this scaffold uses.
+                                        ! UNUSED on the gridded use_esm=True path.
 
-    ! Source grid
-    grid_src        = "none"            ! Source grid of ESM.
 /
 
 &spinup
     tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
-    tstep_const     = 2020              ! Assumed time for "const" method (1pctCO2 era label)
+    tstep_const     = 2015              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 10.0              ! [yr] Ending time (model years) - short forcing-only smoke test
+    time_end        = 15e3              ! [yr] Ending time (model years; = opt cf/tf_time_end)
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
-    use_hist        = False             ! load historical period. If false, use ref before projection.
-    time_ref        = 1961, 1990        ! [yr] MAR base climatology reference period
+    time_ref        = 1961, 1990        ! [yr] Year interval used as Reference
                                         ! If "opt" this time interval will be used as optimization
-    time_esm_ref    = 2020, 2021        ! [yr] 1pctCO2 start (~1xCO2 baseline); unused in spinup
-    time_hist       = 2018, 2019        ! [yr] no historical (kept below time_init)
-    time_proj       = 2020, 2160        ! [yr] 1pctCO2 projection window
+    time_esm_ref    = 1960, 1989        ! [yr] Year interval used as Reference of ESM
+    time_hist       = 1850, 2014        ! [yr] Year interval used as Historical period
+    time_proj       = 2015, 2300        ! [yr] Year interval used as Projection period
 
     clim_var        = False             ! include climate variability
     clim_seed       = 10                ! Randomnes seed
@@ -66,7 +62,6 @@
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
-    use_hist        = False             ! load historical period. If false, use ref before projection.
     time_ref        = 1961, 1990        ! [yr] Reference period for the MAR base climatology
                                         ! If "opt" this time interval will be used as optimization
     time_esm_ref    = 2020, 2021        ! [yr] self-reference: 1pctCO2 start (~1xCO2 baseline),
@@ -290,6 +285,7 @@
     taud_gl_method      = 0               !  0: binary, no subgrid, 1: Two-sided gradient
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim
     beta_min            = 100            ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
+    frz_scale           = True            ! Reduce sliding where the bed is below the pressure melting point: beta*f**(-q), f=frz_min+(1-frz_min)*exp(T_prime_b/frz_efold)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
     ssa_solver           = "energy"       ! "residual" | "energy"
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
@@ -383,7 +379,6 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
@@ -534,8 +529,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 50           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
 
 /
 
@@ -561,7 +554,7 @@
 /
 
 &sed
-    use_obs   = True
+    method    = 1               ! 0: no sediments, H_sed=0; 1: read sediments from observations
     obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
     obs_name  = "z_sed"
 
@@ -571,7 +564,7 @@
     use_obs   = True
     obs_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
     obs_name  = "geothermal_heat_flux1"
-    obs_err_name = "geothermal_heat_flux1"
+    obs_err_name = "none"
     convert_ghf_units = True   ! True converts from W/m^2 to mW/m^2, False does nothing
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
@@ -586,8 +579,6 @@
     correct_compression = .true.    ! Account for compression effects on relaxation time?
     correct_distortion = .false.    ! Account for distortion of projection?
     method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_prognostics  = 1.0           ! [yr] Max. timestep to recalculate prognostics
-    ! Jan: change dt_prog to 0.1 (up to 0.02)
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
     pad         = 512.             ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
@@ -696,8 +687,8 @@
     ! (grid_surface) and marine_shelf (grid_shelf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
-    with_ice_sheet    = False  ! Is the ice sheet active? (OFF: forcing-only test)
-    with_isostasy     = False  ! Is isostasy active? (OFF: forcing-only test)
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
