@@ -5,4 +5,5 @@ deps = [
     "yelmo:dev",
     "FastIsostasy:dev",
     "rembo1:dev",
+    "chion:main",
 ]

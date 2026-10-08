@@ -31,6 +31,7 @@ module kryos
     use yelmox_climate, only : yelmox_climate_class, climate_init
     use smbpal,       only : smbpal_class, smbpal_init
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask
+    use surface_chion, only : surface_chion_class, surface_chion_init
     use ice_optimization, only : ice_opt_params, optimize_par_load, relax_params, relax_par_load
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
@@ -60,7 +61,7 @@ module kryos
         logical :: with_surface   = .true.   ! surface mass balance + temperature (needs climate)
         logical :: with_shelf     = .true.   ! shelf-base melt + temperature (needs climate)
         character(len=56) :: climate        = ""         ! climate backend: snapclim | snapesm | esm | rembo
-        character(len=56) :: surface_method = "smbpal"   ! smbpal | smb_simple | climate (from the backend)
+        character(len=56) :: surface_method = "smbpal"   ! smbpal | smb_simple | chion | climate (from the backend)
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
 
         ! Simulation conditions ([sim]). Cold-start ice state: init_kill_shelves,
@@ -154,6 +155,7 @@ module kryos
         type(climate_out_class)    :: clim  ! backend-agnostic climate output (now/ref)
         type(smbpal_class)     :: smb
         type(smb_simple_class) :: smbs    ! alternative SMB (surface_method="smb_simple")
+        type(surface_chion_class) :: schn ! alternative SMB (surface_method="chion")
         type(sediments_class)  :: sed
         type(geothermal_class) :: gthrm
         type(phys_const_class) :: cnst    ! physical constants, shared by every component
@@ -334,6 +336,13 @@ contains
             call smb_simple_set_mask(dom%smbs, Href_s)
         end if
 
+        ! Alternative SMB (chion) on the same grid, if selected: one column per
+        ! grid_surface point, latitude for the host-supplied insolation.
+        if (trim(dom%ctl%surface_method) == "chion") then
+            call surface_chion_init(dom%schn, path_par, lats_s, &
+                                    group="surface_chion"//trim(sfx), chion_group="chion"//trim(sfx))
+        end if
+
         ! --- marine_shelf on its configured grid (grid_y already read above) ---
         call grid_cdo_read_desc(grid_m, trim(dom%ctl%grid_shelf), MAP_FLDR)
         nx_m = grid_m%G%nx
@@ -499,7 +508,7 @@ contains
         ctl%surface_method = "smbpal"
         call nml_read(path_par, gc, "surface_method", ctl%surface_method)
         select case(trim(ctl%surface_method))
-            case("smbpal", "climate")
+            case("smbpal", "chion", "climate")
             case("smb_simple")
                 if (trim(ctl%climate) == "esm" .or. trim(ctl%climate) == "rembo") then
                     write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method = smb_simple needs &
@@ -508,7 +517,7 @@ contains
                 end if
             case default
                 write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method must be smbpal, &
-                           &smb_simple or climate; got "//trim(ctl%surface_method)
+                           &smb_simple, chion or climate; got "//trim(ctl%surface_method)
                 stop 1
         end select
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)

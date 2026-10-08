@@ -10,6 +10,7 @@ module kryos_coupling
     use fastisostasy, only : isos_update, bsl_class
     use yelmox_climate, only : climate_update
     use smbpal,       only : smbpal_update_monthly, smbpal_update_monthly_equil
+    use surface_chion, only : surface_chion_spinup, surface_chion_update
     use smb_simple_m, only : smb_simple_set_mask, smb_simple_update
     use htopo,        only : htopo_update
     use ice_optimization, only : relax_update, optimize_cb_ref, optimize_tf_corr, &
@@ -283,6 +284,9 @@ contains
         if (trim(dom%ctl%surface_method) == "smb_simple") then
             call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
             call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
+        else if (trim(dom%ctl%surface_method) == "chion") then
+            call remap(dom, dom%schn%ann%smb,  gs, smb_y,  gy, "con")
+            call remap(dom, dom%schn%ann%tsrf, gs, tsrf_y, gy, "con")
         else
             call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
             call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
@@ -384,18 +388,20 @@ contains
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)
-        ! Surface mass balance on grid_surface. Three methods: smbpal (default; monthly,
-        ! needs tas/pr + geometry), smb_simple (needs z_srf + sea-level
-        ! temperature) or the climate's own (climate: esm, rembo). Geometry comes from the hi-res hub, atmospheric forcing from
-        ! the climate (grid_clim). init=.true. runs the smbpal ITM equilibration before
-        ! the first update. The result stays on grid_surface in the SMB model's fields
-        ! (dom%smb%ann or dom%smbs); couple_surface_to_yelmo lands it on the Yelmo grid.
+        ! Surface mass balance on grid_surface. Four methods: smbpal (default; monthly,
+        ! needs tas/pr + geometry), chion (monthly, as smbpal, + bed and sea level
+        ! for its land/ice mask), smb_simple (needs z_srf + sea-level temperature) or the
+        ! climate's own (climate: esm, rembo). Geometry comes from the hi-res hub,
+        ! atmospheric forcing from the climate (grid_clim). init=.true. runs the
+        ! ITM snowpack equilibration (smbpal, chion) before the first update. The
+        ! result stays on grid_surface in the SMB model's fields (dom%smb%ann,
+        ! dom%schn%ann or dom%smbs); couple_surface_to_yelmo lands it on the Yelmo grid.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         logical, intent(in), optional    :: init
 
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
-        real(wp), allocatable :: tsl_s(:,:), Href_s(:,:)
+        real(wp), allocatable :: tsl_s(:,:), Href_s(:,:), z_bed_s(:,:), z_sl_s(:,:)
         real(wp), allocatable :: smb_s(:,:), tsrf_s(:,:)
         character(len=256) :: gc, gs, gh, gy
         logical :: is_init
@@ -425,6 +431,18 @@ contains
             call remap(dom, dom%yelmo%bnd%H_ice_ref,  gy, Href_s,  gs, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
             call smb_simple_update(dom%smbs, z_srf_s, tsl_s)
+        else if (trim(dom%ctl%surface_method) == "chion") then
+            ! chion (monthly -> daily annual cycle)
+            call remap(dom, dom%clim%now%tas, gc, tas_s,   gs, "bilin")
+            call remap(dom, dom%clim%now%pr,  gc, pr_s,    gs, "bilin")
+            call remap(dom, dom%topo%z_srf,   gh, z_srf_s, gs, "bilin")
+            call remap(dom, dom%topo%H_ice,   gh, H_ice_s, gs, "bilin")
+            call remap(dom, dom%topo%z_bed,   gh, z_bed_s, gs, "bilin")
+            call remap(dom, dom%topo%z_sl,    gh, z_sl_s,  gs, "bilin")
+            if (is_init) call surface_chion_spinup(dom%schn, tas_s, pr_s, z_srf_s, z_bed_s, H_ice_s, &
+                                                   z_sl_s, ts%time_rel)
+            call surface_chion_update(dom%schn, tas_s, pr_s, z_srf_s, z_bed_s, H_ice_s, z_sl_s, &
+                                      ts%time_rel)
         else
             ! smbpal (monthly)
             call remap(dom, dom%clim%now%tas, gc, tas_s, gs, "bilin")
