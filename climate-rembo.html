@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>YelmoX</title>
+<title>REMBO climate – YelmoX</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -22,41 +22,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -127,7 +92,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="./index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
@@ -203,63 +168,56 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#yelmox" id="toc-yelmox" class="nav-link active" data-scroll-target="#yelmox">YelmoX</a>
-  <ul class="collapse">
-  <li><a href="#quick-start" id="toc-quick-start" class="nav-link" data-scroll-target="#quick-start">Quick start</a></li>
-  <li><a href="#what-configme-install-yelmox-does" id="toc-what-configme-install-yelmox-does" class="nav-link" data-scroll-target="#what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</a></li>
-  <li><a href="#manual-clone-of-yelmox" id="toc-manual-clone-of-yelmox" class="nav-link" data-scroll-target="#manual-clone-of-yelmox">Manual clone of YelmoX</a></li>
-  <li><a href="#install-configme-one-time" id="toc-install-configme-one-time" class="nav-link" data-scroll-target="#install-configme-one-time">Install configme (one time)</a></li>
-  </ul></li>
+  <li><a href="#configuration" id="toc-configuration" class="nav-link active" data-scroll-target="#configuration">Configuration</a></li>
+  <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output">Output</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/index.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/climate-rembo.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">REMBO climate</h1>
+</div>
 
 
 
+<div class="quarto-title-meta">
 
-<section id="yelmox" class="level1">
-<h1>YelmoX</h1>
-<p><strong>YelmoX</strong> is the driver framework around the <a href="https://github.com/fesmc/yelmo">Yelmo</a> ice-sheet model. It bundles Yelmo together with the libraries needed to run realistic ice-sheet simulations: climate and ocean forcing modules, the <a href="https://github.com/palma-ice/FastIsostasy">FastIsostasy</a> bedrock module, the <a href="https://github.com/alex-robinson/rembo1">REMBOv1</a> energy/moisture-balance model, and shared utilities from <a href="https://github.com/fesmc/fesm-utils">fesm-utils</a>.</p>
-<p>For documentation of the Yelmo ice-sheet model itself, see <a href="https://fesmc.github.io/yelmo/">the Yelmo docs</a>.</p>
-<section id="quick-start" class="level2">
-<h2 class="anchored" data-anchor-id="quick-start">Quick start</h2>
-<p>With <a href="https://github.com/fesmc/configme"><code>configme</code></a> installed (see <a href="#install-configme-one-time">Install configme</a> below), build the whole YelmoX stack with a single command from the directory where you want the checkout to live:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>That’s it, you should now be ready to compile and run any yelmox program:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> clean</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Runs with <strong>REMBOv1</strong>, an energy/moisture-balance regional atmosphere with an integrated surface-mass-balance scheme, use the <code>yelmox</code> program with the REMBO climate backend: <code>[comps] climate = "rembo"</code>. REMBO supplies the atmosphere and the surface mass balance; the ocean comes from snapclim.</p>
+<ul>
+<li><strong>Program:</strong> <code>yelmox/yelmox.f90</code>, backend in <code>libs/yelmox_climate.f90</code>, with the REMBO adapter <code>libs/climate_rembo.f90</code>.</li>
+<li><strong>Build:</strong> <code>make yelmox rembo=1</code> (links rembo1; prerequisite <code>rembo-static</code>). Without <code>rembo=1</code>, a stub (<code>libs/climate_rembo_stub.f90</code>) stops the run if <code>climate = "rembo"</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_rembo_Greenland.nml</code>, plus REMBO’s own parameters in <code>yelmox/rembo_Greenland.nml</code> (staged into the run folder via <code>.runme/info.json</code>).</li>
+<li><strong>Script:</strong> <code>scripts/rembo/run_rembo.sh</code>.</li>
+</ul>
+<section id="configuration" class="level2">
+<h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
+<ul>
+<li><strong>Grid.</strong> REMBO runs on the grid it was compiled for (Greenland, GRL-16KM), which must be <code>grid_clim</code>; the backend checks this at start-up.</li>
+<li><strong>Surface mass balance.</strong> <code>[comps] surface_method = "climate"</code>: REMBO’s smb and surface temperature, at the current surface. REMBO gives annual fields only, so smbpal and smb_simple are not available with it.</li>
+<li><strong>Update cadence.</strong> <code>[comps] dt_clim = dtt</code>: REMBO updates its energy balance and its smb on its own intervals (<code>dtime_emb</code>, <code>dtime_smb</code>).</li>
+<li><strong>Ocean.</strong> The <code>[snap]</code> group, as for snapclim.</li>
+<li><strong>Transient forcing.</strong> <code>[tsforcing]</code> maps the tsgen value <code>f_now</code> onto REMBO’s anomalies: the summer air temperature <code>dT_sum = f_now·f_ta</code>, the annual <code>dT_ann = 1.3·dT_sum</code> (REMBO’s winter factor 1.6), and the ocean <code>dT_ocn = dT_ann·f_to</code>, added to a snapclim ocean held at its reference (<code>ocn_type = "const"</code>).</li>
+<li><strong>Cold start.</strong> REMBO is equilibrated (10 years) before its first update.</li>
+</ul>
 </section>
-<section id="what-configme-install-yelmox-does" class="level2">
-<h2 class="anchored" data-anchor-id="what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</h2>
-<p><code>configme install yelmox</code> clones YelmoX and its component repositories (<code>fesm-utils</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>), configures each for your machine and compiler, links them into the YelmoX directory, and builds <code>fesm-utils</code> (LIS + FFTW + utils, which can take 10-30 min). If <code>configme</code> can detect your machine from the hostname it does so, otherwise it prompts you.</p>
-<p>The only system dependency you must install yourself is <strong>netCDF</strong> (see the <a href="https://fesmc.github.io/yelmo/getting-started.html#dependencies">Yelmo dependencies notes</a> for installation tips). Everything else — LIS, FFTW, the <code>fesm-utils</code> libraries, the component repositories, their links, and <code>runme</code> — is managed by <code>configme</code>.</p>
-<p>Common options:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx   <span class="co"># pick the machine + compiler explicitly</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-d</span> https                 <span class="co"># clone over HTTPS (no GitHub SSH key needed)</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--dir</span> ~/models/yelmox    <span class="co"># put the checkout here instead of ./yelmox</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--overwrite</span>              <span class="co"># re-clone over an existing checkout</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">--build-deps</span>             <span class="co"># rebuild dependency packages without prompting</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Run <code>configme list</code> for the supported machines and compilers, and <code>configme --help</code> for the full command surface. The exact clone/configure/link/build commands <code>configme install yelmox</code> runs for you are recorded in a <code>.install.sh</code> script in the checkout, and are also shown for context on the <a href="./configme-install-details.html">configme install details</a> page — these are shown for reference only; <code>configme install</code> is the recommended path and you do not need to run them by hand.</p>
-</section>
-<section id="manual-clone-of-yelmox" class="level2">
-<h2 class="anchored" data-anchor-id="manual-clone-of-yelmox">Manual clone of YelmoX</h2>
-<p><code>configme install yelmox</code> already clones the repository for you, so most users do not need this step. If you want to fetch the YelmoX source tree by hand (for example, to inspect it before installing), the repository is here: <a href="https://github.com/fesmc/yelmox">https://github.com/fesmc/yelmox</a>.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone git@github.com:fesmc/yelmox.git</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> yelmox</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="install-configme-one-time" class="level2">
-<h2 class="anchored" data-anchor-id="install-configme-one-time">Install configme (one time)</h2>
-<p>YelmoX is configured and built with <a href="https://github.com/fesmc/configme"><code>configme</code></a>, a small Python tool that detects your netCDF installation, configures every package in the stack for your machine and compiler, and clones/links/builds the whole thing with one command. It is installed once, globally, and provides the <code>configme</code> command on your <code>PATH</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install git+https://github.com/fesmc/configme</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>To upgrade it later, use its built-in update command:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> update</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>If the <code>configme</code> command is not found after installation, your Python user bin directory is probably not on your <code>PATH</code>; add it in your <code>~/.bashrc</code> / <code>~/.zshrc</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">PATH</span><span class="op">=</span><span class="st">"</span><span class="va">${PATH}</span><span class="st">:</span><span class="va">${HOME}</span><span class="st">/.local/bin"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="output" class="level2">
+<h2 class="anchored" data-anchor-id="output">Output</h2>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>rembo.nc</code> (annual and summer air temperature, precipitation, smb) and <code>rembo_ts.nc</code> (the applied anomalies, the smb integrated over the ice sheet and the accumulation-area ratio). The tsgen forcing goes to <code>yelmo_ts.nc</code>, as for the other climates. Restart bundles hold REMBO’s <code>rembo_restart.nc</code>; REMBO reads its restart as set in <code>rembo_Greenland.nml</code>.</p>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->
@@ -673,4 +631,4 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/index.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/climate-rembo.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

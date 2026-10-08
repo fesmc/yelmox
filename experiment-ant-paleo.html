@@ -131,20 +131,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Programs</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-yelmox" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">yelmox</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-yelmox">    
         <li>
-    <a class="dropdown-item" href="./flavors.html">
- <span class="dropdown-text">Overview</span></a>
+    <a class="dropdown-item" href="./yelmox.html">
+ <span class="dropdown-text">yelmox</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-yelmox.html">
- <span class="dropdown-text">yelmox (single-domain)</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./flavor-bipolar.html">
+    <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
     </ul>
@@ -159,11 +155,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">snapclim and snapesm</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-esm.html">
+    <a class="dropdown-item" href="./climate-esm.html">
  <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-rembo.html">
+    <a class="dropdown-item" href="./climate-rembo.html">
  <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
@@ -238,9 +234,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <p>An Antarctic simulation of the last glacial period at 32 km, in two steps: a 15-kyr present-day <strong>spin-up</strong> that optimizes the basal friction (<code>cb_ref</code>) and the ocean thermal-forcing correction (<code>tf_corr</code>), then a <strong>transient</strong> from 130 kyr ago to 10 kyr in the future, restarted from the spin-up, with the climate scaled by a glacial index and the sea level following a reconstruction.</p>
 <ul>
-<li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the snapclim backend (<code>[coupling] climate = "snapclim"</code>, see <a href="./climate-snap.html">snapclim and snapesm</a>).</li>
+<li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the snapclim backend (<code>[comps] climate = "snapclim"</code>, see <a href="./climate-snap.html">snapclim and snapesm</a>).</li>
 <li><strong>Config:</strong> <code>yelmox/yelmox_Antarctica_paleo_spinup.nml</code>, <code>yelmox/yelmox_Antarctica_paleo_lgp.nml</code>.</li>
-<li><strong>Scripts:</strong> <code>scripts/ant-paleo/run_spinup.sh</code>, <code>scripts/ant-paleo/run_lgp.sh</code>. Ported from the old single-grid par files kept in <code>scripts/ant-paleo/legacy/</code>.</li>
+<li><strong>Scripts:</strong> <code>scripts/ant-paleo/run_spinup.sh</code>, <code>scripts/ant-paleo/run_lgp.sh</code>. Ported from the old single-grid par files.</li>
 </ul>
 <section id="running" class="level2">
 <h2 class="anchored" data-anchor-id="running">Running</h2>
@@ -253,7 +249,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="spin-up">Spin-up</h2>
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> 0 to 15 kyr, <code>dtt = 5</code> yr, constant insolation; the sea level follows the model’s own ice-volume change (<code>[barysealevel] method = "fastiso"</code>).</li>
-<li><strong>Optimization</strong> (<code>[coupling] equil_method = "opt"</code>): <code>cb_ref</code> and <code>tf_corr</code> until 7.5 kyr (<code>[opt] cf_time_end</code>, <code>tf_time_end</code>), starting from the till friction of the bed (<code>cf_init = -1</code>); the ice thickness relaxes towards the observations until 3 kyr (<code>rel_time2</code>).</li>
+<li><strong>Optimization</strong> (<code>[sim] opt = True</code>): <code>cb_ref</code> and <code>tf_corr</code> until 7.5 kyr (<code>[opt] cf_time_end</code>, <code>tf_time_end</code>), starting from the till friction of the bed (<code>cf_init = -1</code>); the ice thickness relaxes towards the observations until 3 kyr (<code>[sim] relax = True</code>, <code>[relax] time2</code>).</li>
 <li><strong>Climate:</strong> present day (<code>[snap] atm_type = "anom"</code> with zero anomaly, and so a zero ocean anomaly).</li>
 <li><strong>Output:</strong> restart bundles every 15 kyr, so <code>restart-0.000-kyr</code> and <code>restart-15.000-kyr</code>; 2D output every 5 kyr.</li>
 </ul>
@@ -261,7 +257,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="transient" class="level2">
 <h2 class="anchored" data-anchor-id="transient">Transient</h2>
 <ul>
-<li><strong>Timeline:</strong> <code>[ctrl]</code> -130 kyr to +10 kyr, <code>dtt = 5</code> yr, on relative time (<code>tstep_method = "rel"</code>), so that the sea level and the index follow the records. <code>[coupling] equil_method = "none"</code>: <code>cb_ref</code> and <code>tf_corr</code> come from the restart.</li>
+<li><strong>Timeline:</strong> <code>[ctrl]</code> -130 kyr to +10 kyr, <code>dtt = 5</code> yr, on relative time (<code>tstep_method = "rel"</code>), so that the sea level and the index follow the records. <code>[sim] relax = False</code>, <code>opt = False</code>: <code>cb_ref</code> and <code>tf_corr</code> come from the restart.</li>
 <li><strong>Climate:</strong> <code>[snap] atm_type = "snap_1ind"</code>: the present-day reference plus the PMIP3 LGM – piControl anomaly, scaled by the glacial index <code>input/alpha_combined_125kyr_interp.dat</code> (0 = present day, 1 = LGM; -0.2 in the last interglacial). The ocean anomaly is <code>f_to = 0.25</code> times the mean atmospheric one (<code>ocn_type = "fraction"</code>). Insolation varies in time (<code>[smbpal] const_insol = False</code>).</li>
 <li><strong>Sea level:</strong> <code>[barysealevel] method = "file"</code>, <code>input/sealevel_rohling_450kyr.dat</code>.</li>
 <li><strong>Ice age:</strong> isochrones with elsa (<code>[ytrc] use_elsa</code>, <code>[elsa_ant_paleo]</code>): one layer every 1 kyr, coupled every 50 yr.</li>
@@ -294,7 +290,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Surface mass balance</td>
-<td>smbpal (<code>[coupling] smb_method = "smbpal"</code>)</td>
+<td>smbpal (<code>[comps] surface_method = "smbpal"</code>)</td>
 </tr>
 <tr class="even">
 <td>Shelf melt</td>

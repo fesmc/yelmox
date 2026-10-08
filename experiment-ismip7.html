@@ -131,20 +131,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Programs</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-yelmox" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">yelmox</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-yelmox">    
         <li>
-    <a class="dropdown-item" href="./flavors.html">
- <span class="dropdown-text">Overview</span></a>
+    <a class="dropdown-item" href="./yelmox.html">
+ <span class="dropdown-text">yelmox</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-yelmox.html">
- <span class="dropdown-text">yelmox (single-domain)</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./flavor-bipolar.html">
+    <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
     </ul>
@@ -159,11 +155,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">snapclim and snapesm</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-esm.html">
+    <a class="dropdown-item" href="./climate-esm.html">
  <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-rembo.html">
+    <a class="dropdown-item" href="./climate-rembo.html">
  <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
@@ -238,12 +234,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <p>Greenland and Antarctic projections for ISMIP7 run in two steps: a present-day <strong>optimization spin-up</strong>, which fits the basal friction (<code>cb_ref</code>) and an ocean thermal-forcing correction (<code>tf_corr</code>) to the observed ice thickness and writes a restart bundle, then the <strong>scenarios</strong>, which start from that bundle in 2015 and run under the ESM forcing (historical + projection) to 2300.</p>
 <ul>
-<li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the ESM climate backend (<code>[coupling] climate = "esm"</code>, see <a href="./flavor-esm.html">ESM forcing</a>).</li>
+<li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the ESM climate backend (<code>[comps] climate = "esm"</code>, see <a href="./climate-esm.html">ESM forcing</a>).</li>
 <li><strong>Config:</strong> <code>yelmox/yelmox_esm_Greenland.nml</code>, <code>yelmox/yelmox_esm_Antarctica_ismip7.nml</code>.</li>
 <li><strong>Forcing data:</strong> <code>input/esm/esm_grl_ismip7.nml</code>, <code>input/esm/esm_ant_ismip7.nml</code> (see <a href="./database-namelists.html">Database namelists</a>).</li>
 <li><strong>Scripts:</strong> <code>scripts/ismip7/</code> – workflows <code>run_ismip7_greenland.sh</code>, <code>run_ismip7_antarctica.sh</code>; tuned spin-ups <code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code>, <code>opt_ant.sh</code>.</li>
 </ul>
-<p>The par files on their own run a 10-yr forcing-only smoke test (<code>equil_method = "none"</code>, <code>[spinup] time_end = 10</code>); the scripts set the run phase and length.</p>
+<p>The par files on their own run a 10-yr forcing-only smoke test (<code>[sim] opt = False</code>, <code>[spinup] time_end = 10</code>); the scripts set the run phase and length.</p>
 <section id="running-the-workflow" class="level2">
 <h2 class="anchored" data-anchor-id="running-the-workflow">Running the workflow</h2>
 <p>Run from the yelmox root, one step after the other: the scenarios read the spin-up’s last restart bundle.</p>
@@ -304,13 +300,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p>The spin-up passes <code>ctrl.run_step=spinup coupling.equil_method="opt"</code>; each scenario passes <code>ctrl.run_step=transient</code>, <code>esm.use_esm/use_hist/use_proj=True</code> and <code>coupling.restart</code> = the bundle <code>&lt;OUTROOT&gt;/spinup/restart-&lt;SPINUP_YEARS/1e3&gt;-kyr</code> as an absolute path (the run starts inside its own folder).</p>
+<p>The spin-up passes <code>ctrl.run_step=spinup sim.relax=True sim.opt=True</code>; each scenario passes <code>ctrl.run_step=transient</code>, <code>esm.use_esm/use_hist/use_proj=True</code> and <code>ctrl.restart</code> = the bundle <code>&lt;OUTROOT&gt;/spinup/restart-&lt;SPINUP_YEARS/1e3&gt;-kyr</code> as an absolute path (the run starts inside its own folder).</p>
 <p><strong>Other grids.</strong> The full input set exists for <code>GRL-8KM</code>, <code>GRL-16KM</code> and <code>ANT-8KM</code>, <code>ANT-16KM</code>, <code>ANT-32KM</code> (GRL-4KM lacks the ORAS4 reference ocean). The Antarctic par file reads the Earth structure of ANT-8KM (<code>[isos] rheology_file</code>): with another grid, also pass <code>isos.rheology_file=isostasy_data/earth_structure/yelmo/&lt;GRID&gt;_GIA_HR24.nc</code> (as <code>opt_ant.sh</code> does).</p>
-<p><strong>Short spin-ups.</strong> The optimization relaxes the ice thickness towards the observations at first (<code>[opt] rel_tau1/2</code>, until <code>rel_time2</code>: 6 kyr for Greenland). A spin-up that ends before then hands the scenarios ice that the relaxation was holding in place, e.g.&nbsp;thin margin ice under negative SMB, which is then lost within the first years.</p>
+<p><strong>Short spin-ups.</strong> The spin-up relaxes the ice thickness towards the observations at first (<code>[relax] tau1/2</code>, until <code>time2</code>: 6 kyr for Greenland). A spin-up that ends before then hands the scenarios ice that the relaxation was holding in place, e.g.&nbsp;thin margin ice under negative SMB, which is then lost within the first years.</p>
 </section>
 <section id="tuned-spin-ups" class="level2">
 <h2 class="anchored" data-anchor-id="tuned-spin-ups">Tuned spin-ups</h2>
-<p><code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code> (L. Gutierrez Gonzalez) and <code>opt_ant.sh</code> are 15-kyr optimization spin-ups with tuned parameters on top of the par files: the SMB taken from the ESM (<code>coupling.smb_method=climate</code>), <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>, the <code>ytill</code> parameters), a short relaxation (<code>opt.rel_time1/2 = 100</code>), equilibrium calving, DIVA dynamics and shelf enhancement 0.5; <code>opt_grl_ismip.sh</code> uses von Mises calving (<code>vm-l19</code>) and a linear melt law. Their originals are in <code>scripts/ismip7/legacy/</code>. To run the scenarios from one of them, set <code>BUNDLE</code> in the workflow script to its last restart bundle.</p>
+<p><code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code> (L. Gutierrez Gonzalez) and <code>opt_ant.sh</code> are 15-kyr optimization spin-ups with tuned parameters on top of the par files: the SMB taken from the ESM (<code>comps.surface_method=climate</code>), <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>, the <code>ytill</code> parameters), a short relaxation (<code>relax.time1/2 = 100</code>), equilibrium calving, DIVA dynamics and shelf enhancement 0.5; <code>opt_grl_ismip.sh</code> uses von Mises calving (<code>vm-l19</code>) and a linear melt law. To run the scenarios from one of them, set <code>BUNDLE</code> in the workflow script to its last restart bundle.</p>
 </section>
 <section id="forcing" class="level2">
 <h2 class="anchored" data-anchor-id="forcing">Forcing</h2>

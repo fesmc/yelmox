@@ -131,20 +131,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Programs</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-yelmox" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">yelmox</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-yelmox">    
         <li>
-    <a class="dropdown-item" href="./flavors.html">
- <span class="dropdown-text">Overview</span></a>
+    <a class="dropdown-item" href="./yelmox.html">
+ <span class="dropdown-text">yelmox</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-yelmox.html">
- <span class="dropdown-text">yelmox (single-domain)</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./flavor-bipolar.html">
+    <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
     </ul>
@@ -159,11 +155,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">snapclim and snapesm</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-esm.html">
+    <a class="dropdown-item" href="./climate-esm.html">
  <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-rembo.html">
+    <a class="dropdown-item" href="./climate-rembo.html">
  <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
@@ -237,7 +233,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>The two snapshot backends build the climate from a reference state plus climate <strong>snapshots</strong> (e.g.&nbsp;present day, pre-industrial, LGM), blended in time by scalar <strong>indices</strong> (e.g.&nbsp;a glacial index). Both supply the atmosphere (monthly <code>tas</code>, <code>pr</code>, lapse-rate corrected to the current surface) and the ocean as depth profiles (<code>to_ann</code>, <code>so_ann</code>), which the marine shelf interpolates to the shelf base. Both run on <code>grid_clim</code> and read the <code>[snap]</code> group.</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>), backends in <code>libs/snapclim.f90</code> and <code>libs/snapesm.f90</code>, behind <code>libs/yelmox_climate.f90</code>.</li>
-<li><strong>Select:</strong> <code>[coupling] climate = "snapclim"</code> or <code>"snapesm"</code>.</li>
+<li><strong>Select:</strong> <code>[comps] climate = "snapclim"</code> or <code>"snapesm"</code>.</li>
 <li><strong>Output:</strong> with <code>[output] write_clim</code>, <code>snap.nc</code>: the annual air temperature and precipitation; with snapesm also its driving indices (<code>idx_&lt;name&gt;</code>), the surface elevation, the monthly atmosphere (<code>tas</code>, <code>tsl</code>, <code>pr</code>), <code>ta_sum</code>, <code>tsl_ann</code> and the ocean profiles (<code>to_ann</code>, <code>so_ann</code> on <code>depth</code>).</li>
 </ul>
 <section id="snapclim" class="level2">
@@ -285,7 +281,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p>The transient forcing (<code>[tsforcing]</code>/<code>[tsgen]</code>, see <a href="./flavor-yelmox.html">yelmox</a>) reaches snapclim only in the <code>anom</code> methods.</p>
+<p>The transient forcing (<code>[tsforcing]</code>/<code>[tsgen]</code>, see <a href="./yelmox.html">yelmox</a>) reaches snapclim only in the <code>anom</code> methods.</p>
 </section>
 <section id="snapesm" class="level2">
 <h2 class="anchored" data-anchor-id="snapesm">snapesm</h2>

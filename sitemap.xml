@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
+    <loc>https://fesmc.github.io/yelmox/yelmox.html</loc>
+    <lastmod>2026-10-08T10:03:18.224Z</lastmod>
+  </url>
+  <url>
     <loc>https://fesmc.github.io/yelmox/submodules-plan.html</loc>
     <lastmod>2026-07-05T12:51:48.157Z</lastmod>
   </url>
@@ -9,47 +13,39 @@
     <lastmod>2026-10-03T04:42:13.355Z</lastmod>
   </url>
   <url>
-    <loc>https://fesmc.github.io/yelmox/flavor-yelmox.html</loc>
-    <lastmod>2026-10-03T04:42:13.355Z</lastmod>
-  </url>
-  <url>
-    <loc>https://fesmc.github.io/yelmox/flavor-esm.html</loc>
-    <lastmod>2026-10-05T05:24:12.134Z</lastmod>
-  </url>
-  <url>
-    <loc>https://fesmc.github.io/yelmox/experiment-ismip7.html</loc>
-    <lastmod>2026-10-05T05:24:05.805Z</lastmod>
-  </url>
-  <url>
-    <loc>https://fesmc.github.io/yelmox/database-namelists.html</loc>
-    <lastmod>2026-10-03T04:42:13.354Z</lastmod>
-  </url>
-  <url>
-    <loc>https://fesmc.github.io/yelmox/climate-snap.html</loc>
-    <lastmod>2026-10-03T07:13:35.800Z</lastmod>
+    <loc>https://fesmc.github.io/yelmox/experiment-ant-paleo.html</loc>
+    <lastmod>2026-10-07T15:02:39.427Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/configme-install-details.html</loc>
     <lastmod>2026-07-05T12:51:40.447Z</lastmod>
   </url>
   <url>
-    <loc>https://fesmc.github.io/yelmox/experiment-ant-paleo.html</loc>
-    <lastmod>2026-10-05T05:24:05.805Z</lastmod>
+    <loc>https://fesmc.github.io/yelmox/climate-rembo.html</loc>
+    <lastmod>2026-10-08T10:03:18.222Z</lastmod>
   </url>
   <url>
-    <loc>https://fesmc.github.io/yelmox/flavor-bipolar.html</loc>
-    <lastmod>2026-10-03T04:42:13.354Z</lastmod>
+    <loc>https://fesmc.github.io/yelmox/climate-esm.html</loc>
+    <lastmod>2026-10-08T10:03:18.222Z</lastmod>
   </url>
   <url>
-    <loc>https://fesmc.github.io/yelmox/flavor-rembo.html</loc>
-    <lastmod>2026-10-03T04:42:13.355Z</lastmod>
+    <loc>https://fesmc.github.io/yelmox/climate-snap.html</loc>
+    <lastmod>2026-10-08T10:03:18.222Z</lastmod>
   </url>
   <url>
-    <loc>https://fesmc.github.io/yelmox/flavors.html</loc>
-    <lastmod>2026-10-03T04:42:13.355Z</lastmod>
+    <loc>https://fesmc.github.io/yelmox/database-namelists.html</loc>
+    <lastmod>2026-10-08T10:03:18.223Z</lastmod>
+  </url>
+  <url>
+    <loc>https://fesmc.github.io/yelmox/experiment-ismip7.html</loc>
+    <lastmod>2026-10-08T10:03:18.223Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/multigrid.html</loc>
-    <lastmod>2026-10-03T09:01:07.005Z</lastmod>
+    <lastmod>2026-10-08T10:03:18.224Z</lastmod>
+  </url>
+  <url>
+    <loc>https://fesmc.github.io/yelmox/yelmox-bipolar.html</loc>
+    <lastmod>2026-10-08T10:03:18.224Z</lastmod>
   </url>
 </urlset>

@@ -131,20 +131,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Programs</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-yelmox" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">yelmox</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-yelmox">    
         <li>
-    <a class="dropdown-item" href="./flavors.html">
- <span class="dropdown-text">Overview</span></a>
+    <a class="dropdown-item" href="./yelmox.html">
+ <span class="dropdown-text">yelmox</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-yelmox.html">
- <span class="dropdown-text">yelmox (single-domain)</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./flavor-bipolar.html">
+    <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
     </ul>
@@ -159,11 +155,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">snapclim and snapesm</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-esm.html">
+    <a class="dropdown-item" href="./climate-esm.html">
  <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-rembo.html">
+    <a class="dropdown-item" href="./climate-rembo.html">
  <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
@@ -217,6 +213,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#domain-definition-domain-and-the-hi-res-hub-htopo" id="toc-domain-definition-domain-and-the-hi-res-hub-htopo" class="nav-link" data-scroll-target="#domain-definition-domain-and-the-hi-res-hub-htopo">Domain definition (<code>[domain]</code>) and the hi-res hub (htopo)</a></li>
   <li><a href="#buffers" id="toc-buffers" class="nav-link" data-scroll-target="#buffers">Buffers</a></li>
+  </ul></li>
+  <li><a href="#coupling-primitives" id="toc-coupling-primitives" class="nav-link" data-scroll-target="#coupling-primitives">Coupling primitives</a>
+  <ul class="collapse">
+  <li><a href="#initialization-ordering" id="toc-initialization-ordering" class="nav-link" data-scroll-target="#initialization-ordering">Initialization ordering</a></li>
   </ul></li>
   <li><a href="#drivers" id="toc-drivers" class="nav-link" data-scroll-target="#drivers">Drivers</a></li>
   <li><a href="#open-issues" id="toc-open-issues" class="nav-link" data-scroll-target="#open-issues">Open issues</a></li>
@@ -290,10 +290,10 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(yelmo_class)</span>          <span class="dt">::</span> yelmo</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(marshelf_class)</span>       <span class="dt">::</span> mshlf</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(isos_class)</span>           <span class="dt">::</span> isos</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(yelmox_climate_class)</span> <span class="dt">::</span> cl     <span class="co">! climate backend ([coupling] climate)</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(yelmox_climate_class)</span> <span class="dt">::</span> cl     <span class="co">! climate backend ([comps] climate)</span></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(climate_out_class)</span>    <span class="dt">::</span> clim   <span class="co">! backend-agnostic climate output (now/ref)</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(smbpal_class)</span>         <span class="dt">::</span> smb</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(smb_simple_class)</span>     <span class="dt">::</span> smbs   <span class="co">! smb_method = "smb_simple"</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(smb_simple_class)</span>     <span class="dt">::</span> smbs   <span class="co">! surface_method = "smb_simple"</span></span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(sediments_class)</span>      <span class="dt">::</span> sed</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(geothermal_class)</span>     <span class="dt">::</span> gthrm</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(phys_const_class)</span>     <span class="dt">::</span> cnst   <span class="co">! physical constants, shared by every component</span></span>
@@ -302,7 +302,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(ice_opt_params)</span>       <span class="dt">::</span> opt    <span class="co">! spin-up optimization</span></span>
 <span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(negis_params)</span>         <span class="dt">::</span> ngs</span>
 <span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(glacial_smb_params)</span>   <span class="dt">::</span> gsmb</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(domain_ctl)</span>           <span class="dt">::</span> ctl    <span class="co">! [domain], [coupling], [output]</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="dt">type(domain_ctl)</span>           <span class="dt">::</span> ctl    <span class="co">! [domain], [comps], [sim], [output]</span></span>
 <span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="dt">end type</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The barystatic sea level (<code>bsl</code>) and the transient forcing (<code>tsf</code>) are not part of the domain: they are driver-owned, so a multi-domain driver shares them (or not). Each <code>step_*</code> primitive advances one component on its own grid and is a no-op when that component is inactive (<code>with_*</code>); each <code>couple_*_to_yelmo</code> lands one component’s output on Yelmo’s grid. Two domains (bipolar) carry their own coupler and grids, so they never collide.</p>
 <p>The climate reaches the rest of the domain only through <code>climate_out_class</code> (<code>now</code> and <code>ref</code>): the atmosphere, the ocean as depth profiles or at the shelf base, and, when the backend has them, the surface mass balance and subglacial discharge. Nothing downstream depends on which backend produced them.</p>
@@ -316,8 +316,8 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
     grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
     grid_isos    = ""           ! isostasy                             [grid_ice]
     grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
-    grid_smb     = ""           ! surface mass balance                 [grid_clim]
-    grid_mshlf   = ""           ! marine shelf                         [grid_hub]
+    grid_surface = ""           ! surface mass balance                 [grid_clim]
+    grid_shelf   = ""           ! marine shelf                         [grid_hub]
     topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
@@ -346,20 +346,40 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <p>Fields that cross a grid boundary land in <strong>step-local allocatables</strong>, not a coupler-owned pool. <code>remap</code> takes the destination as <code>intent(inout), allocatable</code> and sizes it itself (allocate-on-demand, reshape if wrong), so callers never hand-compute <code>nx,ny</code>. Unit conversions are done in place on the buffer (<code>newfield = f(buf)</code>); they are caller concerns, kept out of the coupler. 3D (e.g.&nbsp;monthly) fields use the <code>remap_3d</code> overload. Step-local allocatables are reentrant, which is what bipolar needs; per-timestep reallocation cost is negligible against the physics.</p>
 </section>
 </section>
+<section id="coupling-primitives" class="level2">
+<h2 class="anchored" data-anchor-id="coupling-primitives">Coupling primitives</h2>
+<p><code>yelmox</code> and <code>yelmox_bipolar</code> advance a domain with these primitives (from <code>kryos_coupling</code>):</p>
+<ul>
+<li><code>step_relax</code> — topography relaxation towards the reference, with a timescale ramp (<code>[sim] relax</code>).</li>
+<li><code>step_optimize</code> — basal-friction / thermal-forcing optimization (<code>[sim] opt</code>).</li>
+<li><code>step_isostasy</code> — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (<code>bsl</code>).</li>
+<li><code>couple_to_yelmo</code> — assemble the Yelmo boundary state from the component outputs (incl.&nbsp;the climate’s subglacial discharge, when supplied).</li>
+<li><code>step_icesheet</code> — run <code>yelmo_update</code>.</li>
+<li><code>couple_yelmo_to_htopo</code> — the hub’s current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo’s anomalies on a finer hub).</li>
+<li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the transient forcing, on the <code>dt_clim</code> cadence.</li>
+<li><code>step_surface</code> — surface mass balance on <code>grid_surface</code> (<code>surface_method</code>: smbpal, smb_simple, or the climate’s own, <code>climate</code>).</li>
+<li><code>step_shelf</code> — sub-shelf melt on <code>grid_shelf</code>, from the climate’s ocean as depth profiles or at the shelf base.</li>
+</ul>
+<p>Every driver writes the sequence out in its time loop, so the coupling order can be read directly from the program; <code>yelmox_bipolar</code> interleaves the second domain and the ocean box model there.</p>
+<section id="initialization-ordering" class="level3">
+<h3 class="anchored" data-anchor-id="initialization-ordering">Initialization ordering</h3>
+<p>On cold start, the Yelmo applied mass-balance diagnostics (<code>smb</code>, <code>bmb</code>, <code>fmb</code>) are populated at the initial time so the first output snapshot reflects the coupled boundary forcing rather than zeros. This is handled inside Yelmo: when the topography solver runs without advancing the ice (<code>pc_step="none"</code> at init, or any <code>topo_fixed</code> step), it diagnoses the applied mass balance from the current boundary forcing (<code>calc_ytopo_mb_diagnostic</code>). <code>mb_net</code> remains zero at <code>t=0</code> (nothing is applied), which is expected.</p>
+</section>
+</section>
 <section id="drivers" class="level2">
 <h2 class="anchored" data-anchor-id="drivers">Drivers</h2>
-<p>Both programs use the same driver plumbing:</p>
+<p><code>yelmox</code> and <code>yelmox_bipolar</code> use the same driver plumbing:</p>
 <ul>
 <li><strong><code>tstep_init(ts, path_par, group, dtt [, time_ref, cal])</code></strong> (fesm-utils <code>timestepping</code>) — reads the run’s timeline group (<code>[ctrl] run_step</code>: <code>"ctrl"</code> for <code>[ctrl]</code> itself, or a phase group such as <code>[spinup]</code>/<code>[transient]</code>) and initializes the driver-owned timestepper; <code>[ctrl] calendar</code> / <code>calendar_ref</code> give <code>cal</code> / <code>time_ref</code> (calendar years, e.g.&nbsp;ESM runs). <code>domain_init</code> takes the same group name (<code>timeline_group</code>) and reads the values the domain needs (<code>tstep_method</code>, <code>dtt</code>) itself.</li>
-<li><strong><code>domain_startup(dom, ts, bsl [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>domain_init_state</code>) or restart-bundle restore + hub rebuild. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, fldr)</code></strong> and passes <code>restore_bsl=.false.</code>.</li>
-<li><strong><code>domain_init_ice(dom, ts)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[coupling]</code> <code>kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>time_equil_thrm</code>; see <a href="./flavor-yelmox.html#configuration">yelmox</a>).</li>
+<li><strong><code>domain_startup(dom, ts, bsl, restart [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>restart = "None"</code>, <code>domain_init_state</code>) or restore of the domain bundle <code>restart</code> + hub rebuild. The driver reads <code>[ctrl] restart</code>. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, fldr)</code></strong>, passes each domain its subfolder of the bundle and <code>restore_bsl=.false.</code>.</li>
+<li><strong><code>domain_init_ice(dom, ts)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[sim]</code> <code>init_kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>init_time_thrm</code>; see <a href="./yelmox.html#configuration">yelmox</a>).</li>
 <li><strong><code>run_restart_write(dom, bsl, time [, tsf])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + the tsforcing state, one auto-named folder).</li>
 <li><strong><code>cadence_due(time, dt)</code></strong> (<code>kryos</code>) — the cadence predicate for <code>dt_clim</code> and <code>dt_cmip</code>; <code>dt &lt;= 0</code> disables a cadence. Output and restart bundles follow fesm-utils <code>timeout</code> schedules (<code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, <code>[tm_rst]</code>); a restart bundle is always written at <code>time_end</code>.</li>
 </ul>
 <p>Every driver loop has the same shape: output and restarts are written at the top of the loop for the current time (<code>time_init</code> on the first pass), then the loop exits if the run is finished (<code>time_end</code>, or a tripped kill switch), else <code>tstep_update</code> advances the time and the domain is stepped with the coupling sequence written out inline. Each output call appears once, and the final state + restart bundle are written on the last pass (<code>timeout_check(...) .or. ts%is_finished</code>).</p>
 <ul>
-<li><strong><code>yelmox</code></strong> — argument is one parameter file; one <code>kryos_domain</code>, output to the run dir. The climate backend is chosen at runtime (<code>[coupling] climate</code>), so ESM and REMBO runs use this program too. See <a href="./flavor-yelmox.html">yelmox</a>.</li>
-<li><strong><code>yelmox_bipolar</code></strong> — argument is one parameter file holding both hemispheres. Each domain’s groups carry a hemisphere suffix (<code>yelmo_south</code>, <code>domain_north</code>, <code>coupling_north</code>, <code>snap_south</code>, …), threaded into every group via <code>domain_init(..., group_suffix=…)</code>; <code>[ctrl]</code>, <code>[barysealevel]</code>, the OBM groups and the Yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared. Distinct group names also let <code>runme -p group.name=val</code> target one hemisphere. The two domains are explicit variables (<code>dom_north</code>, <code>dom_south</code>), not an array: the ocean coupling is asymmetric. The driver owns the shared <code>bsl</code> and Ocean Box Model and interleaves them with the per-domain steps; the ocean coupling lives in <code>yelmox_bipolar/obm_coupling.f90</code>. Each domain writes to a subfolder named after it. See <a href="./flavor-bipolar.html">yelmox_bipolar</a>.</li>
+<li><strong><code>yelmox</code></strong> — argument is one parameter file; one <code>kryos_domain</code>, output to the run dir. The climate backend is chosen at runtime (<code>[comps] climate</code>), so ESM and REMBO runs use this program too. See <a href="./yelmox.html">yelmox</a>.</li>
+<li><strong><code>yelmox_bipolar</code></strong> — argument is one parameter file holding both hemispheres. Each domain’s groups carry a hemisphere suffix (<code>yelmo_south</code>, <code>domain_north</code>, <code>comps_north</code>, <code>snap_south</code>, …), threaded into every group via <code>domain_init(..., group_suffix=…)</code>; <code>[ctrl]</code>, <code>[barysealevel]</code>, the OBM groups and the Yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared. Distinct group names also let <code>runme -p group.name=val</code> target one hemisphere. The two domains are explicit variables (<code>dom_north</code>, <code>dom_south</code>), not an array: the ocean coupling is asymmetric. The driver owns the shared <code>bsl</code> and Ocean Box Model and interleaves them with the per-domain steps; the ocean coupling lives in <code>yelmox_bipolar/obm_coupling.f90</code>. Each domain writes to a subfolder named after it. See <a href="./yelmox-bipolar.html">yelmox_bipolar</a>.</li>
 </ul>
 </section>
 <section id="open-issues" class="level2">

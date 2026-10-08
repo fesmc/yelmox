@@ -131,20 +131,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item dropdown ">
-    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-programs" role="link" data-bs-toggle="dropdown" aria-expanded="false">
- <span class="menu-text">Programs</span>
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-yelmox" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">yelmox</span>
     </a>
-    <ul class="dropdown-menu" aria-labelledby="nav-menu-programs">    
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-yelmox">    
         <li>
-    <a class="dropdown-item" href="./flavors.html">
- <span class="dropdown-text">Overview</span></a>
+    <a class="dropdown-item" href="./yelmox.html">
+ <span class="dropdown-text">yelmox</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-yelmox.html">
- <span class="dropdown-text">yelmox (single-domain)</span></a>
-  </li>  
-        <li>
-    <a class="dropdown-item" href="./flavor-bipolar.html">
+    <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
     </ul>
@@ -159,11 +155,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">snapclim and snapesm</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-esm.html">
+    <a class="dropdown-item" href="./climate-esm.html">
  <span class="dropdown-text">ESM forcing</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./flavor-rembo.html">
+    <a class="dropdown-item" href="./climate-rembo.html">
  <span class="dropdown-text">REMBO climate</span></a>
   </li>  
     </ul>
@@ -417,7 +413,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="how-the-groups-are-consumed">How the groups are consumed</h2>
 <p>A module loads a group into a <code>varslice</code> object once at initialization (<code>varslice_init_nml(vs, filename, group, domain, grid_name, subs=…)</code>) and then asks for a field at a given time during the run (<code>varslice_update(vs, time, method=…)</code>). The database namelist supplies everything the object needs; the <code>method</code> (e.g.&nbsp;<code>exact</code>, <code>interp</code>, <code>extrap</code>) is chosen by the caller at read time, not in the namelist.</p>
 <ul>
-<li><strong><code>esm_forcing</code></strong> groups the atmosphere/ocean database groups into reference, variability, ESM-reference, historical, and projection periods (<code>&amp;gcm_ts_ref</code>, <code>&amp;gcm_to_proj</code>, …) and supplies <code>{gcm}</code>/<code>{experiment}</code>. See <a href="./flavor-esm.html">ESM forcing</a>.</li>
+<li><strong><code>esm_forcing</code></strong> groups the atmosphere/ocean database groups into reference, variability, ESM-reference, historical, and projection periods (<code>&amp;gcm_ts_ref</code>, <code>&amp;gcm_to_proj</code>, …) and supplies <code>{gcm}</code>/<code>{experiment}</code>. See <a href="./climate-esm.html">ESM forcing</a>.</li>
 <li><strong><code>snapesm</code></strong> uses the same reader for its snapshot climate database.</li>
 <li><strong><code>ismip6</code></strong> uses it for the ISMIP6 atmosphere/ocean forcing files.</li>
 </ul>
