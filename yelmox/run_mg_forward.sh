@@ -27,12 +27,14 @@
 # Usage (from anywhere):
 #     yelmox/run_mg_forward.sh
 #
-# Submits to the queue by default. Set runopts='-r' to run locally instead.
+# Submits to the queue by default; set runopts to change that, e.g.
+#     runopts=-r yelmox/run_mg_forward.sh      # run locally
+#     runopts=-s yelmox/run_mg_forward.sh      # stage only
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)" || exit 1   # repo root (absolute)
 cd "$ROOT" || exit 1
 
-runopts='-rs -q compute -w 04:00:00'
+runopts="${runopts:--rs -q compute -w 04:00:00}"
 
 EXE="yelmox"
 NML="yelmox/yelmox_Antarctica.nml"
