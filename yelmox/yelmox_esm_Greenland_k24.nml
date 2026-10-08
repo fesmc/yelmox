@@ -24,8 +24,6 @@
     f_polar         = 1.8               ! Polar amplification
     dT_threshold    = 0.0               ! Temperature threshold. After this, constant climate.
 
-    ! Source grid
-    grid_src        = "none"            ! Source grid of ESM.
 /
 
 &spinup

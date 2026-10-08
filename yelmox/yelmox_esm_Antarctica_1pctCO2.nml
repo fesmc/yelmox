@@ -33,8 +33,6 @@
     dT_threshold    = 1.5               ! Cap for the HOMOGENEOUS (use_esm=False) analytic path only;
                                         ! UNUSED on the gridded use_esm=True path this scaffold uses.
 
-    ! Source grid
-    grid_src        = "none"        ! Source grid of ESM.
 /
 
 &spinup

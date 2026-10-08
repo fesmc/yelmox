@@ -221,7 +221,7 @@ contains
         character(len=256)    :: domain, tgroup
         character(len=64)     :: sfx
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
-        integer               :: nx_m, ny_m, nx_i, ny_i, nx_c, ny_c, nx_s, ny_s
+        integer               :: nx_m, ny_m, nx_i, ny_i, nx_s, ny_s
         real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
         real(wp), allocatable :: regions_y(:,:), basins_y(:,:)
         integer,  allocatable :: mask_ice_y(:,:)
@@ -300,15 +300,13 @@ contains
         ! The climate backends read grid-specific input data, so grid_clim must be
         ! a grid whose forcing files exist (the Yelmo grid for the standard setup).
         call grid_cdo_read_desc(grid_c, trim(dom%ctl%grid_clim), MAP_FLDR)
-        nx_c = grid_c%G%nx
-        ny_c = grid_c%G%ny
         dom%ctl%dx_clim = dom%yelmo%grd%G%dx * (grid_c%G%dx / grid_y%G%dx)
         ! Hemisphere of the domain (seasons, lapse rates): south when the climate
         ! grid lies mostly south of the equator.
         dom%ctl%south = (sum(grid_c%lat) / size(grid_c%lat) < 0.0_wp)
         call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
-        call climate_init(dom%cl, dom%ctl%climate, path_par, domain, trim(dom%ctl%grid_clim), &
-                          nx_c, ny_c, time, basins_c, dom%ctl%south, sfx=trim(sfx), &
+        call climate_init(dom%cl, dom%ctl%climate, path_par, domain, grid_c, &
+                          time, basins_c, dom%ctl%south, sfx=trim(sfx), &
                           timeline_group=trim(tgroup), &
                           smb_direct=(trim(dom%ctl%surface_method) == "climate"))
 
@@ -589,6 +587,8 @@ contains
         else
             method = "con"
         end if
+    end function remap_method_smooth
+
     subroutine prime_map(dom, src, dst, method)
         ! Build the src -> dst map up front, for the pairs remap sends to the
         ! coupler: an identity pair is a copy in remap, so it has no map.
@@ -597,8 +597,6 @@ contains
 
         if (trim(src) /= trim(dst)) call coupler_prime(dom%cpl, src, dst, method)
     end subroutine prime_map
-
-    end function remap_method_smooth
 
     subroutine remap_2D(dom, var_src, src, var_dst, dst, method)
         type(kryos_domain),      intent(inout) :: dom
