@@ -77,3 +77,4 @@
 | 74 | calv_rate_flt     | xc, yc      | m/yr        | Calving speed of floating front cells              |
 | 75 | calv_rate_grnd    | xc, yc      | m/yr        | Calving speed of grounded front cells              |
 | 76 | mb_clip           | xc, yc      | m/yr        | Clip of negative ice thickness after transport     |
+| 77 | mask_kin          | xc, yc      |             | Column rate given by the applied thickness step    |

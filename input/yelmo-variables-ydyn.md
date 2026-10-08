@@ -50,7 +50,7 @@
 | 46 | cb_tgt            | xc, yc           | Pa          | Target basal parameter                        |
 | 47 | cb_ref            | xc, yc           | --          | Reference basal parameter                     |
 | 48 | c_bed             | xc, yc           | Pa          | Basal drag coefficient                        |
-| 49 | f_slide           | xc, yc           | -           | Sub-temperate sliding factor                  |
+| 49 | f_slide           | xc, yc           | -           | Frozen-bed sliding-speed factor               |
 | 50 | beta_acx          | xc, yc           | Pa yr m^-1  | Basal stress factor (x)                       |
 | 51 | beta_acy          | xc, yc           | Pa yr m^-1  | Basal stress factor (y)                       |
 | 52 | beta              | xc, yc           | Pa yr m^-1  | Basal stress factor mag.                      |

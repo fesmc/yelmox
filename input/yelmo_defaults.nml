@@ -16,7 +16,7 @@
     grid_name       = "None"            ! User par file must override this
     grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     phys_const      = "Earth"
-    experiment      = "None"       ! "None"/"EISMINT": zeros borders; "MISMIP3D","MISMIP+"; "TROUGH-F17"; "SLAB","ISMIPHOM","slab","periodic","periodic-xy": periodic x,y; "periodic-x"; "infinite"; "MASK_ICE"
+    experiment      = "None"       ! "None"/"EISMINT": zeros borders; "MISMIP3D","MISMIP+"; "TROUGH-F17"; "SLAB","ISMIPHOM","slab","periodic","periodic-xy": periodic x,y; "periodic-x"; "periodic-y"; "infinite"; "MASK_ICE"
     mask_border     = "auto"            ! Ice mask on the domain border: "auto" (by domain), "none", "fixed", "dynamic"
     nml_ytopo       = "ytopo"
     nml_ycalv       = "ycalv"
@@ -47,9 +47,10 @@
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_filter_vel   = True              ! Advect H_ice with mean of current and previous vel. solutions (vel. fields stay unfiltered)
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 5.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
+    pc_tol          = 1.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
     pc_eps          = 0.02              ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
     pc_cfl_max      = 0.5               ! Courant-number cap on the pc adaptive timestep (dt_method=2)
+    pc_rho_max      = 2.0               ! Maximum growth factor dt_new/dt per step of the pc adaptive timestep (dt_method=2)
     pc_eta_H_min    = 10.0              ! [m] Thinner ice is not included in the pc error norm
     pc_eta_u_min    = 0.0               ! [m/yr] Slower ice is not included in the pc error norm
     pc_eta_trim     = 0.0               ! [--] Fraction of points with the largest errors left out of the pc error norm
@@ -70,14 +71,14 @@
     front_dHdx          = 0.0               ! [m/m] Thickness gradient assumed at a full front (front_subgrid)
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points; 4: grounded grounding zone; -1: bnd%tau_relax
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "pmpt": partial melt (grounding-zone transition); "nmp": no melt
-    gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    gl_sep              = 1                 ! 1: binary f_grnd, linear f_grnd_acx/acy; 3: grounded area of H_grnd bilinear between cell centres (Leguy et al., 2021)
+    gz_nx               = 15                ! [-] Subgrid points per side (gz_nx*gz_nx) of the grounding-zone melt, bmb_gl_method = "pmpt"
 
     ! bmb_gl_method = pmpt
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
@@ -137,13 +138,13 @@
 
 &ydyn
     solver              = "diva"          ! "fixed", "sia", "ssa", "hybrid", "diva", "diva-noslip"
-    uz_method           = 3               ! 1: aa-staggering, 2: strain-rate-on-nodes, 3: jacobian
+    uz_method           = 3               ! 1: aa-staggering, 2: strain-rate-on-nodes, 3: jacobian, 4: flux-consistent (layer mass budget)
     visc_method         = 1               ! 0: constant visc=visc_const, 1: dynamic viscosity (quadrature points), 2: dynamic viscosity (aa-nodes)
     visc_const          = 1e7             ! [Pa a] Constant value for viscosity (if visc_method=0)
     beta_method         = 1               ! -1: imposed externally; 0: constant beta; 1: linear (beta=cb/u0); 2: pseudo-plastic power; 3: regularized Coulomb; 4, 5: as 2, 3 with c_bed and u_b at the cell centre (no quadrature)
     beta_const          = 1e3             ! [Pa a m-1] Constant value of basal friction coefficient to be used
     beta_q              = 1.0             ! Dragging law exponent 
-    beta_u0             = 100.0           ! [m/a] Regularization term for regularized Coulomb law (beta_method=3)
+    beta_u0             = 100.0           ! [m/a] Speed scale of the friction law (beta_method=1-5)
     beta_gl_scale       = 0               ! 0: beta*beta_gl_f, 1: H_grnd linear scaling, 2: Zstar scaling, 3: beta*f_grnd on aa-nodes (with simple staggering)
     beta_gl_stag        = 1               ! -1: beta_acx/acy imposed externally; 0: simple staggering, 1: upstream beta at gl, 2: downstream, 3: f_grnd_ac scaling, 4: weighted by the grounded share of the velocity across the face (Gladstone et al., 2010, B2)
     beta_gl_f           = 1.0             ! [-] Scaling of beta at the grounding line (for beta_gl_scale=0)
@@ -151,15 +152,15 @@
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
-    slide_T             = True            ! Reduce sliding below pressure melting point: beta/f_slide, f_slide=max(lambda_min,exp(T_prime_b/gamma_T))
-    gamma_T             = 1.0             ! [K] e-folding temperature of sub-temperate sliding (slide_T=True)
-    lambda_min          = 1e-6            ! [-] Minimum sub-temperate sliding factor (slide_T=True)
+    frz_scale           = True            ! Reduce sliding where the bed is below the pressure melting point: beta*f**(-q), f=frz_min+(1-frz_min)*exp(T_prime_b/frz_efold)
+    frz_efold           = 3.0             ! [K] e-folding temperature of the sliding speed (at fixed basal stress, any friction law)
+    frz_min             = 1e-3            ! [-] Minimum sliding-speed factor for frozen beds
     ssa_solver          = "energy"      ! "residual" | "energy"
     ssa_lis_opt_residual= "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_lis_opt_energy  = "-i cg -p jacobi -maxiter 200 -tol 1.0e-2 -initx_zeros false"       ! SPD => CG (matches Yelmo.jl default)
     ssa_lat_bc          = "marine"        ! "all","marine","floating","float","none"
-    ssa_vel_lim_method  = "drag"          ! "clip": clip each velocity component at ssa_vel_max; "drag": smooth speed-limit drag on grounded ice, tau = ssa_vel_lim_tau at ssa_vel_max
-    ssa_vel_max         = 10000.0          ! [m a-1] Velocity limit: clip value ("clip"), or speed at which the limit drag reaches ssa_vel_lim_tau ("drag")
+    ssa_vel_lim_method  = "drag"          ! "clip": clip each velocity component at ssa_vel_max; "drag": smooth speed-limit drag on all free faces, tau = ssa_vel_lim_tau at ssa_vel_max, components also clipped at ssa_vel_max
+    ssa_vel_max         = 10000.0          ! [m a-1] Velocity limit: clip value (both methods); "drag": also the speed at which the limit drag reaches ssa_vel_lim_tau
     ssa_vel_lim_tau     = 1e5             ! [Pa] Speed-limit drag at ssa_vel_max (ssa_vel_lim_method="drag")
     ssa_iter_max        = 20              ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
@@ -195,9 +196,9 @@
     W_til_bc         = 0.0 ! [m]
 
     ! ---- bucket (bkt_) ----
-    bkt_N_closure     = 3      ! -1=EXTERNAL 0=CONST 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE
+    bkt_N_closure     = 3      ! -1=EXTERNAL 0=CONST 1=OVERBURDEN 2=MARINE 3=TILL
     bkt_till_rate     = 1.0e-3 ! [m/a]  was ytherm.till_rate
-    bkt_floating_mode = 1      ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
+    bkt_floating_mode = 0      ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
 
     ! ---- closures (no prefix) ----
     const_N         = 1.0e7  ! [Pa] N_CLOSURE_CONST (legacy yneff.const)
@@ -215,7 +216,9 @@
     ! each key maps to is named in the trailing comment.
 
     ! -- mode selectors --
-    k24_substrate_type               = 2        ! 0=HARD 1=SOFT 2=MIXED (Fortran-only; builds kappa)
+    k24_substrate_type               = 2        ! 0=HARD 1=SOFT 2=MIXED (binary, z_bed<-1000) 3=MIXED_SMOOTH (ramp); 4=EXTERNAL not supported by yelmo (Fortran-only; builds kappa)
+    k24_kappa_z_hard                 = -500.0   ! MIXED_SMOOTH: z_bed at/above which the bed is hard, kappa = 0 [m]
+    k24_kappa_z_soft                 = -1500.0  ! MIXED_SMOOTH: z_bed at/below which the bed is soft, kappa = 1 [m]
     k24_flux_solver                  = 3        ! 0=RECURSIVE 1=ITERATIVE 2=TOPOSORT (GDS_WARNER only) 3=TAPED (default)
     k24_routing_scheme               = 0        ! 0=WARNER 1=GDS_WARNER (original K24) 2=QUINN 3=TARBOTON 4=MODIFIED_TARBOTON 5=GDS_TARBOTON
     k24_quinn_original               = False    ! QUINN only: Quinn et al.'s own slope x contour-length weights
@@ -227,25 +230,25 @@
     k24_friction_quadrature          = False    ! STAGGERED only: Yelmo's qb_method=2 Gauss-point heat
     k24_friction_u_floor             = 3.168808781402895e-11 ! [m/s] = 1e-3 m/yr, STAGGERED beta floor
     k24_toposort_allow_cycles        = False    ! TopologicalPsiOut(allow_cycles=...)
-    k24_ub_hook                      = True     ! DIVA velocity iteration re-evaluates K24 N from u_b (yelmo#13, FastHydrology#11); False = N once per step
+    k24_N_ub_coupled                 = True     ! DIVA velocity iteration re-evaluates K24 N from u_b (hydro_N_from_ub); False = N once per step
     k24_drainage_mode                = 0        ! 0=BOTH 1=EFFICIENT_ONLY 2=INEFFICIENT_ONLY
     k24_water_thickness_algorithm    = 0        ! 0=DARCY_WEISBACH 1=LAMINAR 2=AREAL_CONDUIT
     k24_gradient_convention          = 0        ! 0=MEAN 1=LOCAL (Darcy-Weisbach / laminar closures only)
     k24_sliding_law                  = 0        ! 0=NO_FRICTION 1=WEERTMAN 2=POWER_PLASTIC 3=REG_COULOMB 4=PRESCRIBED_FIELD 5=REG_COULOMB_FIELD 6=SHAKTI_REG_COULOMB
 
     ! -- physical constants --
-    k24_manning_exponent             = 3.0      ! n, Glen's flow-law exponent
+    k24_glen_n                       = 3.0      ! n, Glen's flow-law exponent
     k24_latent_heat_water            = 3.335e5  ! L_w [J/kg]; overridden by yelmo L_ice (phys_const)
-    k24_bed_thickness                = 0.1      ! h_b, bed obstacle height [m]
-    k24_manning_coefficient_exponent = 1.25     ! alpha = 5/4
-    k24_bed_friction_exponent        = 1.5      ! beta  = 3/2
+    k24_bed_bump_height              = 0.1      ! h_b, bed obstacle height [m]
+    k24_flux_W_exponent              = 1.25     ! alpha = 5/4
+    k24_flux_grad_exponent           = 1.5      ! beta  = 3/2
     k24_friction_factor              = 0.1      ! f, Darcy-Weisbach friction factor
     k24_till_factor                  = 1.1      ! F_till
     k24_critical_discharge           = 1.0      ! Q_c [m3/s]
-    k24_initial_cavity_height        = 0.1      ! H_0 [m]
-    k24_coupling_length              = 1.0e4    ! l_c, conduit spacing [m]
+    k24_H0_efficient                 = 0.1      ! H_0 [m]
+    k24_conduit_spacing              = 1.0e4    ! l_c, conduit spacing [m]
     k24_coupling_length_kamb86       = 10.0     ! Kamb & Echelmeyer (1986) coupling length / ice thickness; 0 disables the smoothing entirely
-    k24_eta_w                        = 5.703855806525211e-11 ! eta_w [Pa s] = 1.8e-3 per year
+    k24_water_viscosity              = 5.703855806525211e-11 ! water_viscosity [Pa s] = 1.8e-3 per year
 
     ! -- clamps. Julia's constructor leaves all of these OFF; KORI-ULB's own
     !    values are given in the comments if you want that fidelity back.
@@ -262,9 +265,9 @@
     k24_max_dissipation_iters        = 20       ! max_dissipation_iters
     k24_dissipation_rtol             = 1.0e-12  ! dissipation_rtol
     k24_dissipation_verbose          = True     ! dissipation_verbose
-    k24_max_coupling_iters           = 20       ! max_coupling_iters  (N-dependent sliding laws)
-    k24_coupling_rtol                = 1.0e-8   ! coupling_rtol
-    k24_coupling_verbose             = True     ! coupling_verbose
+    k24_max_qN_iters                 = 20       ! max_qN_iters        (N-dependent sliding laws)
+    k24_qN_rtol                      = 1.0e-8   ! qN_rtol
+    k24_qN_verbose                   = True     ! qN_verbose
 
     ! -- sliding-law parameters. Only the set belonging to k24_sliding_law is
     !    read; C / c_till are mandatory keywords in Julia and default to 0 here,
@@ -290,7 +293,7 @@
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
-    de_max                  = 2.0           ! [a-1]  Maximum allowed effective strain rate
+    de_max                  = 100.0          ! [a-1]  Maximum allowed effective strain rate (high: no cap in most cases; only limits strain heating and mat viscosity)
     enh_method              = "shear3D"     ! "simple","shear2D","shear3D" (+ "-tracer" variants)
     enh_shear               = 3.0
     enh_stream              = 3.0
@@ -334,7 +337,7 @@
     advecxy_cfl     = 0.5               ! [--] Target Courant number per horizontal-advection sub-step (CFL_safe)
     advecxy_nmax    = 10                ! [--] Max horizontal-advection sub-steps (safety cap; warns if hit)
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function
-    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = False             ! Use specified constant value of heat conductivity?
@@ -347,6 +350,7 @@
     cap_source      = "auto"            ! [capacity] C from: "auto" ("hyd" with water transport, else "till"), "hyd" (hydrology model), "till" (bucket W_til), "water" (water thickness W), "none" (C=0)
     cap_W_floor     = 0.0               ! [m] [capacity, "till"/"water"] floor subtracted from the water thickness
     cap_eps         = 1e-4              ! [m/a ice equiv.] [capacity] C below this counts as a dry bed
+    gl_temperate    = True              ! Hold grounded bases next to floating ice or open ocean at the pressure melting point (ocean-wetted bed)
     ! Basal water bucket (till_rate, H_w_max) moved to &yhyd.
 
     rock_method     = "equil"           ! "equil" (not active bedrock), "active", or "fixed"

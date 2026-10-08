@@ -39,7 +39,7 @@
 /
 
 &opt
-    opt_cf          = True              ! Should basal friction be optimized?
+    opt_cf          = "L21"             ! Basal friction optimization: "none", "L21"
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 5e-3              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
@@ -50,17 +50,17 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    opt_tf          = True              ! Should thermal forcing be optimized?
+    opt_tf          = "L21-points"      ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
-    tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
+    tf_sigma        = 10e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 10.0              ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
-    basin_fill      = False    
+    tf_basins       = -1                ! L21: Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 /
 
 &relax
@@ -104,7 +104,7 @@
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
+    pc_tol          = 1.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
     pc_eps          = 0.02               ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
 
 /
@@ -124,8 +124,8 @@
 
     ! === Grounding line ===
     bmb_gl_method       = "pmp"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
-    gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    gl_sep              = 1                 ! 1: binary f_grnd, linear f_grnd_acx/acy; 3: grounded area of H_grnd bilinear between cell centres (Leguy et al., 2021)
+    gz_nx               = 15                ! [-] Subgrid points per side (gz_nx*gz_nx) of the grounding-zone melt, bmb_gl_method = "pmpt"
 
     ! bmb_gl_method = pmpt
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
@@ -201,7 +201,7 @@
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
     ssa_lis_opt_energy   = "-i cg -p jacobi -maxiter 200 -tol 1.0e-4 -initx_zeros false"       ! SPD => CG (matches Yelmo.jl default)
     ssa_lat_bc          = "all"           ! "all", "marine", "floating", "none", "slab"
-    ssa_vel_max         = 10000.0          ! [m a-1] Velocity limit: clip value ("clip"), or speed at which the limit drag reaches ssa_vel_lim_tau ("drag")
+    ssa_vel_max         = 10000.0          ! [m a-1] Velocity limit: clip value (both methods); "drag": also the speed at which the limit drag reaches ssa_vel_lim_tau
     ssa_iter_max        = 5               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
@@ -237,7 +237,7 @@
     ! ---- bucket (bkt_) ----
     bkt_N_closure     = 3    ! 0=CONST 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE
     bkt_till_rate     = 1e-3 ! [m/a]  was ytherm.till_rate
-    bkt_floating_mode = 1    ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
+    bkt_floating_mode = 0    ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
 
     ! ---- closures (no prefix) ----
     const_N         = 1.0e7  ! [Pa] N_CLOSURE_CONST (legacy yneff.const)
@@ -252,19 +252,19 @@
     ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
     k24_flux_solver                  = 3
-    k24_manning_exponent             = 3.0
+    k24_glen_n                       = 3.0
     k24_latent_heat_water            = 3.35e5
-    k24_bed_thickness                = 0.1
-    k24_manning_coefficient_exponent = 1.25
-    k24_bed_friction_exponent        = 1.5
+    k24_bed_bump_height              = 0.1
+    k24_flux_W_exponent              = 1.25
+    k24_flux_grad_exponent           = 1.5
     k24_friction_factor              = 0.1
     k24_till_factor                  = 1.1
     k24_critical_discharge           = 1.0
-    k24_initial_cavity_height        = 0.1
-    k24_coupling_length              = 1.0e4
+    k24_H0_efficient                 = 0.1
+    k24_conduit_spacing              = 1.0e4
     k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
-    k24_eta_w                        = 1.8e-3
+    k24_water_viscosity              = 1.8e-3
     k24_W_min                        = 1.0e-8
     k24_W_max                        = 0.015
 /
@@ -277,7 +277,6 @@
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
-    de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
     enh_shear               = 3.0
     enh_stream              = 1.0
@@ -295,7 +294,7 @@
     dt_method       = "FE"              ! "FE", "AB", "SAM"
     solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
-    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = False             ! Use specified constant value of heat conductivity?

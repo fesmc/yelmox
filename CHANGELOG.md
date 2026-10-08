@@ -28,6 +28,31 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- Build: yelmox objects depend on `libfesmutils.a`, `libyelmo.a` and `libisostasy.a`
+  (`climate_rembo.o` also on `librembo.a`), so a type change in a dependency rebuilds
+  them instead of leaving a stale layout (fesmc/FastHydrology#10). Needs fesm-utils,
+  yelmo, FastIsostasy and rembo1 dev with the archive as a file target, else every
+  `make` rebuilds yelmox. FastIsostasy and rembo1 objects depend on `libfesmutils.a`.
+- `ytopo.gl_sep = 3` instead of 2 in `yelmox_esm_Antarctica*.nml` and the ISMIP7/1pctCO2
+  optimization scripts (`opt_ant.sh`, `opt_grl*.sh`): yelmo (b7049784) removes `gl_sep = 2`,
+  which gave `f_grnd = 0` to cells grounded at their centre next to deep ocean (GRL-16KM
+  spin-up killed at t = 1 yr). Needs fesm-utils cc3f719.
+- Follows yelmo dev (f78eaa91): `input/yelmo_defaults.nml` gains `yelmo.pc_rho_max` (2)
+  and `ytherm.gl_temperate` (True); `ydyn.slide_T`/`gamma_T`/`lambda_min` are replaced by
+  `frz_scale`/`frz_efold`/`frz_min` (3 K, 1e-3; sliding-speed e-fold, was ~0.2 K for
+  `beta_q = 0.2`) and `ytherm.use_strain_sia` by `strain_heating = "full"`. All par files
+  take `pc_tol = 1` (was 5), `bkt_floating_mode = 0` (was 1) and the default `de_max = 100`
+  (was 0.5). Ice-sheet results change.
+- Follows yelmo dev (6fad9a11): `&yhyd` K24 keys renamed as in FastHydrology dev
+  (fesmc/FastHydrology#14), e.g. `k24_ub_hook` -> `k24_N_ub_coupled`, `k24_eta_w` ->
+  `k24_water_viscosity` (full list in the yelmo changelog); new `k24_kappa_z_hard` /
+  `k24_kappa_z_soft`. Values unchanged. Needs FastHydrology dev 8e681d0 or later.
+- `[opt] opt_cf` and `opt_tf` are methods instead of switches: `opt_cf = "none" | "L21"`,
+  `opt_tf = "none" | "L21" | "L21-points"`. `"L21"` optimizes one `tf_corr` per basin
+  (`optimize_tf_corr_basin`, `tf_basins`), `"L21-points"` each point (`optimize_tf_corr`,
+  `tf_sigma`, `basin_fill`; the method used so far). Par files: `True` -> `"L21"`
+  (`opt_cf`) / `"L21-points"` (`opt_tf`), `False` -> `"none"`. Logical values stop the
+  model. Needs yelmo with string `opt_cf`/`opt_tf` (`libs/ice_optimization.f90`).
 - The topography relaxation of a spin-up is its own switch, `[sim] relax`, with
   the group `[relax]` (`topo_rel`, `tau1`, `tau2`, `time1`, `time2`, `m`; was
   `[opt] rel_tau1/2`, `rel_time1/2`, `rel_m` with `topo_rel = 4` fixed), applied

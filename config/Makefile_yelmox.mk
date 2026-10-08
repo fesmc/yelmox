@@ -234,3 +234,12 @@ obm_libs = 				$(objdir)/obm_defs.o\
 						$(objdir)/obm_coupling.o
 
 yelmox_help = 			$(objdir)/yelmox_hysteresis_help.o
+
+# yelmox objects embed fesm-utils, yelmo, isostasy (and rembo) types: rebuild
+# them when one of these archives changes, or objects keep a stale type layout
+# (fesmc/FastHydrology#10). libyelmo.a covers FastHydrology, elsa and tracer.
+$(yelmox_libs) $(obm_libs): $(FESMUTILSLIBDIR)/libfesmutils.a \
+                            $(YELMOROOT)/libyelmo/include/libyelmo.a \
+                            $(ISOSTASYROOT)/libisostasy/include/libisostasy.a
+
+$(objdir)/climate_rembo.o: $(REMBOROOT)/librembo/include/librembo.a
