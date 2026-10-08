@@ -1,7 +1,7 @@
 #!/bin/bash
 
 resolution=ANT-16KM
-output_path=output_albedo/1pctCO2/opt-${resolution}-l21-bedmap3
+output_path=output/1pctCO2/opt-${resolution}-l21-bedmap3
 
 ctrl_params=(
     "domain.grid_hub=${resolution}"
@@ -9,7 +9,7 @@ ctrl_params=(
     "comps.surface_method=smbpal"
     "sim.relax=True"
     "sim.opt=True"
-    "spinup.time_end=15.0e3"
+    "spinup.time_end=20.0e3"
     "sim.init_kill_shelves=True"
     "tm_1D.dt=10.0"
     "tm_2Dsm.dt=2e3"
@@ -66,5 +66,5 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica_1pctCO2.nml -o "${output_path}" \
+runme -rs -q shared -w 2-00:00:00 -m 20G -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica_1pctCO2.nml -o "${output_path}" \
       -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${hyd_params[@]}" "${mat_params[@]}"

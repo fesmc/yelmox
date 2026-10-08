@@ -12,7 +12,7 @@
 #   fhyd.*                    -> yhyd.* (the original set bkt_N_closure and
 #                                till_delta twice; runme keeps the last values)
 #   ycalv.tau_ice             -> ycalv.tau_ice_flt
-#   ydyn.scale_T=0            -> ydyn.slide_T=False
+#   ydyn.scale_T=0            -> ydyn.frz_scale=False
 #   gcm_to_ref/gcm_so_ref     -> dropped: input/esm/esm_grl_ismip7.nml already
 #                                uses the annual 1981-2010 mean (data_params_8KM)
 # opt.cf_init=-1 starts cb_ref from the till friction of the bed (cb_tgt).
@@ -85,7 +85,7 @@ calv_params=(
 dyn_params=(
     "ydyn.beta_min=50"
     "ydyn.solver=diva"
-    "ydyn.slide_T=False"
+    "ydyn.frz_scale=False"
     "ydyn.ssa_solver=energy"
     "ydyn.ssa_lat_bc=all"
 )
@@ -96,6 +96,6 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q 48h -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
+runme -rs -q shared -w 2-00:00:00 -m 20G -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
       -p "${res_params[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${hyd_params[@]}" \
       "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"
