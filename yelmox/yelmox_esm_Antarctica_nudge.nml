@@ -546,7 +546,6 @@
     obs_name  = "z_sed"
 
 /
-    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 &ghf
     use_obs   = True 
@@ -555,6 +554,7 @@
     obs_err_name = "None"     ! Uncertainty field ("None": not used)
     f_stdev   = 0.0            ! Number of standard deviations added to obs
     ghf_const = 50.0           ! [mW/m^2]
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
 
 /
 
