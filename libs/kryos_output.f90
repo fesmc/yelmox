@@ -277,7 +277,7 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "m ie/yr", "Surface mass balance")
+        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "mm w.e./yr", "Surface mass balance")
         call io_var2D(filename, "tsrf", smb%ann%tsrf, n, ncid, "K", "Surface temperature")
         call nc_close(ncid)
     end subroutine smb_write_step
