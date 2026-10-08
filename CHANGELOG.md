@@ -28,6 +28,11 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- Build: yelmox objects depend on `libfesmutils.a`, `libyelmo.a` and `libisostasy.a`
+  (`climate_rembo.o` also on `librembo.a`), so a type change in a dependency rebuilds
+  them instead of leaving a stale layout (fesmc/FastHydrology#10). Needs fesm-utils,
+  yelmo, FastIsostasy and rembo1 dev with the archive as a file target, else every
+  `make` rebuilds yelmox. FastIsostasy and rembo1 objects depend on `libfesmutils.a`.
 - `ytopo.gl_sep = 3` instead of 2 in `yelmox_esm_Antarctica*.nml` and the ISMIP7/1pctCO2
   optimization scripts (`opt_ant.sh`, `opt_grl*.sh`): yelmo (b7049784) removes `gl_sep = 2`,
   which gave `f_grnd = 0` to cells grounded at their centre next to deep ocean (GRL-16KM
