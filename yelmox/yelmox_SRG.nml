@@ -134,6 +134,7 @@
     tf_min          = -0.5              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  0.5              ! [degC] Maximum allowed tf_corr value 
     tf_basins       = -1.               ! L21: Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 
 /
 
