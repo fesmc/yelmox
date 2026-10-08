@@ -614,7 +614,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-8KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
@@ -651,7 +651,7 @@
     ! A blank component grid takes the default given in brackets.
     name         = "Antarctica"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "ANT-8KM"          ! hi-res geometry hub
+    grid_hub     = "ANT-16KM"         ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
     grid_isos    = ""                 ! isostasy [grid_ice]
     grid_clim    = ""                 ! reference climate + transient forcing [grid_ice]
