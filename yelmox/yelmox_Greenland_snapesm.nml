@@ -734,7 +734,7 @@
     grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
     grid_surface = "GRL-32KM"         ! surface mass balance [grid_clim]
     grid_shelf   = "GRL-32KM"         ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17-v5.nc"
     topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
     regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
     regions_var  = "mask"
