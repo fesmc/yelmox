@@ -630,6 +630,7 @@
 &ghf
     use_obs   = True 
     obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF_L21.nc"
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
     obs_name  = "ghf"
     obs_err_name = "None"
     f_stdev   = 0.0

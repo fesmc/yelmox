@@ -647,6 +647,7 @@
     c_grz           = 1.0           ! [-] bmb_ref scalar
     f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
     grz_length      = 32.0          ! [km] Length scale of grounding zone
+    convert_ghf_units = False  ! True converts the file from W/m^2 to mW/m^2
     use_obs         = False         ! Load obs for bmb_ref
     obs_path        = "none"
     obs_name        = "bm_eq_reese"
