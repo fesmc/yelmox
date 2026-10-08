@@ -31,7 +31,7 @@
     tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2020              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 10.0              ! [yr] Ending time (model years) - short forcing-only smoke test
+    time_end        = 20e3              ! [yr] Ending time (model years; = opt cf/tf_time_end)
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
@@ -46,9 +46,9 @@
 
 &transient
     tstep_method    = "cal"             ! "const" (time=time_elapsed) or "cal" (time=time_cal)
-    tstep_const     = 2020              ! Assumed time for "const" method
+    tstep_const     = 2015.0            ! Assumed time for "const" method
     time_init       = 2015.0            ! [yr] Starting time (years CE)
-    time_end        = 3500.0            ! [yr] Ending time (years CE)
+    time_end        = 2300.0            ! [yr] Ending time (years CE)
     dtt             = 1.0               ! [yr] Main loop timestep 
 
     ! Time intervals (check with ESM forcings)
@@ -673,8 +673,8 @@
     ! (grid_surface) and marine_shelf (grid_shelf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
-    with_ice_sheet    = True   ! Is the ice sheet active? (OFF: forcing-only test)
-    with_isostasy     = True   ! Is isostasy active? (OFF: forcing-only test)
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
