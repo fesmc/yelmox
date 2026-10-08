@@ -34,6 +34,9 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- Par files: `ydyn.ssa_lis_opt_energy` CG with SSOR preconditioner and `-tol 1.0e-3` (was
+  Jacobi, `1.0e-4`, which hit `-maxiter 200` in almost every ANT-8KM solve; the result was
+  ~1e-3 converged anyway). ANT-8KM: 1/179 solves at the limit, 52 instead of 200 iterations.
 - smbpal ITM runs point by point with OpenMP; the daily forcing and insolation are prepared
   once per call (once for the whole 100-yr cold-start snowpack equilibration). ANT-8KM
   ISMIP7 10-yr test: 22.5 -> 8.0 min (16 threads). Equal to the serial version to
