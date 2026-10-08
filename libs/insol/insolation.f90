@@ -34,10 +34,15 @@ module insolation
     type orbit_class
         integer :: n_orbit, n_lat
         real (dp), dimension(:), allocatable :: time, eccm, perm, xobm
-        real (dp), dimension(:), allocatable :: lats, solarm, coszm 
+        real (dp), dimension(:), allocatable :: lats 
     end type 
 
     type(orbit_class) :: OPAR 
+
+    type insol_day_class
+        ! Daily insolation at latitude nodes, with spline coefficients
+        real (dp), dimension(:), allocatable :: lats, S, b, c, d
+    end type 
 
     interface calc_insol_day
         module procedure calc_insol_day_pt  
@@ -46,6 +51,9 @@ module insolation
 
     private
     public :: calc_insol_day 
+    public :: insol_day_class
+    public :: calc_insol_day_spline
+    public :: insol_day_eval
 
 contains 
 
@@ -90,13 +98,44 @@ contains
         real (dp) :: time_bp
         real (dp) :: insol(size(lats))
 
+        real (dp), optional :: S0
+        integer, optional   :: day_year
+        character(len=*), optional :: fldr 
+
+        ! Local variables
+        type(insol_day_class) :: ins 
+        integer :: j 
+
+        ins = calc_insol_day_spline(day,time_bp,S0,day_year,fldr)
+
+        do j = 1, size(lats)
+            insol(j) = insol_day_eval(ins,lats(j))
+        end do 
+
+        return 
+
+    end function calc_insol_day_1D
+
+    function calc_insol_day_spline(day,time_bp,S0,day_year,fldr) result(ins)
+        ! Daily insolation for a given day of year and time before present
+        ! at the predefined latitude nodes, with its spline coefficients,
+        ! for evaluation at any latitude with insol_day_eval.
+        ! time_bp = years before present (present==1950)
+        ! Not thread safe (orbital parameters are module state).
+
+        implicit none 
+
+        integer   :: day
+        real (dp) :: time_bp
+        type(insol_day_class) :: ins 
+
         integer, parameter :: nh = 24 
 
         real (dp) :: PER, ECC, XOBCH, TPERI, ZAVEXPE
         real (dp) :: PRAE, PCLOCK, PYTIME 
         real (dp) :: PDISSE(nh), PZEN1(nh), PZEN2(nh), PZEN3(nh)
 
-        integer :: j, h 
+        integer :: j, h, n 
 
         real (dp), optional :: S0
         real (dp)           :: S0_value 
@@ -125,28 +164,37 @@ contains
                        PCLOCK,PYTIME,PDISSE(h),PZEN1(h),PZEN2(h),PZEN3(h),PRAE)
         end do 
 
-        ! ================================================
-        ! Using spline interpolation 
-        ! ================================================
-        ! Calculate daily insolation at predefined latitude values,
-        ! then interpolate via spline to get insolation at desired latitudes
-        do j = 1, OPAR%n_lat
-            OPAR%solarm(j) = calc_insol_day_internal(OPAR%lats(j),PDISSE,PZEN1,PZEN2,S0_value)
-        end do 
-        insol = interp_spline(OPAR%lats,OPAR%solarm,lats)
-        where (insol .lt. 0.0_dp) insol = 0.0_dp 
+        ! Calculate daily insolation at the predefined latitude nodes
+        ! and the spline coefficients to interpolate between them
+        n = OPAR%n_lat
+        allocate(ins%lats(n),ins%S(n),ins%b(n),ins%c(n),ins%d(n))
 
-        ! ================================================
-        ! Direct calculation at each latitude (no spline)
-        ! ================================================
-!         ! Calculate daily insolation at each latitude
-!         do j = 1, size(lats)
-!             insol(j) = calc_insol_day_internal(lats(j),PDISSE,PZEN1,PZEN2,S0_value)
-!         end do 
-         
+        ins%lats = OPAR%lats
+        do j = 1, n
+            ins%S(j) = calc_insol_day_internal(ins%lats(j),PDISSE,PZEN1,PZEN2,S0_value)
+        end do 
+        call spline(ins%lats,ins%S,ins%b,ins%c,ins%d,n)
+
         return 
 
-    end function calc_insol_day_1D
+    end function calc_insol_day_spline
+
+    function insol_day_eval(ins,lat) result(insol)
+        ! Daily insolation at latitude lat, interpolated by spline
+        ! from the latitude nodes of ins (calc_insol_day_spline)
+
+        implicit none 
+
+        type(insol_day_class), intent(IN) :: ins 
+        real (dp), intent(IN) :: lat 
+        real (dp) :: insol 
+
+        insol = interp_spline_eval(ins%lats,ins%S,ins%b,ins%c,ins%d,lat)
+        if (insol .lt. 0.0_dp) insol = 0.0_dp 
+
+        return 
+
+    end function insol_day_eval
 
     function calc_insol_day_pt(day,lat,time_bp,S0,day_year,fldr) result(insol)
         ! Given day of year, latitudes and time before present,
@@ -383,9 +431,7 @@ contains
         ! (actual lat values are interpolated from these generic calcs)
         OPAR%n_lat = 61 
         if (allocated(OPAR%lats))   deallocate(OPAR%lats)
-        if (allocated(OPAR%solarm)) deallocate(OPAR%solarm)
-        if (allocated(OPAR%coszm))  deallocate(OPAR%coszm)
-        allocate(OPAR%lats(OPAR%n_lat),OPAR%solarm(OPAR%n_lat),OPAR%coszm(OPAR%n_lat))
+        allocate(OPAR%lats(OPAR%n_lat))
 
         do n = 1, OPAR%n_lat
             OPAR%lats(n) = -90.0_dp + (n-1)*180.0_dp/dble(OPAR%n_lat-1)

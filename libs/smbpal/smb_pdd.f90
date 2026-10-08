@@ -53,7 +53,7 @@ contains
 
     end subroutine calc_ablation_pdd
 
-    subroutine calc_temp_effective(teff, temp, sigma)
+    elemental subroutine calc_temp_effective(teff, temp, sigma)
         ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         ! Subroutine : e f f e c t i v e T
         ! Author     : Reinhard Calov
@@ -69,9 +69,9 @@ contains
 
         implicit none
 
-        real(prec), intent(OUT) :: teff(:,:)
-        real(prec), intent(IN)  :: temp(:,:)
-        real(prec), intent(IN)  :: sigma(:,:)
+        real(prec), intent(OUT) :: teff
+        real(prec), intent(IN)  :: temp
+        real(prec), intent(IN)  :: sigma
         
         real(prec), parameter :: inv_sqrt2   = 1.0/sqrt(2.0)
         real(prec), parameter :: inv_sqrt2pi = 1.0/sqrt(2.0*pi)
@@ -81,29 +81,18 @@ contains
         real(8) :: val_out 
         real(8) :: val_tmp 
 
-        integer :: i, j, nx, ny 
+        inv_sigma   = 1.0/sigma
+        
+        ! Perform calculation of erfc at real(8) precision to
+        ! avoid potential underflow errors at very low temperatures
+        val_in  = -temp*inv_sigma*inv_sqrt2
+        val_out = erfc(val_in)
+        if (dabs(val_out) .lt. 1e-10_dp) val_out = 0.0_dp 
 
-        nx = size(teff,1) 
-        ny = size(teff,2) 
+        val_tmp = dexp(-0.5_dp*(temp*inv_sigma)**2)
+        if (dabs(val_tmp) .lt. 1e-10_dp) val_tmp = 0.0_dp 
 
-        do j = 1, ny 
-        do i = 1, nx 
-
-            inv_sigma   = 1.0/sigma(i,j)
-            
-            ! Perform calculation of erfc at real(8) precision to
-            ! avoid potential underflow errors at very low temperatures
-            val_in  = -temp(i,j)*inv_sigma*inv_sqrt2
-            val_out = erfc(val_in)
-            if (dabs(val_out) .lt. 1e-10_dp) val_out = 0.0_dp 
-
-            val_tmp = dexp(-0.5_dp*(temp(i,j)*inv_sigma)**2)
-            if (dabs(val_tmp) .lt. 1e-10_dp) val_tmp = 0.0_dp 
-
-            teff(i,j) = sigma(i,j)*inv_sqrt2pi*val_tmp + temp(i,j)*0.5*val_out 
-
-        end do 
-        end do 
+        teff = sigma*inv_sqrt2pi*val_tmp + temp*0.5*val_out 
 
         ! Result is the assumed/felt/effective positive degrees, 
         ! given the actual temperature (accounting for fluctuations in day/month/etc, 

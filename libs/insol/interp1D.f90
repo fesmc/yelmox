@@ -17,6 +17,8 @@ module interp1D
     private
     public :: interp_linear
     public :: interp_spline
+    public :: interp_spline_eval
+    public :: spline
     
 contains
 
@@ -135,7 +137,6 @@ contains
         double precision, dimension(:), intent(IN) :: xout
         double precision, dimension(size(xout)) :: yout 
         double precision, dimension(:), allocatable :: b, c, d 
-        double precision :: uh, dx, yh  
         integer :: i, n, nout 
 
         n    = size(x) 
@@ -146,26 +147,44 @@ contains
         call spline (x, y, b, c, d, n)
 
         do i = 1, nout 
-            if (xout(i) .lt. x(1)) then
-                dx = x(1)-xout(i)
-                uh = x(1)+dx
-                yh = ispline(uh,x,y,b,c,d,n)
-                yout(i) = y(1) + (y(1)-yh)
-                !write(*,*) x(1), xout(i), dx, uh, y(1), yh, yout(i)
-            else if (xout(i) .gt. x(n)) then
-                dx = xout(i)-x(n)
-                uh = x(n)-dx
-                yh = ispline(uh,x,y,b,c,d,n)
-                yout(i) = y(n) + (y(n)-yh)
-                !write(*,*) x(n), xout(i), dx, uh, y(n), yh, yout(i)
-            else
-                yout(i) = ispline(xout(i), x, y, b, c, d, n)
-            end if 
+            yout(i) = interp_spline_eval(x,y,b,c,d,xout(i))
         end do 
 
         return
 
     end function interp_spline 
+
+    function interp_spline_eval(x,y,b,c,d,u) result(yout)
+        ! Evaluate the cubic spline with coefficients b, c, d (from spline)
+        ! at u, extrapolating outside of x by reflection about the end points.
+
+        implicit none 
+
+        double precision, dimension(:), intent(IN) :: x, y, b, c, d
+        double precision, intent(IN) :: u
+        double precision :: yout 
+        double precision :: uh, dx, yh  
+        integer :: n 
+
+        n = size(x)
+
+        if (u .lt. x(1)) then
+            dx = x(1)-u
+            uh = x(1)+dx
+            yh = ispline(uh,x,y,b,c,d,n)
+            yout = y(1) + (y(1)-yh)
+        else if (u .gt. x(n)) then
+            dx = u-x(n)
+            uh = x(n)-dx
+            yh = ispline(uh,x,y,b,c,d,n)
+            yout = y(n) + (y(n)-yh)
+        else
+            yout = ispline(u, x, y, b, c, d, n)
+        end if 
+
+        return
+
+    end function interp_spline_eval
 
 !     function ispline_outer(u, x, y, b, c, d, n) result(yout)
 

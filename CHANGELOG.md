@@ -34,6 +34,10 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- smbpal ITM runs point by point with OpenMP; the daily forcing and insolation are prepared
+  once per call (once for the whole 100-yr cold-start snowpack equilibration). ANT-8KM
+  ISMIP7 10-yr test: 22.5 -> 8.0 min (16 threads). Equal to the serial version to
+  single-precision round-off. Daily smbpal output (`file_out_day`) removed.
 - `scripts/check_par_nml.py` follows yelmo's defaults file: it reports keys of yelmo groups
   missing from `input/yelmo_defaults.nml` (what `nml_validate` stops on) and duplicate
   groups/keys, no longer omitted parameters; `--dead` also reports non-yelmo keys that no

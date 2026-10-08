@@ -90,12 +90,14 @@ contains
         mon0  = mon3D(:,:,12)
         mon13 = mon3D(:,:,1)
 
-        do i = 1, nx 
+        !$omp parallel do collapse(2) private(i,j)
         do j = 1, ny 
+        do i = 1, nx 
             day3D(i,j,:) = convert_monthly_daily_1D(mon3D(i,j,:), &
                              mon0(i,j),mon13(i,j),nd,days)
         end do 
         end do 
+        !$omp end parallel do
 
         return 
 
