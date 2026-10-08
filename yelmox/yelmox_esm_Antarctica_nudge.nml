@@ -35,7 +35,6 @@
     dtt             = 10.0              ! [yr] Main loop timestep 
 
     ! Time intervals (check with ESM forcings)
-    use_hist        = False             ! load historical period. If false, use ref before projection.
     time_hist       = 1850.0, 1990.0    ! [yr] Year interval used as Historical period
     time_proj       = 2020.0, 2300.0    ! [yr] Year interval used as Projection period
     time_ref        = 1990.0, 2019.0    ! [yr] Year interval used as Reference
@@ -58,9 +57,7 @@
     
     ! Time intervals ESM
     time_esm_ref    = 4501.0, 5000.0    ! [yr] Year interval used as Reference of ESM
-    use_hist        = False             ! load historical period. If false, dont use snapshots for historical.
     time_hist       = 1950.0, 1990.0    ! [yr] Year interval used as Historical period
-    use_proj        = True             ! load projection period. If false, dont use snapshots for projection projection.
     time_proj       = 4501.0, 5000.0    ! [yr] Year interval used as Projection period
     clim_var        = False             ! include climate variability
     clim_seed       = 1                 ! Randomnes seed
@@ -520,8 +517,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
