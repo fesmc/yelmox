@@ -205,6 +205,12 @@ contains
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
         call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
+
+        ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) with the
+        ! isostasy z_bed/z_sl, as domain_restart_read does, so the hub, climate
+        ! and surface at cold start see a z_srf consistent with z_sl.
+        call calc_ytopo_diagnostic(dom%yelmo%tpo, dom%yelmo%dyn, dom%yelmo%mat, &
+                                   dom%yelmo%thrm, dom%yelmo%bnd)
     end subroutine domain_init_isostasy
 
     subroutine domain_init_ice(dom, ts)
