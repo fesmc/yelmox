@@ -230,12 +230,18 @@ is `topo_rel` and its timescale ramps from `tau1` to `tau2`; after `time2`, the
 
 ### `[opt]`
 
-The optimization (`step_optimize`) of the basal-friction coefficient `cb_ref`
-(between `cf_time_init` and `cf_time_end`, `opt_cf`) and of the thermal-forcing
-correction `tf_corr` of the marine shelf (between `tf_time_init` and
-`tf_time_end`, `opt_tf`), towards the observed ice thickness. `cf_init` is the
-initial `cb_ref` on a cold start (`<= 0`: the till friction of the bed, `cb_tgt`).
-The method and its parameters are described in the Yelmo docs,
+The optimization (`step_optimize`), towards the observed ice thickness, of the
+basal-friction coefficient `cb_ref` (`opt_cf`, between `cf_time_init` and
+`cf_time_end`) and of the thermal-forcing correction `tf_corr` of the marine shelf
+(`opt_tf`, between `tf_time_init` and `tf_time_end`):
+
+| Key | Values | |
+|---|---|---|
+| `opt_cf` | `none`, `L21` | `cb_ref` following Lipscomb et al. (2021) |
+| `opt_tf` | `none`, `L21`, `L21-points` | one `tf_corr` per basin (`tf_basins`), or one per point (`tf_sigma`, `basin_fill`) |
+| `cf_init` | value | initial `cb_ref` on a cold start (`<= 0`: the till friction of the bed, `cb_tgt`) |
+
+The method and its other parameters are described in the Yelmo docs,
 [Basal friction optimization](https://fesmc.github.io/yelmo/optimization.html).
 
 ### `[output]`
