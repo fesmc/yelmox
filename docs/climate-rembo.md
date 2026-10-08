@@ -1,5 +1,7 @@
 ---
 title: "REMBO climate"
+aliases:
+  - flavor-rembo.html
 ---
 
 Runs with **REMBOv1**, an energy/moisture-balance regional atmosphere with an

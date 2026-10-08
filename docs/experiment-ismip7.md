@@ -9,7 +9,7 @@ restart bundle, then the **scenarios**, which start from that bundle in 2015 and
 run under the ESM forcing (historical + projection) to 2300.
 
 - **Program:** `yelmox` (`make yelmox`) with the ESM climate backend
-  (`[comps] climate = "esm"`, see [ESM forcing](flavor-esm.md)).
+  (`[comps] climate = "esm"`, see [ESM forcing](climate-esm.md)).
 - **Config:** `yelmox/yelmox_esm_Greenland.nml`, `yelmox/yelmox_esm_Antarctica_ismip7.nml`.
 - **Forcing data:** `input/esm/esm_grl_ismip7.nml`, `input/esm/esm_ant_ismip7.nml`
   (see [Database namelists](database-namelists.md)).

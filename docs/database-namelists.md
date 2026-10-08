@@ -226,7 +226,7 @@ not in the namelist.
 - **`esm_forcing`** groups the atmosphere/ocean database groups into reference,
   variability, ESM-reference, historical, and projection periods
   (`&gcm_ts_ref`, `&gcm_to_proj`, …) and supplies `{gcm}`/`{experiment}`. See
-  [ESM forcing](flavor-esm.md).
+  [ESM forcing](climate-esm.md).
 - **`snapesm`** uses the same reader for its snapshot climate database.
 - **`ismip6`** uses it for the ISMIP6 atmosphere/ocean forcing files.
 

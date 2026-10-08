@@ -1,5 +1,7 @@
 ---
 title: "ESM forcing"
+aliases:
+  - flavor-esm.html
 ---
 
 Runs forced by **Earth-System-Model (ESM) output** (ISMIP7, TIPMIP, 1pctCO2) use

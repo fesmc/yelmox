@@ -11,7 +11,7 @@ missing.
 The reference defaults to `yelmo/par/yelmo_initmip.nml` (reached via the
 `yelmo` symlink at the repo root), which is maintained alongside the yelmo
 source. Override it with `--ref`. Only the yelmo-core groups present in the
-reference are checked; flavor/library groups (snapclim, smbpal, marine_shelf,
+reference are checked; program/library groups (snapclim, smbpal, marine_shelf,
 ismip6, esm, ...) are out of scope.
 
 Usage:

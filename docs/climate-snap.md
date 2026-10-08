@@ -35,7 +35,7 @@ the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 | `recon` | reconstructed snapshots, interpolated in time (`[snap_recon]`) |
 | `fraction` (ocean only) | an ocean anomaly of `f_to` × the mean atmospheric anomaly |
 
-The transient forcing (`[tsforcing]`/`[tsgen]`, see [yelmox](flavor-yelmox.md))
+The transient forcing (`[tsforcing]`/`[tsgen]`, see [yelmox](yelmox.md))
 reaches snapclim only in the `anom` methods.
 
 ## snapesm
