@@ -1,33 +1,28 @@
 #!/usr/bin/env bash
 #
-# 1pctCO2 forcing-only workflow for Antarctica (yelmox, climate = esm) -- SCAFFOLD.
+# 1pctCO2 workflow for Antarctica (yelmox, climate = esm).
 #
-#   Step 1  spinup     reference-climate spin-up  -> writes a restart bundle
+#   Step 1  spinup     20-kyr present-day OPTIMIZED ice-sheet spin-up
+#                      (sim.opt=True, as ISMIP7) -> writes a restart bundle
 #   Step 2  scenarios  the 1pctCO2 run, branched off that bundle
 #
-# All runs are forcing-only (comps.with_ice_sheet=False, with_isostasy=False):
-# they produce climate + ocean forcing from the 1pctCO2 CMIP fields, no ice dynamics.
-# 1pctCO2 = idealized CMIP experiment, atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140.
-# Forcing is ABSOLUTE tas/pr/thetao/so, self-referenced to the run start (~1xCO2);
-# see input/esm/esm_ant_1pctCO2.nml and its header.
-#
-# *** UNTESTED / DATA-PENDING ***  The 1pctCO2 forcing is NOT on this machine yet
-# (the whole ice_data/1pctCO2/ tree is absent). This scaffold is wired against the
-# expected layout (realization r1i1p4f1, window 2020-2160) so it should run once the
-# data is staged. Until then only STAGE=1 (dir/submit-script staging) will succeed;
-# a real run will stop in varslice when it cannot find the 1pctCO2 files.
+# The ice sheet + isostasy are ACTIVE. 1pctCO2 = idealized CMIP experiment,
+# atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140. The forcing is the GCM's ABSOLUTE
+# tas/pr/thetao/so, self-referenced to the run start (~1xCO2), read from the global
+# CMIP files and remapped online onto the run's grid; see input/esm/esm_ant_1pctCO2.nml.
+# The reference climatology is RACMO2.3 (atmosphere) + meltMIP OI (ocean).
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
 #   scripts/1pctCO2/run_1pctco2_antarctica.sh spinup
 #   scripts/1pctCO2/run_1pctco2_antarctica.sh scenarios
 #
+# The GCM is set with the GCM env var (default MPI-ESM1-2-LR; the spin-up does not
+# depend on it): MPI-ESM1-2-LR | NorESM2-MM | UKESM1-0-LL | IPSL-CM6A-LR | CESM2
+#
 # Stage only (create dirs + SLURM submit script, do NOT submit): STAGE=1
 #
 #   STAGE=1 scripts/1pctCO2/run_1pctco2_antarctica.sh spinup
-#
-# NOTE: larger ANT grids need a big stack. The SLURM submit script sets it; for a
-# local run first do:  ulimit -s unlimited
 #
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
@@ -36,19 +31,20 @@ cd "$(dirname "$0")/../.." || exit 1               # repo root
 EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
 NML="yelmox/yelmox_esm_Antarctica_1pctCO2.nml"
 OUTROOT="output/1pctco2_ant"
-GCM="1pctCO2-r1i1p4f1"                             # label only (no {gcm} templating in the par nml)
-GRID="ANT-32KM"                                    # lightest grid; bump once data + grid confirmed
-SCENARIOS=(1pctCO2)
+GCM="${GCM:-MPI-ESM1-2-LR}"
+GRID="ANT-32KM"
 
-SPINUP_YEARS=10                                    # forcing-only: short suffices
-PROJ_INIT=2020                                     # 1pctCO2 start year (run year 0 = 1xCO2)
+SPINUP_YEARS=20000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=20e3)
+PROJ_INIT=2020                                     # 1pctCO2 start year (year 0 = 1xCO2)
 PROJ_END=2160                                      # 1pctCO2 end year (140 yr)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
-HPCOPT="-q compute -w 04:00:00 --omp 16"
+HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 8"
+HPCOPT_SCEN="-q compute -w 02:00:00 --omp 8"
 
 SPINUP_OUT="$OUTROOT/spinup"
+# The spin-up's final restart bundle. yelmox names it restart-<time/1e3 %.3f>-kyr.
 # Absolute path: the executable runs from inside the scenario's run dir, so a
 # repo-root-relative path would not resolve.
 BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1000}")-kyr"
@@ -56,23 +52,21 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 # ---- steps -----------------------------------------------------------------
 case "${1:-}" in
   spinup)
-    runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup esm.experiment=ctrl esm.esm_name="$GCM" \
+    runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
+      -p ctrl.run_step=spinup sim.relax=True sim.opt=True esm.experiment=ctrl \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
-    for exp in "${SCENARIOS[@]}"; do
-      runme $SUBMIT $HPCOPT -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
-        -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
-           esm.use_esm=True esm.use_hist=False esm.use_proj=True \
-           domain.grid_hub="$GRID" \
-           ctrl.restart="$BUNDLE" \
-           transient.time_init="$PROJ_INIT" transient.time_end="$PROJ_END"
-    done
+    runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/1pctCO2_$GCM" \
+      -p ctrl.run_step=transient esm.experiment=1pctCO2 esm.esm_name="$GCM" \
+         esm.use_esm=True esm.use_hist=False esm.use_proj=True \
+         domain.grid_hub="$GRID" \
+         ctrl.restart="$BUNDLE" \
+         transient.time_init="$PROJ_INIT" transient.time_end="$PROJ_END"
     ;;
   *)
-    echo "usage: $0 {spinup|scenarios}   (prefix STAGE=1 to stage without submitting)" >&2
+    echo "usage: [GCM=...] $0 {spinup|scenarios}   (prefix STAGE=1 to stage without submitting)" >&2
     exit 1
     ;;
 esac

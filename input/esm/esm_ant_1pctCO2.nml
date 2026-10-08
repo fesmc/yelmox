@@ -1,24 +1,24 @@
 ! ============================================================================
-! 1pctCO2 Antarctica ESM forcing -- SCAFFOLD (UNTESTED / DATA-PENDING).
+! 1pctCO2 Antarctica ESM forcing.
 !
 ! Idealized CMIP experiment: atmospheric CO2 rises +1%/yr (compounding), reaching
 ! 4xCO2 at ~yr 140. Consumes ABSOLUTE CMIP fields (tas/pr/thetao/so), NOT precomputed
 ! anomalies -- the anomaly is formed internally by SELF-REFERENCE: gcm_*_esm_ref and
 ! gcm_*_proj point at the SAME 1pctCO2 file, so with the run's time_esm_ref set to the
 ! first years (~1xCO2 baseline) dts = proj(t) - mean(esm_ref) recovers warming relative
-! to the 1pctCO2 start. (Mirrors esm_ant_ismip7.nml's pattern, not the anomaly-file
-! style of the TIPMIP configs.)
+! to the 1pctCO2 start. (Mirrors esm_ant_ismip7.nml's pattern.)
 !
-! Reference climatology: RACMO2.3 (t2m/precip/z_srf) + meltMIP OI (thetao/so) -- both
-! Antarctic products that DO exist on this machine.
+! Reference climatology: RACMO2.3 (t2m/precip/z_srf) + meltMIP OI (thetao/so),
+! shared with ISMIP7 (ice_data/ISMIP7/.../meltMIP/).
 !
-! meltMIP OI ocean reference: shared with ISMIP7 (ice_data/ISMIP7/.../meltMIP/).
-!
-! *** DATA-PENDING: the 1pctCO2 forcing itself is NOT on Levante (2026-10). ***
-! The whole ice_data/1pctCO2/ tree is absent. Expected layout (realization r1i1p4f1):
-!   ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_{tas,pr,orog,thetao,so}.nc
-! Window is 2020-2160 (140 yr). Verify these paths/vars/time axes once the data is
-! staged, then smoke-test via run_1pctco2_antarctica.sh (spinup -> scenarios).
+! The CMIP fields are read as the GCMs provide them (global, native grids) and
+! remapped online onto the climate grid (varslice remap / grid_src):
+!   ice_data/1pctCO2/Global/{gcm}/{var}/{gcm}_1pctCO2_<member>_{var}.nc
+! {gcm} = [esm] esm_name (e.g. MPI-ESM1-2-LR, NorESM2-MM, UKESM1-0-LL, IPSL-CM6A-LR,
+! CESM2). The atmosphere is on a regular lon-lat grid (bilinear); the ocean on the
+! GCM's curvilinear grid (shepard over its lon/lat points), on 6 depth levels.
+! Model year 1 of the experiment is 2020 on the run clock; the protocol's 150 yr
+! (2020-2169) are declared (MPI-ESM1-2-LR provides 165; the first 150 are used).
 ! ============================================================================
 
 ! =========== ATMOSPHERE ===========
@@ -50,44 +50,54 @@
 
 ! ======== ESM Reference period ========
 &gcm_ts_esm_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_tas.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/tas/{gcm}_1pctCO2_*_tas.nc"
     name        = "tas"
     units       = "K" "K"
     scaling     = 1.0 0.0
-    time        = 1, 2020, 2160, 1, 12
+    time        = 1, 2020, 2169, 1, 12
+    remap       = "bilinear"
+    grid_src    = "{gcm}-atm"     ! map cache key of the GCM atmosphere grid
 /
 
 &gcm_pr_esm_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_pr.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/pr/{gcm}_1pctCO2_*_pr.nc"
     name        = "pr"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
-    time        = 1, 2020, 2160, 1, 12
+    time        = 1, 2020, 2169, 1, 12
+    remap       = "bilinear"
+    grid_src    = "{gcm}-atm"     ! map cache key of the GCM atmosphere grid
 /
 
 &gcm_zs_esm_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_orog.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/orog/{gcm}_1pctCO2_*_orog.nc"
     name        = "orog"
     units       = "m" "m"
     scaling     = 1.0 0.0
-    time        = 0, 2000, 2000, 0, 1
+    time        = 0, 2020, 2020, 0, 1
+    remap       = "bilinear"
+    grid_src    = "{gcm}-atm"     ! map cache key of the GCM atmosphere grid
 /
 
 ! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_tas.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/tas/{gcm}_1pctCO2_*_tas.nc"
     name        = "tas"
     units       = "K" "K"
     scaling     = 1.0 0.0
-    time        = 1, 2020, 2160, 1, 12
+    time        = 1, 2020, 2169, 1, 12
+    remap       = "bilinear"
+    grid_src    = "{gcm}-atm"     ! map cache key of the GCM atmosphere grid
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_pr.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/pr/{gcm}_1pctCO2_*_pr.nc"
     name        = "pr"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
-    time        = 1, 2020, 2160, 1, 12
+    time        = 1, 2020, 2169, 1, 12
+    remap       = "bilinear"
+    grid_src    = "{gcm}-atm"     ! map cache key of the GCM atmosphere grid
 /
 
 ! ========      OCEAN      =========
@@ -111,36 +121,44 @@
 
 ! ======== ESM Reference period ========
 &gcm_to_esm_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_thetao.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/thetao/{gcm}_1pctCO2_*_thetao.nc"
     name        = "thetao"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
-    time        = 1, 2020, 2160, 1, 1
+    time        = 1, 2020, 2169, 1, 1
+    remap       = "shepard"
+    grid_src    = "{gcm}-ocn"     ! map cache key of the GCM ocean grid
 /
 
 &gcm_so_esm_ref
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_so.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/so/{gcm}_1pctCO2_*_so.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 1, 2020, 2160, 1, 1
+    time        = 1, 2020, 2169, 1, 1
+    remap       = "shepard"
+    grid_src    = "{gcm}-ocn"     ! map cache key of the GCM ocean grid
 /
 
 ! ======== Projection period ========
 &gcm_to_proj
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_thetao.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/thetao/{gcm}_1pctCO2_*_thetao.nc"
     name        = "thetao"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
-    time        = 1, 2020, 2160, 1, 1
+    time        = 1, 2020, 2169, 1, 1
+    remap       = "shepard"
+    grid_src    = "{gcm}-ocn"     ! map cache key of the GCM ocean grid
 /
 
 &gcm_so_proj
-    filename    = "ice_data/1pctCO2/{domain}/{grid_name}/{grid_name}_1pctCO2_r1i1p4f1_so.nc"
+    filename    = "ice_data/1pctCO2/Global/{gcm}/so/{gcm}_1pctCO2_*_so.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 1, 2020, 2160, 1, 1
+    time        = 1, 2020, 2169, 1, 1
+    remap       = "shepard"
+    grid_src    = "{gcm}-ocn"     ! map cache key of the GCM ocean grid
 /
 
 

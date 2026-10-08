@@ -1,9 +1,8 @@
 ! ============================================================================
-! yelmox (climate = esm) main config -- 1pctCO2 Antarctica, forcing-only SCAFFOLD.
-! UNTESTED / DATA-PENDING: the 1pctCO2 forcing is not on this machine yet
-! (see input/esm/esm_ant_1pctCO2.nml header). Derived from
-! yelmox_esm_Antarctica_ismip7.nml; only &esm, &spinup, &transient differ.
-! Run via scripts/1pctCO2/run_1pctco2_antarctica.sh once the data is staged.
+! yelmox (climate = esm) main config -- 1pctCO2 Antarctica.
+! As yelmox_esm_Antarctica_ismip7.nml except &esm and &transient: the 1pctCO2
+! forcing (input/esm/esm_ant_1pctCO2.nml; global CMIP fields of [esm] esm_name,
+! remapped online). Run via scripts/1pctCO2/run_1pctco2_antarctica.sh.
 ! ============================================================================
 &ctrl
     run_step        = "spinup"
@@ -15,9 +14,9 @@
 &esm
     ! Experiment
     par_file        = "input/esm/esm_ant_1pctCO2.nml"
-    experiment      = "1pctCO2"         ! spinup uses ctrl; scenarios step sets 1pctCO2
+    experiment      = "1pctCO2"         ! spinup uses ctrl; the scenario step sets 1pctCO2
     use_esm         = False             ! use ESM snapshots? (scenario step sets True)
-    esm_name        = "1pctCO2-r1i1p4f1" ! label only: the 1pctCO2 par nml has no {gcm} templating
+    esm_name        = "MPI-ESM1-2-LR"   ! {gcm} of the 1pctCO2 forcing files (see the par_file header)
 
     ! Forcing switches (the smb source is [comps] surface_method)
     use_var         = False             ! include climate variability
@@ -31,7 +30,7 @@
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
     f_polar         = 1.8               ! Polar amplification
     dT_threshold    = 1.5               ! Cap for the HOMOGENEOUS (use_esm=False) analytic path only;
-                                        ! UNUSED on the gridded use_esm=True path this scaffold uses.
+                                        ! UNUSED on the gridded use_esm=True path.
 
 /
 
@@ -39,7 +38,7 @@
     tstep_method    = "const"           ! "const" (time=time_elapsed) or "cal" (time=time_cal)
     tstep_const     = 2020              ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time (model years)
-    time_end        = 10.0              ! [yr] Ending time (model years) - short forcing-only smoke test
+    time_end        = 20e3              ! [yr] Ending time (model years; = opt cf/tf_time_end)
     dtt             = 1.0               ! [yr] Main loop timestep
 
     ! Time intervals (check with ESM forcings)
@@ -47,7 +46,7 @@
     time_proj       = 2015, 2300        ! [yr] Year interval used as Projection period
     time_ref        = 1985, 2014        ! [yr] RACMO2.3 reference climatology (within its 1979-2022 axis)
                                         ! If "opt" this time interval will be used as optimization
-    time_esm_ref    = 2020, 2021        ! [yr] 1pctCO2 start (~1xCO2 baseline); unused in spinup
+    time_esm_ref    = 1960, 1989        ! [yr] Year interval used as Reference of ESM
     clim_var        = False             ! include climate variability
     clim_seed       = 10                ! Randomnes seed
 /
@@ -681,8 +680,8 @@
     ! (grid_surface) and marine_shelf (grid_shelf) all run on the Yelmo grid
     ! (identity remaps = exact parity). Set grid_clim to a coarse ESM grid to run
     ! the ESM forcing on its own grid; its outputs remap to the consumer grids.
-    with_ice_sheet    = False  ! Is the ice sheet active? (OFF: forcing-only test)
-    with_isostasy     = False  ! Is isostasy active? (OFF: forcing-only test)
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
