@@ -17,22 +17,20 @@ website:
     left:
       - text: "Home"
         href: index.md
-      - text: "Programs"
+      - text: "yelmox"
         menu:
-          - text: "Overview"
-            href: flavors.md
-          - text: "yelmox (single-domain)"
-            href: flavor-yelmox.md
+          - text: "yelmox"
+            href: yelmox.md
           - text: "yelmox_bipolar"
-            href: flavor-bipolar.md
+            href: yelmox-bipolar.md
       - text: "Climate backends"
         menu:
           - text: "snapclim and snapesm"
             href: climate-snap.md
           - text: "ESM forcing"
-            href: flavor-esm.md
+            href: climate-esm.md
           - text: "REMBO climate"
-            href: flavor-rembo.md
+            href: climate-rembo.md
       - text: "Experiments"
         menu:
           - text: "ISMIP7 projections"

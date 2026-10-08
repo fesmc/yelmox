@@ -234,9 +234,37 @@ coupler. 3D (e.g. monthly) fields use the `remap_3d` overload. Step-local
 allocatables are reentrant, which is what bipolar needs; per-timestep
 reallocation cost is negligible against the physics.
 
+## Coupling primitives
+
+`yelmox` and `yelmox_bipolar` advance a domain with these primitives (from `kryos_coupling`):
+
+- `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
+- `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`).
+- `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
+- `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
+- `step_icesheet` — run `yelmo_update`.
+- `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
+- `step_climate` — climate on `grid_clim` from the backend, with the transient forcing, on the `dt_clim` cadence.
+- `step_surface` — surface mass balance on `grid_surface` (`surface_method`: smbpal, smb_simple, or the climate's own, `climate`).
+- `step_shelf` — sub-shelf melt on `grid_shelf`, from the climate's ocean as depth profiles or at the shelf base.
+
+Every driver writes the sequence out in its time loop, so the coupling order can
+be read directly from the program; `yelmox_bipolar` interleaves the second domain
+and the ocean box model there.
+
+### Initialization ordering
+
+On cold start, the Yelmo applied mass-balance diagnostics (`smb`, `bmb`, `fmb`)
+are populated at the initial time so the first output snapshot reflects the
+coupled boundary forcing rather than zeros. This is handled inside Yelmo: when
+the topography solver runs without advancing the ice (`pc_step="none"` at init,
+or any `topo_fixed` step), it diagnoses the applied mass balance from the current
+boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
+(nothing is applied), which is expected.
+
 ## Drivers
 
-Both programs use the same driver plumbing:
+`yelmox` and `yelmox_bipolar` use the same driver plumbing:
 
 - **`tstep_init(ts, path_par, group, dtt [, time_ref, cal])`** (fesm-utils
   `timestepping`) — reads the run's timeline group (`[ctrl] run_step`: `"ctrl"`
@@ -253,7 +281,7 @@ Both programs use the same driver plumbing:
   each domain its subfolder of the bundle and `restore_bsl=.false.`.
 - **`domain_init_ice(dom, ts)`** — the cold-start ice state after
   `yelmo_init_state` (`[sim]` `init_kill_shelves`, `init_marine_H`,
-  `init_method`, `init_time_thrm`; see [yelmox](flavor-yelmox.md#configuration)).
+  `init_method`, `init_time_thrm`; see [yelmox](yelmox.md#configuration)).
 - **`run_restart_write(dom, bsl, time [, tsf])`** — the single-domain restart
   bundle (domain sub-models + `bsl_restart.nc` + the tsforcing state, one
   auto-named folder).
@@ -272,7 +300,7 @@ ts%is_finished`).
 
 - **`yelmox`** — argument is one parameter file; one `kryos_domain`, output to
   the run dir. The climate backend is chosen at runtime (`[comps] climate`),
-  so ESM and REMBO runs use this program too. See [yelmox](flavor-yelmox.md).
+  so ESM and REMBO runs use this program too. See [yelmox](yelmox.md).
 - **`yelmox_bipolar`** — argument is one parameter file holding both
   hemispheres. Each domain's groups carry a hemisphere suffix (`yelmo_south`,
   `domain_north`, `comps_north`, `snap_south`, …), threaded into every group
@@ -283,7 +311,7 @@ ts%is_finished`).
   ocean coupling is asymmetric. The driver owns the shared `bsl` and Ocean Box
   Model and interleaves them with the per-domain steps; the ocean coupling lives
   in `yelmox_bipolar/obm_coupling.f90`. Each domain writes to a subfolder named
-  after it. See [yelmox_bipolar](flavor-bipolar.md).
+  after it. See [yelmox_bipolar](yelmox-bipolar.md).
 
 ## Open issues
 

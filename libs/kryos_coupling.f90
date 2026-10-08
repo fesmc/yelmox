@@ -267,7 +267,7 @@ contains
         ! Surface mass balance + surface temperature from the active SMB model
         ! (grid_surface -> Yelmo, conservative), with the we->ie unit scaling and the
         ! optional Greenland modifications. The producing step (step_surface,
-        ! or a flavor climate step) leaves smb/tsrf on grid_surface in the SMB model's
+        ! or the climate's own) leaves smb/tsrf on grid_surface in the SMB model's
         ! own fields; this coupler is the single place that lands them on Yelmo.
         type(kryos_domain), intent(inout) :: dom
 

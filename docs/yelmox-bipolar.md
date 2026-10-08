@@ -1,12 +1,15 @@
 ---
 title: "yelmox_bipolar"
+aliases:
+  - flavor-bipolar.html
 ---
 
-A **two-domain** driver that runs a northern and a southern ice-sheet domain
-together, coupled through a **shared barystatic sea level** and a **shared Ocean
+The two-domain variant of [`yelmox`](yelmox.md): it runs a northern and a southern
+ice-sheet domain together, coupled through a **shared barystatic sea level** and a **shared Ocean
 Box Model (OBM)** that exchanges freshwater flux and ocean temperature between the
-hemispheres. Each domain is a full `kryos_domain` (the same one the single-domain
-[`yelmox`](flavor-yelmox.md) uses); the driver interleaves the `step_*` primitives
+hemispheres. Each domain is a full `kryos_domain`, configured
+as in `yelmox` with the hemisphere suffix on its groups (see
+[Configuration](yelmox.md#configuration)); the driver interleaves the `step_*` primitives
 across both domains plus the OBM.
 
 - **Program:** `yelmox_bipolar/yelmox_bipolar.f90` + `yelmox_bipolar/obm_coupling.f90` + `libs/kryos*.f90`.
@@ -80,4 +83,4 @@ Key ordering points:
 
 Transient forcing is handled through the OBM/hysteresis machinery
 (`obm_exchange`), **not** the `tsgen` `[tsforcing]` mechanism — the driver-owned
-`tsgen` forcing currently lives only in the single-domain [`yelmox`](flavor-yelmox.md).
+`tsgen` forcing currently lives only in the single-domain [`yelmox`](yelmox.md).

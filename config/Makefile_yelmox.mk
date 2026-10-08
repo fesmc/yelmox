@@ -102,7 +102,7 @@ $(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)
 
 # Bipolar ocean coupling: bridge over kryos_domain + the obm box model. Lives
 # alongside the bipolar driver in yelmox_bipolar/ -- it is only pertinent to
-# that flavor -- and is linked via obm_libs (bipolar targets only).
+# that program -- and is linked via obm_libs (bipolar targets only).
 $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) -c -o $@ $<

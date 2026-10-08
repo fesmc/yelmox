@@ -99,7 +99,7 @@ rembo-static: fesmutils-static
 	$(MAKE) -C $(REMBOROOT) rembo-static openmp=$(openmp)
 
 # ---------------------------------------------------------------------------
-# Default programs: the multigrid drivers, one per flavor folder.
+# Default programs: the multigrid drivers, one per program folder.
 # ---------------------------------------------------------------------------
 
 yelmox : fesmutils-static yelmo-static isostasy-static $(rembo_dep) $(yelmox_libs)
@@ -137,7 +137,7 @@ usage:
 	@echo ""
 	@echo "    * USAGE * "
 	@echo ""
-	@echo " Default (multigrid) drivers, one per flavor folder:"
+	@echo " Default (multigrid) drivers, one per program folder:"
 	@echo "   make yelmox | yelmox_bipolar"
 	@echo "   rembo=1 links REMBO (climate = rembo)"
 	@echo " make clean      : cleans object files"

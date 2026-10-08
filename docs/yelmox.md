@@ -1,18 +1,28 @@
 ---
-title: "yelmox (single-domain)"
+title: "yelmox"
+aliases:
+  - flavor-yelmox.html
+  - flavors.html
 ---
 
-The single-domain program: one ice-sheet domain with FastIsostasy bedrock, a
-shared barystatic sea level, a climate backend chosen at runtime, a surface mass
-balance and the marine shelf. It is the reference implementation of the multigrid
-`kryos_domain`; [`yelmox_bipolar`](flavor-bipolar.md) runs two of them.
+The YelmoX program: one ice-sheet domain with FastIsostasy bedrock, a shared
+barystatic sea level, a climate backend chosen at runtime, a surface mass balance
+and the marine shelf, built on the multigrid `kryos_domain` (see
+[Multigrid coupling](multigrid.md)). Its variant
+[`yelmox_bipolar`](yelmox-bipolar.md) runs two domains, north and south, coupled
+through the sea level and an ocean box model.
+
+| Program | Build | Domains | Climate | Ocean |
+|---|---|---|---|---|
+| `yelmox` | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[comps] climate`) | the climate (depth profiles or shelf base) |
+| [`yelmox_bipolar`](yelmox-bipolar.md) | `make yelmox_bipolar` | north + south | snapclim (×2) | snapclim + shared ocean box model |
 
 - **Program:** `yelmox/yelmox.f90` (thin driver) + `libs/kryos*.f90` (domain, coupling, startup, output).
 - **Build:** `make yelmox` (`make yelmox rembo=1` to link REMBO).
 - **Configs:** `yelmox/yelmox_<domain>.nml` (Antarctica, Greenland, North, LIS,
   Pyrenees, SRG, plus `pd_` present-day and paleo variants), `yelmox_esm_*.nml`
-  ([ESM forcing](flavor-esm.md)), `yelmox_rembo_Greenland.nml`
-  ([REMBO](flavor-rembo.md)), `yelmox_Greenland_snapesm*.nml`
+  ([ESM forcing](climate-esm.md)), `yelmox_rembo_Greenland.nml`
+  ([REMBO](climate-rembo.md)), `yelmox_Greenland_snapesm*.nml`
   ([snapesm](climate-snap.md)).
 
 ## Components
@@ -21,13 +31,24 @@ balance and the marine shelf. It is the reference implementation of the multigri
 |---|---|---|
 | Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
-| Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](flavor-esm.md) or [rembo](flavor-rembo.md) | `grid_clim` |
+| Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](climate-esm.md) or [rembo](climate-rembo.md) | `grid_clim` |
 | Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_surface` |
 | Sub-shelf melt | marine_shelf | `grid_shelf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
 
 Each module runs on its own grid, set in `[domain]`; the coupler remaps fields between
 grids at the moment of coupling. See [Multigrid coupling](multigrid.md).
+
+### Climate backends
+
+The forcing of a run is set at runtime by its climate backend, `[comps] climate`:
+
+| Backend | Supplies | Page |
+|---|---|---|
+| `snapclim` | atmosphere + ocean profiles, from climate snapshots blended by indices | [snapclim and snapesm](climate-snap.md) |
+| `snapesm` | as snapclim, configured as one blend model over any number of snapshots | [snapclim and snapesm](climate-snap.md) |
+| `esm` | reference climatology + Earth-system-model anomalies; atmosphere or smb, ocean at the shelf base, subglacial discharge | [ESM forcing](climate-esm.md) |
+| `rembo` | REMBOv1 atmosphere + smb; ocean from snapclim | [REMBO climate](climate-rembo.md) |
 
 ## Stepping order
 
@@ -92,7 +113,7 @@ How the anomalies reach the climate depends on the backend:
 | snapclim | used only in the `"anom"` methods (`snap.atm_type` for `dTa`, `snap.ocn_type` for `dTo`/`dSo`); ignored in the index-based methods (`snap_1ind_new`, `snap_2ind`, `hybrid`, …), as in the legacy `hyster` contract |
 | snapesm | added on top in every configuration |
 | esm | not used: the backend has its own forcing |
-| rembo | mapped onto REMBO's summer, annual and ocean anomalies (see [REMBO](flavor-rembo.md)) |
+| rembo | mapped onto REMBO's summer, annual and ocean anomalies (see [REMBO](climate-rembo.md)) |
 
 With `active = False` (the default in the shipped configs) `step_climate`
 applies no anomalies.
