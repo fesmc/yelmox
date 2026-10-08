@@ -121,6 +121,8 @@ module esm_forcing
         real(wp), allocatable :: dso_var(:,:)     ! Precipitation relative anomaly variability [%]
         real(wp), allocatable :: Qd_ann(:,:)      ! Annual mean subglacial discharge [m3/s]
         real(wp), allocatable :: Qd_sum(:,:)      ! Summer mean subglacial discharge [m3/s]
+        logical :: with_sgd_hist = .false.        ! Qd from the sgd_hist group (Greenland; its filename /= "none")
+        logical :: with_sgd_proj = .false.        ! Qd from the sgd_proj group (Greenland; its filename /= "none")
         
         ! === Mean fields ===
         real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
@@ -353,7 +355,8 @@ contains
                     call varslice_init_nml(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, subs=esm_subs)
                     call esm_check_ocean_layout(esm%to_hist, esm%to_esm_ref)
                     call esm_check_ocean_layout(esm%so_hist, esm%so_esm_ref)
-                    if (trim(domain).eq."Greenland") then
+                    esm%with_sgd_hist = sgd_active(filename, grp_Qd_hist, domain)
+                    if (esm%with_sgd_hist) then
                         call varslice_init_nml(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,subs=esm_subs)
                     end if
                 end if
@@ -373,7 +376,8 @@ contains
                     call varslice_init_nml(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,subs=esm_subs)
                     call esm_check_ocean_layout(esm%to_proj, esm%to_esm_ref)
                     call esm_check_ocean_layout(esm%so_proj, esm%so_esm_ref)
-                    if (trim(domain).eq."Greenland") then
+                    esm%with_sgd_proj = sgd_active(filename, grp_Qd_proj, domain)
+                    if (esm%with_sgd_proj) then
                         call varslice_init_nml(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,subs=esm_subs)
                     end if
                 end if
@@ -388,6 +392,21 @@ contains
         return 
     
     end subroutine esm_forcing_init
+
+    function sgd_active(filename, group, domain) result(active)
+        ! Subglacial discharge (Qd) is a Greenland forcing; it is read from the
+        ! group's file unless its filename is "none" (Qd = 0).
+        character(len=*), intent(IN) :: filename, group, domain
+        logical :: active
+        character(len=512) :: sgd_file
+
+        active = .false.
+        if (trim(domain) .ne. "Greenland") return
+
+        call nml_read(filename, trim(group), "filename", sgd_file)
+        active = .not. (trim(sgd_file) .eq. "none" .or. trim(sgd_file) .eq. "None")
+        if (.not. active) write(*,*) "esm_forcing_init:: "//trim(group)//": filename = none, Qd = 0."
+    end function sgd_active
 
     subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,south)
         ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
@@ -625,7 +644,7 @@ contains
     end subroutine esm_variability_update
 
     subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,&
-                                  domain,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
+                                  H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -636,7 +655,6 @@ contains
         real(wp), intent(IN) :: time
         logical,  intent(IN) :: use_esm
         real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
-        character(len=*), intent(IN) :: domain
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
         logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
@@ -710,7 +728,7 @@ contains
                                                H_ice,basins,z_bed,f_grnd,z_sl)
                         call esm_ocean_anomaly(esm%dso,mshlf,esm%so_hist,esm%so_esm_ref,time, &
                                                H_ice,basins,z_bed,f_grnd,z_sl)
-                        if (trim(domain).eq."Greenland") then
+                        if (esm%with_sgd_hist) then
                             call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_hist%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_hist%var(:,:,6,1)+esm%Qd_hist%var(:,:,7,1)+esm%Qd_hist%var(:,:,8,1)) / 3.0
@@ -743,7 +761,7 @@ contains
                                                H_ice,basins,z_bed,f_grnd,z_sl)
                         call esm_ocean_anomaly(esm%dso,mshlf,esm%so_proj,esm%so_esm_ref,time, &
                                                H_ice,basins,z_bed,f_grnd,z_sl)
-                        if (trim(domain).eq."Greenland") then
+                        if (esm%with_sgd_proj) then
                             call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_proj%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_proj%var(:,:,6,1)+esm%Qd_proj%var(:,:,7,1)+esm%Qd_proj%var(:,:,8,1)) / 3.0

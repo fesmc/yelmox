@@ -227,7 +227,7 @@ contains
 
             case("esm")
                 call esm_update(cl, out, ts%time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, &
-                                z_srf_ref, basins, domain, mshlf)
+                                z_srf_ref, basins, mshlf)
 
             case("rembo")
                 call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, basins, domain, dx, &
@@ -574,7 +574,7 @@ contains
     end subroutine esm_init
 
     subroutine esm_update(cl, out, time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
-                          basins, domain, mshlf)
+                          basins, mshlf)
         ! The reference climatology at the current surface, the esm anomalies
         ! (historical / projection / homogeneous) and the variability, then the
         ! products: atmosphere, the surface mass balance (surface_method = climate),
@@ -585,7 +585,6 @@ contains
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
         real(wp),         intent(in) :: z_srf_ref(:,:)
         real(wp),         intent(in) :: basins(:,:)
-        character(len=*), intent(in) :: domain
         type(marshelf_class), intent(in) :: mshlf
 
         associate(esm => cl%esm, ec => cl%esm_ctl)
@@ -599,7 +598,7 @@ contains
         end if
 
         call esm_forcing_update(esm, mshlf, time, ec%use_esm, ec%time_ref, ec%time_hist, &
-                                ec%time_proj, ec%time_esm_ref, domain, H_ice, basins, z_bed, &
+                                ec%time_proj, ec%time_esm_ref, H_ice, basins, z_bed, &
                                 f_grnd, z_sl, ec%use_smb, use_ref_atm=.false., use_ref_ocn=.false.)
 
         call esm_variability_update(esm, mshlf, time, dtt, ec%clim_var, ec%time_ref, H_ice, &
