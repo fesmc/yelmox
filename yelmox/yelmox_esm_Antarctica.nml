@@ -546,7 +546,7 @@
 /
 
 &sed
-    use_obs   = False
+    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
     obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
     obs_name  = "z_sed"
 
