@@ -16,7 +16,7 @@
 
     "par_paths" :
         {
-            "rembo"        : "yelmox/rembo_Greenland.nml"
+            "yelmox"       : "yelmox/rembo_Greenland.nml"
         },
 
     "files" : ["git_yelmo.txt"],
