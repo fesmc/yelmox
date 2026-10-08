@@ -246,9 +246,9 @@ contains
 
         ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
         call coupler_init(dom%cpl)
-        call coupler_prime(dom%cpl, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
-        call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
-        call coupler_prime(dom%cpl, dom%ctl%grid_hub, dom%ctl%grid_ice, "nn")     ! hub -> Yelmo (masks)
+        call prime_map(dom, dom%ctl%grid_ice, dom%ctl%grid_hub, "bilin")  ! Yelmo -> hub
+        call prime_map(dom, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
+        call prime_map(dom, dom%ctl%grid_hub, dom%ctl%grid_ice, "nn")     ! hub -> Yelmo (masks)
 
         ! --- ice sheet on grid_ice, with the hub's topography and masks ---
         ! The hub topography is both Yelmo's initial state and its present-day
@@ -589,6 +589,15 @@ contains
         else
             method = "con"
         end if
+    subroutine prime_map(dom, src, dst, method)
+        ! Build the src -> dst map up front, for the pairs remap sends to the
+        ! coupler: an identity pair is a copy in remap, so it has no map.
+        type(kryos_domain), intent(inout) :: dom
+        character(len=*),   intent(in)    :: src, dst, method
+
+        if (trim(src) /= trim(dst)) call coupler_prime(dom%cpl, src, dst, method)
+    end subroutine prime_map
+
     end function remap_method_smooth
 
     subroutine remap_2D(dom, var_src, src, var_dst, dst, method)
