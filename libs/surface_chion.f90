@@ -21,10 +21,11 @@ module surface_chion
     ! cold state. Inactive columns: smb = 0, tsrf = annual-mean air temperature.
     !
     ! smb is the surface mass balance, sf + rf - runoff - subl (smbpal's smb),
-    ! not chion_get_smb's ice-facing flux. tsrf is computed here once per year
-    ! from the annual-mean air temperature and annual net melt (refrz - melt),
-    ! as smbpal does: chion's per-step ITM tsrf applies firn_fac to a daily
-    ! melt_net, whereas firn_fac is calibrated against the annual total.
+    ! not chion_get_smb's ice-facing flux. tsrf and alb_s are the annual means
+    ! of chion's per-step surface state (chion_get_surface), as for any chion
+    ! model. For ITM this differs from smbpal, which applies the firn warming
+    ! and the freezing-point cap once to annual means: per step, summer days
+    ! are capped, so tsrf is colder in the ablation zone.
     !
     ! The per-column host work (forcing, accumulation, PDDs, insolation lookup)
     ! is OpenMP-parallel over the active columns, like chion's own step.
@@ -55,7 +56,6 @@ module surface_chion
         character(len=512) :: insol_fldr    ! folder of the orbital-parameter tables
         real(wp)           :: sf_a, sf_b    ! snowfall fraction, -0.5*tanh(sf_a*(T-sf_b))+0.5
         real(wp)           :: sigma_pdd     ! [K] temperature standard deviation for the PDDs
-        real(wp)           :: firn_fac      ! [K (mm w.e.)-1] firn warming per annual net refreezing
         real(wp)           :: time_equil    ! [yr] cold-start snowpack spin-up
         integer            :: dt_days       ! [d] chion step; divides the 360-day year
     end type surface_chion_param_class
@@ -72,8 +72,8 @@ module surface_chion
         real(wp), allocatable :: runoff(:,:)    ! [mm w.e./yr]
         real(wp), allocatable :: refrz(:,:)     ! [mm w.e./yr]
         real(wp), allocatable :: smb(:,:)       ! [mm w.e./yr] sf + rf - runoff - subl
-        real(wp), allocatable :: tsrf(:,:)      ! [K]
-        real(wp), allocatable :: alb_s(:,:)     ! [1] end-of-year surface albedo
+        real(wp), allocatable :: tsrf(:,:)      ! [K] surface temperature
+        real(wp), allocatable :: alb_s(:,:)     ! [1] surface albedo
         real(wp), allocatable :: H_snow(:,:)    ! [mm w.e.] end-of-year snowpack (itm)
     end type surface_chion_ann_class
 
@@ -175,7 +175,7 @@ contains
 
         real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:)
         real(wp), allocatable :: t_sum(:), pr_sum(:), sf_sum(:), S_sum(:), PDDs(:)
-        real(wp), allocatable :: tsrf_c(:), alb_c(:)
+        real(wp), allocatable :: tsrf_c(:), alb_c(:), ts_sum(:), alb_sum(:)
         real(wp_acc), allocatable :: melt0(:), runoff0(:), refrz0(:), subl0(:)
         real(wp_acc), allocatable :: melt1(:), runoff1(:), refrz1(:), subl1(:)
         real(wp), allocatable :: melt_a(:), runoff_a(:), refrz_a(:), subl_a(:)
@@ -238,8 +238,10 @@ contains
         allocate(melt1(sc%ncol), runoff1(sc%ncol), refrz1(sc%ncol), subl1(sc%ncol))
         call chion_get_surface_flux_totals(sc%chn, melt=melt0, runoff=runoff0, refrz=refrz0, subl=subl0)
 
-        allocate(t_sum(na), pr_sum(na), sf_sum(na), S_sum(na))
+        allocate(t_sum(na), pr_sum(na), sf_sum(na), S_sum(na), ts_sum(na), alb_sum(na))
         t_sum = 0.0_wp;  pr_sum = 0.0_wp;  sf_sum = 0.0_wp;  S_sum = 0.0_wp
+        ts_sum = 0.0_wp; alb_sum = 0.0_wp
+        allocate(tsrf_c(sc%ncol), alb_c(sc%ncol))
 
         do day = 1, nday, sc%par%dt_days
             sc%chn%forc%day_of_year = real(day, wp)
@@ -268,6 +270,16 @@ contains
             !$omp end parallel do
 
             call chion_update(sc%chn, dt)
+
+            ! Surface state after the step, into the annual means.
+            call chion_get_surface(sc%chn, t_srf=tsrf_c, albedo=alb_c)
+            !$omp parallel do default(shared) private(i,icol)
+            do i = 1, na
+                icol = idx(i)
+                ts_sum(i)  = ts_sum(i)  + tsrf_c(icol)*dt
+                alb_sum(i) = alb_sum(i) + alb_c(icol)*dt
+            end do
+            !$omp end parallel do
         end do
 
         call chion_get_surface_flux_totals(sc%chn, melt=melt1, runoff=runoff1, refrz=refrz1, subl=subl1)
@@ -277,9 +289,6 @@ contains
         runoff_a = annual_total(runoff1(idx), runoff0(idx))
         refrz_a  = annual_total(refrz1(idx),  refrz0(idx))
         subl_a   = annual_total(subl1(idx),   subl0(idx))
-
-        allocate(tsrf_c(sc%ncol), alb_c(sc%ncol))
-        call chion_get_surface(sc%chn, t_srf=tsrf_c, albedo=alb_c)
 
         sc%ann%mask = unpack_col(spread(1.0_wp, 1, na), idx, sc, 0.0_wp)
         sc%ann%t2m  = sum(t2m, dim=3)/real(nmon, wp)
@@ -293,13 +302,11 @@ contains
         sc%ann%runoff = unpack_col(runoff_a,                     idx, sc, 0.0_wp)
         sc%ann%refrz  = unpack_col(refrz_a,                      idx, sc, 0.0_wp)
         sc%ann%smb    = unpack_col(pr_sum - runoff_a - subl_a,   idx, sc, 0.0_wp)
-        sc%ann%alb_s  = unpack_col(alb_c(idx),                   idx, sc, MV)
+        sc%ann%alb_s  = unpack_col(alb_sum/real(nday, wp),       idx, sc, MV)
 
-        ! Surface temperature from the annual means; inactive columns keep t2m.
+        ! Surface temperature: chion's annual mean; inactive columns keep t2m.
         sc%ann%tsrf = sc%ann%t2m
-        col = reshape(H_ice, [sc%ncol])
-        call scatter(sc%ann%tsrf, calc_temp_surf(t_sum/real(nday, wp), col(idx), &
-                                                 refrz_a - melt_a, sc%par%firn_fac, T0), idx, sc)
+        call scatter(sc%ann%tsrf, ts_sum/real(nday, wp), idx, sc)
 
         sc%ann%H_snow = MV
         if (trim(sc%chn%par%model) == "itm") &
@@ -342,7 +349,6 @@ contains
         call nml_read(filename, group, "sf_a",        par%sf_a)
         call nml_read(filename, group, "sf_b",        par%sf_b)
         call nml_read(filename, group, "sigma_pdd",   par%sigma_pdd)
-        call nml_read(filename, group, "firn_fac",    par%firn_fac)
         call nml_read(filename, group, "time_equil",  par%time_equil)
         call nml_read(filename, group, "dt_days",     par%dt_days)
     end subroutine surface_chion_par_load
@@ -459,18 +465,5 @@ contains
 
         f = -0.5_wp*tanh(a*(t2m - b)) + 0.5_wp
     end function calc_snowfrac
-
-    elemental function calc_temp_surf(tann, H_ice, melt_net, fac, T0) result(ts)
-        ! smbpal calc_temp_surf, on annual means: net refreezing [mm w.e./yr]
-        ! warms the firn, capped at the freezing point on ice.
-        real(wp), intent(in) :: tann, H_ice, melt_net, fac, T0
-        real(wp) :: ts
-
-        if (H_ice > 0.0_wp) then
-            ts = min(T0, tann + fac*max(0.0_wp, melt_net))
-        else
-            ts = tann
-        end if
-    end function calc_temp_surf
 
 end module surface_chion

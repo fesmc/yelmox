@@ -474,7 +474,6 @@
     sf_a        = 0.273   ! Snow fraction function (parameter a)
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs
-    firn_fac    = 0.0266  ! [K/(mm w.e./yr)] Firn warming per annual net refreezing
     time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
     dt_days     = 1       ! [d] chion step (divides the 360-day year)
 /
