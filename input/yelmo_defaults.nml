@@ -363,8 +363,14 @@
 /
 
 &yelmo_masks
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
+    regions_group    = "None"            ! group of the regions (FesmData, fesm-utils regions); "None" = no regions
+    basins           = "None"            ! basin ids of bnd%basins: "<set>" or "<set>.group" of the regions, "None" or "domain" (one basin)
+    mask_ice_dynamic = "all"             ! where ice is dynamic, else no ice (selection expression of the regions)
+    mask_ice_fixed   = "none"            ! where ice thickness is prescribed (over mask_ice_dynamic)
+    relax            = "none"            ! where ice relaxes to H_ice_ref (ytopo.topo_rel = -1)
+    relax_tau        = 0.0               ! [yr] relaxation timescale there
+    mask_rmse        = "all"             ! where the error metrics are computed
+/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
     basins_nms      = "basin" "basin_mask"
     regions_load    = True 
     regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
@@ -373,7 +379,7 @@
 
 &yelmo_init_topo
     init_topo_load  = True 
-    init_topo_path  = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    init_topo_path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
     init_topo_names = "H_ice" "z_bed" "z_bed_sd" "z_srf"    ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     init_topo_state = 0                                     ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd      = -1.0                                  ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
@@ -384,7 +390,7 @@
 
 &yelmo_data 
     pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
+    pd_topo_path      = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
     pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
