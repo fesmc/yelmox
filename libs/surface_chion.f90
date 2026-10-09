@@ -248,20 +248,20 @@ contains
         deallocate(mon, ctl)
 
         ! Fixed for the year: geometry, the air pressure from the surface
-        ! elevation and the annual-mean air temperature, and (ITM) the ice
-        ! thickness and the annual positive degree days.
+        ! elevation and the annual-mean air temperature, the ice thickness
+        ! (H_ice = 0 is a land column: no ice albedo, substrate or ablation)
+        ! and (ITM) the annual positive degree days.
         col   = reshape(sum(t2m, dim=3)/real(nmon, wp), [sc%ncol])
         t_ann = col(idx)
         col = reshape(z_srf, [sc%ncol])
         sc%chn%forc%surface_height(idx) = col(idx)
         sc%chn%forc%air_pressure(idx)   = p_sl*exp(-sc%chn%c%grav*col(idx)/(R_dry*t_ann))
+        col = reshape(H_ice, [sc%ncol])
+        sc%chn%forc%H_ice(idx) = col(idx)
 
         allocate(PDDs(na))
         PDDs = 0.0_wp
         if (sc%itm) then
-            col = reshape(H_ice, [sc%ncol])
-            sc%chn%forc%H_ice(idx) = col(idx)
-
             !$omp parallel do default(shared) private(i,day,t_d)
             do i = 1, na
                 do day = 1, nday, pdd_dday
