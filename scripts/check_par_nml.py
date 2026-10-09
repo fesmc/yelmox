@@ -16,7 +16,7 @@ parameters). This script reproduces that check offline, with two more:
      smbpal, isos, ...) whose name appears nowhere in the Fortran sources as a
      string literal, so no `nml_read` can read them. The match is by key name
      only (not by group), so it misses keys that are read in another group.
-     Needs the dependency checkouts (yelmo, fesm-utils, FastIsostasy, rembo1)
+     Needs the dependency checkouts (yelmo, fesm-utils, FastIsostasy, rembo1, chion)
      next to the scripts directory.
 
 The yelmo groups of a file are found from its control blocks: `&yelmo<sfx>`
@@ -44,7 +44,7 @@ PAR_GLOBS = ["yelmox/*.nml", "yelmox_bipolar/*.nml"]
 # Source trees searched by --dead (symlinked checkouts are followed, so yelmo
 # brings its own elsa, tracer, FastHydrology, ...).
 SRC_DIRS = ["libs", "yelmox", "yelmox_bipolar", "fesm-utils", "FastIsostasy",
-            "rembo1", "yelmo"]
+            "rembo1", "yelmo", "chion"]
 SKIP_DIRS = {".git", ".claude", "output", "logs", "tmp"}
 
 # nml_* key of the control block -> group of the defaults file it maps to.
