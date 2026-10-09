@@ -11,8 +11,10 @@ module surface_chion
     ! Inputs chion does not own, supplied here (as smbpal does internally):
     !   - daily top-of-atmosphere insolation (libs/insol), as shortwave_down,
     !     from a per-day latitude table (insol_dlat) interpolated to the columns;
-    !   - the annual positive degree days (ITM's critical snow depth), from the
-    !     daily temperature with chion's Calov-Greve integral, fixed for the year;
+    !   - the annual positive degree days (ITM's vegetation proxy: critical snow
+    !     depth and snow-free land albedo), with chion's Calov-Greve integral on
+    !     every pdd_dday-th day of the daily temperature, as smbpal does, fixed for
+    !     the year;
     !   - the snowfall/rainfall split (smbpal's calc_snowfrac).
     ! Monthly -> daily is chion_forcing_monthly (mean-preserving).
     !
@@ -50,6 +52,7 @@ module surface_chion
     integer,  parameter :: nmon       = 12
     integer,  parameter :: nday_mon   = 30       ! 360-day year, as smbpal and the climate
     real(dp), parameter :: insol_dlat = 0.1_dp   ! [deg] latitude spacing of the insolation table
+    integer,  parameter :: pdd_dday   = 10       ! [d] sampling of the annual PDD sum (as smbpal)
 
     type surface_chion_param_class
         logical            :: const_insol   ! insolation at const_kabp instead of the model time
@@ -227,10 +230,11 @@ contains
         !$omp parallel do default(shared) private(i,day,t_d)
         do i = 1, na
             PDDs(i) = 0.0_wp
-            do day = 1, nday
+            do day = 1, nday, pdd_dday
                 call interp_monthly_to_day(sc%md, t_ctl(:,i), day, t_d)
-                PDDs(i) = PDDs(i) + real(pdd_expected_positive_temperature(real(t_d - T0, dp), &
-                                                                       real(sc%par%sigma_pdd, dp)), wp)
+                PDDs(i) = PDDs(i) + real(pdd_dday, wp) &
+                        * real(pdd_expected_positive_temperature(real(t_d - T0, dp), &
+                                                                 real(sc%par%sigma_pdd, dp)), wp)
             end do
             sc%chn%forc%PDDs(idx(i)) = PDDs(i)
         end do
