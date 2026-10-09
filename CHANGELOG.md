@@ -6,6 +6,10 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- chion BESSI in yelmox (`[chion] model = "bessi"`): the host supplies its surface shortwave
+  (TOA insolation times `[surface_chion] trans_sw`), constant `wind_speed` and `rel_hum`, the
+  air pressure from the surface elevation (barometric, annual-mean air temperature) and the
+  solar longitude; longwave from chion's own parameterization. ITM results unchanged.
 - 1pctCO2 (Greenland, Antarctica) and TIPMIP (Greenland) finished: ice sheet and isostasy
   on, ISMIP7-like optimization spin-up; TIPMIP stabilisations branch off the ramp's
   restarts (years 109, 232). 1pctCO2 reads the global CMIP fields of `[esm] esm_name`
@@ -34,6 +38,10 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- Greenland par files: chion's ITM parameters in their own group `[itm_chion]` (`[chion]
+  nml_itm`), `[itm]` with `alb_ice = 0.31` (was 0.4, shared with smbpal), calibrated to MAR
+  v3.11 1961-1990 at GRL-8KM with fixed present-day geometry: runoff 635 Gt/yr (MAR 645;
+  0.4 gave 543), ablation-zone smb bias -2 mm/yr (0.4: +215). smbpal keeps `[itm]`.
 - chion is the default surface model: `[comps] surface_method = "chion"` in every ITM par
   file (Greenland, Antarctica paleo, SRG, pd_Greenland, all ESM except `nudge`, bipolar
   north) and the kryos built-in default. Each gets `[surface_chion]` + `[chion]` with the
