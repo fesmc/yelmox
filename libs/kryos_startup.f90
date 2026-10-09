@@ -156,6 +156,13 @@ contains
         ! restart bundle see it.
         call couple_yelmo_to_htopo(dom)
 
+        ! The surface above was produced on the geometry before the ice init;
+        ! update it (no re-equilibration) on the final initial geometry, so
+        ! geometry-dependent state (chion's active columns) matches the initial
+        ! ice, and land it on Yelmo.
+        call step_surface(dom, ts)
+        call couple_surface_to_yelmo(dom)
+
     end subroutine domain_init_state
 
     subroutine domain_opt_init_cb_ref(dom)

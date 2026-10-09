@@ -353,6 +353,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- Cold start: the surface is updated once more on the final initial geometry (after the
+  `[sim]` ice init), so chion's active columns match the initial ice; before, new margin
+  ice had smb = 0 until the next surface update.
 - A forced run (`[tsforcing] active`) can restart from a bundle without tsgen state (an
   unforced spin-up): the forcing series starts at the restart time instead of stopping
   in ncio.
