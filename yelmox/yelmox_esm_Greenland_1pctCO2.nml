@@ -31,6 +31,7 @@
     dT_threshold    = 0.0               ! Only the homogeneous use_esm=False analytic path uses this;
                                         ! UNUSED on the gridded use_esm=True path.
 
+    basins          = "ismip7"  ! basins of the ocean extrapolation: <set>, <set>.group, None or domain
 /
 
 &spinup
@@ -401,7 +402,13 @@
 /
 
 &yelmo_masks
-    ! regions and basins come from the hub ([domain])
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "ismip7"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "region:Greenland & ~zone:open_ocean"
 /
 
 &yelmo_init_topo
@@ -537,11 +544,14 @@
     restart         = "none"        ! Load fields from a restart file?
     extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
                                     ! Useful to account for moving ice fronts and/or filling mv in datasets
+    basins          = "ismip7"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "~region:Greenland | zone:open_ocean"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    corr_method     = "none"  ! none, tf or bmb: corrections by region
+    corr_names      = ""
+    corr_values     = 0.0
 
-    corr_method     = "none"          ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number    = 1
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0
     tf_correction   = False
     tf_path         = "ice_data/ISMIP6/{domain}/{grid_name}/Ocean/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
@@ -579,13 +589,6 @@
     obs_scale       = 50           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
 
-/
-
-&tf_corr_ant
-    ronne   = 0.0                   ! [K] tf_corr for ronne basin (basin=1)
-    ross    = 0.0                   ! [K] tf_corr for ross basin (basin=12)
-    pine    = 0.0                   ! [K] tf_corr for pine island (basin=14)
-    abbott  = 0.0                   ! [K] tf_corr for Abbott glacier (basin=15)
 /
 
 
@@ -701,8 +704,8 @@
 /
 
 &domain
-    ! Domain definition: name, the grid of every component, and the hub's
-    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
     ! A blank component grid takes the default given in brackets.
     name         = "Greenland"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
@@ -712,22 +715,20 @@
     grid_clim    = ""                 ! reference climate + transient forcing [grid_ice]
     grid_surface = ""                 ! surface mass balance [grid_clim]
     grid_shelf   = ""                 ! marine shelf [grid_hub]
-    topo_path    = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    topo_names   = "bed" "thickness" "surface_grimp" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
-    regions_var  = "mask"
-    basins_path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"  ! "" = none (basins = 1)
-    basins_var   = "mouginot_basins"
-    sectors_path = ""                ! "" = none (sectors = 1)
-    sectors_var  = ""
-    ice_codes_mode = "include"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
-    ice_codes    = 1.3 1.11 1.0      ! codes of regions ("" = none)
-    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
-    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
-    region_codes = ""                ! one code per named region
-    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
-    relax_codes  = ""                ! codes of regions ("" = none)
-    relax_tau    = 0.0               ! [yr] relaxation timescale there
+    basins       = "ismip7"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo
+    path  = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"  ! not FesmData: on the hub grid
+    vars  = "z_bed" "H_ice" "z_srf"
+    names = "bed" "thickness" "surface_grimp"  ! variables of the file
+/
+
+&regions
+    path_regions       = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    basin_sets         = "ismip7"
+    path_basins_ismip7 = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
+    var_basins_ismip7  = "mouginot_basins"
 /
 
 &comps
