@@ -353,6 +353,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- A forced run (`[tsforcing] active`) can restart from a bundle without tsgen state (an
+  unforced spin-up): the forcing series starts at the restart time instead of stopping
+  in ncio.
 - `scripts/ant-paleo/run_lgp.sh` passes the spin-up restart as an absolute path
   (the relative one did not resolve from the run dir) and stops if it is missing.
 - `[domain] regions_var`/`basins_var`/`sectors_var` left blank are empty (were
