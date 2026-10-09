@@ -134,11 +134,22 @@ contains
     subroutine tsforcing_restart_read(tsf, fldr)
         ! Restore the tsgen state from fldr/tsgen_restart.nc so the series resumes,
         ! then refresh the derived anomalies and the restart mark (no-op if
-        ! inactive). Call after tsforcing_init on a restart run.
+        ! inactive). Call after tsforcing_init on a restart run. A bundle from an
+        ! unforced run has no tsgen state: the series then starts fresh from
+        ! tsforcing_init, i.e. at the restart time.
         type(tsforcing_class), intent(inout) :: tsf
         character(len=*),      intent(in)    :: fldr
+        character(len=1024) :: filename
+        logical :: found
         if (.not. tsf%active) return
-        call tsgen_restart_read(tsf%tsg, trim(fldr)//"/tsgen_restart.nc")
+        filename = trim(fldr)//"/tsgen_restart.nc"
+        inquire(file=trim(filename), exist=found)
+        if (.not. found) then
+            write(*,*) "tsforcing:: no tsgen state in "//trim(fldr)// &
+                       " (unforced run); the forcing series starts at the restart time."
+            return
+        end if
+        call tsgen_restart_read(tsf%tsg, trim(filename))
         call tsforcing_set_anom(tsf)
         tsf%f_last_restart = tsf%tsg%f_now
     end subroutine tsforcing_restart_read

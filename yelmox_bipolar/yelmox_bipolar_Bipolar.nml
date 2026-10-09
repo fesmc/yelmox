@@ -1144,6 +1144,23 @@
 
 /
 
+&surface_chion_north
+    ! Host side of chion (surface_method = "chion"): forcing chion does not own.
+    const_insol = True    ! Insolation at const_kabp instead of the model time
+    const_kabp  = 0.0     ! [kyr BP] Insolation time when const_insol
+    insol_fldr  = "input" ! Folder of the orbital-parameter tables
+    sf_a        = 0.273   ! Snow fraction function (parameter a)
+    sf_b        = 273.6   ! Snow fraction function (parameter b)
+    sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
+    dt_days     = 1       ! [d] chion step (divides the 360-day year)
+/
+
+&chion_north
+    model           = "itm"                          ! Snowpack model (surface_chion supports itm)
+    nml_itm         = "itm_north"                    ! ITM parameters: shared with smbpal
+/
+
 &marine_shelf_north
     bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
     tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
@@ -1318,7 +1335,7 @@
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    surface_method  = "smbpal"
+    surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0
 /
 

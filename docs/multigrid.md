@@ -245,7 +245,7 @@ reallocation cost is negligible against the physics.
 - `step_icesheet` — run `yelmo_update`.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
 - `step_climate` — climate on `grid_clim` from the backend, with the transient forcing, on the `dt_clim` cadence.
-- `step_surface` — surface mass balance on `grid_surface` (`surface_method`: smbpal, smb_simple, or the climate's own, `climate`).
+- `step_surface` — surface mass balance on `grid_surface` (`surface_method`: chion, smbpal, smb_simple, or the climate's own, `climate`).
 - `step_shelf` — sub-shelf melt on `grid_shelf`, from the climate's ocean as depth profiles or at the shelf base.
 
 Every driver writes the sequence out in its time loop, so the coupling order can
