@@ -12,7 +12,9 @@ module surface_chion
     !   - daily top-of-atmosphere insolation (libs/insol) from a per-day latitude
     !     table (insol_dlat) interpolated to the columns, as shortwave_down: as is
     !     for ITM (which applies its own transmissivity), times a constant
-    !     transmissivity trans_sw for BESSI (surface shortwave);
+    !     transmissivity trans_sw for BESSI (surface shortwave), and as the
+    !     TOA itself (toa_shortwave) for BESSI's cloud-proxy longwave, so
+    !     chion does not divide by its own fixed-orbit 365-day TOA;
     !   - the annual positive degree days (ITM only: its vegetation proxy for the
     !     critical snow depth and the snow-free land albedo), with chion's
     !     Calov-Greve integral on every pdd_dday-th day of the daily temperature,
@@ -38,8 +40,9 @@ module surface_chion
     ! The per-column host work (forcing, accumulation, PDDs, insolation lookup)
     ! is OpenMP-parallel over the active columns, like chion's own step.
     !
-    ! Supported chion models: "itm" and "bessi" (longwave from chion's own
-    ! air-temperature parameterization).
+    ! Supported chion models: "itm" and "bessi". BESSI's downwelling longwave
+    ! is chion's own (longwave_scheme; default "cloud_proxy", whose cloudiness
+    ! 1 - SWdn/(TOA*tau_clear) is elevation-only here, SWdn/TOA = trans_sw).
 
     use nml,        only : nml_read
     use phys_constants, only : phys_const_class, sec_day
@@ -173,6 +176,7 @@ contains
         sc%chn%forc%wind_speed            = sc%par%wind_speed
         sc%chn%forc%relative_humidity     = sc%par%rel_hum
         sc%chn%forc%has_relative_humidity = .true.
+        sc%chn%forc%has_toa_shortwave     = .true.
 
         call chion_init_state(sc%chn)
 
@@ -304,6 +308,7 @@ contains
                 sc%chn%forc%snowfall_rate(icol)   = sf_d/spd             ! [mm/d] -> [kg m-2 s-1]
                 sc%chn%forc%rainfall_rate(icol)   = (p_d - sf_d)/spd
                 sc%chn%forc%shortwave_down(icol)  = sc%sw_fac*S_d
+                sc%chn%forc%toa_shortwave(icol)   = S_d
 
                 t_sum(i)  = t_sum(i)  + t_d*dt
                 pr_sum(i) = pr_sum(i) + p_d*dt
