@@ -57,7 +57,6 @@ yelmox/libs/
   kryos_output.f90      per-module 2D/1D output, CMIP output
   kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
   kryos_forcing.f90     driver-owned transient forcing (tsgen)
-  htopo.f90             the hi-res geometry hub
   yelmox_climate.f90    climate backends behind one interface (climate_out)
         │
         ▼
@@ -135,13 +134,15 @@ The climate reaches the rest of the domain only through `climate_out_class`
 base, and, when the backend has them, the surface mass balance and subglacial
 discharge. Nothing downstream depends on which backend produced them.
 
-### Domain definition (`[domain]`) and the hi-res hub (htopo)
+### Domain definition (`[domain]`), the hi-res hub (htopo) and the regions
 
 One `[domain]` group (`[domain_north]`/`[domain_south]` in bipolar) defines the
-domain: its name, its physical constants, the grid of every component, and the
-hub's topography and code masks. Yelmo takes the domain name and its grid from it
-(`[yelmo]` no longer sets `domain`/`grid_name`). A blank component grid takes its
-default:
+domain: its name, its physical constants and the grid of every component. Its
+topography is in `[topo]` and its regions, zones and basins in `[regions]`
+(`[topo_south]`, `[regions_south]`, ... in bipolar), all from
+[FesmData](https://github.com/fesmc/FesmData) v2 (`ice_data/v2/`). Yelmo takes
+the domain name and its grid from `[domain]` (`[yelmo]` no longer sets
+`domain`/`grid_name`). A blank component grid takes its default:
 
 ```
 &domain
@@ -153,24 +154,29 @@ default:
     grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
     grid_surface = ""           ! surface mass balance                 [grid_clim]
     grid_shelf   = ""           ! marine shelf                         [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
-    regions_var  = "mask"
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    basins_var   = "basin"
-    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"   ! "" = none (1)
-    sectors_var  = "mask_regions"
-    ice_codes_mode = "exclude"      ! where ice is allowed: all | include | exclude (ice_codes)
-    ice_codes    = 2.0              ! codes of regions ("" = none)
-    region_names = "APIS" "WAIS" "EAIS"   ! named regions for 1D output ("" = none)
-    region_mask  = "sectors"        ! regions | basins | sectors
-    region_codes = 3.0 1.0 2.0
-    relax_codes_mode = "none"       ! where ice relaxes to the reference: none | all | include | exclude
-    relax_codes  = ""               ! codes of regions ("" = none)
-    relax_tau    = 0.0              ! [yr] relaxation timescale there
+    basins       = "Zwally2012" ! basin ids of the hub output
+/
+&topo
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+&regions
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+    masks        = "APIS" "WAIS" "EAIS"           ! named regions for 1D output
+    mask_APIS    = "region:Antarctic_Peninsula"
+    mask_WAIS    = "region:West_Antarctica"
+    mask_EAIS    = "region:East_Antarctica"
 /
 ```
+
+`{domain}/{grid_name}` in the paths resolve to `name`/`grid_hub`. The groups are
+those of fesm-utils `topodata` and `regions` (see the fesm-utils docs), which
+also describe the selection expressions used below
+(`"region:Greenland & ~zone:open_ocean"`) and custom basin sets
+(`path_basins_<set>`, `var_basins_<set>`, e.g. the ISMIP7 basins).
 
 The domain loads its physical constants once (`phys_const_load`, the group
 `phys_const` of `input/yelmo_phys_const.nml`) and hands the same record to every
@@ -178,21 +184,16 @@ component: the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and
 `smb_simple`. Yelmo's own `yelmo.phys_const` then only selects its calendar year
 (`sec_year`).
 
-`htopo` holds the hub. It sits *above* every physics module (including Yelmo):
-its grid (`grid_hub`) is the finest resolution in the setup, and it is the
-reference geometry the coupler remaps *from*. On the hub grid it holds static
-fields (the code masks `regions`/`basins`/`sectors` and the bed roughness
-`z_bed_sd`, loaded once), the reference geometry `z_bed_ref`/`H_ice_ref`/`z_srf_ref`
-(loaded once) and the current geometry `z_bed`/`H_ice`/`z_srf`/`f_grnd`/`z_sl`
-(refreshed each step, see below). `{domain}/{grid_name}` in the paths
-resolve to `name`/`grid_hub`. `htopo_init` resolves the grid from
-`grid_<name>.txt` (the disk grid table) and reads the fields onto it —
-validated by `tests/test_htopo.f90` against the real ANT-16KM data. A blank
-mask path (e.g. paleo domains without mask files) leaves the mask at `1.0`
-(single region/basin/sector); a blank `z_bed_sd` name leaves it at `0`. Gaps in the
-topography file (missing values, e.g. outside the coverage of the source
+`htopo` (fesm-utils) holds the hub. It sits *above* every physics module
+(including Yelmo): its grid (`grid_hub`) is the finest resolution in the setup,
+and it is the reference geometry the coupler remaps *from*. On the hub grid it
+holds the reference topography (`topo%ref`: `z_bed`, `H_ice`, `z_srf`,
+`z_bed_sd`), the regions (`topo%reg`) and the current geometry
+`z_bed`/`H_ice`/`z_srf`/`f_grnd`/`z_sl` (refreshed each step, see below).
+`htopo_init` resolves the grid from `grid_<name>.txt` (the disk grid table).
+Gaps in the topography (missing values, e.g. outside the coverage of the source
 dataset) are filled: no ice, the bed from the nearest valid cell, the surface
-from the bed and the ice thickness (sea level 0), and no bed roughness.
+from the bed and the ice thickness (sea level 0).
 
 Yelmo is populated from the domain like the other components. Its grid comes
 from `maps/grid_<grid_ice>.txt` (`yelmo_init_grid`, `grid_def="none"`), and the
@@ -212,16 +213,27 @@ flotation) and the surface elevation, with Yelmo's densities; sea level is
 refined bilinearly. The hi-res bed and ice therefore reach the marine shelf and
 the climate's surface elevation, instead of a refined copy of Yelmo's fields.
 
-The code masks reach Yelmo the same way (nearest neighbour): `regions` and
-`basins` are Yelmo's (`yelmo_init` `regions`/`basins`), and every component uses
-this one set. Where ice is allowed follows from `ice_codes_mode` and
-`ice_codes` (codes of `regions`; `yelmo_init` `mask_ice`); Yelmo's
-`mask_border` (`[yelmo]`, default `"auto"`) then sets the domain border.
-Where the ice relaxes to the reference follows from `relax_codes_mode` and
-`relax_codes` (codes of `regions`): Yelmo's `tau_relax` is `relax_tau` there and
--1 (free) elsewhere, used with `ytopo.topo_rel = -1`. The
-named regions (`region_names`, one code each of `region_mask`) get their own 1D
-output, `yelmo_ts_<name>.nc`.
+The regions reach every component on its own grid (the files of the hub grid,
+nearest neighbour), and each component makes its own masks from them once at
+init, with selection expressions in its own group:
+
+- Yelmo (`[yelmo_masks]`, `yelmo_init` `reg`): where ice is dynamic or fixed
+  (`mask_ice_dynamic`, `mask_ice_fixed`; Yelmo's `mask_border` then sets the
+  domain border), where it relaxes to the reference (`relax`, `relax_tau`, with
+  `ytopo.topo_rel = -1`), the region of the error metrics (`mask_rmse`), its
+  basins (`basins`), and the named regions of `[regions]` with their own 1D
+  output, `yelmo_ts_<name>.nc`.
+- The marine shelf (`[marine_shelf]`): the reference ocean mask (`mask_ocean`,
+  `mask_deep_ocean`), PICO's margin (`mask_pico_deep`), its basins (`basins`)
+  and the corrections by region (`corr_method` = none | tf | bmb, `corr_names`,
+  `corr_values` and one expression `corr_<name>` per name).
+- The climate (`[esm] basins`): the basins of the ocean extrapolation.
+- The domain: where a reconstruction's ice is imposed (`[sim] recon_regions`)
+  and the NEGIS parts (`[negis] region_centre/south/north`).
+
+A basin spec is `"<set>"`, `"<set>.group"` (e.g. `"Zwally2012.group"`, the
+Greenland major systems), `"None"` (no basins) or `"domain"` (the whole domain
+is one basin).
 
 ### Buffers
 

@@ -218,10 +218,10 @@ times counted from the start of the run (`time_init`).
 
 | Key | Values | |
 |---|---|---|
-| `init_method` | `none`, `equil`, `recon`, `recon_ref` | cold-start ice state: as initialized; a short equilibration with constant boundaries; the reconstruction `recon_path` as initial ice on the `recon_codes` regions; the reconstruction as reference ice only |
+| `init_method` | `none`, `equil`, `recon`, `recon_ref` | cold-start ice state: as initialized; a short equilibration with constant boundaries; the reconstruction `recon_path` as initial ice where `recon_regions` selects; the reconstruction as reference ice only |
 | `init_equil_time` | [yr] | `equil`: equilibration time |
 | `recon_path`, `recon_var` | path, name | `recon`, `recon_ref`: the reconstruction file (`{domain}`, `{grid_name}` = `grid_ice`) and its ice-thickness variable |
-| `recon_codes` | codes | `recon`: the regions where its ice is imposed |
+| `recon_regions` | selection expression | `recon`: where its ice is imposed (e.g. `"region:North_America"`) |
 | `init_marine_H` | bool | LGM-like marine ice, before `init_method` |
 | `init_kill_shelves` | bool | no ice where the present-day bed is ocean |
 | `init_time_thrm` | [yr] | then equilibrate with the topography fixed (`0` = off) |
