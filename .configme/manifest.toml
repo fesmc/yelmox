@@ -5,5 +5,5 @@ deps = [
     "yelmo:dev",
     "FastIsostasy:dev",
     "rembo1:dev",
-    "chion:main",
+    "chion:sync-dev-nils",
 ]
