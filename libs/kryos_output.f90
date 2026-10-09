@@ -9,6 +9,7 @@ module kryos_output
     use marine_shelf, only : marshelf_class
     use fastisostasy, only : isos_class
     use smbpal,       only : smbpal_class
+    use surface_chion, only : surface_chion_class
     use htopo,        only : htopo_write_init, htopo_write_step
     use timestepping, only : tstep_class
     use yelmox_climate, only : climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
@@ -66,7 +67,7 @@ contains
         if (dom%ctl%write_shelf) &
             call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_shelf, time)
         if (dom%ctl%write_surface) &
-            call io_dims_init(trim(io_fname(outfldr,"smbpal")), dom%ctl%grid_surface,   time)
+            call io_dims_init(trim(io_fname(outfldr,surface_file_base(dom))), dom%ctl%grid_surface, time)
         if (dom%ctl%write_clim) then
             call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
             call climate_write_init(dom%cl, trim(io_fname(outfldr,climate_file_base(dom%cl))))
@@ -99,8 +100,13 @@ contains
             call isos_write_step(dom%isos, trim(io_fname(outfldr,"isos")), time)
         if (dom%ctl%write_shelf) &
             call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf")), time)
-        if (dom%ctl%write_surface) &
-            call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
+        if (dom%ctl%write_surface) then
+            if (trim(dom%ctl%surface_method) == "chion") then
+                call surface_chion_write_step(dom%schn, trim(io_fname(outfldr,"chion")), time)
+            else
+                call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
+            end if
+        end if
         if (dom%ctl%write_clim) &
             call clim_write_step(dom, trim(io_fname(outfldr,climate_file_base(dom%cl))), time)
     end subroutine domain_write_step
@@ -271,10 +277,43 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "m ie/yr", "Surface mass balance")
+        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "mm w.e./yr", "Surface mass balance")
         call io_var2D(filename, "tsrf", smb%ann%tsrf, n, ncid, "K", "Surface temperature")
         call nc_close(ncid)
     end subroutine smb_write_step
+
+    function surface_file_base(dom) result(base)
+        ! The surface model's 2D output file: chion.nc for chion, else smbpal.nc.
+        type(kryos_domain), intent(in) :: dom
+        character(len=56) :: base
+        base = "smbpal"
+        if (trim(dom%ctl%surface_method) == "chion") base = "chion"
+    end function surface_file_base
+
+    subroutine surface_chion_write_step(sc, filename, time)
+        ! Annual means of the last chion annual cycle on grid_surface.
+        type(surface_chion_class), intent(in) :: sc
+        character(len=*),          intent(in) :: filename
+        real(wp),                  intent(in) :: time
+        integer :: ncid, n
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_var2D(filename, "smb",    sc%ann%smb,    n, ncid, "mm w.e./yr", "Surface mass balance (sf+rf-runoff-subl)")
+        call io_var2D(filename, "tsrf",   sc%ann%tsrf,   n, ncid, "K", "Surface temperature")
+        call io_var2D(filename, "melt",   sc%ann%melt,   n, ncid, "mm w.e./yr", "Melt")
+        call io_var2D(filename, "runoff", sc%ann%runoff, n, ncid, "mm w.e./yr", "Runoff")
+        call io_var2D(filename, "refrz",  sc%ann%refrz,  n, ncid, "mm w.e./yr", "Refreezing")
+        call io_var2D(filename, "pr",     sc%ann%pr,     n, ncid, "mm w.e./yr", "Precipitation")
+        call io_var2D(filename, "sf",     sc%ann%sf,     n, ncid, "mm w.e./yr", "Snowfall")
+        call io_var2D(filename, "t2m",    sc%ann%t2m,    n, ncid, "K", "Near-surface air temperature")
+        call io_var2D(filename, "S",      sc%ann%S,      n, ncid, "W m-2", "TOA insolation")
+        call io_var2D(filename, "PDDs",   sc%ann%PDDs,   n, ncid, "K d", "Positive degree days")
+        call io_var2D(filename, "alb_s",  sc%ann%alb_s,  n, ncid, "1", "Surface albedo")
+        call io_var2D(filename, "H_snow", sc%ann%H_snow, n, ncid, "mm w.e.", "Snowpack thickness (end of year)")
+        call io_var2D(filename, "mask",   sc%ann%mask,   n, ncid, "1", "chion active (z_srf > z_sl)")
+        call nc_close(ncid)
+    end subroutine surface_chion_write_step
 
     subroutine clim_write_step(dom, filename, time)
         ! One record of the climate's 2D file (fields chosen by the backend).

@@ -17,6 +17,7 @@ module kryos_startup
     use fastisostasy, only : isos_init_ref, isos_init_state, isos_restart_write, &
                              bsl_class, bsl_restart_read, bsl_restart_write
     use smbpal,       only : smbpal_restart_write, smbpal_restart_read
+    use surface_chion, only : surface_chion_restart_write, surface_chion_restart_read
     use kryos,        only : kryos_domain, remap, remap_method_smooth
     use kryos_regions,  only : domain_init_marine_ice
     use kryos_coupling, only : couple_yelmo_to_htopo, step_climate, &
@@ -204,6 +205,12 @@ contains
         call isos_init_state(dom%isos, z_bed_i, H_ice_i, ts%time, bsl)
         call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
+
+        ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) with the
+        ! isostasy z_bed/z_sl, as domain_restart_read does, so the hub, climate
+        ! and surface at cold start see a z_srf consistent with z_sl.
+        call calc_ytopo_diagnostic(dom%yelmo%tpo, dom%yelmo%dyn, dom%yelmo%mat, &
+                                   dom%yelmo%thrm, dom%yelmo%bnd)
     end subroutine domain_init_isostasy
 
     subroutine domain_init_ice(dom, ts)
@@ -350,6 +357,8 @@ contains
             call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
         call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
         call smbpal_restart_write(dom%smb,   trim(bundle)//"/smbpal_restart.nc", time)
+        if (trim(dom%ctl%surface_method) == "chion") &
+            call surface_chion_restart_write(dom%schn, trim(bundle)//"/chion_restart.nc", time)
 
         ! The climate backend's own state (snapesm, REMBO), with the hub geometry on grid_clim.
         if (dom%ctl%with_climate) then
@@ -426,6 +435,8 @@ contains
         ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
         call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc")
+        if (trim(dom%ctl%surface_method) == "chion") &
+            call surface_chion_restart_read(dom%schn, trim(fldr)//"/chion_restart.nc")
 
         ! The climate backend's own state (snapesm's driving indices).
         if (dom%ctl%with_climate) call climate_restart_read(dom%cl, trim(fldr))

@@ -43,6 +43,11 @@ TRACERROOT = ${YELMOROOT}/tracer
 INC_TRACER = -I${TRACERROOT}/libtracer/include
 LIB_TRACER = -L${TRACERROOT}/libtracer/include -ltracer
 
+# chion: snowpack / surface mass balance library (surface_method = "chion").
+CHIONROOT = chion
+INC_CHION = -I${CHIONROOT}/libchion/include
+LIB_CHION = -L${CHIONROOT}/libchion/include -lchion
+
 REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
@@ -83,4 +88,4 @@ endif
 # macbook does this). ?= leaves any such earlier machine setting in force.
 LFLAGS_EXTRA ?= -Wl,-zmuldefs
 
-LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_ELSA) $(LIB_TRACER) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
+LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_CHION) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_ELSA) $(LIB_TRACER) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)

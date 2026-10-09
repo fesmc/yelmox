@@ -23,7 +23,7 @@ openmp ?= 1
 ## SHARED DEPENDENCY WIRING ##
 # Pulled in after the compiler/machine fragment so it can reference
 # FFLAGS, FFLAGS_OPENMP, LIB_NC, and LFLAGS_EXTRA set there. Defines the
-# yelmo, FastIsostasy, FESMUTILS, LIS, FastHydrology, FFTW, and rembo1
+# yelmo, FastIsostasy, chion, FESMUTILS, LIS, FastHydrology, FFTW, and rembo1
 # paths, the openmp= build switch, and the final LFLAGS.
 
 include config/common.mk
@@ -91,6 +91,10 @@ yelmo-static: fesmutils-static
 isostasy-static: fesmutils-static
 	$(MAKE) -C $(ISOSTASYROOT) isostasy-static openmp=$(openmp)
 
+# Compile static library in its own directory
+chion-static: fesmutils-static
+	$(MAKE) -C $(CHIONROOT) chion-static openmp=$(openmp)
+
 # Compile the static library librembo,
 # using Makefile located in $(REMBOROOT) directory.
 # rembo1 builds against fesm-utils (which provides the coord/grid modules), so
@@ -102,15 +106,15 @@ rembo-static: fesmutils-static
 # Default programs: the multigrid drivers, one per program folder.
 # ---------------------------------------------------------------------------
 
-yelmox : fesmutils-static yelmo-static isostasy-static $(rembo_dep) $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox/yelmox.f90 \
+yelmox : fesmutils-static yelmo-static isostasy-static chion-static $(rembo_dep) $(yelmox_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_CHION) $(INC_YELMO) -o $(bindir)/yelmox.x yelmox/yelmox.f90 \
 		$(yelmox_libs) $(rembo_lib) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox.x is ready."
 	@echo " "
 
-yelmox_bipolar : fesmutils-static yelmo-static isostasy-static $(rembo_dep) $(yelmox_libs) $(obm_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_YELMO) -o $(bindir)/yelmox_bipolar.x yelmox_bipolar/yelmox_bipolar.f90 \
+yelmox_bipolar : fesmutils-static yelmo-static isostasy-static chion-static $(rembo_dep) $(yelmox_libs) $(obm_libs)
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_LIS) $(INC_ISOSTASY) $(INC_CHION) $(INC_YELMO) -o $(bindir)/yelmox_bipolar.x yelmox_bipolar/yelmox_bipolar.f90 \
 		$(yelmox_libs) $(obm_libs) $(rembo_lib) $(LFLAGS)
 	@echo " "
 	@echo "    yelmox_bipolar.x is ready."
