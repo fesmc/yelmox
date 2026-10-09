@@ -276,7 +276,13 @@
 /
 
 &yelmo_masks
-    ! regions and basins come from the hub ([domain])
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "domain"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "~zone:open_ocean"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "all"
 /
 
 &yelmo_init_topo
@@ -517,11 +523,14 @@
     restart         = "none"        ! Load fields from a restart file?
     extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
                                     ! Useful to account for moving ice fronts and/or filling mv in datasets
+    basins          = "domain"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "none"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "all"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    corr_method     = "none"  ! none, tf or bmb: corrections by region
+    corr_names      = ""
+    corr_values     = 0.0
     
-    corr_method     = "none"        ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number    = 1             ! 1 2 3
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
     tf_correction   = False
     tf_path         = "none"
     tf_name         = "dT_nl"
@@ -664,8 +673,8 @@
 /
 
 &domain
-    ! Domain definition: name, the grid of every component, and the hub's
-    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
     ! A blank component grid takes the default given in brackets.
     name         = "North"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
@@ -675,22 +684,17 @@
     grid_clim    = "NH-32KM"          ! reference climate + transient forcing [grid_ice]
     grid_surface = "NH-32KM"          ! surface mass balance [grid_clim]
     grid_shelf   = "NH-32KM"          ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-RTOPO-2.0.1.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
-    regions_var  = "mask"
-    basins_path  = ""  ! "" = none (basins = 1)
-    basins_var   = "basin"
-    sectors_path = ""                ! "" = none (sectors = 1)
-    sectors_var  = ""
-    ice_codes_mode = "exclude"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
-    ice_codes    = 1.0               ! codes of regions ("" = none)
-    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
-    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
-    region_codes = ""                ! one code per named region
-    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
-    relax_codes  = ""                ! codes of regions ("" = none)
-    relax_tau    = 0.0               ! [yr] relaxation timescale there
+    basins       = "domain"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
+    vars  = "z_bed" "z_srf" "H_ice"
+    remap = "con"
+/
+
+&regions
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
 /
 
 &comps
@@ -711,7 +715,7 @@
     init_method             = "recon"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
     recon_path              = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-ICE-6G_C.nc"   ! {grid_name} = grid_ice
     recon_var               = "dz"      ! ice thickness in recon_path
-    recon_codes             = 1.1 1.11 1.12   ! recon: regions where the reconstructed ice is imposed
+    recon_regions             = "region:North_America"  ! recon: where its ice is imposed
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
     init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
