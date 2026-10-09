@@ -32,7 +32,7 @@ through the sea level and an ocean box model.
 | Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
 | Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](climate-esm.md) or [rembo](climate-rembo.md) | `grid_clim` |
-| Surface mass balance | smbpal, `smb_simple` or the climate's own | `grid_surface` |
+| Surface mass balance | chion (default), smbpal, `smb_simple` or the climate's own | `grid_surface` |
 | Sub-shelf melt | marine_shelf | `grid_shelf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
 
@@ -135,7 +135,7 @@ the run), except the keys of an unselected `init_method` and the `[relax]` and
 | `[output]` | the output files; their intervals are `[tm_1D]`, `[tm_2D]`, `[tm_2Dsm]`, and `[tm_rst]` for restarts |
 
 The models have their own groups (`[yelmo]` and the Yelmo physics groups,
-`[isos]`, `[barysealevel]`, `[marine_shelf]`, `[smbpal]`, the climate backend's,
+`[isos]`, `[barysealevel]`, `[marine_shelf]`, `[surface_chion]` + `[chion]`, `[smbpal]`, the climate backend's,
 ...). In `yelmox_bipolar` the domain groups carry the hemisphere suffix
 (`[domain_north]`, `[comps_north]`, `[sim_north]`, `[relax_north]`,
 `[opt_north]`, `[output_north]`, ...); `[ctrl]` and the timeline are shared.
@@ -162,7 +162,7 @@ A minimal skeleton:
     with_surface    = True
     with_shelf      = True
     climate         = "snapclim"
-    surface_method  = "smbpal"
+    surface_method  = "chion"
     dt_clim         = 10.0
 /
 
@@ -206,7 +206,7 @@ The components: which are active, with which model, how often.
 |---|---|---|
 | `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
 | `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
-| `surface_method` | `smbpal`, `smb_simple`, `climate` | smbpal (from the climate's temperature and precipitation); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
+| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM snowpack in daily steps (`[surface_chion]`, `[chion]`; its ITM parameters are smbpal's `[itm]`), smbpal also has PDD (the PDD configurations use it); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
 
 ### `[sim]`
@@ -275,7 +275,7 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 | `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<region>.nc` for the named regions of `[domain]`) |
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
 | `write_shelf` | `mshlf.nc` |
-| `write_surface` | `smbpal.nc` |
+| `write_surface` | `chion.nc` (chion), `smbpal.nc` (smbpal, climate) |
 | `write_clim` | the backend's file: `snap.nc` (snapclim, snapesm), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
 | `write_htopo` | `htopo.nc` (the hub) |
 | `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_shelf = grid_ice`) |

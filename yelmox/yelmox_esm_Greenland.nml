@@ -697,7 +697,7 @@
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
     climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    surface_method  = "smbpal" ! "smbpal", "chion", "smb_simple" or "climate"
+    surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
 /
 

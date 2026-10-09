@@ -61,7 +61,7 @@ module kryos
         logical :: with_surface   = .true.   ! surface mass balance + temperature (needs climate)
         logical :: with_shelf     = .true.   ! shelf-base melt + temperature (needs climate)
         character(len=56) :: climate        = ""         ! climate backend: snapclim | snapesm | esm | rembo
-        character(len=56) :: surface_method = "smbpal"   ! smbpal | smb_simple | chion | climate (from the backend)
+        character(len=56) :: surface_method = "chion"    ! chion | smbpal | smb_simple | climate (from the backend)
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
 
         ! Simulation conditions ([sim]). Cold-start ice state: init_kill_shelves,
@@ -153,9 +153,9 @@ module kryos
         type(isos_class)       :: isos
         type(yelmox_climate_class) :: cl    ! climate backend ([comps] climate)
         type(climate_out_class)    :: clim  ! backend-agnostic climate output (now/ref)
-        type(smbpal_class)     :: smb
+        type(smbpal_class)     :: smb     ! smbpal (surface_method="smbpal"; always initialized)
         type(smb_simple_class) :: smbs    ! alternative SMB (surface_method="smb_simple")
-        type(surface_chion_class) :: schn ! alternative SMB (surface_method="chion")
+        type(surface_chion_class) :: schn ! chion, the default SMB (surface_method="chion")
         type(sediments_class)  :: sed
         type(geothermal_class) :: gthrm
         type(phys_const_class) :: cnst    ! physical constants, shared by every component
@@ -336,7 +336,7 @@ contains
             call smb_simple_set_mask(dom%smbs, Href_s)
         end if
 
-        ! Alternative SMB (chion) on the same grid, if selected: one column per
+        ! chion (the default SMB) on the same grid, if selected: one column per
         ! grid_surface point, latitude for the host-supplied insolation.
         if (trim(dom%ctl%surface_method) == "chion") then
             call surface_chion_init(dom%schn, path_par, lats_s, &
@@ -506,10 +506,10 @@ contains
             stop 1
         end if
         call nml_read(path_par, gc, "climate",        ctl%climate)
-        ctl%surface_method = "smbpal"
+        ctl%surface_method = "chion"
         call nml_read(path_par, gc, "surface_method", ctl%surface_method)
         select case(trim(ctl%surface_method))
-            case("smbpal", "chion", "climate")
+            case("chion", "smbpal", "climate")
             case("smb_simple")
                 if (trim(ctl%climate) == "esm" .or. trim(ctl%climate) == "rembo") then
                     write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method = smb_simple needs &
@@ -517,8 +517,8 @@ contains
                     stop 1
                 end if
             case default
-                write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method must be smbpal, &
-                           &smb_simple, chion or climate; got "//trim(ctl%surface_method)
+                write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method must be chion, smbpal, &
+                           &smb_simple or climate; got "//trim(ctl%surface_method)
                 stop 1
         end select
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)

@@ -34,8 +34,8 @@ projection periods, optional climate variability and subglacial discharge.
   read the global CMIP fields this way.
 - **Surface mass balance.** `[comps] surface_method = "climate"` takes the ESM's
   own SMB (reference + anomaly, corrected from the present-day surface with the SMB
-  elevation gradient); `"smbpal"` computes it from the ESM temperature and
-  precipitation.
+  elevation gradient); `"chion"` (the default) or `"smbpal"` computes it from the
+  ESM temperature and precipitation.
 - **Update cadence.** `[comps] dt_clim = 1.0`: the forcing is updated every step.
 - **Cold start.** `[sim] init_kill_shelves` (no ice where the present-day bed is
   ocean) and `init_time_thrm` (equilibration with topography fixed), shared with
@@ -43,7 +43,7 @@ projection periods, optional climate variability and subglacial discharge.
 
 ## What the backend supplies
 
-- the atmosphere (`tas`, `pr`) for smbpal, or the surface mass balance directly;
+- the atmosphere (`tas`, `pr`) for chion or smbpal, or the surface mass balance directly;
 - the ocean **at the shelf base** (`T_shlf`, `S_shlf` and their anomalies),
   interpolated from the reference ocean with the marine-shelf parameters, so
   `step_shelf` passes it straight to the marine shelf;
@@ -51,7 +51,7 @@ projection periods, optional climate variability and subglacial discharge.
 
 ## Output
 
-The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, `smbpal.nc`, ...),
+The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, `chion.nc`, ...),
 plus, with `[output] write_clim`, `esm.nc` (the ESM fields on the climate grid) and
 `esm_ts.nc` (the forcing averaged over the ice and the floating ice), and, with
 `[output] write_cmip` (every `dt_cmip`), the CMIP-formatted `yelmo_cmip.nc` and

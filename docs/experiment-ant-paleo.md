@@ -58,7 +58,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   `input/alpha_combined_125kyr_interp.dat` (0 = present day, 1 = LGM; -0.2 in the
   last interglacial). The ocean anomaly is `f_to = 0.25` times the mean
   atmospheric one (`ocn_type = "fraction"`). Insolation varies in time
-  (`[smbpal] const_insol = False`).
+  (`[surface_chion] const_insol = False`, and `[smbpal]` for smbpal).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
 - **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_ant_paleo]`): one
   layer every 1 kyr, coupled every 50 yr.
@@ -72,7 +72,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 | Topography | BedMachine (`ANT-32KM_TOPO-BedMachine.nc`) |
 | Reference climate (`snap_clim0`) | RACMO2.3--ERA-Interim hybrid 1981--2010; ocean ISMIP6 (Jourdain et al. 2020) |
 | Snapshots (`snap_clim1`, `snap_clim2`) | PMIP3 piControl and LGM means (atmosphere only; the ocean follows `fraction`) |
-| Surface mass balance | smbpal (`[comps] surface_method = "smbpal"`) |
+| Surface mass balance | chion ITM (`[comps] surface_method = "chion"`) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |
 | Dynamics | DIVA |

@@ -34,6 +34,12 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- chion is the default surface model: `[comps] surface_method = "chion"` in every ITM par
+  file (Greenland, Antarctica paleo, SRG, pd_Greenland, all ESM except `nudge`, bipolar
+  north) and the kryos built-in default. Each gets `[surface_chion]` + `[chion]` with the
+  host values of its own `[smbpal]`; `[smbpal]` stays, so `surface_method = "smbpal"`
+  switches back. The PDD par files (Antarctica, North, LIS, Pyrenees, pd_Antarctica,
+  esm_Antarctica_nudge, rembo, bipolar south) keep smbpal.
 - Par files: `ydyn.ssa_lis_opt_energy` CG with SSOR preconditioner and `-tol 1.0e-3` (was
   Jacobi, `1.0e-4`, which hit `-maxiter 200` in almost every ANT-8KM solve; the result was
   ~1e-3 converged anyway). ANT-8KM: 1/179 solves at the limit, 52 instead of 200 iterations.
