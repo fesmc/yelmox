@@ -9,13 +9,19 @@ module surface_chion
     ! units so couple_surface_to_yelmo treats both models alike.
     !
     ! Inputs chion does not own, supplied here (as smbpal does internally):
-    !   - daily top-of-atmosphere insolation (libs/insol), as shortwave_down,
-    !     from a per-day latitude table (insol_dlat) interpolated to the columns;
-    !   - the annual positive degree days (ITM's vegetation proxy: critical snow
-    !     depth and snow-free land albedo), with chion's Calov-Greve integral on
-    !     every pdd_dday-th day of the daily temperature, as smbpal does, fixed for
-    !     the year;
-    !   - the snowfall/rainfall split (smbpal's calc_snowfrac).
+    !   - daily top-of-atmosphere insolation (libs/insol) from a per-day latitude
+    !     table (insol_dlat) interpolated to the columns, as shortwave_down: as is
+    !     for ITM (which applies its own transmissivity), times a constant
+    !     transmissivity trans_sw for BESSI (surface shortwave);
+    !   - the annual positive degree days (ITM only: its vegetation proxy for the
+    !     critical snow depth and the snow-free land albedo), with chion's
+    !     Calov-Greve integral on every pdd_dday-th day of the daily temperature,
+    !     as smbpal does, fixed for the year;
+    !   - the snowfall/rainfall split (smbpal's calc_snowfrac);
+    !   - constant wind speed and relative humidity, the air pressure from the
+    !     surface elevation (barometric, with the annual-mean air temperature, as
+    !     Chion.jl's air_pressure_from_surface_height) and the solar longitude of
+    !     the day (BESSI's energy balance; the climate supplies none of them).
     ! Monthly -> daily is chion_forcing_monthly (mean-preserving).
     !
     ! Active columns: land or ice, not open ocean (H_ice > 0 or z_bed > z_sl),
@@ -32,7 +38,8 @@ module surface_chion
     ! The per-column host work (forcing, accumulation, PDDs, insolation lookup)
     ! is OpenMP-parallel over the active columns, like chion's own step.
     !
-    ! Only model = "itm" is supported: the host supplies ITM's forcing only.
+    ! Supported chion models: "itm" and "bessi" (longwave from chion's own
+    ! air-temperature parameterization).
 
     use nml,        only : nml_read
     use phys_constants, only : phys_const_class, sec_day
@@ -53,6 +60,9 @@ module surface_chion
     integer,  parameter :: nday_mon   = 30       ! 360-day year, as smbpal and the climate
     real(dp), parameter :: insol_dlat = 0.1_dp   ! [deg] latitude spacing of the insolation table
     integer,  parameter :: pdd_dday   = 10       ! [d] sampling of the annual PDD sum (as smbpal)
+    real(wp), parameter :: p_sl       = 101325.0_wp  ! [Pa] sea-level air pressure (Chion.jl)
+    real(wp), parameter :: R_dry      = 287.058_wp   ! [J kg-1 K-1] dry-air gas constant (Chion.jl R/M_air)
+    real(wp), parameter :: days_trop  = 365.2422_wp  ! [d] tropical year, for the solar longitude
 
     type surface_chion_param_class
         logical            :: const_insol   ! insolation at const_kabp instead of the model time
@@ -62,6 +72,9 @@ module surface_chion
         real(wp)           :: sigma_pdd     ! [K] temperature standard deviation for the PDDs
         real(wp)           :: time_equil    ! [yr] cold-start snowpack spin-up
         integer            :: dt_days       ! [d] chion step; divides the 360-day year
+        real(wp)           :: trans_sw      ! [1] TOA -> surface shortwave transmissivity (BESSI)
+        real(wp)           :: wind_speed    ! [m s-1] constant wind speed
+        real(wp)           :: rel_hum       ! [1] constant relative humidity
     end type surface_chion_param_class
 
     type surface_chion_ann_class
@@ -99,6 +112,8 @@ module surface_chion
         type(surface_chion_insol_class) :: ins
         type(surface_chion_ann_class)   :: ann
         integer                         :: nx, ny, ncol
+        logical                         :: itm      ! model = "itm" (ITM-only forcing)
+        real(wp)                        :: sw_fac   ! shortwave_down = sw_fac * TOA insolation
     end type surface_chion_class
 
     public :: surface_chion_class
@@ -129,11 +144,18 @@ contains
 
         call chion_init(sc%chn, filename, sc%ncol, group=chion_group, cnst=cnst)
 
-        if (trim(sc%chn%par%model) /= "itm") then
-            write(*,*) "surface_chion_init:: error: only chion model = itm is supported &
-                       &(the host supplies ITM forcing only); got "//trim(sc%chn%par%model)
-            stop 1
-        end if
+        select case(trim(sc%chn%par%model))
+            case("itm")
+                sc%itm    = .true.
+                sc%sw_fac = 1.0_wp
+            case("bessi")
+                sc%itm    = .false.
+                sc%sw_fac = sc%par%trans_sw
+            case default
+                write(*,*) "surface_chion_init:: error: chion model must be itm or bessi &
+                           &(the host supplies no forcing for others); got "//trim(sc%chn%par%model)
+                stop 1
+        end select
 
         call monthly_to_daily_init(sc%md, nmon, nday_mon)
 
@@ -146,6 +168,11 @@ contains
         ! Column icol = i + (j-1)*nx: reshape order.
         sc%chn%forc%latitude_deg = reshape(lats, [sc%ncol])
         call insol_init(sc%ins, sc%chn%forc%latitude_deg, sc%md%nday_year)
+
+        ! Constant for the run.
+        sc%chn%forc%wind_speed            = sc%par%wind_speed
+        sc%chn%forc%relative_humidity     = sc%par%rel_hum
+        sc%chn%forc%has_relative_humidity = .true.
 
         call chion_init_state(sc%chn)
 
@@ -179,7 +206,7 @@ contains
         real(wp), intent(in) :: z_sl(:,:)           ! [m]
         real(wp), intent(in) :: time_bp             ! [yr] model time, for the insolation
 
-        real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:)
+        real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:), t_ann(:)
         real(wp), allocatable :: t_sum(:), pr_sum(:), sf_sum(:), S_sum(:), PDDs(:)
         real(wp), allocatable :: tsrf_c(:), alb_c(:), ts_sum(:), alb_sum(:)
         real(wp_acc), allocatable :: melt0(:), runoff0(:), refrz0(:), subl0(:)
@@ -220,25 +247,33 @@ contains
         p_ctl = transpose(ctl)
         deallocate(mon, ctl)
 
-        ! Fixed for the year: geometry and the annual positive degree days.
+        ! Fixed for the year: geometry, the air pressure from the surface
+        ! elevation and the annual-mean air temperature, and (ITM) the ice
+        ! thickness and the annual positive degree days.
+        col   = reshape(sum(t2m, dim=3)/real(nmon, wp), [sc%ncol])
+        t_ann = col(idx)
         col = reshape(z_srf, [sc%ncol])
         sc%chn%forc%surface_height(idx) = col(idx)
-        col = reshape(H_ice, [sc%ncol])
-        sc%chn%forc%H_ice(idx) = col(idx)
+        sc%chn%forc%air_pressure(idx)   = p_sl*exp(-sc%chn%c%grav*col(idx)/(R_dry*t_ann))
 
         allocate(PDDs(na))
-        !$omp parallel do default(shared) private(i,day,t_d)
-        do i = 1, na
-            PDDs(i) = 0.0_wp
-            do day = 1, nday, pdd_dday
-                call interp_monthly_to_day(sc%md, t_ctl(:,i), day, t_d)
-                PDDs(i) = PDDs(i) + real(pdd_dday, wp) &
-                        * real(pdd_expected_positive_temperature(real(t_d - T0, dp), &
-                                                                 real(sc%par%sigma_pdd, dp)), wp)
+        PDDs = 0.0_wp
+        if (sc%itm) then
+            col = reshape(H_ice, [sc%ncol])
+            sc%chn%forc%H_ice(idx) = col(idx)
+
+            !$omp parallel do default(shared) private(i,day,t_d)
+            do i = 1, na
+                do day = 1, nday, pdd_dday
+                    call interp_monthly_to_day(sc%md, t_ctl(:,i), day, t_d)
+                    PDDs(i) = PDDs(i) + real(pdd_dday, wp) &
+                            * real(pdd_expected_positive_temperature(real(t_d - T0, dp), &
+                                                                     real(sc%par%sigma_pdd, dp)), wp)
+                end do
+                sc%chn%forc%PDDs(idx(i)) = PDDs(i)
             end do
-            sc%chn%forc%PDDs(idx(i)) = PDDs(i)
-        end do
-        !$omp end parallel do
+            !$omp end parallel do
+        end if
 
         ! Annual flux totals are the difference of chion's running totals.
         allocate(melt0(sc%ncol), runoff0(sc%ncol), refrz0(sc%ncol), subl0(sc%ncol))
@@ -251,7 +286,8 @@ contains
         allocate(tsrf_c(sc%ncol), alb_c(sc%ncol))
 
         do day = 1, nday, sc%par%dt_days
-            sc%chn%forc%day_of_year = real(day, wp)
+            sc%chn%forc%day_of_year         = real(day, wp)
+            sc%chn%forc%solar_longitude_deg = solar_longitude_deg(day, nday)
 
             !$omp parallel do default(shared) private(i,icol,j0,t_d,p_d,sf_d,S_d)
             do i = 1, na
@@ -267,7 +303,7 @@ contains
                 sc%chn%forc%air_temperature(icol) = t_d
                 sc%chn%forc%snowfall_rate(icol)   = sf_d/spd             ! [mm/d] -> [kg m-2 s-1]
                 sc%chn%forc%rainfall_rate(icol)   = (p_d - sf_d)/spd
-                sc%chn%forc%shortwave_down(icol)  = S_d
+                sc%chn%forc%shortwave_down(icol)  = sc%sw_fac*S_d
 
                 t_sum(i)  = t_sum(i)  + t_d*dt
                 pr_sum(i) = pr_sum(i) + p_d*dt
@@ -358,6 +394,9 @@ contains
         call nml_read(filename, group, "sigma_pdd",   par%sigma_pdd)
         call nml_read(filename, group, "time_equil",  par%time_equil)
         call nml_read(filename, group, "dt_days",     par%dt_days)
+        call nml_read(filename, group, "trans_sw",    par%trans_sw)
+        call nml_read(filename, group, "wind_speed",  par%wind_speed)
+        call nml_read(filename, group, "rel_hum",     par%rel_hum)
     end subroutine surface_chion_par_load
 
     subroutine ann_alloc(ann, nx, ny)
@@ -464,6 +503,23 @@ contains
         ins%time = time
     end subroutine insol_update
 
+
+    pure function solar_longitude_deg(day, nday) result(lon)
+        ! [deg] Solar longitude of a day of the model year (nday days), with
+        ! Chion.jl's calendar-day formula (_solar_longitude_deg_from_calendar_day)
+        ! on the day stretched to the tropical year.
+        integer, intent(in) :: day, nday
+        real(wp) :: lon
+
+        real(dp) :: d, mean_lon, mean_anom
+        real(dp), parameter :: deg = acos(-1.0_dp)/180.0_dp
+
+        d         = real(day - 1, dp)*real(days_trop, dp)/real(nday, dp)
+        mean_lon  = 280.46646_dp + 0.98564736_dp*d
+        mean_anom = 357.52911_dp + 0.98560028_dp*d
+        lon = real(modulo(mean_lon + 1.914602_dp*sin(mean_anom*deg) &
+                          + 0.019993_dp*sin(2.0_dp*mean_anom*deg), 360.0_dp), wp)
+    end function solar_longitude_deg
 
     elemental function calc_snowfrac(t2m, a, b) result(f)
         ! smbpal calc_snowfrac: snow fraction of total precipitation.

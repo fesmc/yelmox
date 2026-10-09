@@ -6,6 +6,10 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- chion BESSI in yelmox (`[chion] model = "bessi"`): the host supplies its surface shortwave
+  (TOA insolation times `[surface_chion] trans_sw`), constant `wind_speed` and `rel_hum`, the
+  air pressure from the surface elevation (barometric, annual-mean air temperature) and the
+  solar longitude; longwave from chion's own parameterization. ITM results unchanged.
 - 1pctCO2 (Greenland, Antarctica) and TIPMIP (Greenland) finished: ice sheet and isostasy
   on, ISMIP7-like optimization spin-up; TIPMIP stabilisations branch off the ramp's
   restarts (years 109, 232). 1pctCO2 reads the global CMIP fields of `[esm] esm_name`

@@ -478,10 +478,13 @@
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs
     time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
     dt_days     = 1       ! [d] chion step (divides the 360-day year)
+    trans_sw    = 0.6     ! [1] TOA -> surface shortwave transmissivity (bessi)
+    wind_speed  = 5.0     ! [m s-1] Constant wind speed (bessi)
+    rel_hum     = 0.8     ! [1] Constant relative humidity (bessi)
 /
 
 &chion
-    model           = "itm"                          ! Snowpack model (surface_chion supports itm)
+    model           = "itm"                          ! Snowpack model: "itm" or "bessi"
     nml_itm         = "itm"                          ! ITM parameters: shared with smbpal
 /
 

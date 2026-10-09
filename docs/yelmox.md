@@ -206,7 +206,7 @@ The components: which are active, with which model, how often.
 |---|---|---|
 | `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
 | `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
-| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM snowpack in daily steps (`[surface_chion]`, `[chion]`; its ITM parameters are smbpal's `[itm]`), smbpal also has PDD (the PDD configurations use it); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
+| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM or BESSI snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are smbpal's `[itm]`; BESSI gets the surface shortwave as TOA insolation times `trans_sw`, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation), smbpal also has PDD (the PDD configurations use it); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
 
 ### `[sim]`
