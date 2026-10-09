@@ -618,11 +618,6 @@ contains
                 
         end select
    
-        ! routine to rome variability in speciic basins. TO DO
-        if (.FALSE.) then
-                where(basins .eq. 1) esm%dto_var = 0.0_wp
-        end if
-
         if (use_ref_atm) then
             ! set atmosphere to reference values
             esm%dts_var = 0.0_wp

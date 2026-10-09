@@ -27,6 +27,7 @@ module yelmox_climate
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
     use kryos_forcing, only : tsforcing_class
     use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_restart_write
+    use regions,       only : regions_class, regions_basin_ids
 
     implicit none
 
@@ -62,6 +63,7 @@ module yelmox_climate
         type(esm_forcing_class) :: esm
         type(esm_ctl_class)     :: esm_ctl
         type(rembo_state_class) :: rembo
+        real(wp), allocatable   :: basins(:,:)   ! basin ids on the climate grid (esm: [esm] basins)
     end type yelmox_climate_class
 
     public :: yelmox_climate_class
@@ -73,7 +75,7 @@ module yelmox_climate
 
 contains
 
-    subroutine climate_init(cl, method, filename, domain, grid, time, basins, &
+    subroutine climate_init(cl, method, filename, domain, grid, time, reg, &
                             south, sfx, timeline_group, smb_direct)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
         ! smb_direct: the surface mass balance is taken from the climate
@@ -84,7 +86,7 @@ contains
         character(len=*), intent(in) :: filename, domain
         type(grid_class), intent(in) :: grid             ! the climate grid
         real(wp),         intent(in) :: time
-        real(wp),         intent(in) :: basins(:,:)
+        type(regions_class), intent(in) :: reg           ! the regions on the climate grid
         logical,          intent(in) :: south
         character(len=*), intent(in) :: sfx              ! namelist group suffix of the domain
         character(len=*), intent(in) :: timeline_group   ! group of the run phase's timeline
@@ -114,17 +116,17 @@ contains
 
         select case(trim(cl%method))
             case("snapclim")
-                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, basins, &
+                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, &
                                    south, group="snap"//trim(sfx))
             case("snapesm")
-                call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, time, basins, &
+                call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, time, &
                                   south, group="snap"//trim(sfx))
             case("esm")
                 call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &
-                              smb_direct)
+                              smb_direct, reg)
             case("rembo")
                 ! REMBO for the atmosphere and smb, snapclim for the ocean.
-                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, basins, &
+                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, &
                                    south, group="snap"//trim(sfx))
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))
@@ -137,7 +139,7 @@ contains
 
     end subroutine climate_init
 
-    subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, basins, &
+    subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
                               domain, dx, dtt, mshlf, tsf, init)
         ! Update the backend on the climate grid and fill `out`. The geometry is
         ! the domain's, on the climate grid, with its present-day surface
@@ -157,7 +159,6 @@ contains
         type(tstep_class),          intent(in)    :: ts
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
         real(wp),         intent(in) :: z_srf_ref(:,:)
-        real(wp),         intent(in) :: basins(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
         real(wp),         intent(in) :: dtt              ! [yr] time step of the run
@@ -181,10 +182,10 @@ contains
             case("snapclim")
                 if (forced) then
                     call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
-                                         dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx, basins=basins)
+                                         dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx)
                 else
                     call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
-                                         dx=dx, basins=basins)
+                                         dx=dx)
                 end if
 
                 ! snapclim's reference climate is clim0.
@@ -209,10 +210,10 @@ contains
             case("snapesm")
                 if (forced) then
                     call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
-                                        dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx, basins=basins)
+                                        dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx)
                 else
                     call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
-                                        dx=dx, basins=basins)
+                                        dx=dx)
                 end if
 
                 out%now%tas     = cl%snapesm%now%tas
@@ -235,10 +236,10 @@ contains
 
             case("esm")
                 call esm_update(cl, out, ts%time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, &
-                                z_srf_ref, basins, mshlf)
+                                z_srf_ref, mshlf)
 
             case("rembo")
-                call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, basins, domain, dx, &
+                call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
                                   forced, is_init, tsf)
         end select
 
@@ -533,7 +534,7 @@ contains
 
     ! ===== esm backend =====================================================
 
-    subroutine esm_init(cl, filename, domain, grid, group, timeline_group, use_smb)
+    subroutine esm_init(cl, filename, domain, grid, group, timeline_group, use_smb, reg)
         ! Read [esm] (experiment + physics) and the esm periods of the run phase
         ! (timeline group), seed the random generator for the climate
         ! variability, and initialize esm_forcing on the climate grid.
@@ -541,14 +542,22 @@ contains
         character(len=*), intent(in) :: filename, domain, group, timeline_group
         type(grid_class), intent(in) :: grid
         logical,          intent(in) :: use_smb
+        type(regions_class), intent(in) :: reg           ! the regions on the climate grid
 
         integer :: n
         integer, allocatable :: seed(:)
+        character(len=56) :: basins
 
         cl%esm_ctl%run_type = trim(timeline_group)
         cl%esm_ctl%use_smb  = use_smb
 
         call nml_read(filename, group, "par_file",     cl%esm_ctl%par_file)
+
+        ! Basins of the ocean extrapolation: "<set>", "<set>.group" of the
+        ! regions, "None" or "domain" (one basin)
+        call nml_read(filename, group, "basins",       basins)
+        allocate(cl%basins(grid%G%nx,grid%G%ny))
+        cl%basins = real(regions_basin_ids(reg, basins), wp)
         call nml_read(filename, group, "experiment",   cl%esm_ctl%experiment)
         call nml_read(filename, group, "esm_name",     cl%esm_ctl%esm_name)
         call nml_read(filename, group, "use_esm",      cl%esm_ctl%use_esm)
@@ -582,7 +591,7 @@ contains
     end subroutine esm_init
 
     subroutine esm_update(cl, out, time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
-                          basins, mshlf)
+                          mshlf)
         ! The reference climatology at the current surface, the esm anomalies
         ! (historical / projection / homogeneous) and the variability, then the
         ! products: atmosphere, the surface mass balance (surface_method = climate),
@@ -592,10 +601,9 @@ contains
         real(wp),         intent(in) :: time, dtt
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
         real(wp),         intent(in) :: z_srf_ref(:,:)
-        real(wp),         intent(in) :: basins(:,:)
         type(marshelf_class), intent(in) :: mshlf
 
-        associate(esm => cl%esm, ec => cl%esm_ctl)
+        associate(esm => cl%esm, ec => cl%esm_ctl, basins => cl%basins)
 
         call esm_clim_update(esm, z_srf, time, ec%time_ref, ec%use_smb, cl%south)
 
@@ -663,7 +671,7 @@ contains
 
     ! ===== rembo backend ===================================================
 
-    subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, basins, domain, dx, &
+    subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
                             forced, init, tsf)
         ! REMBO's atmosphere and surface mass balance, and the ocean from snapclim
         ! (at `time`, as for the snapclim backend). The transient forcing maps
@@ -676,7 +684,6 @@ contains
         type(tstep_class),          intent(in)    :: ts
         real(wp),         intent(in) :: time
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
-        real(wp),         intent(in) :: basins(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
         logical,          intent(in) :: forced, init
@@ -709,7 +716,7 @@ contains
 
         ! Ocean (depth profiles) from snapclim; its reference is clim0.
         call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
-                             dx=dx, basins=basins)
+                             dx=dx)
         out%now%to_ann = cl%snapclim%now%to_ann
         out%now%so_ann = cl%snapclim%now%so_ann
         out%now%depth  = cl%snapclim%now%depth

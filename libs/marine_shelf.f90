@@ -13,6 +13,7 @@ module marine_shelf
 
     use pico 
     use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
+    use regions,        only : regions_class, regions_select, regions_basin_ids
 
     implicit none 
 
@@ -34,6 +35,9 @@ module marine_shelf
     integer, parameter :: mask_val_ocean          = 3
     integer, parameter :: mask_val_deep_ocean     = 4
     integer, parameter :: mask_val_lake           = 5
+
+    integer, parameter :: len_expr  = 1000
+    integer, parameter :: n_corr_max = 50
         
     type marshelf_param_class
 
@@ -48,10 +52,17 @@ module marine_shelf
         character(len=512)  :: obs_path
         character(len=56)   :: obs_name 
         real(wp)            :: obs_scale, obs_lim
-        character(len=56)   :: corr_method 
-        real(wp)            :: basin_number(50)
-        real(wp)            :: basin_bmb_corr(50)
-        real(wp)            :: basin_tf_corr(50)
+        ! Masks and basins from the regions (selection expressions)
+        character(len=56)       :: basins            ! basin ids: "<set>", "<set>.group", "None" or "domain" (one basin)
+        character(len=len_expr) :: mask_ocean        ! mask_ocn_ref: ocean (else land)
+        character(len=len_expr) :: mask_deep_ocean   ! mask_ocn_ref: deep ocean (over ocean)
+        character(len=len_expr) :: mask_pico_deep    ! pico: bmb averaged with c_deep there
+        ! Corrections by region: corr_method = none, bmb or tf; value
+        ! corr_values(k) where the expression corr_<corr_names(k)> selects
+        character(len=56)       :: corr_method 
+        character(len=56),       allocatable :: corr_names(:)
+        character(len=len_expr), allocatable :: corr_exprs(:)
+        real(wp),                allocatable :: corr_values(:)
         logical             :: tf_correction
         character(len=512)  :: tf_path
         character(len=56)   :: tf_name
@@ -122,6 +133,9 @@ module marine_shelf
 
         integer,  allocatable :: mask_ocn_ref(:,:) 
         integer,  allocatable :: mask_ocn(:,:) 
+
+        real(wp), allocatable :: basins(:,:)            ! Basin ids (0 = no basin), from the regions
+        logical,  allocatable :: mask_pico_deep(:,:)    ! pico: bmb averaged with c_deep
         
     end type 
 
@@ -150,7 +164,7 @@ module marine_shelf
 
 contains 
     
-    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
+    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
                                                 depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
@@ -161,7 +175,6 @@ contains
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: basins(:,:) 
         real(wp), intent(IN) :: z_sl(:,:)
         real(wp), intent(IN) :: dx
         real(wp), intent(IN), optional :: depth(:)
@@ -197,7 +210,7 @@ contains
 
     end subroutine marshelf_update_shelf_2D
 
-    subroutine marshelf_update_shelf_3D(mshlf,H_ice,z_bed,f_grnd,basins,z_sl,dx, &
+    subroutine marshelf_update_shelf_3D(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
                                     depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
@@ -208,7 +221,6 @@ contains
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: basins(:,:) 
         real(wp), intent(IN) :: z_sl(:,:)
         real(wp), intent(IN) :: dx
         real(wp), intent(IN) :: depth(:)
@@ -430,7 +442,7 @@ contains
 
     end subroutine marshelf_interp_shelf
 
-    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,regions,basins,z_sl,dx,z_srf)
+    subroutine marshelf_update(mshlf,H_ice,z_bed,f_grnd,z_sl,dx,z_srf)
         
         implicit none
         
@@ -438,8 +450,6 @@ contains
         real(wp), intent(IN) :: H_ice(:,:) 
         real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: regions(:,:)
-        real(wp), intent(IN) :: basins(:,:)
         real(wp), intent(IN) :: z_sl(:,:) 
         !real(wp), intent(IN) :: depth(:),to_ann(:,:,:),dto_ann(:,:,:)
         real(wp), intent(IN) :: dx   ! grid resolution [m]
@@ -559,20 +569,18 @@ contains
                 ! compute mean values at bedrock depth with ice-free points
                 
                 call calc_variable_basin_pico(mshlf%now%T_shlf_basin,mshlf%now%T_shlf, &
-                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
+                                                        f_grnd,mshlf%now%basins,H_ice,mshlf%now%mask_ocn)
                 call calc_variable_basin_pico(mshlf%now%S_shlf_basin,mshlf%now%S_shlf, &
-                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
+                                                        f_grnd,mshlf%now%basins,H_ice,mshlf%now%mask_ocn)
 
                 call pico_update(mshlf%pico,mshlf%now%T_shlf_basin,mshlf%now%S_shlf_basin, &
-                                    H_ice,z_bed,f_grnd,z_sl,basins,mshlf%now%mask_ocn,dx)
+                                    H_ice,z_bed,f_grnd,z_sl,mshlf%now%basins,mshlf%now%mask_ocn,dx)
 
                 mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
 
-                ! jablasco: to avoid ice shelves growing at the margin lets impose an averaged melt in region 2.1
-                select case(trim(mshlf%par%domain))
-                    case("Antarctica")
-                        where (regions .eq. 2.1) mshlf%now%bmb_shlf = 0.5*mshlf%now%bmb_shlf+0.5*mshlf%par%c_deep
-                end select 
+                ! jablasco: to avoid ice shelves growing at the margin, impose an averaged
+                ! melt there (mask_pico_deep)
+                where (mshlf%now%mask_pico_deep) mshlf%now%bmb_shlf = 0.5*mshlf%now%bmb_shlf+0.5*mshlf%par%c_deep
 
             case("lin","quad","quad-nl","lin-slope", &
                     "quad-slope","quad-nl-slope","anom") 
@@ -626,7 +634,7 @@ contains
                         
                         ! Calculate basin-average thermal forcing 
                         call calc_variable_basin(mshlf%now%tf_basin,mshlf%now%tf_shlf, &
-                                                        f_grnd,basins,H_ice,mshlf%now%mask_ocn)
+                                                        f_grnd,mshlf%now%basins,H_ice,mshlf%now%mask_ocn)
 
                         ! Ensure tf_basin is non-negative following Lipscomb et al (2021)
                         ! jalv: this line overcomes the option of bmb_max being greater than 0 (some refreezing) if temperatures
@@ -693,7 +701,9 @@ contains
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,regions,basins,xc,yc,dx,cnst)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,reg,xc,yc,dx,cnst)
+        ! reg: the regions on the shelf grid, from which the masks, basins and
+        ! corrections of the parameters (selection expressions) are made here.
 
         implicit none 
 
@@ -703,19 +713,14 @@ contains
         integer, intent(IN)               :: nx, ny 
         character(len=*), intent(IN)      :: domain
         character(len=*), intent(IN)      :: grid_name
-        real(wp), intent(IN)              :: regions(:,:)
-        real(wp), intent(IN)              :: basins(:,:)
+        type(regions_class), intent(IN)   :: reg
         real(wp), intent(IN), optional    :: xc(:)
         real(wp), intent(IN), optional    :: yc(:)
         real(wp), intent(IN), optional    :: dx 
         type(phys_const_class), intent(IN), optional :: cnst
 
         ! Local variables
-        integer  :: j 
-        integer  :: num
-        character(len=56) :: group_now
-        real(wp) :: basin_number_now
-        real(wp) :: tf_corr_now 
+        integer  :: k
         real(wp) :: grd_dx 
 
         ! Load parameters
@@ -785,84 +790,20 @@ contains
 
         end if 
 
-        ! Initialize basin-wide correction fields
+        ! Basins, and the corrections by region
+        mshlf%now%basins = real(regions_basin_ids(reg,mshlf%par%basins),wp)
+
         mshlf%now%bmb_corr      = 0.0
         mshlf%now%tf_corr_basin = 0.0
 
-        ! Define basin-wide corrections as needed     
-        select case(trim(mshlf%par%corr_method))
-            
-            case("bmb")
-                ! Modify specific basins according to parameter values 
-
-                call apply_value_by_basin(mshlf%now%bmb_corr,basins,mshlf%par%basin_bmb_corr, &
-                                            basin_numbers=mshlf%par%basin_number)
-
-            case("tf")
-                ! Modify specific basins according to parameter values 
-
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,mshlf%par%basin_tf_corr, &
-                                            basin_numbers=mshlf%par%basin_number)
-
-            case("tf-grl") 
-                ! Modify specific basins according to parameter values 
-                ! as defined in the parameter section 'tf_corr_grl'
-
-                group_now = "tf_corr_grl" 
-
-                ! ne = northeast
-                call nml_read(filename,group_now,"ne",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[2.0_wp])
-                
-                ! e = east
-                call nml_read(filename,group_now,"e",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[3.0_wp])
-                
-                
-                ! se = southeast 
-                call nml_read(filename,group_now,"se",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[4.0_wp])
-                
-                ! w = west
-                call nml_read(filename,group_now,"w",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[6.0_wp,7.0_wp,8.0_wp])
-                
-
-            case("tf-ant") 
-                ! Modify specific basins according to parameter values 
-                ! as defined in the parameter section 'tf_corr_ant'
-
-                group_now = "tf_corr_ant" 
-
-                ! Ronne 
-                call nml_read(filename,group_now,"ronne",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[1.0_wp])
-                
-                ! Ross
-                call nml_read(filename,group_now,"ross",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[12.0_wp])
-                
-                ! Pine Island 
-                call nml_read(filename,group_now,"pine",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[14.0_wp])
-                
-                ! Abbott 
-                call nml_read(filename,group_now,"abbott",tf_corr_now)
-                call apply_value_by_basin(mshlf%now%tf_corr_basin,basins,[tf_corr_now], &
-                                                basin_numbers=[15.0_wp])
-                
-            case DEFAULT ! eg, "none", "None", "zero"
-
-                ! DO NOTHING
-
-        end select
+        do k = 1, size(mshlf%par%corr_names)
+            select case(trim(mshlf%par%corr_method))
+                case("bmb")
+                    where (regions_select(reg,mshlf%par%corr_exprs(k))) mshlf%now%bmb_corr = mshlf%par%corr_values(k)
+                case("tf")
+                    where (regions_select(reg,mshlf%par%corr_exprs(k))) mshlf%now%tf_corr_basin = mshlf%par%corr_values(k)
+            end select
+        end do
 
         ! Load tf_corr field from file if desired 
         if (mshlf%par%tf_correction) then 
@@ -872,53 +813,14 @@ contains
         end if  
 
         ! ==============================================
-        ! Generate reference ocean mask 
-        ! (0: land, 1: open ocean, 2: deep ocean) 
+        ! Reference ocean mask: land, ocean (mask_ocean), deep ocean
+        ! (mask_deep_ocean, where c_deep may apply)
 
-        ! Define mask_ocn_ref based on regions mask 
-        ! (these definitions should work for all North and Antarctica domains)
         mshlf%now%mask_ocn_ref = mask_val_land 
-        where (regions .eq. 1.0_wp) mshlf%now%mask_ocn_ref = mask_val_ocean
-        where (regions .eq. 2.0_wp) mshlf%now%mask_ocn_ref = mask_val_ocean
+        where (regions_select(reg,mshlf%par%mask_ocean))      mshlf%now%mask_ocn_ref = mask_val_ocean
+        where (regions_select(reg,mshlf%par%mask_deep_ocean)) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
 
-        select case(trim(mshlf%par%domain))
-
-            case("Greenland") 
-                ! Greenland specific ocean kill regions
-
-                where (regions .ne. 1.3) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
-
-                ! ajr: not used anymore now with mask_ocn_ref formulation,
-                ! keeping code here just to see if Greenland domain still calculated well.
-                ! ! Kill regions that should not be calculated (for now)
-                ! ! North America and Ellesmere Island (1.1,1.11)
-                ! ! Svalbard (1.2,1.23)
-                ! ! Iceland (1.31)
-                ! ! open sea (1.0)
-                ! where (regions .eq. 1.1 .or. regions .eq. 1.11) is_c_deep = .TRUE.
-                ! where (regions .eq. 1.2 .or. regions .eq. 1.23) is_c_deep = .TRUE.
-                ! where (regions .eq. 1.31) is_c_deep = .TRUE.
-                ! where (regions .eq. 1.0)  is_c_deep = .TRUE.
-
-            case("Antarctica") 
-                ! Antarctica specific ocean kill regions
-
-                ! Omit regions==2.11 which means c_deep is not applied to deep points within continental shelf
-                where (regions .ne. 2.11) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
-
-            ! case("North") 
-            !     ! North specific ocean kill regions
-
-            !     ! Apply only in purely open-ocean regions  
-            !     where (regions .eq. 1.0) mshlf%now%mask_ocn_ref = mask_val_deep_ocean
-
-            case DEFAULT 
-                ! Other domains: c_deep potentially applied everywhere 
-                ! with deep ocean points 
-
-                mshlf%now%mask_ocn_ref = mask_val_deep_ocean
-
-        end select 
+        mshlf%now%mask_pico_deep = regions_select(reg,mshlf%par%mask_pico_deep)
 
         ! ==============================================
         ! PICO 
@@ -970,53 +872,6 @@ contains
 
     end subroutine marshelf_init
 
-    subroutine apply_value_by_basin(val,basins,basin_vals,basin_numbers)
-        ! Apply the value of basin_vals in the basins that correspond
-        ! to the given basin_numbers of interest. 
-
-        implicit none
-
-        real(wp), intent(INOUT) :: val(:,:) 
-        real(wp), intent(IN)    :: basins(:,:) 
-        real(wp), intent(IN)    :: basin_vals(:)
-        real(wp), intent(IN)    :: basin_numbers(:) 
-
-        ! Local variables 
-        integer :: b, nb 
-        real(wp), allocatable :: basin_values(:)
-
-        nb = size(basin_numbers,1)
-
-        allocate(basin_values(nb))
-        if (size(basin_numbers,1) .gt. 1 .and. size(basin_vals,1) .eq. 1) then 
-            ! Populate basin_values to be the same length as basin_numbers
-
-            basin_values = basin_vals(1) 
-
-        else 
-            ! Populate local basin_values array with argument values
-
-            basin_values = basin_vals 
-
-        end if 
-
-        if (basin_numbers(1) .eq. -1) then 
-            ! Apply value to all basins
-
-            val = basin_values(1) 
-
-        else 
-
-            do b = 1, nb 
-                where( basins .eq. basin_numbers(b) ) val = basin_values(b)
-            end do 
-
-        end if 
-
-        return
-
-    end subroutine apply_value_by_basin
-
     subroutine marshelf_end(mshlf)
 
         implicit none 
@@ -1040,11 +895,12 @@ contains
         logical, optional :: init 
         logical :: init_pars 
 
+        character(len=56) :: names(n_corr_max)
+        real(wp)          :: values(n_corr_max)
+        integer           :: n, k
+
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
-
-        par%basin_bmb_corr = 0.0 
-        par%basin_tf_corr  = 0.0 
 
         call nml_read(filename,group,"bmb_method",     par%bmb_method,     init=init_pars)
         call nml_read(filename,group,"tf_method",      par%tf_method,      init=init_pars)
@@ -1054,10 +910,32 @@ contains
         call nml_read(filename,group,"restart",        par%restart,        init=init_pars)
         call nml_read(filename,group,"extrap_shlf",    par%extrap_shlf,    init=init_pars)
         
+        call nml_read(filename,group,"basins",         par%basins,         init=init_pars)
+        call nml_read(filename,group,"mask_ocean",     par%mask_ocean,     init=init_pars)
+        call nml_read(filename,group,"mask_deep_ocean",par%mask_deep_ocean,init=init_pars)
+        call nml_read(filename,group,"mask_pico_deep", par%mask_pico_deep, init=init_pars)
+
+        ! Corrections by region: corr_names, corr_values and one expression
+        ! corr_<name> per name
         call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
-        call nml_read(filename,group,"basin_number",   par%basin_number,   init=init_pars)
-        call nml_read(filename,group,"basin_bmb_corr", par%basin_bmb_corr, init=init_pars)
-        call nml_read(filename,group,"basin_tf_corr",  par%basin_tf_corr,  init=init_pars)       
+        names  = ""
+        values = 0.0_wp
+        call nml_read(filename,group,"corr_names",     names,              init=init_pars)
+        call nml_read(filename,group,"corr_values",    values,             init=init_pars)
+        n = count(len_trim(names) .gt. 0)
+        allocate(par%corr_names(n), par%corr_exprs(n), par%corr_values(n))
+        par%corr_names  = pack(names, len_trim(names) .gt. 0)
+        par%corr_values = values(1:n)
+        do k = 1, n
+            call nml_read(filename,group,"corr_"//trim(par%corr_names(k)),par%corr_exprs(k),init=init_pars)
+        end do
+        select case(trim(par%corr_method))
+            case("none","bmb","tf")
+            case default
+                write(*,*) "marshelf_par_load:: Error: corr_method must be none, bmb or tf."
+                write(*,*) "corr_method = ", trim(par%corr_method)
+                stop
+        end select
         call nml_read(filename,group,"tf_correction",  par%tf_correction,  init=init_pars)
         call nml_read(filename,group,"tf_path",        par%tf_path,        init=init_pars)
         call nml_read(filename,group,"tf_name",        par%tf_name,        init=init_pars)
@@ -1473,6 +1351,7 @@ contains
 
         ! Loop over each basin
         do m=1, int(maxval(basins))
+            if (.not. any(basins .eq. m)) cycle   ! basin ids need not be consecutive
             
             ! First calculate the basin-wide average variable value,
             ! limited to floating ice shelf points
@@ -1789,6 +1668,7 @@ contains
 
         ! Loop over each basin
         do m=1, int(maxval(basins))
+            if (.not. any(basins .eq. m)) cycle   ! basin ids need not be consecutive
 
             ! First calculate the basin-wide average variable value,
             ! limited to floating ice shelf points
@@ -1886,6 +1766,8 @@ contains
         allocate(now%slope_base(nx,ny))
 
         allocate(now%mask_ocn_ref(nx,ny))
+        allocate(now%basins(nx,ny))
+        allocate(now%mask_pico_deep(nx,ny))
         allocate(now%mask_ocn(nx,ny))
 
         ! Initialize variables 
@@ -1945,6 +1827,8 @@ contains
         if (allocated(now%slope_base))      deallocate(now%slope_base)
         
         if (allocated(now%mask_ocn_ref))    deallocate(now%mask_ocn_ref)
+        if (allocated(now%basins))          deallocate(now%basins)
+        if (allocated(now%mask_pico_deep))  deallocate(now%mask_pico_deep)
         if (allocated(now%mask_ocn))        deallocate(now%mask_ocn)
         
         return

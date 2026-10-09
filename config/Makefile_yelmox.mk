@@ -63,22 +63,17 @@ $(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o
 						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o $(climate_rembo_obj)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
-# Hi-res topography reference hub for multigrid yelmox
-$(objdir)/htopo.o: $(libdir)/htopo.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
 # Kryos: the domain (kryos_domain + config + init + remap) and the modules built
 # on it -- region-specific physics, per-step coupling, cold start + restarts,
 # output, and the driver-owned transient forcing.
 $(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o \
 						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
-						$(objdir)/surface_chion.o $(objdir)/htopo.o \
+						$(objdir)/surface_chion.o \
 						$(objdir)/sediments.o $(objdir)/geothermal.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
 
-$(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o \
-						$(objdir)/htopo.o
+$(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
 
 $(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
@@ -220,7 +215,6 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/yelmox_climate.o \
 					    $(objdir)/snapclim.o \
 					    $(objdir)/snapesm.o \
-						$(objdir)/htopo.o \
 						$(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o \
 						$(objdir)/kryos_coupling.o \

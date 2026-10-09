@@ -256,13 +256,12 @@ contains
     subroutine domain_init_recon(dom, ts)
         ! Start from an ice reconstruction (recon_path, e.g. ICE-6G_C at the LGM):
         ! it becomes the reference ice thickness and, with recon, the initial ice
-        ! on the recon_codes regions (bed > -500 m). Then refresh the surface
+        ! on the recon_regions (bed > -500 m). Then refresh the surface
         ! and (via the hub) the climate/smb, and stabilize the dynamic fields.
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
 
-        integer  :: nx, ny, k
-        logical, allocatable :: on_codes(:,:)
+        integer  :: nx, ny
         real(wp) :: beta_min_save
 
         nx = dom%yelmo%tpo%par%nx
@@ -274,12 +273,7 @@ contains
 
         if (trim(dom%ctl%init_method) == "recon") then
             ! Initial ice from the reconstruction on the given regions.
-            allocate(on_codes(nx,ny))
-            on_codes = .false.
-            do k = 1, dom%ctl%n_recon_codes
-                where (abs(dom%yelmo%bnd%regions - dom%ctl%recon_codes(k)) < 1e-3_wp) on_codes = .true.
-            end do
-            where (dom%yelmo%bnd%z_bed > -500.0_wp .and. on_codes) &
+            where (dom%yelmo%bnd%z_bed > -500.0_wp .and. dom%mask_recon) &
                 dom%yelmo%tpo%now%H_ice = dom%yelmo%bnd%H_ice_ref
             call smooth_gauss_2D(dom%yelmo%tpo%now%H_ice, dx=real(dom%yelmo%grd%G%dx,wp), f_sigma=2.0_wp)
             call yelmo_init_topo(dom%yelmo, trim(dom%ctl%path_par), &

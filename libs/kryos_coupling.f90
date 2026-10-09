@@ -360,7 +360,7 @@ contains
         logical,               intent(in), optional :: init
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
-        real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:), basins_c(:,:)
+        real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:)
         character(len=256) :: gc, gh
         logical :: is_init
 
@@ -379,11 +379,10 @@ contains
         call remap(dom, dom%topo%z_bed,  gh, z_bed_c,  gc, "bilin")
         call remap(dom, dom%topo%f_grnd, gh, f_grnd_c, gc, "bilin")
         call remap(dom, dom%topo%z_sl,   gh, z_sl_c,   gc, "bilin")
-        call remap(dom, dom%topo%z_srf_ref, gh, z_srf_ref_c, gc, "bilin")
-        call remap(dom, dom%topo%basins, gh, basins_c, gc, "nn")
+        call remap(dom, dom%topo%ref%z_srf, gh, z_srf_ref_c, gc, "bilin")
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
-                            z_srf_ref_c, basins_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
+                            z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
                             dtt=dom%ctl%dtt, mshlf=dom%mshlf, tsf=tsf, init=is_init)
     end subroutine step_climate
 
@@ -480,7 +479,7 @@ contains
             dom%topo%z_sl   = dom%yelmo%bnd%z_sl
             dom%topo%z_srf  = dom%yelmo%tpo%now%z_srf
         else
-            call remap(dom, dom%topo%H_ice_ref, gh, H_ice_ref_y, gy, "con")
+            call remap(dom, dom%topo%ref%H_ice, gh, H_ice_ref_y, gy, "con")
             call remap(dom, dom%yelmo%bnd%z_bed - dom%yelmo%bnd%z_bed_ref, gy, dz_bed_h, gh, "bilin")
             call remap(dom, dom%yelmo%tpo%now%H_ice - H_ice_ref_y,         gy, dH_ice_h, gh, "bilin")
             call remap(dom, dom%yelmo%bnd%z_sl,                            gy, z_sl_h,   gh, "bilin")
@@ -498,7 +497,6 @@ contains
 
         real(wp), allocatable :: H_ice_m(:,:), z_bed_m(:,:), f_grnd_m(:,:), z_sl_m(:,:)
         real(wp), allocatable :: z_srf_m(:,:)
-        real(wp), allocatable :: regions_m(:,:), basins_m(:,:)
         real(wp), allocatable :: to_m(:,:,:), so_m(:,:,:), dto_m(:,:,:), dto_y(:,:,:)
         character(len=256) :: gm, gh, gc
 
@@ -508,14 +506,12 @@ contains
         gh = trim(dom%ctl%grid_hub)
         gc = trim(dom%ctl%grid_clim)
 
-        ! geometry + masks: hub -> mshlf grid
+        ! geometry: hub -> mshlf grid
         call remap(dom, dom%topo%H_ice,   gh, H_ice_m,   gm, "bilin")
         call remap(dom, dom%topo%z_bed,   gh, z_bed_m,   gm, "bilin")
         call remap(dom, dom%topo%f_grnd,  gh, f_grnd_m,  gm, "bilin")
         call remap(dom, dom%topo%z_sl,    gh, z_sl_m,    gm, "bilin")
         call remap(dom, dom%topo%z_srf,   gh, z_srf_m,   gm, "bilin")
-        call remap(dom, dom%topo%regions, gh, regions_m, gm, "nn")
-        call remap(dom, dom%topo%basins,  gh, basins_m,  gm, "nn")
 
         if (dom%clim%has_ocn_shelf) then
             ! Ocean already at the shelf base (esm): grid_clim -> mshlf grid.
@@ -523,7 +519,7 @@ contains
             call remap(dom, dom%clim%now%S_shlf,  gc, dom%mshlf%now%S_shlf,  gm, "bilin")
             call remap(dom, dom%clim%now%dT_shlf, gc, dom%mshlf%now%dT_shlf, gm, "bilin")
             call remap(dom, dom%clim%now%dS_shlf, gc, dom%mshlf%now%dS_shlf, gm, "bilin")
-            call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
+            call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, &
                     z_sl_m, dx=dom%ctl%dx_shelf, z_srf=z_srf_m)
             return
         end if
@@ -535,9 +531,9 @@ contains
         call remap(dom, dto_y, gc, dto_m, gm, "bilin")
 
         ! run marine_shelf on grid_shelf
-        call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, basins_m, z_sl_m, &
+        call marshelf_update_shelf(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, z_sl_m, &
                 dom%ctl%dx_shelf, dom%clim%now%depth, to_m, so_m, dto_ann=dto_m)
-        call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, regions_m, basins_m, &
+        call marshelf_update(dom%mshlf, H_ice_m, z_bed_m, f_grnd_m, &
                 z_sl_m, dx=dom%ctl%dx_shelf, z_srf=z_srf_m)
     end subroutine step_shelf
 

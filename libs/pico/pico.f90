@@ -219,6 +219,7 @@ contains
         d_max = maxval(pico%now%d_shlf)
 
         do m = 1 , int(maxval(basins))
+            if (.not. any(basins .eq. m)) cycle   ! basin ids need not be consecutive
             d_max_basin = maxval(pico%now%d_shlf,basins .eq. m)
             boxes_basin = 0.0
             where(basins .eq. m)

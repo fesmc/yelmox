@@ -1,7 +1,7 @@
 program test_snapesm_ref
     ! Validation harness for the snapclim -> snapesm port. Mirrors
     ! tests/test_snapclim_ref.f90 exactly (same GRL-16KM config, same synthetic
-    ! z_srf dome / uniform basins, same times), driving `snapesm` instead of
+    ! z_srf dome, same times), driving `snapesm` instead of
     ! snapclim and dumping now%{...} to logs/snapesm_ref.nc for a field-by-field
     ! diff (tests/diff_nc.py) against logs/snapclim_ref.nc.
     !
@@ -17,8 +17,8 @@ program test_snapesm_ref
     integer, parameter :: nx = 106, ny = 181
 
     type(snapesm_class) :: sc
-    real(sp) :: z_srf_sp(nx,ny), basins_sp(nx,ny)
-    real(wp) :: z_srf(nx,ny), basins(nx,ny)
+    real(sp) :: z_srf_sp(nx,ny)
+    real(wp) :: z_srf(nx,ny)
     real(wp) :: xc(nx), yc(ny)
     real(wp) :: times(3)
     character(len=256) :: path_par, outfile, domain, grid
@@ -29,16 +29,14 @@ program test_snapesm_ref
     grid     = "GRL-16KM"
     outfile  = "logs/snapesm_ref.nc"
 
-    ! Identical synthetic z_srf dome & uniform basins as test_snapclim_ref (computed
+    ! Identical synthetic z_srf dome as test_snapclim_ref (computed
     ! in single precision, then promoted, so the inputs are bit-identical).
     do j = 1, ny
     do i = 1, nx
         z_srf_sp(i,j) = 2500.0*exp(-( ((i-nx/2.0)/40.0)**2 + ((j-ny/2.0)/60.0)**2 ))
     end do
     end do
-    basins_sp = 1.0
     z_srf  = real(z_srf_sp, wp)
-    basins = real(basins_sp, wp)
 
     do i = 1, nx; xc(i) = (i-1)*16.0_wp; end do
     do j = 1, ny; yc(j) = (j-1)*16.0_wp; end do
@@ -47,12 +45,12 @@ program test_snapesm_ref
     nt = size(times)
 
     call snapesm_init(sc, trim(path_par), trim(domain), trim(grid), nx, ny, &
-                      times(1), basins, south=.FALSE., group="snp")   ! Greenland
+                      times(1), south=.FALSE., group="snp")   ! Greenland
 
     call dump_init(trim(outfile), sc, xc, yc, times(1))
 
     do it = 1, nt
-        call snapesm_update(sc, z_srf=z_srf, time=times(it), basins=basins)
+        call snapesm_update(sc, z_srf=z_srf, time=times(it))
         call dump_step(trim(outfile), sc, times(it), it)
         write(*,"(a,f12.1,a,f10.4,a,f10.4)") " time=", times(it), &
             "  ta_ann(mid)=", sc%now%ta_ann(nx/2,ny/2), &
