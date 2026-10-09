@@ -80,6 +80,13 @@
 ! inside SnowpackPhysicalConstants, and every chion physics routine
 ! already receives the constants object. See docs/porting_notes.md D3
 ! and D4.
+!
+! CALIBRATED DEFAULT SET. alpha_ice = 0.40, seb_scheme = turbulent_flux_scheme
+! = "semix" (sensible factor 2.5, stable coefficient 40), longwave_scheme =
+! "cloud_proxy", and in &bessi the 5-layer ice substrate, the fine
+! near-surface layers and 8 diurnal substeps with a 1 K cycle are Chion.jl
+! 03bb445's setup, calibrated as one package against MAR over Greenland for
+! daily forcing. Changing one member leaves the others off their calibration.
 
 &chion_const
 
@@ -92,20 +99,19 @@
     rho_s_a                   = 109.0       ! [kg m-3] Intercept
     rho_s_b                   = 6.0         ! [kg m-3 K-1] Temperature slope
     rho_s_c                   = 26.0        ! [kg m-3 (m s-1)^-1/2] Wind slope
-    fresh_snow_density_scheme = "constant"  ! "constant" | "parameterized" (aliases: "bessi", "htessel")
+    fresh_snow_density_scheme = "constant"  ! "constant" | "parameterized"
 
     ! ## Thermal properties ##
-    Ki                        = 2.1         ! [W m-1 K-1] Thermal conductivity of ice
     Lv                        = 2.501e6     ! [J kg-1] Latent heat of vaporization
     cp_air                    = 1003.0      ! [J kg-1 K-1] Heat capacity of air
     latent_heat_flux_ratio    = 1.0         ! [1] Scaling of the turbulent latent flux
 
-    ! ## Turbulent exchange ##
-    D_sh                      = 10.0        ! [W m-2 K-1] Sensible heat exchange coefficient
+    ! ## Surface energy balance and turbulent exchange ##
+    seb_scheme                = "semix"     ! Longwave only: "bessi" | "semix" (absorbed with eps_snow / eps_ice)
+    turbulent_flux_scheme     = "semix"     ! Sensible and latent heat: "bessi" | "semix" | "climberx"
+    D_sh                      = 10.0        ! [W m-2 K-1] Sensible heat exchange coefficient (bessi)
 
-    ! ## Surface energy balance (CLIMBER-X SEMIX aerodynamic scheme) ##
-    ! seb_scheme = "bessi" uses D_sh above and ignores everything below it.
-    seb_scheme                = "bessi"     ! "bessi" | "semix"
+    ! ## CLIMBER-X SEMIX aerodynamic exchange (turbulent_flux_scheme = "climberx") ##
     z0m_snow                  = 0.0024      ! [m]  Momentum roughness length, snow
     z0m_ice                   = 0.002       ! [m]  Momentum roughness length, ice
     zm_to_zh                  = 0.13533528  ! [1]  Heat/momentum roughness ratio, exp(-2)
@@ -114,14 +120,33 @@
     R_dry                     = 287.058     ! [J kg-1 K-1] Gas constant of dry air
     l_neutral                 = .FALSE.     ! [1]  Force neutral stratification?
     l_dew                     = .TRUE.      ! [1]  Allow dew/frost deposition?
-    semix_qsat                = "semix"     ! "semix" | "bessi" (aliases: "climberx", "chion")
+    climberx_qsat             = "climberx"  ! Saturation humidity: "climberx" (q_sat_i) | "bessi"
+
+    ! ## Chion.jl bulk turbulence (turbulent_flux_scheme = "semix") ##
+    semix_karman                   = 0.4    ! [1]  von Karman constant
+    semix_surface_height           = 10.0   ! [m]  Reference height of air temperature and wind
+    semix_z0m_snow                 = 0.001  ! [m]  Momentum roughness length, snow
+    semix_z0m_ice                  = 0.01   ! [m]  Momentum roughness length, bare ice
+    semix_zm_to_zh                 = 10.0   ! [1]  z0m/z0h
+    semix_sensible_exchange_factor = 2.5    ! [1]  Sensible-heat exchange factor (MAR-calibrated)
+    semix_stable_coefficient       = 40.0   ! [1]  b in the stable damping 1/(1 + b*Ri) (MAR-calibrated)
+    semix_latent_exchange_factor   = 1.0    ! [1]  Latent-heat exchange factor
 
     ! ## Albedo ##
     alpha_dry                 = 0.81        ! [1] Dry snow albedo (upper bound)
     alpha_wet                 = 0.70        ! [1] Wet snow albedo (lower bound)
-    alpha_ice                 = 0.30        ! [1] Bare ice albedo
+    alpha_ice                 = 0.40        ! [1] Bare ice albedo
     max_lwc_albedo            = 0.10        ! [1] LWC at which the albedo reaches alpha_wet
-    albedo_scheme             = "dynamic"   ! "constant" | "dynamic" | "prescribed" | "semix" (aliases: "bessi", "legacy")
+    albedo_scheme             = "dynamic"   ! "constant" | "dynamic" | "prescribed" | "semix" | "aging"
+    aging_cold_timescale_days    = 20.0     ! [d] Aging e-folding time, surface below T0 (albedo_scheme = "aging")
+    aging_melting_timescale_days = 2.0      ! [d] Aging e-folding time, surface at T0
+    aging_snowfall_ref        = 10.0        ! [kg m-2] e-folding snowfall of the aging albedo's rejuvenation
+
+    ! ## Thin-snow albedo (chion; D40, D41) ##
+    swe_crit_albedo           = 10.0        ! [kg m-2] Column SWE of full snow cover (0 = off: any snow covers)
+    alpha_land                = 0.2         ! [1] Background albedo of a land column (H_ice = 0)
+    c_fsnow                   = 10.0        ! [1] SEMIX snow cover tanh(h_snow/(c_fsnow*z0m_ice)) (CLIMBER-X)
+    c_fsnow_orog              = 2e-4        ! [1] SEMIX orography h_snow/(h_snow + c_fsnow_orog*z_sur_std)
 
     ! ## SEMIX spectral albedo (albedo_scheme = "semix"; CLIMBER-X) ##
     frac_vu                   = 0.45        ! [1]  Visible+UV fraction of incoming solar
@@ -137,14 +162,21 @@
     snow_1                    = 0.5         ! [1]  Snowfall-rate aging exponent
     w_snow_dust               = 10.0        ! [kg m-2] SWE melt that doubles dust concentration
     dust_con_scale            = 1.0         ! [1]  Dust concentration scaling
-    semix_snow_albedo         = "dang"      ! "ww" | "dang" (CLIMBER-X default: Dang 2015)
+    semix_snow_albedo         = "dang"      ! "warren_wiscombe" | "dang" (CLIMBER-X default: Dang 2015)
     dalb_snow_vis             = 0.0         ! [1]  Visible snow albedo offset (Dang)
     dalb_snow_nir             = 0.0         ! [1]  Near-IR snow albedo offset (Dang)
     k_sigma_orog              = 0.0         ! [1]  Orographic albedo reduction scale (Dang)
     sigma_orog_crit           = 1000.0      ! [m]  Orographic roughness scale (Dang)
 
     ! ## Radiation ##
-    eps_air                   = 0.80        ! [1] Emissivity of air
+    eps_air                   = 0.80        ! [1] Emissivity of air (graybody longwave)
+    longwave_scheme           = "cloud_proxy" ! Downwelling longwave if not prescribed: "graybody" | "cloud_proxy"
+    lw_emissivity_base                 = 0.624   ! [1]     Cloud proxy: emissivity at T0, clear sky
+    lw_emissivity_temperature_slope    = 0.0032  ! [K-1]   Cloud proxy: emissivity per K of T_air - T0
+    lw_emissivity_cloud_slope          = 0.613   ! [1]     Cloud proxy: emissivity per unit cloudiness
+    lw_clear_sky_transmissivity        = 0.85    ! [1]     Cloud proxy: clear-sky SW transmissivity at sea level
+    lw_clear_sky_transmissivity_per_km = 0.075   ! [km-1]  Cloud proxy: its increase with surface height
+    lw_night_cloud_fraction            = 0.389   ! [1]     Cloud proxy: cloudiness without a daily TOA
     eps_snow                  = 0.98        ! [1] Emissivity of snow
     eps_ice                   = 0.98        ! [1] Emissivity of bare ice (seb_scheme = "semix" only)
     sigma_sb                  = 5.670373e-8 ! [W m-2 K-4] Stefan-Boltzmann constant
@@ -165,6 +197,71 @@
 !   Takes the DYNAMIC code path inside the albedo routines and is then
 !   overridden by the caller. If forc%has_prescribed_albedo is false it
 !   silently behaves as "dynamic" (docs/PLAN.md section 5 item 9).
+!
+! albedo_scheme = "aging"
+!   Snowfall-age scheme (Chion.jl 6d06af6):
+!   alpha = alpha_wet + (alpha - alpha_wet)*exp(-dt/tau), tau = the
+!   melting timescale when the surface is at T0, else the cold one.
+!   Requires 0 <= alpha_wet <= alpha_dry <= 1. Snowfall S [kg m-2] in a
+!   step rejuvenates aged snow by f = 1 - exp(-S/aging_snowfall_ref): the
+!   aging progress -ln((alpha-alpha_wet)/(alpha_dry-alpha_wet)) and
+!   snow_age_days are scaled by (1-f), so a trace of snow does almost
+!   nothing, and a day's snowfall refreshes the same in one step as in
+!   diurnal substeps. Snow onto a bare surface starts fresh (alpha_dry),
+!   its thinness left to the snow-cover fraction (D30). Chion.jl resets on
+!   any snowfall; legacy_chion builds do the same.
+!
+! swe_crit_albedo, alpha_land, c_fsnow, c_fsnow_orog (chion; D40, D41)
+!   The surface energy balance sees the snow albedo blended with the
+!   background, f*alpha_snow + (1-f)*alpha_bg, so a trace of snow on bare
+!   ice no longer hides the ice albedo. Snow-cover fraction f =
+!   min(1, SWE/swe_crit_albedo), SWE the column's snow water equivalent
+!   (solid + liquid over the snow layers), under the dynamic, aging and
+!   constant schemes; 0 turns the blend off (f = 1 on any surface snow,
+!   Chion.jl's switch). Under albedo_scheme = "semix" CLIMBER-X's own
+!   f = tanh(h_snow/(c_fsnow*z0m_ice)), h_snow the snow depth, times
+!   h_snow/(h_snow + c_fsnow_orog*z_sur_std) when the host gives z_sur_std.
+!   A prescribed albedo is never blended. Background alpha_bg: alpha_ice
+!   (or the host's alb_ice_host) where forc%H_ice > 0; alpha_land on a land
+!   column (H_ice = 0), which also has no ice ablation: snow-free land
+!   exchanges nothing, its Tsrf is the air temperature (D41). A host must
+!   therefore fill H_ice for BESSI. legacy_chion: no blend, bare ice under
+!   every column.
+!
+! seb_scheme, turbulent_flux_scheme
+!   Chion.jl's split (d0146e1): seb_scheme selects the longwave
+!   treatment only, turbulent_flux_scheme the sensible and latent heat.
+!   "semix" is Chion.jl's bulk turbulence (03bb445): neutral log-law
+!   exchange at semix_surface_height, z0h = z0m/semix_zm_to_zh,
+!   bulk-Richardson damping 1/(1 + b*Ri) when stable and sqrt(1 - 16*Ri)
+!   enhancement when unstable, wind floored at 0.1 m s-1, air humidity
+!   relative to saturation over ice, vapour mass Q_lh/L. The default (with
+!   seb_scheme = "semix"), as in Chion.jl. Over bare ice chion uses Lv + Lm
+!   in its latent exchange (D35), and c%R_dry for the air density (D38).
+!   "bessi" is BESSI's original pair: LWdn - eps_snow*sigma*Ts^4 and the
+!   bulk coefficient D_sh.
+!   "climberx" is chion's port of CLIMBER-X SEMIX's aerodynamic exchange
+!   (docs/semix_port_scope.md); its vapour mass converts with Lv + Lm at
+!   every surface temperature. CLIMBER-X's full surface scheme is
+!   seb_scheme = "semix" with turbulent_flux_scheme = "climberx" (formerly
+!   seb_scheme = "semix" alone); its spectral albedo is albedo_scheme =
+!   "semix", as in Chion.jl.
+!
+! longwave_scheme
+!   Chion.jl 03bb445, BESSI only, used when the host does not prescribe
+!   q_lw_down. "graybody": eps_air*sigma*T_air^4. "cloud_proxy":
+!   eps*sigma*T_air^4 with eps = clamp(lw_emissivity_base
+!   + lw_emissivity_temperature_slope*(T_air - T0)
+!   + lw_emissivity_cloud_slope*n, 0.4, 1.3), cloudiness
+!   n = clamp(1 - SWdn/(TOA*tau_clear), 0, 1), tau_clear =
+!   lw_clear_sky_transmissivity + lw_clear_sky_transmissivity_per_km*z/km
+!   (z = surface_height, NaN or negative -> 0). Daily-mean TOA from
+!   latitude, solar longitude and day of year (S0 = 1361 W m-2, fixed
+!   orbit), or the host's forc%toa_shortwave when set (D33). Below
+!   50 W m-2 of TOA (polar night), at dt < 0.75 d or without a latitude,
+!   n = lw_night_cloud_fraction. Resolved once per forcing step, before
+!   the diurnal substeps, which reuse it. Default "cloud_proxy", as in
+!   Chion.jl; "graybody" is BESSI's original eps_air*sigma*T_air^4.
 !
 ! low_density_densification
 !   Selects only the rho < 550 kg m-3 branch. The mid and high branches
@@ -204,29 +301,59 @@
     density_init     = 300.0                ! [kg m-3] Density assigned to an inactive layer slot
     temperature_init = 273.0                ! [K] Temperature assigned to an inactive layer slot
 
-    diurnal_shortwave_substeps            = False   ! [1] Resolve the diurnal cycle by substepping
+    ice_substrate_layers        = 5         ! [1] Thermal ice layers below the snow/firn column (0 = none)
+    ice_substrate_top_thickness = 0.05      ! [m] Top substrate layer; each layer below is twice as thick
+
+    near_surface_layer_max_thicknesses = 0.02, 0.05, 0.10, 0.30   ! [m] Maximum thickness of layers 1-4 (0 = no limit)
+
+    diurnal_shortwave_substeps            = True    ! [1] Resolve the diurnal cycle by substepping
     diurnal_shortwave_threshold           = 0.0     ! [W m-2] Peak-minus-mean excess required to substep
-    diurnal_shortwave_max_substeps        = 3       ! [1] Substeps per day when enabled; 1..24
+    diurnal_shortwave_max_substeps        = 8       ! [1] Substeps per day when enabled; 1..24
     diurnal_shortwave_min_air_temperature = 265.15  ! [K] Below this, do not substep (Julia: -8 C)
-    diurnal_temperature_cycle             = False   ! [1] Impose a diurnal air-temperature cycle
-    diurnal_temperature_amplitude         = 5.0     ! [K] Half-amplitude of that cycle
+    diurnal_temperature_cycle             = True    ! [1] Impose a diurnal air-temperature cycle
+    diurnal_temperature_amplitude         = 1.0     ! [K] Half-amplitude of that cycle at reference height
+    diurnal_temperature_amplitude_gradient         = 0.0     ! [K km-1] Amplitude increase above reference height
+    diurnal_temperature_amplitude_reference_height = 0.0     ! [m] Reference height of that gradient
+    diurnal_temperature_amplitude_max              = 1.0     ! [K] Upper bound on the amplitude
 /
 
 ! Notes on &bessi
 !
-! diurnal_shortwave_substeps
-!   OFF by default, and that is a physics choice rather than a
-!   performance one. The albedo aging law carries no dt
-!   (docs/PLAN.md section 5 item 5), so enabling substepping ages the
-!   albedo max_substeps times per day — upstream defect 19. Snowfall
-!   brightening is likewise nonlinear under substepping (defect 21).
-!   Enabling this changes the albedo scheme, not only the shortwave
-!   resolution.
+! diurnal_shortwave_substeps (and the diurnal_* parameters)
+!   ON by default, Chion.jl's calibrated 03bb445 set: a day with shortwave
+!   and air temperature above -8 C is split into 8 intervals of hour angle,
+!   each with its mean shortwave and a +-1 K air-temperature cycle (capped at
+!   1 K). Substepping also changes the albedo, not only the shortwave
+!   resolution: aging scales with each substep's dt, but snowfall
+!   brightening is nonlinear under substepping (upstream defect 21). Cost:
+!   up to 8 core steps on a warm day. A day that is not split keeps its
+!   forcing (D39).
 !
 ! Ntot
-!   The snow-depth cap uses a hard-coded reference layer count of 15
-!   REGARDLESS of Ntot (docs/PLAN.md section 5 item 11). Changing Ntot
-!   therefore does not move the depth cap.
+!   The snow-depth cap is a fixed 22.5 m of solid depth
+!   (BESSI_REFERENCE_SNOW_DEPTH_M, Chion.jl 03bb445), independent of Ntot
+!   and mass_split; changing Ntot does not move it.
+!
+! ice_substrate_layers, ice_substrate_top_thickness
+!   Chion.jl 03bb445: fixed layers of glacier ice (0.05, 0.10, 0.20, 0.40,
+!   0.80 m at 5 layers; 1.55 m) below the snow/firn, insulated at the base,
+!   solved with the snow in one implicit system. Bare ice then carries cold
+!   content and must warm to T0 before it melts; with 0 it is held at T0.
+!   Default 5, as in Chion.jl; 0 holds bare ice at T0 (BESSI's original).
+!   chion only (D34): no substrate where forc%H_ice = 0 (land), so a host
+!   using it must fill H_ice for BESSI too; ice_temperature is reset with
+!   the column and is initialised to min(t_srf, T0) from an older restart.
+!
+! near_surface_layer_max_thicknesses
+!   Chion.jl 03bb445: the top four layers are held at these thicknesses
+!   (upstream default 0.02, 0.05, 0.10, 0.30 m) by a conservative remesh
+!   after accumulation and after refreezing, so the energy solve always
+!   sees a thin top cell. With layer 1 limited, the mass_min surface merge
+!   is off; the first layer below the fine ones is split and merged by
+!   mass_max/mass_split/mass_min instead (chion only, D32; Chion.jl keeps
+!   everything below them in one layer). 0 = no limit (Julia Inf); only a
+!   leading block of layers can be limited (D36). Defaults as in Chion.jl;
+!   all four 0 is BESSI's original mass-based layering.
 !
 ! The three sub-scheme choices — albedo_scheme, fresh_snow_density_scheme
 ! and low_density_densification — are NOT here. They live in the
@@ -238,10 +365,10 @@
 ! &pdd — bulk positive-degree-day model (Chion.jl PDDModel)
 ! ============================================================
 !
-! No layers, no energy balance. Read docs/PLAN.md section 3.2 and
-! docs/pdd_defects.md before changing anything here: Chion.jl's PDD is
-! known not to be fully working, and several of its behaviours are
-! reproduced deliberately rather than fixed.
+! No layers, no energy balance. A capped one-layer snow reservoir with an
+! ice-facing smb_ice (docs/porting_notes.md D23); Chion.jl adopted the
+! same budget (ce6a68d), and validation/ gates the two against each other.
+! docs/pdd_defects.md records the defects this budget fixed.
 
 &pdd
     ddf_snow            = 3.0               ! [kg m-2 K-1 d-1] Degree-day factor for snow
@@ -249,36 +376,30 @@
     refreezing_fraction = 0.6               ! [1] Fraction of SNOW melt that refreezes
     temperature_sigma   = 5.0               ! [K] Std dev of unresolved temperature variability
     H_snow_max          = 5000.0            ! [kg m-2] Snowpack cap; the excess is converted to ice
-    pdd_method          = "pism"            ! PDD integral: "simple" | "pism"
+    pdd_method          = "simple"          ! PDD integral: "simple" | "pism"
 /
 
 ! Notes on &pdd
 !
-! pdd_method — DEFAULT DIVERGES FROM Chion.jl, deliberately.
+! pdd_method — same default as Chion.jl (PDDModel pdd_method=:simple).
 !   "simple"  max(T-T0,0)*dt. Ignores sub-step temperature variability
 !             entirely, so it produces no melt at all below freezing.
+!             Appropriate when dt resolves the temperature cycle (daily).
 !   "pism"    the Calov–Greve expectation integral
 !             dt*(sigma*phi(z) + Tbar*Phi(z)), z = Tbar/sigma.
+!             Use it for monthly steps, or wherever sub-step variability
+!             matters: at daily dt the simple form loses 1.25 kg m-2 d-1
+!             of melt at -5 C and 5.98 at 0 C, concentrated at the
+!             equilibrium line. smbpal always uses the integral, so a host
+!             replacing smbpal sets pdd_method = "pism" explicitly.
 !
-!   Chion.jl selects between these IMPLICITLY on the timestep length
-!   (27 <= dt_days <= 32 picks the integral) — a change of physics
-!   triggered by a timestep, which chion replaces with this explicit
-!   parameter (docs/pdd_defects.md D4).
-!
-!   chion defaults to "pism" rather than reproducing Chion.jl's daily
-!   behaviour, per docs/PLAN.md section 3.1b item 5. The simple form
-!   loses 1.25 kg m-2 d-1 of melt at -5 C and 5.98 kg m-2 d-1 at 0 C,
-!   and that loss is concentrated exactly at the equilibrium line where
-!   the ice-sheet response is most sensitive. smbpal, which is the
-!   scheme actually in production use in yelmox, always uses the
-!   integral. Set pdd_method = "simple" to recover Chion.jl's daily
-!   path for a line-by-line comparison.
+!   The choice is explicit in both models; Chion.jl formerly selected it
+!   implicitly from the timestep length (docs/pdd_defects.md D4).
 !
 ! refreezing_fraction
-!   Applied to snow melt with NO cold-content and NO capacity limit
-!   (upstream defect 5), and the refrozen mass re-enters the meltable
-!   reservoir (defect 6). smbpal instead caps refreezing at
-!   min(melt_snow, acc*f_refrz_max). Reproduced, not fixed.
+!   refrozen = min(refreezing_fraction*H_snow, snow_melt), with H_snow the
+!   snow left after melt; the refrozen mass becomes superimposed ice and
+!   leaves the reservoir (D23). No cold-content limit (pdd_defects.md D1).
 
 
 ! ============================================================
