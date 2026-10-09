@@ -1,6 +1,6 @@
 # CISM as an ice-sheet backend: evaluation and plan
 
-Status: evaluation only (2026-10-04). Not tracked in git. The leading `_` keeps
+Status: evaluation only (2026-10-04). The leading `_` keeps
 quarto from rendering it. To be continued in a dedicated new repo for the
 shared ice-model interface.
 
