@@ -504,6 +504,13 @@
 
 /
 
+&chion_const
+    ! chion's own constants. alpha_ice (BESSI) calibrated to MAR v3.11 1961-1990
+    ! (GRL-8KM, fixed present-day geometry, cloud-proxy longwave: runoff and
+    ! ablation-zone smb).
+    alpha_ice       = 0.55          ! [1] Bare ice albedo (chion default 0.40)
+/
+
 &surface_chion
     ! Host side of chion (surface_method = "chion"): forcing chion does not own.
     const_insol = True    ! Insolation at const_kabp instead of the model time

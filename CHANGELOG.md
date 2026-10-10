@@ -53,6 +53,14 @@ annotated git tag. Dates are release (tag) dates.
   and L. Gutierrez Gonzalez's `opt_grl_ismip.sh`) for the current `yelmox_esm`.
 
 ### Changed
+- chion BESSI follows chion `sync-dev-nils` (Chion.jl 9ec6cc7; `input/chion_defaults.nml`
+  re-synced): semix turbulence, cloud-proxy longwave, 5-layer ice substrate, thin-snow albedo
+  blend, 8 diurnal substeps. yelmox now fills `H_ice` for BESSI (`H_ice = 0` is land: no ice
+  albedo, substrate or ablation) and passes its TOA insolation to the cloud proxy. Greenland
+  par files: `[chion_const] alpha_ice = 0.55` (BESSI; chion default 0.40), calibrated to MAR
+  v3.11 1961-1990 like ITM's `alb_ice`: runoff 648 Gt/yr (MAR 645; 0.50 gave 705), ablation
+  area 0.43 (MAR 0.41) 1e6 km2, ablation-zone smb bias +15 mm/yr. ITM results unchanged
+  (bit-identical). BESSI GRL-8KM (16 threads): cold-start setup 664 s (was 212), 20-yr loop 2.1x.
 - Greenland par files: chion's ITM parameters in their own group `[itm_chion]` (`[chion]
   nml_itm`), `[itm]` with `alb_ice = 0.31` (was 0.4, shared with smbpal), calibrated to MAR
   v3.11 1961-1990 at GRL-8KM with fixed present-day geometry: runoff 635 Gt/yr (MAR 645;
