@@ -84,7 +84,6 @@ module snapclim
         real(wp) :: dSo_const 
         real(wp) :: f_to 
         real(wp) :: f_p
-        real(wp) :: f_p_ne
         real(wp) :: f_stdev
         logical  :: south = .FALSE.   ! southern hemisphere (seasons, lapse rates)
 
@@ -204,7 +203,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,basins,south,group)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,south,group)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -216,7 +215,6 @@ contains
         character(len=*),     intent(IN)    :: filename 
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
-        real(wp), intent(IN) :: basins(:,:)
         logical,  intent(IN) :: south       ! southern hemisphere
         character(len=*),  intent(IN), optional :: group
 
@@ -323,14 +321,14 @@ contains
         ! == clim0: reference climate (eg, present day) ==
 
         call snapshot_par_load(snp%clim0%par,filename,trim(nml_group)//"_clim0",domain,grid_name,init=.TRUE.)
-        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
+        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
         call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,trim(nml_group)//"_clim1",domain,grid_name,init=.TRUE.)                
-            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
             if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
 
         end if 
@@ -339,7 +337,7 @@ contains
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,trim(nml_group)//"_clim2",domain,grid_name,init=.TRUE.)                
-            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
             if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
 
         end if 
@@ -348,7 +346,7 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,trim(nml_group)//"_clim3",domain,grid_name,init=.TRUE.)
-            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,snp%par%f_stdev,snp%par%south,basins)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
             if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
 
         end if 
@@ -386,14 +384,13 @@ contains
 
     end subroutine snapclim_init
 
-    subroutine snapclim_update(snp,z_srf,time,dTa,dTo,dSo,dx,basins)
+    subroutine snapclim_update(snp,z_srf,time,dTa,dTo,dSo,dx)
 
         implicit none 
 
         type(snapclim_class), intent(INOUT) :: snp
         real(wp), intent(IN)    :: z_srf(:,:) 
         real(wp), intent(IN)    :: time    ! Current simulation year
-        real(wp), intent(IN)    :: basins(:,:)
         real(wp), intent(IN), optional :: dTa   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dTo   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dSo   ! For atm_type='anom'
@@ -600,7 +597,7 @@ contains
 
                 ! Load reconstruction fields of tas and pr for the current time 
                 call read_climate_snapshot_reconstruction(snp%clim1,snp%recon,snp%clim0%z_srf, &
-                                                                    snp%par%lapse,snp%par%f_p,snp%par%f_p_ne,time,snp%par%south,basins) 
+                                                                    snp%par%lapse,snp%par%f_p,time,snp%par%south) 
 
                 ! We  have loaded dT and pr/pr_0 fields, apply to reference climate  
                 ! to get current climate snapshot 
@@ -1149,7 +1146,7 @@ contains
 
     end subroutine calc_salinity_anom
 
-    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,f_p_ne,time,south,basins)
+    subroutine read_climate_snapshot_reconstruction(clim,par,z_srf,lapse,f_p,time,south)
         ! Given a predefined climate snapshot clim (already allocated),
         ! repopulate it with new snapshot based on current time 
 
@@ -1160,10 +1157,8 @@ contains
         real(wp),       intent(IN) :: z_srf(:,:) 
         real(wp),       intent(IN) :: lapse(2) 
         real(wp),       intent(IN) :: f_p 
-        real(wp),       intent(IN) :: f_p_ne
         real(wp),       intent(IN) :: time 
         logical,        intent(IN) :: south     ! southern hemisphere
-        real(wp),       intent(IN) :: basins(:,:)
 
         ! Local variables 
         integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j   
@@ -1190,7 +1185,6 @@ contains
 
         ! Define beta_p from f_p
         clim%beta_p = f_p    
-        where(basins .eq. 2.0 .or. basins .eq. 9.0) clim%beta_p = f_p * f_p_ne    
 
         ! Determine the indices of reconstruction time slices 
         ! bracketing the current time 
@@ -1556,7 +1550,6 @@ contains
         call nml_read(filename,nml_group,"dSo_const",          par%dSo_const,      init=init_pars)
         call nml_read(filename,nml_group,"f_to",               par%f_to,           init=init_pars)
         call nml_read(filename,nml_group,"f_p",                par%f_p,            init=init_pars)
-        !call nml_read(filename,nml_group,"f_p_ne",             par%f_p_ne,         init=init_pars)
         call nml_read(filename,nml_group,"f_stdev",            par%f_stdev,        init=init_pars)
         
         call nml_read(filename,trim(nml_group)//"_hybrid","hybrid_path", hpar%hybrid_path,  init=init_pars)
@@ -1565,11 +1558,6 @@ contains
         call nml_read(filename,trim(nml_group)//"_hybrid","f_hol",       hpar%f_hol,        init=init_pars)
         call nml_read(filename,trim(nml_group)//"_hybrid","f_seas",      hpar%f_seas,       init=init_pars)
         call nml_read(filename,trim(nml_group)//"_hybrid","f_to",        hpar%f_to,         init=init_pars)
-        
-        ! For now, impose the value of f_p_ne=1.0 to use the unmodified value of f_p everywhere
-        ! ajr: note that this parameter is domain specific (to Greenland). 
-        ! Code should be adjusted to allow for variable f_p, but in a general way...
-        par%f_p_ne = 1.0_wp 
 
         return 
 
@@ -1675,7 +1663,7 @@ contains
 
     end subroutine snapshot_par_load
 
-    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_p_ne,f_stdev,south,basins)
+    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_stdev,south)
         ! `names` is a vector of names in the netcdf file that 
         ! correspond to the fields to be read in:
         ! (1) 2D elevation field
@@ -1689,10 +1677,8 @@ contains
         integer,          intent(IN) :: nx, ny  
         real(wp),       intent(IN) :: lapse(2)
         real(wp),       intent(IN) :: f_p 
-        real(wp),       intent(IN) :: f_p_ne
         real(wp),       intent(IN) :: f_stdev
         logical,        intent(IN) :: south     ! southern hemisphere
-        real(wp),       intent(IN) :: basins(:,:)       
   
         ! Local variables
         real(wp) :: lapse_mon(12)   
@@ -1742,7 +1728,6 @@ contains
 
             ! Define beta_p
             clim%beta_p = f_p
-            where(basins .eq. 2.1 .or. basins .eq. 2.2 .or. basins .eq. 9.0) clim%beta_p = f_p * f_p_ne
 
             if (clim%par%clim_monthly) then 
                 ! Read in monthly climate fields, then get the averages

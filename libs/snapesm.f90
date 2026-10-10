@@ -152,7 +152,7 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, basins, south, group)
+    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, south, group)
         ! Mirrors snapclim_init, plus `time` (required to initialize the tsgen indices,
         ! which anchor ramp-type series to their start time).
         implicit none
@@ -162,7 +162,6 @@ contains
         character(len=*),      intent(IN)    :: grid_name
         integer,               intent(IN)    :: nx, ny
         real(wp),              intent(IN)    :: time
-        real(wp),              intent(IN)    :: basins(:,:)
         logical,               intent(IN)    :: south     ! southern hemisphere
         character(len=*),      intent(IN), optional :: group
 
@@ -185,12 +184,12 @@ contains
         end do
 
         ! Load the snapshot fields (varslice), reduce them, and set the reference state.
-        call snapesm_load_snapshots(sc, filename, time, basins)
+        call snapesm_load_snapshots(sc, filename, time)
 
         return
     end subroutine snapesm_init
 
-    subroutine snapesm_update(sc, z_srf, time, dTa, dTo, dSo, dx, basins)
+    subroutine snapesm_update(sc, z_srf, time, dTa, dTo, dSo, dx)
         ! Mirrors snapclim_update. Pipeline: advance indices -> refresh loads ->
         ! combine -> transform -> derive.
         implicit none
@@ -198,7 +197,6 @@ contains
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(wp),              intent(IN)    :: time
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
-        real(wp),              intent(IN)    :: basins(:,:)
 
         real(wp), allocatable :: ta_ann_lag(:,:)
 
@@ -822,7 +820,7 @@ contains
         return
     end subroutine read_snapshot_spec
 
-    subroutine snapesm_load_snapshots(sc, filename, time, basins)
+    subroutine snapesm_load_snapshots(sc, filename, time)
         ! For each snapshot and each enabled field, read the varslice group reference(s)
         ! from the state group &<group>_<snapshot> (key = field name; 1 group = already
         ! monthly, 2 groups = [ann, sum] synthesized later), load them from the var_defs
@@ -831,7 +829,6 @@ contains
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         real(wp),              intent(IN)    :: time
-        real(wp),              intent(IN)    :: basins(:,:)
 
         integer            :: s, f, k, nsrc
         character(len=64)  :: refs(2)

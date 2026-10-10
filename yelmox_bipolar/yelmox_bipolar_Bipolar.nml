@@ -419,7 +419,13 @@
 /
 
 &yelmo_masks_south
-    ! regions and basins come from the hub ([domain_south])
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "Zwally2012"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "~zone:open_ocean"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "all"
 /
 
 &yelmo_init_topo_south
@@ -633,11 +639,18 @@
     restart         = "none"        ! Load fields from a restart file?
     extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
                                     ! Useful to account for moving ice fronts and/or filling mv in datasets
+    basins          = "Zwally2012"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "region:Antarctica & zone:shelf_break_buffer"  ! pico: bmb averaged with c_deep there
+    corr_method     = "tf"  ! none, tf or bmb: corrections by region
+    corr_names      = "ronne" "ross" "pine" "abbott"
+    corr_values     = 0.3 0.3 -1.5 0.0
+    corr_ronne = "Zwally2012:1"
+    corr_ross = "Zwally2012:12"
+    corr_pine = "Zwally2012:14"
+    corr_abbott = "Zwally2012:15"
     
-    corr_method     = "tf-ant"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number    = 1             ! 1 2 3
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
     tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped snapclim forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
@@ -675,13 +688,6 @@
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
     
-/
-
-&tf_corr_ant
-    ronne   =  0.3                  ! [K] tf_corr for ronne basin (basin=1)
-    ross    =  0.3                  ! [K] tf_corr for ronne ross  (basin=12)
-    pine    = -1.5                  ! [K] tf_corr for ronne pine  (basin=14)
-    abbott  =  0.0                  ! [K] tf_corr for Abbott glacier (basin=15)
 /
 
 &pico_south
@@ -784,8 +790,8 @@
 /
 
 &domain_south
-    ! Domain definition: name, the grid of every component, and the hub's
-    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
     ! A blank component grid takes the default given in brackets.
     name         = "Antarctica"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
@@ -795,22 +801,23 @@
     grid_clim    = "ANT-32KM"         ! reference climate + transient forcing [grid_ice]
     grid_surface = "ANT-32KM"         ! surface mass balance [grid_clim]
     grid_shelf   = "ANT-16KM"         ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
-    regions_var  = "mask"
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
-    basins_var   = "basin"
-    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" ! "" = none (sectors = 1)
-    sectors_var  = "mask_regions"
-    ice_codes_mode = "exclude"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
-    ice_codes    = 2.0               ! codes of regions ("" = none)
-    region_names = "APIS" "WAIS" "EAIS" ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
-    region_mask  = "sectors"         ! code mask of the named regions: regions, basins or sectors
-    region_codes = 3.0 1.0 2.0       ! one code per named region
-    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
-    relax_codes  = ""                ! codes of regions ("" = none)
-    relax_tau    = 0.0               ! [yr] relaxation timescale there
+    basins       = "Zwally2012"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo_south
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+
+&regions_south
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+    masks        = "APIS" "WAIS" "EAIS"
+    mask_APIS    = "region:Antarctic_Peninsula"
+    mask_WAIS    = "region:West_Antarctica"
+    mask_EAIS    = "region:East_Antarctica"
 /
 
 &comps_south
@@ -925,7 +932,13 @@
 /
 
 &yelmo_masks_north
-    ! regions and basins come from the hub ([domain_north])
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "Zwally2012.group"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "region:Greenland & ~zone:open_ocean"
 /
 
 &yelmo_init_topo_north
@@ -1173,11 +1186,14 @@
     restart         = "none"        ! Load fields from a restart file?
     extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
                                     ! Useful to account for moving ice fronts and/or filling mv in datasets
+    basins          = "Zwally2012.group"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "~region:Greenland | zone:open_ocean"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    corr_method     = "none"  ! none, tf or bmb: corrections by region
+    corr_names      = ""
+    corr_values     = 0.0
     
-    corr_method     = "none"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-grl": use values in tf_corr_grl parameter section
-    basin_number    = 1             ! 1 2 3
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
     tf_correction   = False
     tf_path         = "none"
     tf_name         = "dT_nl"
@@ -1215,13 +1231,6 @@
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
     
-/
-
-&tf_corr_grl
-    ne      = 0.0                   ! [K] tf_corr for northeast/negis basin (basin=2)
-    e       = 1.0                   ! [K] tf_corr for eastern basin (basin=3)
-    se      = 1.5                   ! [K] tf_corr for southeast basin (basin=4)
-    w       = 0.0                   ! [K] tf_corr for western basin (basins=[6,7,8])
 /
 
 &sed_north
@@ -1301,8 +1310,8 @@
 /
 
 &domain_north
-    ! Domain definition: name, the grid of every component, and the hub's
-    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
     ! A blank component grid takes the default given in brackets.
     name         = "Greenland"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
@@ -1312,22 +1321,19 @@
     grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
     grid_surface = "GRL-32KM"         ! surface mass balance [grid_clim]
     grid_shelf   = "GRL-32KM"         ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17-v5.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
-    regions_var  = "mask"
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"  ! "" = none (basins = 1)
-    basins_var   = "basin"
-    sectors_path = ""                ! "" = none (sectors = 1)
-    sectors_var  = ""
-    ice_codes_mode = "include"       ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
-    ice_codes    = 1.3 1.11 1.0      ! codes of regions ("" = none)
-    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
-    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
-    region_codes = ""                ! one code per named region
-    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
-    relax_codes  = ""                ! codes of regions ("" = none)
-    relax_tau    = 0.0               ! [yr] relaxation timescale there
+    basins       = "Zwally2012.group"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo_north
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+
+&regions_north
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
 /
 
 &comps_north

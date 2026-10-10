@@ -56,8 +56,8 @@
 /
 
 &domain
-    ! Domain definition: name, the grid of every component, and the hub's
-    ! topography and code masks ({grid_name} in the paths = grid_hub).
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
     ! A blank component grid takes the default given in brackets.
     name         = "Pyrenees"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
@@ -67,24 +67,17 @@
     grid_clim    = "PYR-1KM"          ! reference climate + transient forcing [grid_ice]
     grid_surface = "PYR-1KM"          ! surface mass balance [grid_clim]
     grid_shelf   = "PYR-1KM"          ! marine shelf [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" ""  ! z_bed, H_ice, z_srf, z_bed_sd ("" = none)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"  ! "" = none (regions = 1)
-    regions_var  = "mask"
-    ! No basins field for this domain (basins are consumed only by marine_shelf,
-    ! which is off here); no file, so basins default to 1.0.
-    basins_path  = ""                 ! "" = none (basins = 1)
-    basins_var   = "basin"
-    sectors_path = ""                ! "" = none (sectors = 1)
-    sectors_var  = ""
-    ice_codes_mode = "all"           ! where ice is allowed: "all", "include" (only on ice_codes), "exclude" (all but ice_codes)
-    ice_codes    = ""                ! codes of regions ("" = none)
-    region_names = ""                ! named regions for 1D output, yelmo_ts_<name>.nc ("" = none)
-    region_mask  = "regions"         ! code mask of the named regions: regions, basins or sectors
-    region_codes = ""                ! one code per named region
-    relax_codes_mode = "none"        ! where ice relaxes to the reference (ytopo.topo_rel = -1): none, all, include, exclude
-    relax_codes  = ""                ! codes of regions ("" = none)
-    relax_tau    = 0.0               ! [yr] relaxation timescale there
+    basins       = "domain"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
+    vars  = "z_bed" "z_srf" "H_ice"
+    remap = "con"
+/
+
+&regions
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
 /
 
 &tm_1D
@@ -355,7 +348,13 @@
 /
 
 &yelmo_masks
-    ! regions and basins come from the hub ([domain])
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "domain"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "all"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "all"
 /
 
 &yelmo_init_topo
@@ -595,10 +594,13 @@
     find_ocean      = True          ! Find points connected to open ocean
     restart         = "none"        ! Load fields from a restart file?
     extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
-    corr_method     = "tf-grl"      ! "tf", "bmb", "tf-grl" (reads [tf_corr_grl])
-    basin_number    = 1
-    basin_bmb_corr  = 0.0
-    basin_tf_corr   = 0.5
+    basins          = "domain"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "none"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "all"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    corr_method     = "none"  ! none, tf or bmb: corrections by region
+    corr_names      = ""
+    corr_values     = 0.0
     tf_correction   = False
     tf_path         = "none"
     tf_name         = "dT_nl"
@@ -624,13 +626,6 @@
     obs_name        = "bm_eq_reese"
     obs_scale       = 1.0
     obs_lim         = 100.0
-/
-
-&tf_corr_grl
-    ne      = 0.0                   ! [K] tf_corr for basin=2
-    e       = 1.0                   ! [K] tf_corr for basin=3
-    se      = 1.5                   ! [K] tf_corr for basin=4
-    w       = 0.0                   ! [K] tf_corr for basins=[6,7,8]
 /
 
 &sed

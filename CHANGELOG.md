@@ -5,6 +5,21 @@ annotated git tag. Dates are release (tag) dates.
 
 ## [Unreleased]
 
+### Changed
+- **FesmData v2 regions** (needs FesmData v2 data, `ice_data/v2/`): the topography is in
+  `[topo]` and the regions, zones and basins in `[regions]` (fesm-utils `topodata`,
+  `regions`); htopo moved to fesm-utils. Each component makes its own masks from the
+  regions on its grid with selection expressions: Yelmo in `[yelmo_masks]` (where ice is
+  allowed, relaxation, error metrics, basins, named regions), the marine shelf in
+  `[marine_shelf]` (`mask_ocean`, `mask_deep_ocean`, `mask_pico_deep`, `basins`, and the
+  corrections `corr_method`/`corr_names`/`corr_values`/`corr_<name>` replacing `tf-grl`,
+  `tf-ant`, `basin_number`, `basin_*_corr`), the climate in `[esm] basins`, the domain in
+  `[sim] recon_regions` and `[negis] region_*`. Removed from `[domain]`: `topo_*`,
+  `regions_*`, `basins_*`, `sectors_*`, `ice_codes*`, `region_*`, `relax_*`. The
+  `tf-ant` corrections keep the Zwally ids they read before (`Zwally2012:1,12,14,15`),
+  although their labels follow the Reese numbering. Pyrenees and SRG have no v2 data yet.
+- Removed the unused NE precipitation factor of snapclim (`f_p_ne`) and its basin masks.
+
 ### Added
 - chion BESSI in yelmox (`[chion] model = "bessi"`): the host supplies its surface shortwave
   (TOA insolation times `[surface_chion] trans_sw`), constant `wind_speed` and `rel_hum`, the

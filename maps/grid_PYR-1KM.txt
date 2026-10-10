@@ -1,0 +1,14 @@
+gridtype = projection
+gridsize = 115921
+xsize    = 481
+ysize    = 241
+xname    = xc
+xunits   = km
+yname    = yc
+yunits   = km
+xfirst   = 80.0
+xinc     = 1.0
+yfirst   = 4620.0
+yinc     = 1.0
+grid_mapping = crs
+proj_params = "+proj=tmerc +lon_0=3 +lat_0=0 +k=0.9996 +x_0=500000 +y_0=0 +a=6378137 +rf=298.257223563 +units=m"

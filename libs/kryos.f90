@@ -35,7 +35,8 @@ module kryos
     use ice_optimization, only : ice_opt_params, optimize_par_load, relax_params, relax_par_load
     use sediments,    only : sediments_class, sediments_init
     use geothermal,   only : geothermal_class, geothermal_init
-    use htopo,        only : htopo_class, htopo_init, htopo_ice_allowed, htopo_relax_tau
+    use htopo,        only : htopo_class, htopo_init
+    use regions,      only : regions_class, regions_init_nml, regions_select, regions_end
     use coupler,      only : coupler_class, coupler_init, coupler_prime, cpl_remap => remap
 
     implicit none
@@ -70,8 +71,7 @@ module kryos
         real(wp)           :: init_equil_time   = 10.0_wp   ! [yr] equil: equilibration time
         character(len=512) :: recon_path = ""               ! recon*: ice reconstruction file
         character(len=56)  :: recon_var  = ""               ! recon*: its ice-thickness variable
-        real(wp)           :: recon_codes(20)               ! recon: regions where its ice is imposed
-        integer            :: n_recon_codes = 0
+        character(len=1000) :: recon_regions = ""           ! recon: where its ice is imposed (selection expression)
         logical            :: init_marine_H     = .false.   ! impose LGM-like marine ice
         logical            :: init_kill_shelves = .false.   ! no ice where the present-day bed is ocean
         real(wp)           :: init_time_thrm    = 0.0_wp    ! [yr] then equilibrate with topography fixed
@@ -126,9 +126,10 @@ module kryos
         real(wp) :: cf_north  = 1.0_wp
         real(wp) :: cf_south  = 1.0_wp
         real(wp) :: cf_x    = 1.0_wp
-        real(wp) :: basin_centre = 9.1_wp   ! basin codes of the NEGIS parts
-        real(wp) :: basin_south  = 9.2_wp
-        real(wp) :: basin_north  = 9.3_wp
+        ! The NEGIS parts (selection expressions of the regions), and their
+        ! masks on the Yelmo grid
+        character(len=1000) :: region_centre = "", region_south = "", region_north = ""
+        logical, allocatable :: mask_centre(:,:), mask_south(:,:), mask_north(:,:)
     end type negis_params
 
     ! Glacial smb scaling parameters: negative smb above lat_lim is reduced by
@@ -166,6 +167,7 @@ module kryos
         type(negis_params)     :: ngs     ! NEGIS cb_ref modification
         type(glacial_smb_params) :: gsmb  ! glacial smb scaling
         type(domain_ctl)       :: ctl
+        logical, allocatable   :: mask_recon(:,:)   ! recon: where its ice is imposed (Yelmo grid)
     end type kryos_domain
 
     public :: MAP_FLDR
@@ -182,6 +184,20 @@ module kryos
     end interface remap
 
 contains
+
+    subroutine domain_regions_load(reg, dom, path_par, sfx, grid)
+        ! The domain's regions ([regions<sfx>], the files of the hub grid) on a
+        ! component grid: remapped by nearest neighbour if it is another grid.
+        ! The component makes its own masks from them at its init.
+        type(regions_class), intent(out) :: reg
+        type(kryos_domain),  intent(in)  :: dom
+        character(len=*),    intent(in)  :: path_par, sfx
+        type(grid_class),    intent(in)  :: grid
+
+        call regions_init_nml(reg, path_par, "regions"//trim(sfx), domain=trim(dom%ctl%domain), &
+                              grid_name=trim(dom%ctl%grid_hub), grid=grid, verbose=.false.)
+
+    end subroutine domain_regions_load
 
     function cadence_due(time, dt) result(due)
         ! Cadence predicate: true when `time` falls on the dt grid (0.01-yr
@@ -224,9 +240,7 @@ contains
         character(len=64)     :: sfx
         type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_s, ny_s
-        real(wp), allocatable :: regions_m(:,:), basins_m(:,:), basins_c(:,:)
-        real(wp), allocatable :: regions_y(:,:), basins_y(:,:)
-        integer,  allocatable :: mask_ice_y(:,:)
+        type(regions_class)   :: reg_y, reg_c, reg_m
         real(wp), allocatable :: xs(:), ys(:), lats_s(:,:), Href_s(:,:)
         type(ytopo_input_class) :: topo_y
 
@@ -243,8 +257,9 @@ contains
         ! --- physical constants of the domain, handed to every component ---
         call phys_const_load(dom%cnst, PHYS_CONST_FILE, group=trim(dom%ctl%phys_const))
 
-        ! --- hi-res geometry hub (topography + masks from [domain]) + coupler ---
-        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), domain, dom%ctl%grid_hub, dom%cnst)
+        ! --- hi-res geometry hub (topography [topo] + regions [regions]) + coupler ---
+        call htopo_init(dom%topo, path_par, "domain"//trim(sfx), "topo"//trim(sfx), "regions"//trim(sfx), &
+                        domain, dom%ctl%grid_hub, dom%cnst)
 
         ! Grids resolve from maps/grid_<name>.txt; prime the Yelmo<->hub maps.
         call coupler_init(dom%cpl)
@@ -252,32 +267,37 @@ contains
         call prime_map(dom, dom%ctl%grid_hub, dom%ctl%grid_ice, "con")    ! hub -> Yelmo
         call prime_map(dom, dom%ctl%grid_hub, dom%ctl%grid_ice, "nn")     ! hub -> Yelmo (masks)
 
-        ! --- ice sheet on grid_ice, with the hub's topography and masks ---
+        ! --- ice sheet on grid_ice, with the hub's topography and the regions ---
         ! The hub topography is both Yelmo's initial state and its present-day
-        ! reference (H_ice_ref, z_bed_ref, optimization target). The code masks
-        ! come from the hub too, and the domain says where ice is allowed
-        ! (Yelmo's mask_border then sets the border).
+        ! reference (H_ice_ref, z_bed_ref, optimization target). Each component
+        ! gets the regions ([regions], the files of the hub grid) on its own grid
+        ! and makes its masks from them ([yelmo_masks]: where ice is allowed,
+        ! relaxation, basins; Yelmo's mask_border then sets the border).
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         call yelmo_init_grid(dom%yelmo%grd, grid_y)
 
-        call remap(dom, dom%topo%z_bed_ref, dom%ctl%grid_hub, topo_y%z_bed,   dom%ctl%grid_ice, "con")
-        call remap(dom, dom%topo%H_ice_ref, dom%ctl%grid_hub, topo_y%H_ice,   dom%ctl%grid_ice, "con")
-        call remap(dom, dom%topo%z_srf_ref, dom%ctl%grid_hub, topo_y%z_srf,   dom%ctl%grid_ice, "con")
-        call remap(dom, dom%topo%z_bed_sd, dom%ctl%grid_hub, topo_y%z_bed_sd, dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%ref%z_bed,    dom%ctl%grid_hub, topo_y%z_bed,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%ref%H_ice,    dom%ctl%grid_hub, topo_y%H_ice,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%ref%z_srf,    dom%ctl%grid_hub, topo_y%z_srf,    dom%ctl%grid_ice, "con")
+        call remap(dom, dom%topo%ref%z_bed_sd, dom%ctl%grid_hub, topo_y%z_bed_sd, dom%ctl%grid_ice, "con")
 
-        call remap(dom, dom%topo%regions,  dom%ctl%grid_hub, regions_y,       dom%ctl%grid_ice, "nn")
-        call remap(dom, dom%topo%basins,   dom%ctl%grid_hub, basins_y,        dom%ctl%grid_ice, "nn")
-        allocate(mask_ice_y(size(regions_y,1), size(regions_y,2)))
-        mask_ice_y = MASK_ICE_NONE
-        where (htopo_ice_allowed(dom%topo%par, regions_y)) mask_ice_y = MASK_ICE_DYNAMIC
+        call domain_regions_load(reg_y, dom, path_par, trim(sfx), grid_y)
 
         call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
-                        group="yelmo"//trim(sfx), regions=regions_y, basins=basins_y, &
-                        mask_ice=mask_ice_y, topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
+                        group="yelmo"//trim(sfx), reg=reg_y, &
+                        topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
 
-        ! Where the ice relaxes to the reference (ytopo.topo_rel = -1).
-        dom%yelmo%bnd%tau_relax = htopo_relax_tau(dom%topo%par, regions_y)
+        ! Where the reconstruction's ice is imposed (init_method = recon).
+        if (trim(dom%ctl%init_method) == "recon") then
+            dom%mask_recon = regions_select(reg_y, dom%ctl%recon_regions)
+        end if
+
+        ! NEGIS cb_ref modification: its parameters and the masks of its parts,
+        ! loaded when enabled, so it cannot silently run with defaults.
+        if (dom%ctl%use_negis) call negis_par_load(dom%ngs, path_par, trim(sfx), reg_y)
+
+        call regions_end(reg_y)
 
         ! --- external forcing models (climate/smb/isostasy on the Yelmo grid) ---
         ! Isostasy on its configured grid (grid_isos).
@@ -306,11 +326,12 @@ contains
         ! Hemisphere of the domain (seasons, lapse rates): south when the climate
         ! grid lies mostly south of the equator.
         dom%ctl%south = (sum(grid_c%lat) / size(grid_c%lat) < 0.0_wp)
-        call remap(dom, dom%topo%basins, dom%ctl%grid_hub, basins_c, dom%ctl%grid_clim, "nn")
+        call domain_regions_load(reg_c, dom, path_par, trim(sfx), grid_c)
         call climate_init(dom%cl, dom%ctl%climate, path_par, domain, grid_c, &
-                          time, basins_c, dom%ctl%south, sfx=trim(sfx), &
+                          time, reg_c, dom%ctl%south, sfx=trim(sfx), &
                           timeline_group=trim(tgroup), &
                           smb_direct=(trim(dom%ctl%surface_method) == "climate"))
+        call regions_end(reg_c)
 
         ! --- smb on its configured grid (grid_surface) ---
         ! smbpal reads no grid-specific data; only lats (insolation) is physical.
@@ -351,13 +372,12 @@ contains
         ! Grid spacing in Yelmo dx units, scaled by the resolution ratio.
         dom%ctl%dx_shelf = dom%yelmo%grd%G%dx * (grid_m%G%dx / grid_y%G%dx)
 
-        ! Region/basin masks on the mshlf grid (from the hub).
-        call remap(dom, dom%topo%regions, dom%ctl%grid_hub, regions_m, dom%ctl%grid_shelf, "nn")
-        call remap(dom, dom%topo%basins,  dom%ctl%grid_hub, basins_m,  dom%ctl%grid_shelf, "nn")
+        ! The regions on the mshlf grid.
+        call domain_regions_load(reg_m, dom, path_par, trim(sfx), grid_m)
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
-                           domain, trim(dom%ctl%grid_shelf), regions_m, basins_m, &
-                           cnst=dom%cnst)
+                           domain, trim(dom%ctl%grid_shelf), reg_m, cnst=dom%cnst)
+        call regions_end(reg_m)
 
         ! Relaxation parameters + the par-file ytopo values it restores; no-op
         ! unless [sim] relax. Must follow yelmo_init (ytopo params known).
@@ -367,19 +387,20 @@ contains
         ! [sim] opt. Must follow yelmo_init (grid + till params known).
         call domain_opt_init(dom, path_par, trim(sfx))
 
-        ! NEGIS cb_ref modification and glacial smb scaling: load their groups
-        ! when enabled, so they cannot silently run with default parameters.
-        if (dom%ctl%use_negis)         call negis_par_load(dom%ngs, path_par, trim(sfx))
+        ! Glacial smb scaling: load its group when enabled, so it cannot
+        ! silently run with default parameters.
         if (dom%ctl%scale_glacial_smb) call glacial_smb_par_load(dom%gsmb, path_par, trim(sfx))
 
     end subroutine domain_init
 
-    subroutine negis_par_load(ngs, path_par, suffix)
-        ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]). Only read
-        ! when [sim] use_negis is set.
-        type(negis_params), intent(inout) :: ngs
-        character(len=*),   intent(in)    :: path_par
-        character(len=*),   intent(in)    :: suffix
+    subroutine negis_par_load(ngs, path_par, suffix, reg)
+        ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]) and make the
+        ! masks of its parts from the regions on the Yelmo grid. Only read when
+        ! [sim] use_negis is set.
+        type(negis_params),  intent(inout) :: ngs
+        character(len=*),    intent(in)    :: path_par
+        character(len=*),    intent(in)    :: suffix
+        type(regions_class), intent(in)    :: reg
 
         ngs%use_negis_par = .true.
         call nml_read(path_par, "negis"//trim(suffix), "cf_0",      ngs%cf_0)
@@ -387,9 +408,13 @@ contains
         call nml_read(path_par, "negis"//trim(suffix), "cf_centre", ngs%cf_centre)
         call nml_read(path_par, "negis"//trim(suffix), "cf_north",  ngs%cf_north)
         call nml_read(path_par, "negis"//trim(suffix), "cf_south",  ngs%cf_south)
-        call nml_read(path_par, "negis"//trim(suffix), "basin_centre", ngs%basin_centre)
-        call nml_read(path_par, "negis"//trim(suffix), "basin_south",  ngs%basin_south)
-        call nml_read(path_par, "negis"//trim(suffix), "basin_north",  ngs%basin_north)
+        call nml_read(path_par, "negis"//trim(suffix), "region_centre", ngs%region_centre)
+        call nml_read(path_par, "negis"//trim(suffix), "region_south",  ngs%region_south)
+        call nml_read(path_par, "negis"//trim(suffix), "region_north",  ngs%region_north)
+
+        ngs%mask_centre = regions_select(reg, ngs%region_centre)
+        ngs%mask_south  = regions_select(reg, ngs%region_south)
+        ngs%mask_north  = regions_select(reg, ngs%region_north)
     end subroutine negis_par_load
 
     subroutine glacial_smb_par_load(gsmb, path_par, suffix)
@@ -542,11 +567,9 @@ contains
                 call nml_replace(ctl%recon_path, "{domain}",    trim(ctl%domain))
                 call nml_replace(ctl%recon_path, "{grid_name}", trim(ctl%grid_ice))
                 if (trim(ctl%init_method) == "recon") then
-                    ctl%recon_codes = -9999.0_wp
-                    call nml_read(path_par, gs, "recon_codes", ctl%recon_codes)
-                    ctl%n_recon_codes = count(ctl%recon_codes /= -9999.0_wp)
-                    if (ctl%n_recon_codes == 0) then
-                        write(*,*) "domain_ctl_load:: error: "//trim(gs)//".init_method = recon needs recon_codes."
+                    call nml_read(path_par, gs, "recon_regions", ctl%recon_regions)
+                    if (len_trim(ctl%recon_regions) == 0) then
+                        write(*,*) "domain_ctl_load:: error: "//trim(gs)//".init_method = recon needs recon_regions."
                         stop 1
                     end if
                 end if
