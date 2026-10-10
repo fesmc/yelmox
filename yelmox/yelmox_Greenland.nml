@@ -783,7 +783,19 @@
 &regions
     path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
-    basin_sets   = "Zwally2012"
+    basin_sets   = "Zwally2012" "NEGIS"
+/
+
+&negis
+    ! NEGIS basal friction scaling ([sim] use_negis): cb_ref of each part times its factor
+    cf_0          = 1.0             ! [-] before -11 ka, ramping to cf_1 at 0 ka
+    cf_1          = 1.0
+    cf_centre     = 1.0             ! [-] factor of the centre part
+    cf_south      = 1.0             ! [-] factor of the south part
+    cf_north      = 1.0             ! [-] factor of the north part (paleo ice stream)
+    region_centre = "NEGIS:centre"  ! basin set NEGIS (FesmData; NEGIS-v1: the hand-drawn v1 parts)
+    region_south  = "NEGIS:south"
+    region_north  = "NEGIS:north"
 /
 
 &comps
