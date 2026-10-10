@@ -17,7 +17,7 @@ annotated git tag. Dates are release (tag) dates.
   `[sim] recon_regions` and `[negis] region_*`. Removed from `[domain]`: `topo_*`,
   `regions_*`, `basins_*`, `sectors_*`, `ice_codes*`, `region_*`, `relax_*`. The
   `tf-ant` corrections keep the Zwally ids they read before (`Zwally2012:1,12,14,15`),
-  although their labels follow the Reese numbering. Pyrenees and SRG have no v2 data yet.
+  although their labels follow the Reese numbering.
 - Existing builds need `make clean` once after updating: the `htopo.mod` left in
   `libyelmox/include` by the old yelmox htopo hides the fesm-utils module, and `kryos.f90`
   fails to compile (`'ref' is not a member of the 'htopo_class' structure`).
