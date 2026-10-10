@@ -175,8 +175,8 @@ the domain name and its grid from `[domain]` (`[yelmo]` no longer sets
 `{domain}/{grid_name}` in the paths resolve to `name`/`grid_hub`. The groups are
 those of fesm-utils `topodata` and `regions` (see the fesm-utils docs), which
 also describe the selection expressions used below
-(`"region:Greenland & ~zone:open_ocean"`) and custom basin sets
-(`path_basins_<set>`, `var_basins_<set>`, e.g. the ISMIP7 basins).
+(`"region:Greenland & ~zone:open_ocean"`) and layers of other files
+(`layers`, `path_<layer>`, `var_<layer>`, e.g. the ISMIP7 basins).
 
 The domain loads its physical constants once (`phys_const_load`, the group
 `phys_const` of `input/yelmo_phys_const.nml`) and hands the same record to every

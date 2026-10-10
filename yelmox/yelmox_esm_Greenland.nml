@@ -713,9 +713,9 @@
 
 &regions
     path_regions       = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    basin_sets         = "ismip7"
-    path_basins_ismip7 = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
-    var_basins_ismip7  = "mouginot_basins"
+    layers             = "ismip7"
+    path_ismip7        = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
+    var_ismip7         = "mouginot_basins"
 /
 
 &comps
