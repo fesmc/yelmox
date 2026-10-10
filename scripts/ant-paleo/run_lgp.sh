@@ -16,5 +16,9 @@ if [ ! -d "${restart}" ]; then
     exit 1
 fi
 
-runme -rs -q shared -e yelmox -w 2-00:00:00 -m 10G -n yelmox/yelmox_Antarctica_paleo_lgp.nml -o "${output_path}" \
+# Submits to the queue by default; set runopts to change that (other queues, e.g. on
+# albedo: runopts="-rs -q 48h -w 48:00:00", or -s to stage only).
+runopts="${runopts:--rs -q shared -w 2-00:00:00 -m 10G}"
+
+runme $runopts -e yelmox -n yelmox/yelmox_Antarctica_paleo_lgp.nml -o "${output_path}" \
       -p ctrl.restart="${restart}"

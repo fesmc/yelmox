@@ -40,8 +40,10 @@ PROJ_END=2160                                      # 1pctCO2 end year (140 yr)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
-HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 8"
-HPCOPT_SCEN="-q compute -w 02:00:00 --omp 8"
+# HPCOPT_SPINUP / HPCOPT_SCEN can be set in the environment (other queues, e.g. on
+# albedo: HPCOPT_SPINUP="-q 48h -w 48:00:00 --omp 8").
+HPCOPT_SPINUP="${HPCOPT_SPINUP:--q compute -w 08:00:00 --omp 8}"
+HPCOPT_SCEN="${HPCOPT_SCEN:--q compute -w 02:00:00 --omp 8}"
 
 SPINUP_OUT="$OUTROOT/spinup"
 # The spin-up's final restart bundle. yelmox names it restart-<time/1e3 %.3f>-kyr.

@@ -51,8 +51,8 @@ MODEL="${MODEL:-ipsl}"                             # ipsl | ecearth
 case "$MODEL" in
   ipsl)
     GCM="IPSL-CM6-ESMCO2"; GRID="GRL-8KM"; OUTROOT="output/tipmip_grl_ipsl"
-    HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 8"
-    HPCOPT_SCEN="-q compute -w 02:00:00 --omp 8"
+    HPCOPT_SPINUP="${HPCOPT_SPINUP:--q compute -w 08:00:00 --omp 8}"
+    HPCOPT_SCEN="${HPCOPT_SCEN:--q compute -w 02:00:00 --omp 8}"
     STABS=(
       "esm-up2p0-gwl2p0  109"
       "esm-up2p0-gwl4p0  232"
@@ -60,8 +60,8 @@ case "$MODEL" in
     ;;
   ecearth)
     GCM="EC-Earth3-ESM-1"; GRID="GRL-4KM"; OUTROOT="output/tipmip_grl_ecearth"
-    HPCOPT_SPINUP="-q compute -w 08:00:00 --omp 32"   # GRL-4KM: verify the spin-up fits the queue limit
-    HPCOPT_SCEN="-q compute -w 08:00:00 --omp 16"
+    HPCOPT_SPINUP="${HPCOPT_SPINUP:--q compute -w 08:00:00 --omp 32}"   # GRL-4KM: verify the spin-up fits the queue limit
+    HPCOPT_SCEN="${HPCOPT_SCEN:--q compute -w 08:00:00 --omp 16}"
     STABS=()
     ;;
   *) echo "unknown MODEL='$MODEL' (use: ipsl | ecearth)" >&2; exit 1 ;;
@@ -69,6 +69,8 @@ esac
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
+# HPCOPT_SPINUP / HPCOPT_SCEN can be set in the environment (other queues, e.g. on
+# albedo: HPCOPT_SPINUP="-q 48h -w 48:00:00 --omp 8").
 
 # yelmox names restart bundles restart-<time/1e3 %.3f>-kyr. Absolute paths: the
 # executable runs from inside the run dir, so a repo-root-relative path would not resolve.

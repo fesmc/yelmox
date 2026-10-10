@@ -80,6 +80,9 @@ annotated git tag. Dates are release (tag) dates.
   once per call (once for the whole 100-yr cold-start snowpack equilibration). ANT-8KM
   ISMIP7 10-yr test: 22.5 -> 8.0 min (16 threads). Equal to the serial version to
   single-precision round-off. Daily smbpal output (`file_out_day`) removed.
+- Run scripts (`scripts/ismip7`, `ant-paleo`, `1pctCO2`, `tipmip`, `run_lis_smbsimple.sh`): the
+  queue options are taken from the environment if set (`runopts`, `HPCOPT_SPINUP`/`HPCOPT_SCEN`,
+  `RUNOPT`), so they submit on other machines than Levante (e.g. albedo `-q 48h`).
 - `scripts/check_par_nml.py` follows yelmo's defaults file: it reports keys of yelmo groups
   missing from `input/yelmo_defaults.nml` (what `nml_validate` stops on) and duplicate
   groups/keys, no longer omitted parameters; `--dead` also reports non-yelmo keys that no

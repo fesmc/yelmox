@@ -17,7 +17,7 @@ set -euo pipefail
 # ---- configuration -----------------------------------------------------------
 NML=yelmox/yelmox_LIS.nml                 # LIS namelist (surface_method="smb_simple" default)
 EXE=yelmox                                # runme exe alias -> libyelmox/bin/yelmox.x
-RUNOPT="-rs -q 12h -w 10:00:00"           # SLURM submit; tune queue/walltime
+RUNOPT="${RUNOPT:--rs -q 12h -w 10:00:00}"  # SLURM submit; set RUNOPT to change queue/walltime
 OUTROOT="tmp/lischeck/$(date +%Y-%m-%d)"  # base output dir
 TIME_END=30e3                             # short test length; raise (e.g. 30e3) for production
 RUN_ENSEMBLES="${RUN_ENSEMBLES:-0}"       # set to 1 to also submit the parameter ensembles

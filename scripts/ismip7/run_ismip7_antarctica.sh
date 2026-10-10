@@ -42,11 +42,13 @@ PROJ_END=2300                                      # scenario end year (CE)
 
 # runme submit options. STAGE=1 writes the submit script without submitting.
 if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
+# HPCOPT_SPINUP / HPCOPT_SCEN can be set in the environment (other queues, e.g. on
+# albedo: HPCOPT_SPINUP="-q 48h -w 48:00:00 --omp 8").
 # Walltimes differ hugely: the 20-kyr opt spin-up is the long job (ANT-16KM, 16
 # threads: ~3 model-yr/min at the start, i.e. several days; shared queue, up to 7
 # days); the ~285-yr projection is short.
-HPCOPT_SPINUP="-q shared -w 7-00:00:00 -m 20G --omp 16"
-HPCOPT_SCEN="-q compute -w 08:00:00 --omp 16"
+HPCOPT_SPINUP="${HPCOPT_SPINUP:--q shared -w 7-00:00:00 -m 20G --omp 16}"
+HPCOPT_SCEN="${HPCOPT_SCEN:--q compute -w 08:00:00 --omp 16}"
 
 SPINUP_OUT="$OUTROOT/spinup"
 # The spin-up's final restart bundle. yelmox names it restart-<time/1e3 %.3f>-kyr.

@@ -96,6 +96,10 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
-runme -rs -q shared -w 2-00:00:00 -m 20G -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
+# Submits to the queue by default; set runopts to change that (other queues, e.g. on
+# albedo: runopts="-rs -q 48h -w 48:00:00", or -s to stage only).
+runopts="${runopts:--rs -q shared -w 2-00:00:00 -m 20G}"
+
+runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
       -p "${res_params[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${hyd_params[@]}" \
       "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"
