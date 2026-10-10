@@ -746,7 +746,7 @@
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 
     relax                   = False     ! relax the topography towards the reference ([relax])
-    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
+    opt                     = True      ! optimize cb_ref and tf_corr ([opt])
 
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
