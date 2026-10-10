@@ -29,8 +29,10 @@ annotated git tag. Dates are release (tag) dates.
   on, ISMIP7-like optimization spin-up; TIPMIP stabilisations branch off the ramp's
   restarts (years 109, 232). 1pctCO2 reads the global CMIP fields of `[esm] esm_name`
   (default MPI-ESM1-2-LR) with online remapping (fesm-utils `varslice` `remap`/`grid_src`).
-- `[ghf] convert_ghf_units` (W/m2 -> mW/m2); missing (negative) GHF values are filled
-  from the nearest valid value.
+- The geothermal heat flux (and its error field) is converted to mW/m2 from the `units`
+  attribute of its variable (W/m2 or mW/m2; other units stop the run), so the same par
+  file reads either version of a dataset; missing (negative) GHF values are filled from
+  the nearest valid value.
 - Greenland ISMIP7 setup with the K24 basal hydrology: `yelmox/yelmox_esm_Greenland_k24.nml`
   (`yelmox_esm_Greenland.nml` with `method_transport = 1`, so K24 sets N_eff, and
   `k24_sliding_law = 4`, so K24 takes Yelmo's basal stress and its water source includes
@@ -84,7 +86,7 @@ annotated git tag. Dates are release (tag) dates.
   source reads. Checks `yelmox/*.nml` and `yelmox_bipolar/*.nml` by default.
 - **ISMIP7 geothermal heat flux**: the ObsISMIP7 GHF (W/m2) was never converted and,
   with `obs_err_name` = the GHF itself, clamped to 0.1 mW/m2 everywhere. Fixed
-  (`convert_ghf_units = True`, `obs_err_name = "none"`); ISMIP7 spin-ups must be redone.
+  (units from the file, `obs_err_name = "none"`); ISMIP7 spin-ups must be redone.
 - `[esm]` subglacial discharge is read only if the sgd group's `filename` is not
   `"none"` (Qd = 0), instead of always for Greenland; `[esm] grid_src` removed (unused).
 - `climate_init`/`esm_forcing_init` take the climate `grid_class` instead of its name and size.

@@ -24,7 +24,6 @@ module geothermal
         character(len=56)  :: obs_err_name
         real(wp)           :: f_stdev
         real(wp)           :: ghf_const 
-        logical            :: convert_ghf_units
     end type 
 
     type geothermal_state_class 
@@ -92,11 +91,9 @@ contains
                 write(*,*) "geothermal_init:: missing values filled from the nearest valid value."
             end if
 
-            ! The model needs mW/m2; some datasets (e.g. ISMIP7) are in W/m2.
-            if (gthrm%par%convert_ghf_units) then
-                gthrm%now%ghf = gthrm%now%ghf * 1000.0_wp
-                write(*,*) "geothermal_init:: ghf converted from W/m2 to mW/m2."
-            end if
+            ! The model needs mW/m2; the units attribute of the variable says
+            ! what the file holds (e.g. the ISMIP7 fields are in W/m2).
+            gthrm%now%ghf = gthrm%now%ghf * ghf_to_mW(gthrm%par%obs_path,gthrm%par%obs_name)
 
             ! Also read it ghf error (e.g. standard deviation) if available
 
@@ -106,7 +103,7 @@ contains
                 ! Load stdev field too
 
                 call nc_read(gthrm%par%obs_path,gthrm%par%obs_err_name,gthrm%now%ghf_err)
-                if (gthrm%par%convert_ghf_units) gthrm%now%ghf_err = gthrm%now%ghf_err * 1000.0_wp
+                gthrm%now%ghf_err = gthrm%now%ghf_err * ghf_to_mW(gthrm%par%obs_path,gthrm%par%obs_err_name)
 
                 ! Offset GHF field by desired sigma level
                 gthrm%now%ghf = gthrm%now%ghf + gthrm%par%f_stdev*gthrm%now%ghf_err
@@ -175,6 +172,49 @@ contains
     end subroutine geothermal_end
 
 
+    function ghf_to_mW(filename,varname) result(fac)
+        ! Factor converting the variable varname of filename to mW/m2,
+        ! from its units attribute (W/m2 or mW/m2, in any of the usual
+        ! spellings). Other units stop the model.
+
+        implicit none
+
+        character(len=*), intent(IN) :: filename, varname
+        real(wp) :: fac
+
+        ! Local variables
+        character(len=256) :: units, u
+        integer :: i
+
+        units = ""
+        call nc_read_attr(filename,varname,"units",units)
+
+        ! Normalise the spelling: "mW m**-2", "mW m-2", "mW/m^2" -> "mWm-2", "mW/m2"
+        u = ""
+        do i = 1, len_trim(units)
+            if (index(" *^",units(i:i)) .eq. 0) u = trim(u)//units(i:i)
+        end do
+
+        select case(trim(u))
+            case("mWm-2","mW/m2")
+                fac = 1.0_wp
+            case("Wm-2","W/m2")
+                fac = 1000.0_wp
+                write(*,*) "geothermal_init:: "//trim(varname)//" converted from W/m2 to mW/m2."
+            case DEFAULT
+                write(*,*) "geothermal_init:: Error: units of the geothermal heat flux not recognized."
+                write(*,*) "file:     ", trim(filename)
+                write(*,*) "variable: ", trim(varname)
+                write(*,*) "units:    ", trim(units)
+                write(*,*) "Expected W/m2 or mW/m2 (e.g. 'mW m-2', 'mW m**-2', 'W/m^2')."
+                stop
+        end select
+
+        return
+
+    end function ghf_to_mW
+
+
     subroutine geothermal_par_load(par,filename,domain,grid_name,init,group)
 
         type(geothermal_param_class), intent(OUT) :: par
@@ -203,7 +243,6 @@ contains
         call nml_read(filename,nml_group,"obs_err_name",    par%obs_err_name,   init=init_pars)
         call nml_read(filename,nml_group,"f_stdev",         par%f_stdev,        init=init_pars)
         call nml_read(filename,nml_group,"ghf_const",       par%ghf_const,      init=init_pars)
-        call nml_read(filename,nml_group,"convert_ghf_units", par%convert_ghf_units, init=init_pars)
 
         ! Replace gridding template values from path
         call parse_path(par%obs_path,domain,grid_name)
