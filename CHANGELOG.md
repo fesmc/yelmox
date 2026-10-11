@@ -22,6 +22,11 @@ annotated git tag. Dates are release (tag) dates.
   `libyelmox/include` by the old yelmox htopo hides the fesm-utils module, and `kryos.f90`
   fails to compile (`'ref' is not a member of the 'htopo_class' structure`).
 - Removed the unused NE precipitation factor of snapclim (`f_p_ne`) and its basin masks.
+- Par files: `ytopo.grad_lim_zb = 0.5` (Yelmo default; was 0.05, except SRG 0.5 and
+  Pyrenees 1.0). With 0.05 Yelmo smoothed the bed and ice thickness wherever the bed slope
+  exceeds 5% (initial state and present-day target): ANT-16KM grounded thickness 131 m RMSE
+  from the observations at the start of the ISMIP7 spin-up; with 0.5, 16-24 m (56-59 m after
+  15 kyr, was 141 m). Ice-sheet results change.
 
 ### Added
 - `[comps] dt_isos` [yr]: isostasy update interval (10 in all par files; was every step).
