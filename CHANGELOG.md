@@ -24,6 +24,10 @@ annotated git tag. Dates are release (tag) dates.
 - Removed the unused NE precipitation factor of snapclim (`f_p_ne`) and its basin masks.
 
 ### Added
+- Timing of the time loop: the wall time of each part (output, forcing, relax, optimize,
+  isostasy, coupling, ice sheet, climate, surface, shelf; bipolar also the ocean box model)
+  is printed at the end of a run and written to `timing.txt` at the `tm_1D` cadence
+  (accumulated seconds). Needs fesm-utils with `timer_init`/`timer_write_totals`.
 - chion BESSI in yelmox (`[chion] model = "bessi"`): the host supplies its surface shortwave
   (TOA insolation times `[surface_chion] trans_sw`), constant `wind_speed` and `rel_hum`, the
   air pressure from the surface elevation (barometric, annual-mean air temperature) and the

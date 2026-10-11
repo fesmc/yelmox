@@ -25,6 +25,8 @@ program yelmox
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
+    use timer,          only : timer_class, timer_init, timer_step, &
+                               timer_print_totals, timer_write_totals
 
     implicit none
 
@@ -54,6 +56,14 @@ program yelmox
     ! the kill switch (see libs/kryos_forcing.f90).
     type(tsforcing_class) :: tsf
     real(wp) :: fvar
+
+    ! Wall time of each part of the time loop (fesm-utils timer), accumulated
+    ! over the run: printed at the end, and written to timing.txt (tm_1D cadence).
+    type(timer_class) :: tmr
+    integer, parameter :: tt_output = 1, tt_forcing = 2, tt_relax = 3, tt_optimize = 4, &
+                          tt_isostasy = 5, tt_couple_yelmo = 6, tt_icesheet = 7, &
+                          tt_couple_htopo = 8, tt_climate = 9, tt_surface = 10, tt_shelf = 11
+    logical :: timing_init = .TRUE.   ! timing.txt is created on the first 1D write
 
     ! Parameter file path from the command line (runme passes it per run).
     call yelmo_load_command_line_args(path_par)
@@ -125,6 +135,10 @@ program yelmox
     ! finished (time_end reached, or the kill switch tripped), else the time is
     ! advanced and the domain stepped. The final state and a final restart
     ! bundle are always written.
+    call timer_init(tmr, [character(len=16) :: "output", "forcing", "relax", "optimize", &
+                          "isostasy", "couple_yelmo", "icesheet", "couple_htopo", &
+                          "climate", "surface", "shelf"])
+
     call tstep_print_header(ts)
     do
 
@@ -139,6 +153,9 @@ program yelmox
         if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
             call domain_write_1D(dom, trim(outfldr), ts%time)
             call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
+            call timer_write_totals(tmr, real(ts%time,8), "s", trim(outfldr)//"timing.txt", &
+                                    init=timing_init)
+            timing_init = .FALSE.
         end if
 
         ! CMIP-formatted output ([output] write_cmip, every dt_cmip).
@@ -148,6 +165,8 @@ program yelmox
         if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then
             call run_restart_write(dom, bsl, ts%time, tsf=tsf)
         end if
+
+        call timer_step(tmr, tt_output)
 
         if (ts%is_finished) exit
 
@@ -163,17 +182,27 @@ program yelmox
             fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
             call tsforcing_update(tsf, ts%time, var=fvar)
         end if
+        call timer_step(tmr, tt_forcing)
 
         ! === coupling sequence ===
         call step_relax(dom, ts)          ! topography relaxation (relax)
+        call timer_step(tmr, tt_relax)
         call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
+        call timer_step(tmr, tt_optimize)
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
+        call timer_step(tmr, tt_isostasy)
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+        call timer_step(tmr, tt_couple_yelmo)
         call step_icesheet(dom, ts)       ! yelmo_update
+        call timer_step(tmr, tt_icesheet)
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
+        call timer_step(tmr, tt_couple_htopo)
         call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
+        call timer_step(tmr, tt_climate)
         call step_surface(dom, ts)        ! surface mass balance + temperature
+        call timer_step(tmr, tt_surface)
         call step_shelf(dom, ts)          ! shelf-base melt + temperature
+        call timer_step(tmr, tt_shelf)
 
         ! Forcing-increment restart each |Δf| > restart_every_df (folders
         ! restart-<n>), so a ramp can be branched at fixed forcing levels.
@@ -194,6 +223,9 @@ program yelmox
     write(*,*)
     write(*,*) "yelmox: run complete at time =", ts%time
     write(*,*) "  H_ice max   =", maxval(dom%yelmo%tpo%now%H_ice)
+    write(*,*)
+    write(*,*) "yelmox: wall time of the time loop by component"
+    call timer_print_totals(tmr, "s")
 
     ! Finalize Yelmo (deallocates model state) -- must come after the last
     ! access to dom%yelmo (it deallocates tpo%now%H_ice etc).

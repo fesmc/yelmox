@@ -42,6 +42,8 @@ program yelmox_bipolar
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
     use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
+    use timer,        only : timer_class, timer_init, timer_step, &
+                             timer_print_totals, timer_write_totals
 
     implicit none
 
@@ -62,6 +64,16 @@ program yelmox_bipolar
 
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
     logical             :: do_2D, do_2Dsm, do_1D, do_rst
+
+    ! Wall time of each part of the time loop (fesm-utils timer, both domains
+    ! together), accumulated over the run: printed at the end, and written to
+    ! timing.txt (tm_1D cadence).
+    type(timer_class) :: tmr
+    integer, parameter :: tt_output = 1, tt_forcing = 2, tt_relax = 3, tt_optimize = 4, &
+                          tt_isostasy = 5, tt_obm = 6, tt_couple_yelmo = 7, tt_icesheet = 8, &
+                          tt_couple_htopo = 9, tt_climate = 10, tt_surface = 11, &
+                          tt_obm_exchange = 12, tt_shelf = 13
+    logical :: timing_init = .TRUE.   ! timing.txt is created on the first 1D write
 
     real(wp) :: dtt
 
@@ -121,6 +133,10 @@ program yelmox_bipolar
     ! time (time_init on the first pass), then the loop exits once the run is
     ! finished, else the time is advanced and both domains stepped. The final
     ! state and a final restart bundle are always written.
+    call timer_init(tmr, [character(len=16) :: "output", "forcing", "relax", "optimize", &
+                          "isostasy", "obm", "couple_yelmo", "icesheet", "couple_htopo", &
+                          "climate", "surface", "obm_exchange", "shelf"])
+
     call tstep_print_header(ts)
     do
 
@@ -133,6 +149,10 @@ program yelmox_bipolar
         if (active_north) call write_domain_step(dom_north, outfldr_north)
         if (active_south) call write_domain_step(dom_south, outfldr_south)
         if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
+        if (do_1D) then
+            call timer_write_totals(tmr, real(ts%time,8), "s", "timing.txt", init=timing_init)
+            timing_init = .FALSE.
+        end if
 
         ! Run restart bundle: the shared bsl + obm here, each domain in its
         ! subfolder (write_domain_step).
@@ -143,6 +163,8 @@ program yelmox_bipolar
                     trim(restart_bundle_dir(ts%time))//"/obm_restart.nc", ts%time, "years")
         end if
 
+        call timer_step(tmr, tt_output)
+
         if (ts%is_finished) exit
 
         call tstep_update(ts, dtt)
@@ -150,46 +172,66 @@ program yelmox_bipolar
 
         ! Shared sea level: update once per step, before either domain advances.
         call bsl_update(bsl, ts%time_rel)
+        call timer_step(tmr, tt_forcing)
 
         ! Relaxation + optimization + isostasy (each domain), before the OBM step.
         if (active_north) then
             call step_relax(dom_north, ts)
+            call timer_step(tmr, tt_relax)
             call step_optimize(dom_north, ts)
+            call timer_step(tmr, tt_optimize)
             call step_isostasy(dom_north, ts, bsl)
+            call timer_step(tmr, tt_isostasy)
         end if
         if (active_south) then
             call step_relax(dom_south, ts)
+            call timer_step(tmr, tt_relax)
             call step_optimize(dom_south, ts)
+            call timer_step(tmr, tt_optimize)
             call step_isostasy(dom_south, ts, bsl)
+            call timer_step(tmr, tt_isostasy)
         end if
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
         if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
+        call timer_step(tmr, tt_obm)
 
         ! Ice sheet, hub refresh, climate + surface mass balance (each domain).
         if (active_north) then
             call couple_to_yelmo(dom_north)   ! bedrock now; smb + shelf melt lag one step
+            call timer_step(tmr, tt_couple_yelmo)
             call step_icesheet(dom_north, ts)
+            call timer_step(tmr, tt_icesheet)
             call couple_yelmo_to_htopo(dom_north)
+            call timer_step(tmr, tt_couple_htopo)
             call step_climate(dom_north, ts)
+            call timer_step(tmr, tt_climate)
             call step_surface(dom_north, ts)
+            call timer_step(tmr, tt_surface)
         end if
         if (active_south) then
             call couple_to_yelmo(dom_south)
+            call timer_step(tmr, tt_couple_yelmo)
             call step_icesheet(dom_south, ts)
+            call timer_step(tmr, tt_icesheet)
             call couple_yelmo_to_htopo(dom_south)
+            call timer_step(tmr, tt_couple_htopo)
             call step_climate(dom_south, ts)
+            call timer_step(tmr, tt_climate)
             call step_surface(dom_south, ts)
+            call timer_step(tmr, tt_surface)
         end if
 
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
         ! flux, hysteresis forcing, obm->ism ocean temperature.
         call obm_exchange(oc, obox, dom_north, dom_south, active_north, active_south, &
                           ts%time, ts%time_init, dtt)
+        call timer_step(tmr, tt_obm_exchange)
 
         ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.
         if (active_north) call step_shelf(dom_north, ts)
         if (active_south) call step_shelf(dom_south, ts)
+        call timer_step(tmr, tt_shelf)
     end do
 
     write(*,*)
@@ -198,6 +240,9 @@ program yelmox_bipolar
                                  maxval(dom_north%yelmo%tpo%now%H_ice)
     if (active_south) write(*,*) "  "//trim(dom_south%ctl%domain)//" H_ice max =", &
                                  maxval(dom_south%yelmo%tpo%now%H_ice)
+    write(*,*)
+    write(*,*) "yelmox_bipolar: wall time of the time loop by component"
+    call timer_print_totals(tmr, "s")
 
     if (active_north) call yelmo_end(dom_north%yelmo, time=ts%time)
     if (active_south) call yelmo_end(dom_south%yelmo, time=ts%time)
