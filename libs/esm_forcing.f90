@@ -540,6 +540,8 @@ contains
         integer  :: m, year, step_idx
         real(wp) :: tmp, lapse
         real(wp) :: rand, year_rand
+        real(wp), allocatable :: to_ref(:,:,:), so_ref(:,:,:)   ! the ocean fields, extrapolated
+        real(wp), allocatable :: to_now(:,:,:), so_now(:,:,:)
 
         ! Initialize anomalies
         esm%dts_var = 0.0_wp
@@ -557,8 +559,10 @@ contains
         call varslice_update(esm%to_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
         call varslice_update(esm%so_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1) 
         
-        call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),H_ice,basins,-esm%to_var_ref%z,z_bed)
-        call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),H_ice,basins,-esm%so_var_ref%z,z_bed)
+        to_ref = esm%to_var_ref%var(:,:,:,1)
+        so_ref = esm%so_var_ref%var(:,:,:,1)
+        call ocn_variable_extrapolation(to_ref,H_ice,basins,-esm%to_var_ref%z,z_bed)
+        call ocn_variable_extrapolation(so_ref,H_ice,basins,-esm%so_var_ref%z,z_bed)
 
         ! Obtain reference year climatology
         select case(trim(clim_var))
@@ -604,14 +608,16 @@ contains
                 call varslice_update(esm%so_var,[year_rand],method="extrap",rep=1)
 
                 ! Interpolate ocean data to the interior of ice shelves
-                call ocn_variable_extrapolation(esm%to_var%var(:,:,:,1),H_ice,basins,-esm%to_var%z,z_bed)
-                call ocn_variable_extrapolation(esm%so_var%var(:,:,:,1),H_ice,basins,-esm%so_var%z,z_bed)
+                to_now = esm%to_var%var(:,:,:,1)
+                so_now = esm%so_var%var(:,:,:,1)
+                call ocn_variable_extrapolation(to_now,H_ice,basins,-esm%to_var%z,z_bed)
+                call ocn_variable_extrapolation(so_now,H_ice,basins,-esm%so_var%z,z_bed)
 
                 ! Compute the anomaly at the desired depth level
-                call marshelf_interp_shelf(esm%dto_var,mshlf,esm%to_var%var(:,:,:,1)-esm%to_var_ref%var(:,:,:,1),H_ice, &
+                call marshelf_interp_shelf(esm%dto_var,mshlf,to_now-to_ref,H_ice, &
                                             z_bed,f_grnd,z_sl,-esm%to_var_ref%z)
-                call marshelf_interp_shelf(esm%dso_var,mshlf,esm%so_var%var(:,:,:,1)-esm%so_var_ref%var(:,:,:,1),H_ice, &
-                                            z_bed,f_grnd,z_sl,-esm%so_var_ref%z) 
+                call marshelf_interp_shelf(esm%dso_var,mshlf,so_now-so_ref,H_ice, &
+                                            z_bed,f_grnd,z_sl,-esm%so_var_ref%z)
 
             case DEFAULT
                 ! Assume no variabiliy anomaly (do nothing)
@@ -670,6 +676,7 @@ contains
         integer  :: k, m
         real(wp) :: tmp, anomaly
         character(len=56) :: slice_method
+        real(wp), allocatable :: to_esm_ref(:,:,:), so_esm_ref(:,:,:)   ! the esm reference ocean, extrapolated
 
         ! Get slices for current time
         slice_method = "extrap"
@@ -705,9 +712,11 @@ contains
                     call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                         
                     ! Interpolate ocean data to the interior of ice shelves
+                    to_esm_ref = esm%to_esm_ref%var(:,:,:,1)
+                    so_esm_ref = esm%so_esm_ref%var(:,:,:,1)
                     if (mshlf%par%extrap_shlf) then
-                        call ocn_variable_extrapolation(esm%to_esm_ref%var(:,:,:,1),H_ice,basins,-esm%to_esm_ref%z,z_bed)
-                        call ocn_variable_extrapolation(esm%so_esm_ref%var(:,:,:,1),H_ice,basins,-esm%so_esm_ref%z,z_bed)
+                        call ocn_variable_extrapolation(to_esm_ref,H_ice,basins,-esm%to_esm_ref%z,z_bed)
+                        call ocn_variable_extrapolation(so_esm_ref,H_ice,basins,-esm%so_esm_ref%z,z_bed)
                     end if
 
                     ! === Historical period ===
@@ -731,9 +740,9 @@ contains
                             end if
                         end do
                         ! ===   Oceanic fields   ===
-                        call esm_ocean_anomaly(esm%dto,mshlf,esm%to_hist,esm%to_esm_ref,time, &
+                        call esm_ocean_anomaly(esm%dto,mshlf,esm%to_hist,to_esm_ref,time, &
                                                H_ice,basins,z_bed,f_grnd,z_sl)
-                        call esm_ocean_anomaly(esm%dso,mshlf,esm%so_hist,esm%so_esm_ref,time, &
+                        call esm_ocean_anomaly(esm%dso,mshlf,esm%so_hist,so_esm_ref,time, &
                                                H_ice,basins,z_bed,f_grnd,z_sl)
                         if (esm%with_sgd_hist) then
                             call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
@@ -764,9 +773,9 @@ contains
                         end do    
                         
                         ! ===   Oceanic fields   ===
-                        call esm_ocean_anomaly(esm%dto,mshlf,esm%to_proj,esm%to_esm_ref,time, &
+                        call esm_ocean_anomaly(esm%dto,mshlf,esm%to_proj,to_esm_ref,time, &
                                                H_ice,basins,z_bed,f_grnd,z_sl)
-                        call esm_ocean_anomaly(esm%dso,mshlf,esm%so_proj,esm%so_esm_ref,time, &
+                        call esm_ocean_anomaly(esm%dso,mshlf,esm%so_proj,so_esm_ref,time, &
                                                H_ice,basins,z_bed,f_grnd,z_sl)
                         if (esm%with_sgd_proj) then
                             call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
@@ -873,9 +882,10 @@ contains
     
     end subroutine esm_forcing_update
 
-    subroutine esm_ocean_anomaly(dvar,mshlf,vs,vs_ref,time,H_ice,basins,z_bed,f_grnd,z_sl)
+    subroutine esm_ocean_anomaly(dvar,mshlf,vs,var_ref,time,H_ice,basins,z_bed,f_grnd,z_sl)
         ! Shelf-depth anomaly of a transient ESM ocean field (historical or
-        ! projection) relative to its ESM reference. The field is sliced at the
+        ! projection) relative to its ESM reference (var_ref, on the same levels:
+        ! esm_check_ocean_layout). The field is sliced at the
         ! current time with its declared sub-annual period (varslice_nsub) and
         ! averaged to an annual (x,y,z) field (a single level for depth-less
         ! forcing, e.g. Greenland ISMIP7), optionally extrapolated into the
@@ -886,7 +896,7 @@ contains
         real(wp),             intent(INOUT) :: dvar(:,:)
         type(marshelf_class), intent(IN)    :: mshlf
         type(varslice_class), intent(INOUT) :: vs
-        type(varslice_class), intent(IN)    :: vs_ref
+        real(wp),             intent(IN)    :: var_ref(:,:,:)
         real(wp),             intent(IN)    :: time
         real(wp),             intent(IN)    :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
 
@@ -900,8 +910,8 @@ contains
             call ocn_variable_extrapolation(var_ann,H_ice,basins,-vs%z,z_bed)
         end if
 
-        call marshelf_interp_shelf(dvar,mshlf,var_ann-vs_ref%var(:,:,:,1),H_ice, &
-                                    z_bed,f_grnd,z_sl,-vs_ref%z)
+        call marshelf_interp_shelf(dvar,mshlf,var_ann-var_ref,H_ice, &
+                                    z_bed,f_grnd,z_sl,-vs%z)
 
         return
 

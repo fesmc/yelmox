@@ -27,6 +27,10 @@ annotated git tag. Dates are release (tag) dates.
   exceeds 5% (initial state and present-day target): ANT-16KM grounded thickness 131 m RMSE
   from the observations at the start of the ISMIP7 spin-up; with 0.5, 16-24 m (56-59 m after
   15 kyr, was 141 m). Ice-sheet results change.
+- esm: the ocean fields are extrapolated into the ice-shelf interiors on copies, not in
+  the forcing slices (fesm-utils varslice now reads data without time once). Fixes the
+  repeated extrapolation of slices that were not re-read (ESM reference ocean of the
+  transient runs, variability) with `extrap_shlf = True`; results otherwise unchanged.
 
 ### Added
 - `[comps] dt_isos` [yr]: isostasy update interval (10 in all par files; was every step).

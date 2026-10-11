@@ -603,14 +603,18 @@ contains
         real(wp),         intent(in) :: z_srf_ref(:,:)
         type(marshelf_class), intent(in) :: mshlf
 
+        real(wp), allocatable :: to_ref(:,:,:), so_ref(:,:,:)   ! the reference ocean, extrapolated
+
         associate(esm => cl%esm, ec => cl%esm_ctl, basins => cl%basins)
 
         call esm_clim_update(esm, z_srf, time, ec%time_ref, ec%use_smb, cl%south)
 
         ! Extrapolate the reference ocean into ice-shelf interiors.
+        to_ref = esm%to_ref%var(:,:,:,1)
+        so_ref = esm%so_ref%var(:,:,:,1)
         if (mshlf%par%extrap_shlf) then
-            call ocn_variable_extrapolation(esm%to_ref%var(:,:,:,1), H_ice, basins, -esm%to_ref%z, z_bed)
-            call ocn_variable_extrapolation(esm%so_ref%var(:,:,:,1), H_ice, basins, -esm%so_ref%z, z_bed)
+            call ocn_variable_extrapolation(to_ref, H_ice, basins, -esm%to_ref%z, z_bed)
+            call ocn_variable_extrapolation(so_ref, H_ice, basins, -esm%so_ref%z, z_bed)
         end if
 
         call esm_forcing_update(esm, mshlf, time, ec%use_esm, ec%time_ref, ec%time_hist, &
@@ -652,9 +656,9 @@ contains
             allocate(out%now%T_shlf(size(H_ice,1), size(H_ice,2)))
             allocate(out%now%S_shlf(size(H_ice,1), size(H_ice,2)))
         end if
-        call marshelf_interp_shelf(out%now%T_shlf, mshlf, esm%to_ref%var(:,:,:,1), &
+        call marshelf_interp_shelf(out%now%T_shlf, mshlf, to_ref, &
                                    H_ice, z_bed, f_grnd, z_sl, -esm%to_ref%z)
-        call marshelf_interp_shelf(out%now%S_shlf, mshlf, esm%so_ref%var(:,:,:,1), &
+        call marshelf_interp_shelf(out%now%S_shlf, mshlf, so_ref, &
                                    H_ice, z_bed, f_grnd, z_sl, -esm%so_ref%z)
         out%now%T_shlf  = out%now%T_shlf + esm%dto + esm%dto_var
         out%now%S_shlf  = out%now%S_shlf + esm%dso + esm%dso_var
