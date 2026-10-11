@@ -802,6 +802,7 @@
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
 &sim

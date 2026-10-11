@@ -744,6 +744,7 @@
     climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
+    dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
 &sim

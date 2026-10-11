@@ -58,7 +58,7 @@ the domain once per step with the coupling sequence written out in the time loop
 ```fortran
 call step_relax(dom, ts)          ! topography relaxation (relax)
 call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
-call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
+call step_isostasy(dom, ts, bsl)  ! bedrock + sea level (dt_isos cadence)
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
@@ -71,7 +71,8 @@ call step_shelf(dom, ts)          ! shelf-base melt + temperature
 smb and shelf melt from the **previous** step (a one-step coupling lag);
 `step_climate`, `step_surface` and `step_shelf` then produce the forcing
 consumed on the next step.
-The climate is refreshed on the `comps.dt_clim` cadence; the smb every step.
+The climate is refreshed on the `comps.dt_clim` cadence, isostasy on the
+`comps.dt_isos` cadence (the bedrock is held in between); the smb every step.
 
 ## Transient time-series forcing (`tsgen`)
 
@@ -164,6 +165,7 @@ A minimal skeleton:
     climate         = "snapclim"
     surface_method  = "chion"
     dt_clim         = 10.0
+    dt_isos         = 10.0
 /
 
 &sim
@@ -208,6 +210,7 @@ The components: which are active, with which model, how often.
 | `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
 | `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM or BESSI snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs), smbpal also has PDD (the PDD configurations use it); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
+| `dt_isos` | [yr] | isostasy update interval (> 0; 10 in all par files): FastIsostasy integrates the whole interval in one call, the bedrock is held in between |
 
 ### `[sim]`
 

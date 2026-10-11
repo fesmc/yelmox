@@ -64,6 +64,7 @@ module kryos
         character(len=56) :: climate        = ""         ! climate backend: snapclim | snapesm | esm | rembo
         character(len=56) :: surface_method = "chion"    ! chion | smbpal | smb_simple | climate (from the backend)
         real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
+        real(wp) :: dt_isos     = 10.0_wp   ! [yr] isostasy update interval
 
         ! Simulation conditions ([sim]). Cold-start ice state: init_kill_shelves,
         ! then init_marine_H, then init_method, then init_time_thrm.
@@ -200,7 +201,7 @@ contains
     end subroutine domain_regions_load
 
     function cadence_due(time, dt) result(due)
-        ! Cadence predicate: true when `time` falls on the dt grid (0.01-yr
+        ! Cadence predicate (dt_clim, dt_isos, dt_cmip): true when `time` falls on the dt grid (0.01-yr
         ! precision). dt <= 0 disables the cadence (never due).
         real(wp), intent(in) :: time, dt
         logical :: due
@@ -547,6 +548,12 @@ contains
                 stop 1
         end select
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
+        call nml_read(path_par, gc, "dt_isos",        ctl%dt_isos)
+        if (ctl%with_isostasy .and. ctl%dt_isos <= 0.0_wp) then
+            write(*,*) "domain_ctl_load:: error: "//trim(gc)//".dt_isos must be > 0 &
+                       &(with_isostasy = False switches isostasy off)."
+            stop 1
+        end if
 
         ! Simulation conditions ([sim<suffix>]).
         gs = "sim"//trim(suffix)

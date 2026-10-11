@@ -252,7 +252,7 @@ reallocation cost is negligible against the physics.
 
 - `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
 - `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`).
-- `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`).
+- `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`), on the `dt_isos` cadence.
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
@@ -297,8 +297,8 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
 - **`run_restart_write(dom, bsl, time [, tsf])`** — the single-domain restart
   bundle (domain sub-models + `bsl_restart.nc` + the tsforcing state, one
   auto-named folder).
-- **`cadence_due(time, dt)`** (`kryos`) — the cadence predicate for `dt_clim` and
-  `dt_cmip`; `dt <= 0` disables a cadence. Output and restart bundles follow
+- **`cadence_due(time, dt)`** (`kryos`) — the cadence predicate for `dt_clim`,
+  `dt_isos` and `dt_cmip`; `dt <= 0` disables a cadence. Output and restart bundles follow
   fesm-utils `timeout` schedules (`[tm_1D]`, `[tm_2D]`, `[tm_2Dsm]`, `[tm_rst]`);
   a restart bundle is always written at `time_end`.
 

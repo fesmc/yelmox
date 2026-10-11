@@ -37,6 +37,8 @@ projection periods, optional climate variability and subglacial discharge.
   elevation gradient); `"chion"` (the default) or `"smbpal"` computes it from the
   ESM temperature and precipitation.
 - **Update cadence.** `[comps] dt_clim = 1.0`: the forcing is updated every step.
+  The spin-up scripts pass `comps.dt_clim=10`: the forcing of a spin-up is a fixed
+  climatology, so only the geometry correction changes between updates.
 - **Cold start.** `[sim] init_kill_shelves` (no ice where the present-day bed is
   ocean) and `init_time_thrm` (equilibration with topography fixed), shared with
   the other configurations.

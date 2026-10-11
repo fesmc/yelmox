@@ -24,6 +24,13 @@ annotated git tag. Dates are release (tag) dates.
 - Removed the unused NE precipitation factor of snapclim (`f_p_ne`) and its basin masks.
 
 ### Added
+- `[comps] dt_isos` [yr]: isostasy update interval (10 in all par files; was every step).
+  FastIsostasy integrates the interval in one call; the bedrock is held in between. Its
+  yearly `tsit54` step was ~37% of the ANT-16KM ISMIP7 spin-up wall time (11% at 8KM).
+  Results change slightly.
+- ESM spin-up scripts (`scripts/ismip7`, `1pctCO2`, `tipmip`) pass `comps.dt_clim=10`
+  (the forcing is a fixed climatology; ~12% of the ANT-16KM spin-up wall time at 1 yr);
+  transient runs keep `dt_clim = 1`.
 - Timing of the time loop: the wall time of each part (output, forcing, relax, optimize,
   isostasy, coupling, ice sheet, climate, surface, shelf; bipolar also the ocean box model)
   is printed at the end of a run and written to `timing.txt` at the `tm_1D` cadence

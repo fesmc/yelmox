@@ -10,6 +10,7 @@ ctrl_params=(
     "domain.grid_hub=${resolution}"
     "isos.rheology_file=isostasy_data/earth_structure/yelmo/${resolution}_GIA_HR24.nc"
     "ctrl.run_step=spinup"
+    "comps.dt_clim=10"
     "comps.surface_method=climate"
     "sim.relax=True"
     "sim.opt=True"

@@ -6,6 +6,7 @@ output_path=output/1pctCO2/opt-${resolution}-l21-bedmap3
 ctrl_params=(
     "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
+    "comps.dt_clim=10"
     "comps.surface_method=smbpal"
     "sim.relax=True"
     "sim.opt=True"

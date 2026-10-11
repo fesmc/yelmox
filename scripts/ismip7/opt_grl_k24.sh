@@ -12,6 +12,7 @@ output_path=output/ismip7/${resolution}/opt-l21-grimp-k24
 ctrl_params=(
     "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
+    "comps.dt_clim=10"
     "comps.surface_method=climate"
     "sim.relax=True"
     "sim.opt=True"

@@ -104,7 +104,9 @@ contains
     end subroutine step_optimize
 
     subroutine step_isostasy(dom, ts, bsl)
-        ! Run isostasy on its own grid: ice load from Yelmo (bilin). The bedrock /
+        ! Run isostasy on its own grid, on the dt_isos cadence (FastIsostasy
+        ! integrates the whole interval; the bedrock is held in between): ice load
+        ! from Yelmo (bilin). The bedrock /
         ! sea-surface outputs stay on grid_isos (in dom%isos%out); they are landed
         ! on the Yelmo grid by couple_isostasy_to_yelmo (in step_icesheet, before
         ! yelmo_update). Assumes grid_isos is at least as fine as grid_ice
@@ -121,6 +123,7 @@ contains
         character(len=32)  :: mth_load
 
         if (.not. dom%ctl%with_isostasy) return
+        if (.not. cadence_due(ts%time_elapsed, dom%ctl%dt_isos)) return
 
         gi = trim(dom%ctl%grid_isos)
         gy = trim(dom%ctl%grid_ice)

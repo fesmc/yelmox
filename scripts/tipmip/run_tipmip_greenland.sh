@@ -89,7 +89,7 @@ done
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup sim.relax=True sim.opt=True \
+      -p ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True \
          esm.experiment=ctrl esm.esm_name="$GCM" \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
