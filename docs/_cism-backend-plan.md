@@ -333,6 +333,73 @@ main@869eed8c (the mediator), and local CISM `libglad/`.
   and a single shared communicator.
 - **Not verified:** CISM's own OpenMP coverage; how CTSM consumes glc fields.
 
-### Additional open decision
+## Decision 6: glissade wrapper vs GLAD (2026-10-11)
 
-6. **CISM wrapper:** our own glissade wrapper, or extend glad upstream?
+Decided: a glissade wrapper now, shaped like GLAD, with an upstream GLAD
+extension as the long-term target.
+
+### Background
+
+- "Dycore" = glissade, the full thermomechanical model. One
+  `glissade_tstep(model, time)` call runs isostasy, the thermal solve,
+  basal and sub-shelf melt, transport, calving and the diagnostic velocity
+  solve. GLAD adds no physics; it calls the same `glissade_tstep`
+  (`glad_timestep.F90`).
+- GLAD does not provide the parallelism. That lives in CISM's
+  `parallel_mpi`; GLAD only does owned <-> haloed copies. CESM's distributed
+  coupling is ESMF in CISM-wrapper. Our wrapper would use the same
+  `parallel_*` calls.
+- Using GLAD gives no CESM access. CESM reaches GLAD through CISM-wrapper
+  (NUOPC), and neither yelmox nor CLIMBER-X would gain anything CESM-side.
+
+### What a glissade wrapper loses
+
+- **Upstream maintenance (the main cost).** The CISM developers keep GLAD in
+  step with glissade internals (init order, `model%...` fields). Mitigation:
+  pin the CISM version and add a small regression test.
+- **Code we have to write** (all of GLAD is about 3000 lines, much of it
+  CESM-specific):
+  - output fluxes time-averaged over ice substeps (rofi, rofl, hflx), needed
+    for CLIMBER-X freshwater conservation
+  - output masks and topography (icemask, ice_covered, topo), and restarting
+    those averages
+  - grid queries, multiple-instance handling, thermal forcing from T/S
+- **No shared bug-finding** with CESM users of this code path.
+
+### What GLAD would cost us
+
+- **Missing inputs:** no topg, eus/z_sl, bmb_shlf or Q_geo, which yelmox
+  needs.
+- **Run length:** time is a default (32-bit) integer in hours
+  (`glad_main.F90:617`), so runs overflow after about 245 kyr of simulated
+  time. That blocks the multi-glacial CLIMBER-X runs.
+- **Fixed cadence and calendar:** the mass-balance step is hard-coded to 1 yr
+  (`glad_mbal_coupling.F90:101`) on a 365-day calendar. The ice model must be
+  called at least once per simulated year, and restarts are possible only at
+  those boundaries.
+- **Untested ocean path:** CESM never passes ocean forcing through GLAD.
+- **Hybrid not adopted:** setting the extra fields through the public
+  `params%instances(i)%model` before `glad_gcm` would work, but it relies on
+  internals anyway and keeps the time limits.
+
+### Plan
+
+1. **Contact the CISM developers (Lipscomb group) early** and propose a GLAD
+   extension:
+   - optional topg, eus, bmb_shlf and Q_geo inputs
+   - 64-bit (or real) time
+   - a configurable mass-balance step
+   - the topg/eus halo update and marine-mask recompute after external
+     changes
+
+   The time-integer change must happen upstream in any case.
+2. **Meanwhile, write our own glissade wrapper (plan step 3) shaped like
+   GLAD:**
+   - the same routine split (initialize / initialize_instance / get_grid_* /
+     get_initial_outputs / step / okay_to_restart / end)
+   - the same output-flux and mask conventions
+   - pinned CISM version plus a regression test
+
+   This lets it turn into the upstream extension with little rework.
+3. **If the upstream extension lands,** switch the CISM backend to GLAD and
+   drop our duplicated code.
