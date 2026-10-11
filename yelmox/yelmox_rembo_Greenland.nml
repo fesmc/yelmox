@@ -176,12 +176,6 @@
 
 /
 
-&ice_enh
-    enh_path = "input/alpha_orbital_r2020.dat"
-    enh_glac = 3.0                              ! Glacial enhancement factor 
-    enh_int  = 1.0                              ! Interglacial enhancement factor 
-/
-
 ! ===== Solid earth =====
 
 &isos

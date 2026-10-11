@@ -994,12 +994,6 @@
     basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 /
 
-&ice_enh_north
-    enh_path = "input/alpha_orbital_r2020.dat"
-    enh_glac = 3.0                              ! Glacial enhancement factor 
-    enh_int  = 1.0                              ! Interglacial enhancement factor 
-/
-
 ! ===== Solid earth =====
 
 &isos_north
