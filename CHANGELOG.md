@@ -515,6 +515,8 @@ annotated git tag. Dates are release (tag) dates.
   memory (differing between builds). Results are unchanged.
 
 ### Removed
+- `libs/ismip6.f90` (module `ismip6`, unused since the `yelmox_ismip6` and
+  `yelmox_nahosmip` flavors were retired).
 - `libs/simpleclim.f90` (empty stub) and the unreachable `"const"` branch of
   the LGM-north cold start.
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.

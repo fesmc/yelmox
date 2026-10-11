@@ -18,9 +18,6 @@ $(objdir)/latinhypercube.o: $(libdir)/latinhypercube.f90
 $(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/pico.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/ismip6.o: $(libdir)/ismip6.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
 $(objdir)/esm_forcing.o: $(libdir)/esm_forcing.f90 $(objdir)/marine_shelf.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
@@ -196,7 +193,6 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/hyster.o \
 					    $(objdir)/interp1D.o \
 					    $(objdir)/insolation.o \
-					    $(objdir)/ismip6.o \
 					    $(objdir)/esm_forcing.o \
 					    $(objdir)/marine_shelf.o \
                         $(objdir)/pico_geometry.o \
