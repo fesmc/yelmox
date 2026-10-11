@@ -1,3 +1,5 @@
+! ===== Run setup =====
+
 &ctrl
     ! Shared timeline + restart (driver-owned). Domain components live in [comps], simulation conditions in [sim].
     run_step        = "ctrl"            ! group holding the timeline ("ctrl" = this group)
@@ -10,6 +12,76 @@
     dtt             = 10.0              ! [yr] Main loop timestep
     restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
 /
+
+&comps
+    ! Components: which are active, with which model, how often.
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
+    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
+    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_isos         = 10.0     ! [yr] isostasy update interval
+/
+
+&sim
+    ! Conditions of this simulation: cold-start ice state (init_*),
+    ! relaxation, optimization, regional modifications.
+    init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
+    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+
+    relax                   = False     ! relax the topography towards the reference ([relax])
+    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
+
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
+/
+
+&output
+    write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos    = True
+    write_shelf   = True
+    write_surface = True
+    write_clim    = True
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
+/
+
+&domain
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Greenland"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "GRL-16KM"         ! hi-res geometry hub
+    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_isos    = "GRL-16KM"         ! isostasy [grid_ice]
+    grid_clim    = "GRL-16KM"         ! reference climate + transient forcing [grid_ice]
+    grid_surface = "GRL-16KM"         ! surface mass balance [grid_clim]
+    grid_shelf   = "GRL-16KM"         ! marine shelf [grid_hub]
+    basins       = "Zwally2012.group"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+
+&regions
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+/
+
+! ===== Output timing =====
+
 &tm_1D
     method          = "const"           ! "const", "file", "times"
     dt              = 1.0
@@ -38,6 +110,44 @@
     times           = 0
 /
 
+! ===== Forcing =====
+
+&tsforcing
+    active = False    ! Apply transient tsgen forcing as snapclim anomalies?
+    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
+    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
+    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
+/
+
+&tsgen
+    method     = "const"    ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
+    with_kill  = False      ! stop the run once the response equilibrates at a bound
+    dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
+    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
+    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
+    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
+    df_sign    = 1          ! +1/-1 direction of forcing change
+    tol        = 1.0        ! response-rate tolerance (feedback/kill)
+    df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
+    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
+    f_min      = 0.0        ! [f]   lower forcing bound
+    f_max      = 5.0        ! [f]   upper forcing bound
+    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+/
+
+! ===== Simulation options =====
+
+&relax
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100.0             ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2000.0            ! [yr] End of the tau1 period
+    time2           = 6000.0            ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
+/
+
 &opt
     opt_cf          = "L21"             ! Basal friction optimization: "none", "L21"
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
@@ -63,15 +173,103 @@
     basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 /
 
-&relax
-    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
-    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
-    tau1            = 100.0             ! [yr] Relaxation timescale until time1
-    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
-    time1           = 2000.0            ! [yr] End of the tau1 period
-    time2           = 6000.0            ! [yr] End of the relaxation (then the ytopo values apply)
-    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
+&ice_enh
+    enh_path = "input/alpha_orbital_r2020.dat"
+    enh_glac = 3.0                              ! Glacial enhancement factor 
+    enh_int  = 1.0                              ! Interglacial enhancement factor 
 /
+
+! ===== Solid earth =====
+
+&isos
+    ! Options
+    heterogeneous_ssh = .true.      ! Sea level varies spatially?
+    interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
+    include_elastic = .true.        ! Include elastic deformation?
+    correct_compression = .true.    ! Account for compression effects on relaxation time?
+    correct_distortion = .false.    ! Account for distortion of projection?
+    method          = 2             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
+    dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
+    pad         = 512.              ! [km] Padding around domain (preferably chosen as a power
+                                    ! of 2 multiplied by the resolution)
+
+    ! Rheology methods
+    mantle = "uniform"          ! Choose mantle viscosity field, options:
+                                ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+    lithosphere = "uniform"     ! Choose lithospheric thickness field:
+                                ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+    layering    = "equalized"   ! "parallel" or "equalized"
+    lumping     = "min"         ! "bottom", "min", "max", "mean", "logmean", "freqdomain"
+    viscosity_scaling_method = "none"  ! "scale" or "min" or "max"
+    viscosity_scaling = 1.              ! Only used if viscosity_scaling_method = "scale"
+    
+    ! Rheology parameters
+    nl          = 1             ! [1] Number of viscous layers for sub-lithospheric mantle
+    zl = 88.                    ! [km] Depth of layer boundaries. The first value is overwritten
+                                ! if a lithospheric thickness filed is provided.
+    viscosities = 1.e21         ! [Pa s] Layer viscosities. Only used if
+                                ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
+                                ! viscosity field is provided.
+    ref_viscosity = 1.e21       ! [Pa s] Reference viscosity for scaling
+    tau = 3000.0                ! [yr] Relaxation time used for "method" = 2
+    litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
+
+    ! Physical constants
+    E               = 66.0          ! [GPa] Young modulus
+    nu              = 0.28          ! [-] Poisson ratio
+    rho_litho       = 3200.0        ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
+    r_earth         = 6.378e3       ! [km]  Earth radius, Coulon et al. (2021)
+    m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
+
+    ! Files
+    restart = "None"
+    mask_file = "None"
+    rheology_file = "None"
+
+    ! Time stepping
+    dt_method = "tsit54"    ! Time stepping method, options: "euler", "rk4", "bs32", "tsit54"
+    dt_init = 1.0           ! [yr] Initial time step for time stepping method. If dt_method
+                            ! is "euler" or "rk4", this value is used throughout the simulation.
+                            ! If dt_method is "bs32" or "tsit54", the time step is adapted
+                            ! during the simulation, and this value is only used as an initial guess.
+    dt_min = 1e-10          ! [yr] Minimum dt. Only used if dt_method is "bs32" or "tsit54".
+    dt_max = 10.0           ! [yr] Maximum dt. Only used if dt_method is "bs32" or "tsit54".
+    rtol = 1e-4             ! Relative tol. Only used if dt_method is "bs32" or "tsit54".
+    atol = 1e-2             ! Absolute tol. Only used if dt_method is "bs32" or "tsit54".
+    q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
+/
+
+&barysealevel
+    method      = "fastiso" ! "const": BSL = bsl_init throughout sim
+                            ! "file": BSL = time series provided from sl_path
+                            ! "fastiso": BSL = sum of contributions from fastiso domains
+                            ! "mixed": combine "file" and "fastiso"
+    bsl_init    = 0.0       ! [m] BSL relative to present day
+    sl_path     = "input/sl_deglaciation.dat"   ! Input time series filename
+    sl_name     = "none"    ! Variable name in netcdf file, if relevant
+    A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
+    A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc" ! Path to ocean surface file
+    restart     = "None"    ! Path to restart file
+/
+
+&sed
+    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
+    obs_name  = "z_sed"
+
+/
+
+&ghf
+    use_obs   = False 
+    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M05.nc"
+    obs_name  = "ghf"
+    obs_err_name = "ghf_sigma"
+    f_stdev   = 0.0
+    ghf_const = 50.0           ! [mW/m^2]
+
+/
+
+! ===== Ice sheet (Yelmo) =====
 
 &yelmo
     ! domain, grid_name and the grid come from &domain
@@ -329,7 +527,6 @@
     
 /
 
-
 &yelmo_data 
     ! The present-day topography comes from the hub ([domain])
     pd_tsrf_load      = True 
@@ -349,38 +546,7 @@
 
 /
 
-
-! ===== EXTERNAL LIBRARIES =====
-
-&ice_enh
-    enh_path = "input/alpha_orbital_r2020.dat"
-    enh_glac = 3.0                              ! Glacial enhancement factor 
-    enh_int  = 1.0                              ! Interglacial enhancement factor 
-/
-
-&tsforcing
-    active = False    ! Apply transient tsgen forcing as snapclim anomalies?
-    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
-    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
-    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
-/
-
-&tsgen
-    method     = "const"    ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
-    with_kill  = False      ! stop the run once the response equilibrates at a bound
-    dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
-    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
-    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
-    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
-    df_sign    = 1          ! +1/-1 direction of forcing change
-    tol        = 1.0        ! response-rate tolerance (feedback/kill)
-    df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
-    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
-    f_min      = 0.0        ! [f]   lower forcing bound
-    f_max      = 5.0        ! [f]   upper forcing bound
-    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
-/
+! ===== Climate =====
 
 &snap
     atm_type           = "anom"
@@ -471,6 +637,8 @@
     ocn_monthly     = False
     ocn_time        = -21000
 /
+
+! ===== Surface =====
 
 &smbpal
     const_insol = True
@@ -620,6 +788,8 @@
     nml_itm         = "itm_chion"                    ! ITM parameters (chion's own group)
 /
 
+! ===== Ocean =====
+
 &marine_shelf
     bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
     tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
@@ -674,160 +844,4 @@
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
     
-/
-
-
-&sed
-    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
-    obs_name  = "z_sed"
-
-/
-
-&ghf
-    use_obs   = False 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M05.nc"
-    obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
-    f_stdev   = 0.0
-    ghf_const = 50.0           ! [mW/m^2]
-
-/
-&isos
-    ! Options
-    heterogeneous_ssh = .true.      ! Sea level varies spatially?
-    interactive_sealevel = .true.   ! Sea level interacts with solid Earth deformation?
-    include_elastic = .true.        ! Include elastic deformation?
-    correct_compression = .true.    ! Account for compression effects on relaxation time?
-    correct_distortion = .false.    ! Account for distortion of projection?
-    method          = 2             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
-    dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    pad         = 512.              ! [km] Padding around domain (preferably chosen as a power
-                                    ! of 2 multiplied by the resolution)
-
-    ! Rheology methods
-    mantle = "uniform"          ! Choose mantle viscosity field, options:
-                                ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
-    lithosphere = "uniform"     ! Choose lithospheric thickness field:
-                                ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
-    layering    = "equalized"   ! "parallel" or "equalized"
-    lumping     = "min"         ! "bottom", "min", "max", "mean", "logmean", "freqdomain"
-    viscosity_scaling_method = "none"  ! "scale" or "min" or "max"
-    viscosity_scaling = 1.              ! Only used if viscosity_scaling_method = "scale"
-    
-    ! Rheology parameters
-    nl          = 1             ! [1] Number of viscous layers for sub-lithospheric mantle
-    zl = 88.                    ! [km] Depth of layer boundaries. The first value is overwritten
-                                ! if a lithospheric thickness filed is provided.
-    viscosities = 1.e21         ! [Pa s] Layer viscosities. Only used if
-                                ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
-                                ! viscosity field is provided.
-    ref_viscosity = 1.e21       ! [Pa s] Reference viscosity for scaling
-    tau = 3000.0                ! [yr] Relaxation time used for "method" = 2
-    litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
-
-    ! Physical constants
-    E               = 66.0          ! [GPa] Young modulus
-    nu              = 0.28          ! [-] Poisson ratio
-    rho_litho       = 3200.0        ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
-    r_earth         = 6.378e3       ! [km]  Earth radius, Coulon et al. (2021)
-    m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
-
-    ! Files
-    restart = "None"
-    mask_file = "None"
-    rheology_file = "None"
-
-    ! Time stepping
-    dt_method = "tsit54"    ! Time stepping method, options: "euler", "rk4", "bs32", "tsit54"
-    dt_init = 1.0           ! [yr] Initial time step for time stepping method. If dt_method
-                            ! is "euler" or "rk4", this value is used throughout the simulation.
-                            ! If dt_method is "bs32" or "tsit54", the time step is adapted
-                            ! during the simulation, and this value is only used as an initial guess.
-    dt_min = 1e-10          ! [yr] Minimum dt. Only used if dt_method is "bs32" or "tsit54".
-    dt_max = 10.0           ! [yr] Maximum dt. Only used if dt_method is "bs32" or "tsit54".
-    rtol = 1e-4             ! Relative tol. Only used if dt_method is "bs32" or "tsit54".
-    atol = 1e-2             ! Absolute tol. Only used if dt_method is "bs32" or "tsit54".
-    q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
-/
-
-&barysealevel
-    method      = "fastiso" ! "const": BSL = bsl_init throughout sim
-                            ! "file": BSL = time series provided from sl_path
-                            ! "fastiso": BSL = sum of contributions from fastiso domains
-                            ! "mixed": combine "file" and "fastiso"
-    bsl_init    = 0.0       ! [m] BSL relative to present day
-    sl_path     = "input/sl_deglaciation.dat"   ! Input time series filename
-    sl_name     = "none"    ! Variable name in netcdf file, if relevant
-    A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
-    A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc" ! Path to ocean surface file
-    restart     = "None"    ! Path to restart file
-/
-
-
-&domain
-    ! Domain definition: name, the grid of every component, and the basins
-    ! of the hub output (topography: [topo], regions: [regions]).
-    ! A blank component grid takes the default given in brackets.
-    name         = "Greenland"
-    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "GRL-16KM"         ! hi-res geometry hub
-    grid_ice     = ""                 ! Yelmo [grid_hub]
-    grid_isos    = "GRL-16KM"         ! isostasy [grid_ice]
-    grid_clim    = "GRL-16KM"         ! reference climate + transient forcing [grid_ice]
-    grid_surface = "GRL-16KM"         ! surface mass balance [grid_clim]
-    grid_shelf   = "GRL-16KM"         ! marine shelf [grid_hub]
-    basins       = "Zwally2012.group"  ! basin ids of the hub output: <set>, <set>.group, None or domain
-/
-
-&topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
-    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
-    remap = "con"
-/
-
-&regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
-    basin_sets   = "Zwally2012"
-/
-
-&comps
-    ! Components: which are active, with which model, how often.
-    with_ice_sheet    = True   ! Is the ice sheet active?
-    with_isostasy     = True   ! Is isostasy active?
-    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
-    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
-    with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
-    surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
-    dt_isos         = 10.0     ! [yr] isostasy update interval
-/
-
-&sim
-    ! Conditions of this simulation: cold-start ice state (init_*),
-    ! relaxation, optimization, regional modifications.
-    init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
-    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
-    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
-    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
-
-    relax                   = False     ! relax the topography towards the reference ([relax])
-    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
-
-    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
-    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
-    lim_pd_ice              = False   ! Extra melt outside PD ice extent
-/
-
-&output
-    write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
-    write_isos    = True
-    write_shelf   = True
-    write_surface = True
-    write_clim    = True
-    write_htopo   = True
-    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
-    dt_cmip       = 1.0          ! [yr] its interval
 /
