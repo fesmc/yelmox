@@ -258,7 +258,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="transient">Transient</h2>
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> -130 kyr to +10 kyr, <code>dtt = 5</code> yr, on relative time (<code>tstep_method = "rel"</code>), so that the sea level and the index follow the records. <code>[sim] relax = False</code>, <code>opt = False</code>: <code>cb_ref</code> and <code>tf_corr</code> come from the restart.</li>
-<li><strong>Climate:</strong> <code>[snap] atm_type = "snap_1ind"</code>: the present-day reference plus the PMIP3 LGM – piControl anomaly, scaled by the glacial index <code>input/alpha_combined_125kyr_interp.dat</code> (0 = present day, 1 = LGM; -0.2 in the last interglacial). The ocean anomaly is <code>f_to = 0.25</code> times the mean atmospheric one (<code>ocn_type = "fraction"</code>). Insolation varies in time (<code>[smbpal] const_insol = False</code>).</li>
+<li><strong>Climate:</strong> <code>[snap] atm_type = "snap_1ind"</code>: the present-day reference plus the PMIP3 LGM – piControl anomaly, scaled by the glacial index <code>input/alpha_combined_125kyr_interp.dat</code> (0 = present day, 1 = LGM; -0.2 in the last interglacial). The ocean anomaly is <code>f_to = 0.25</code> times the mean atmospheric one (<code>ocn_type = "fraction"</code>). Insolation varies in time (<code>[surface_chion] const_insol = False</code>, and <code>[smbpal]</code> for smbpal).</li>
 <li><strong>Sea level:</strong> <code>[barysealevel] method = "file"</code>, <code>input/sealevel_rohling_450kyr.dat</code>.</li>
 <li><strong>Ice age:</strong> isochrones with elsa (<code>[ytrc] use_elsa</code>, <code>[elsa_ant_paleo]</code>): one layer every 1 kyr, coupled every 50 yr.</li>
 <li><strong>Output:</strong> 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.</li>
@@ -290,7 +290,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Surface mass balance</td>
-<td>smbpal (<code>[comps] surface_method = "smbpal"</code>)</td>
+<td>chion ITM (<code>[comps] surface_method = "chion"</code>)</td>
 </tr>
 <tr class="even">
 <td>Shelf melt</td>

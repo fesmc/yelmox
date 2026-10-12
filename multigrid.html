@@ -211,7 +211,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#coupler-fesm-utils" id="toc-coupler-fesm-utils" class="nav-link" data-scroll-target="#coupler-fesm-utils">Coupler (fesm-utils)</a></li>
   <li><a href="#the-domain-kryos_domain" id="toc-the-domain-kryos_domain" class="nav-link" data-scroll-target="#the-domain-kryos_domain">The domain (<code>kryos_domain</code>)</a>
   <ul class="collapse">
-  <li><a href="#domain-definition-domain-and-the-hi-res-hub-htopo" id="toc-domain-definition-domain-and-the-hi-res-hub-htopo" class="nav-link" data-scroll-target="#domain-definition-domain-and-the-hi-res-hub-htopo">Domain definition (<code>[domain]</code>) and the hi-res hub (htopo)</a></li>
+  <li><a href="#domain-definition-domain-the-hi-res-hub-htopo-and-the-regions" id="toc-domain-definition-domain-the-hi-res-hub-htopo-and-the-regions" class="nav-link" data-scroll-target="#domain-definition-domain-the-hi-res-hub-htopo-and-the-regions">Domain definition (<code>[domain]</code>), the hi-res hub (htopo) and the regions</a></li>
   <li><a href="#buffers" id="toc-buffers" class="nav-link" data-scroll-target="#buffers">Buffers</a></li>
   </ul></li>
   <li><a href="#coupling-primitives" id="toc-coupling-primitives" class="nav-link" data-scroll-target="#coupling-primitives">Coupling primitives</a>
@@ -265,7 +265,6 @@ yelmox/libs/
   kryos_output.f90      per-module 2D/1D output, CMIP output
   kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
   kryos_forcing.f90     driver-owned transient forcing (tsgen)
-  htopo.f90             the hi-res geometry hub
   yelmox_climate.f90    climate backends behind one interface (climate_out)
         │
         ▼
@@ -306,9 +305,9 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="dt">end type</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The barystatic sea level (<code>bsl</code>) and the transient forcing (<code>tsf</code>) are not part of the domain: they are driver-owned, so a multi-domain driver shares them (or not). Each <code>step_*</code> primitive advances one component on its own grid and is a no-op when that component is inactive (<code>with_*</code>); each <code>couple_*_to_yelmo</code> lands one component’s output on Yelmo’s grid. Two domains (bipolar) carry their own coupler and grids, so they never collide.</p>
 <p>The climate reaches the rest of the domain only through <code>climate_out_class</code> (<code>now</code> and <code>ref</code>): the atmosphere, the ocean as depth profiles or at the shelf base, and, when the backend has them, the surface mass balance and subglacial discharge. Nothing downstream depends on which backend produced them.</p>
-<section id="domain-definition-domain-and-the-hi-res-hub-htopo" class="level3">
-<h3 class="anchored" data-anchor-id="domain-definition-domain-and-the-hi-res-hub-htopo">Domain definition (<code>[domain]</code>) and the hi-res hub (htopo)</h3>
-<p>One <code>[domain]</code> group (<code>[domain_north]</code>/<code>[domain_south]</code> in bipolar) defines the domain: its name, its physical constants, the grid of every component, and the hub’s topography and code masks. Yelmo takes the domain name and its grid from it (<code>[yelmo]</code> no longer sets <code>domain</code>/<code>grid_name</code>). A blank component grid takes its default:</p>
+<section id="domain-definition-domain-the-hi-res-hub-htopo-and-the-regions" class="level3">
+<h3 class="anchored" data-anchor-id="domain-definition-domain-the-hi-res-hub-htopo-and-the-regions">Domain definition (<code>[domain]</code>), the hi-res hub (htopo) and the regions</h3>
+<p>One <code>[domain]</code> group (<code>[domain_north]</code>/<code>[domain_south]</code> in bipolar) defines the domain: its name, its physical constants and the grid of every component. Its topography is in <code>[topo]</code> and its regions, zones and basins in <code>[regions]</code> (<code>[topo_south]</code>, <code>[regions_south]</code>, … in bipolar), all from <a href="https://github.com/fesmc/FesmData">FesmData</a> v2 (<code>ice_data/v2/</code>). Yelmo takes the domain name and its grid from <code>[domain]</code> (<code>[yelmo]</code> no longer sets <code>domain</code>/<code>grid_name</code>). A blank component grid takes its default:</p>
 <pre><code>&amp;domain
     name         = "Antarctica"
     phys_const   = "Earth"      ! physical constants: group of input/yelmo_phys_const.nml
@@ -318,28 +317,35 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
     grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
     grid_surface = ""           ! surface mass balance                 [grid_clim]
     grid_shelf   = ""           ! marine shelf                         [grid_hub]
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    topo_names   = "z_bed" "H_ice" "z_srf" "z_bed_sd"   ! z_bed_sd: "" = none (0)
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"   ! "" = none (1)
-    regions_var  = "mask"
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    basins_var   = "basin"
-    sectors_path = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"   ! "" = none (1)
-    sectors_var  = "mask_regions"
-    ice_codes_mode = "exclude"      ! where ice is allowed: all | include | exclude (ice_codes)
-    ice_codes    = 2.0              ! codes of regions ("" = none)
-    region_names = "APIS" "WAIS" "EAIS"   ! named regions for 1D output ("" = none)
-    region_mask  = "sectors"        ! regions | basins | sectors
-    region_codes = 3.0 1.0 2.0
-    relax_codes_mode = "none"       ! where ice relaxes to the reference: none | all | include | exclude
-    relax_codes  = ""               ! codes of regions ("" = none)
-    relax_tau    = 0.0              ! [yr] relaxation timescale there
+    basins       = "Zwally2012" ! basin ids of the hub output
+/
+&amp;topo
+    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+&amp;regions
+    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+    masks        = "APIS" "WAIS" "EAIS"           ! named regions for 1D output
+    mask_APIS    = "region:Antarctic_Peninsula"
+    mask_WAIS    = "region:West_Antarctica"
+    mask_EAIS    = "region:East_Antarctica"
 /</code></pre>
+<p><code>{domain}/{grid_name}</code> in the paths resolve to <code>name</code>/<code>grid_hub</code>. The groups are those of fesm-utils <code>topodata</code> and <code>regions</code> (see the fesm-utils docs), which also describe the selection expressions used below (<code>"region:Greenland &amp; ~zone:open_ocean"</code>) and layers of other files (<code>layers</code>, <code>path_&lt;layer&gt;</code>, <code>var_&lt;layer&gt;</code>, e.g.&nbsp;the ISMIP7 basins).</p>
 <p>The domain loads its physical constants once (<code>phys_const_load</code>, the group <code>phys_const</code> of <code>input/yelmo_phys_const.nml</code>) and hands the same record to every component: the hub, Yelmo (<code>yelmo_init</code> <code>cnst</code>), isostasy, the marine shelf and <code>smb_simple</code>. Yelmo’s own <code>yelmo.phys_const</code> then only selects its calendar year (<code>sec_year</code>).</p>
-<p><code>htopo</code> holds the hub. It sits <em>above</em> every physics module (including Yelmo): its grid (<code>grid_hub</code>) is the finest resolution in the setup, and it is the reference geometry the coupler remaps <em>from</em>. On the hub grid it holds static fields (the code masks <code>regions</code>/<code>basins</code>/<code>sectors</code> and the bed roughness <code>z_bed_sd</code>, loaded once), the reference geometry <code>z_bed_ref</code>/<code>H_ice_ref</code>/<code>z_srf_ref</code> (loaded once) and the current geometry <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>f_grnd</code>/<code>z_sl</code> (refreshed each step, see below). <code>{domain}/{grid_name}</code> in the paths resolve to <code>name</code>/<code>grid_hub</code>. <code>htopo_init</code> resolves the grid from <code>grid_&lt;name&gt;.txt</code> (the disk grid table) and reads the fields onto it — validated by <code>tests/test_htopo.f90</code> against the real ANT-16KM data. A blank mask path (e.g.&nbsp;paleo domains without mask files) leaves the mask at <code>1.0</code> (single region/basin/sector); a blank <code>z_bed_sd</code> name leaves it at <code>0</code>. Gaps in the topography file (missing values, e.g.&nbsp;outside the coverage of the source dataset) are filled: no ice, the bed from the nearest valid cell, the surface from the bed and the ice thickness (sea level 0), and no bed roughness.</p>
+<p><code>htopo</code> (fesm-utils) holds the hub. It sits <em>above</em> every physics module (including Yelmo): its grid (<code>grid_hub</code>) is the finest resolution in the setup, and it is the reference geometry the coupler remaps <em>from</em>. On the hub grid it holds the reference topography (<code>topo%ref</code>: <code>z_bed</code>, <code>H_ice</code>, <code>z_srf</code>, <code>z_bed_sd</code>), the regions (<code>topo%reg</code>) and the current geometry <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>f_grnd</code>/<code>z_sl</code> (refreshed each step, see below). <code>htopo_init</code> resolves the grid from <code>grid_&lt;name&gt;.txt</code> (the disk grid table). Gaps in the topography (missing values, e.g.&nbsp;outside the coverage of the source dataset) are filled: no ice, the bed from the nearest valid cell, the surface from the bed and the ice thickness (sea level 0).</p>
 <p>Yelmo is populated from the domain like the other components. Its grid comes from <code>maps/grid_&lt;grid_ice&gt;.txt</code> (<code>yelmo_init_grid</code>, <code>grid_def="none"</code>), and the hub’s <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>z_bed_sd</code>, remapped conservatively to <code>grid_ice</code>, are both its initial topography and its present-day reference (<code>yelmo_init</code> <code>topo_init</code>/<code>topo_pd</code>). Yelmo then processes them as it would its own files (<code>[yelmo_init_topo]</code> keeps <code>init_topo_state</code>, <code>z_bed_f_sd</code>, smoothing; its <code>grad_lim_zb</code> applies). Where <code>grid_ice = grid_hub</code> the remap is a copy.</p>
 <p>The hub follows the models each step (<code>couple_yelmo_to_htopo</code>, after Yelmo). On Yelmo’s grid it mirrors Yelmo, fractional grounding included. On a finer hub it keeps its hi-res reference and adds Yelmo’s anomalies, refined bilinearly: the bed displacement <code>z_bed - z_bed_ref</code>, and the change in ice thickness from the hub reference as Yelmo received it (remapped conservatively), clipped at zero thickness. <code>htopo_update</code> then recomputes on the hub the grounding (0 or 1, from flotation) and the surface elevation, with Yelmo’s densities; sea level is refined bilinearly. The hi-res bed and ice therefore reach the marine shelf and the climate’s surface elevation, instead of a refined copy of Yelmo’s fields.</p>
-<p>The code masks reach Yelmo the same way (nearest neighbour): <code>regions</code> and <code>basins</code> are Yelmo’s (<code>yelmo_init</code> <code>regions</code>/<code>basins</code>), and every component uses this one set. Where ice is allowed follows from <code>ice_codes_mode</code> and <code>ice_codes</code> (codes of <code>regions</code>; <code>yelmo_init</code> <code>mask_ice</code>); Yelmo’s <code>mask_border</code> (<code>[yelmo]</code>, default <code>"auto"</code>) then sets the domain border. Where the ice relaxes to the reference follows from <code>relax_codes_mode</code> and <code>relax_codes</code> (codes of <code>regions</code>): Yelmo’s <code>tau_relax</code> is <code>relax_tau</code> there and -1 (free) elsewhere, used with <code>ytopo.topo_rel = -1</code>. The named regions (<code>region_names</code>, one code each of <code>region_mask</code>) get their own 1D output, <code>yelmo_ts_&lt;name&gt;.nc</code>.</p>
+<p>The regions reach every component on its own grid (the files of the hub grid, nearest neighbour), and each component makes its own masks from them once at init, with selection expressions in its own group:</p>
+<ul>
+<li>Yelmo (<code>[yelmo_masks]</code>, <code>yelmo_init</code> <code>reg</code>): where ice is dynamic or fixed (<code>mask_ice_dynamic</code>, <code>mask_ice_fixed</code>; Yelmo’s <code>mask_border</code> then sets the domain border), where it relaxes to the reference (<code>relax</code>, <code>relax_tau</code>, with <code>ytopo.topo_rel = -1</code>), the region of the error metrics (<code>mask_rmse</code>), its basins (<code>basins</code>), and the named regions of <code>[regions]</code> with their own 1D output, <code>yelmo_ts_&lt;name&gt;.nc</code>.</li>
+<li>The marine shelf (<code>[marine_shelf]</code>): the reference ocean mask (<code>mask_ocean</code>, <code>mask_deep_ocean</code>), PICO’s margin (<code>mask_pico_deep</code>), its basins (<code>basins</code>) and the corrections by region (<code>corr_method</code> = none | tf | bmb, <code>corr_names</code>, <code>corr_values</code> and one expression <code>corr_&lt;name&gt;</code> per name).</li>
+<li>The climate (<code>[esm] basins</code>): the basins of the ocean extrapolation.</li>
+<li>The domain: where a reconstruction’s ice is imposed (<code>[sim] recon_regions</code>) and the NEGIS parts (<code>[negis] region_centre/south/north</code>).</li>
+</ul>
+<p>A basin spec is <code>"&lt;set&gt;"</code>, <code>"&lt;set&gt;.group"</code> (e.g.&nbsp;<code>"Zwally2012.group"</code>, the Greenland major systems), <code>"None"</code> (no basins) or <code>"domain"</code> (the whole domain is one basin).</p>
 </section>
 <section id="buffers" class="level3">
 <h3 class="anchored" data-anchor-id="buffers">Buffers</h3>
@@ -352,12 +358,12 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <ul>
 <li><code>step_relax</code> — topography relaxation towards the reference, with a timescale ramp (<code>[sim] relax</code>).</li>
 <li><code>step_optimize</code> — basal-friction / thermal-forcing optimization (<code>[sim] opt</code>).</li>
-<li><code>step_isostasy</code> — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (<code>bsl</code>).</li>
+<li><code>step_isostasy</code> — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (<code>bsl</code>), on the <code>dt_isos</code> cadence.</li>
 <li><code>couple_to_yelmo</code> — assemble the Yelmo boundary state from the component outputs (incl.&nbsp;the climate’s subglacial discharge, when supplied).</li>
 <li><code>step_icesheet</code> — run <code>yelmo_update</code>.</li>
 <li><code>couple_yelmo_to_htopo</code> — the hub’s current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo’s anomalies on a finer hub).</li>
 <li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the transient forcing, on the <code>dt_clim</code> cadence.</li>
-<li><code>step_surface</code> — surface mass balance on <code>grid_surface</code> (<code>surface_method</code>: smbpal, smb_simple, or the climate’s own, <code>climate</code>).</li>
+<li><code>step_surface</code> — surface mass balance on <code>grid_surface</code> (<code>surface_method</code>: chion, smbpal, smb_simple, or the climate’s own, <code>climate</code>).</li>
 <li><code>step_shelf</code> — sub-shelf melt on <code>grid_shelf</code>, from the climate’s ocean as depth profiles or at the shelf base.</li>
 </ul>
 <p>Every driver writes the sequence out in its time loop, so the coupling order can be read directly from the program; <code>yelmox_bipolar</code> interleaves the second domain and the ocean box model there.</p>
@@ -374,7 +380,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <li><strong><code>domain_startup(dom, ts, bsl, restart [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>restart = "None"</code>, <code>domain_init_state</code>) or restore of the domain bundle <code>restart</code> + hub rebuild. The driver reads <code>[ctrl] restart</code>. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, fldr)</code></strong>, passes each domain its subfolder of the bundle and <code>restore_bsl=.false.</code>.</li>
 <li><strong><code>domain_init_ice(dom, ts)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[sim]</code> <code>init_kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>init_time_thrm</code>; see <a href="./yelmox.html#configuration">yelmox</a>).</li>
 <li><strong><code>run_restart_write(dom, bsl, time [, tsf])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + the tsforcing state, one auto-named folder).</li>
-<li><strong><code>cadence_due(time, dt)</code></strong> (<code>kryos</code>) — the cadence predicate for <code>dt_clim</code> and <code>dt_cmip</code>; <code>dt &lt;= 0</code> disables a cadence. Output and restart bundles follow fesm-utils <code>timeout</code> schedules (<code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, <code>[tm_rst]</code>); a restart bundle is always written at <code>time_end</code>.</li>
+<li><strong><code>cadence_due(time, dt)</code></strong> (<code>kryos</code>) — the cadence predicate for <code>dt_clim</code>, <code>dt_isos</code> and <code>dt_cmip</code>; <code>dt &lt;= 0</code> disables a cadence. Output and restart bundles follow fesm-utils <code>timeout</code> schedules (<code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, <code>[tm_rst]</code>); a restart bundle is always written at <code>time_end</code>.</li>
 </ul>
 <p>Every driver loop has the same shape: output and restarts are written at the top of the loop for the current time (<code>time_init</code> on the first pass), then the loop exits if the run is finished (<code>time_end</code>, or a tripped kill switch), else <code>tstep_update</code> advances the time and the domain is stepped with the coupling sequence written out inline. Each output call appears once, and the final state + restart bundle are written on the last pass (<code>timeout_check(...) .or. ts%is_finished</code>).</p>
 <ul>

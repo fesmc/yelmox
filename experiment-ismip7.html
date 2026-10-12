@@ -265,7 +265,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td><code>GRID</code></td>
 <td><code>GRL-8KM</code></td>
-<td><code>ANT-8KM</code></td>
+<td><code>ANT-16KM</code></td>
 <td><code>[domain] grid_hub</code></td>
 </tr>
 <tr class="even">
@@ -301,7 +301,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tbody>
 </table>
 <p>The spin-up passes <code>ctrl.run_step=spinup sim.relax=True sim.opt=True</code>; each scenario passes <code>ctrl.run_step=transient</code>, <code>esm.use_esm/use_hist/use_proj=True</code> and <code>ctrl.restart</code> = the bundle <code>&lt;OUTROOT&gt;/spinup/restart-&lt;SPINUP_YEARS/1e3&gt;-kyr</code> as an absolute path (the run starts inside its own folder).</p>
-<p><strong>Other grids.</strong> The full input set exists for <code>GRL-8KM</code>, <code>GRL-16KM</code> and <code>ANT-8KM</code>, <code>ANT-16KM</code>, <code>ANT-32KM</code> (GRL-4KM lacks the ORAS4 reference ocean). The Antarctic par file reads the Earth structure of ANT-8KM (<code>[isos] rheology_file</code>): with another grid, also pass <code>isos.rheology_file=isostasy_data/earth_structure/yelmo/&lt;GRID&gt;_GIA_HR24.nc</code> (as <code>opt_ant.sh</code> does).</p>
+<p><strong>Other grids.</strong> The full input set exists for <code>GRL-8KM</code>, <code>GRL-16KM</code> and <code>ANT-8KM</code>, <code>ANT-16KM</code>, <code>ANT-32KM</code> (GRL-4KM: inputs present since 2026-10, not yet tested). The Antarctic par file reads the Earth structure of ANT-16KM (<code>[isos] rheology_file</code>): with another grid, also pass <code>isos.rheology_file=isostasy_data/earth_structure/yelmo/&lt;GRID&gt;_GIA_HR24.nc</code> (as <code>opt_ant.sh</code> does).</p>
 <p><strong>Short spin-ups.</strong> The spin-up relaxes the ice thickness towards the observations at first (<code>[relax] tau1/2</code>, until <code>time2</code>: 6 kyr for Greenland). A spin-up that ends before then hands the scenarios ice that the relaxation was holding in place, e.g.&nbsp;thin margin ice under negative SMB, which is then lost within the first years.</p>
 </section>
 <section id="tuned-spin-ups" class="level2">
@@ -328,7 +328,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td>Reference atmosphere</td>
 <td>MAR v3.11 (ERA), 1961–1990 monthly</td>
-<td>RACMO2.3p2 (ERA5), 1985–2014 (<code>time_ref</code>)</td>
+<td>RACMO2.3p2 (ERA5), monthly climatology 1985–2014 (<code>time_ref</code>), FesmData v2 <code>SMB-RACMO2.3p2-1985-2014</code></td>
 </tr>
 <tr class="even">
 <td>Reference ocean</td>
@@ -359,6 +359,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Topography, basins</td>
 <td>ISMIP7 obs v1.3 (GrIMP surface)</td>
 <td>ISMIP7 obs v1.1 (Bedmap3)</td>
+</tr>
+<tr class="even">
+<td>Present-day smb, <code>T_srf</code> (comparison)</td>
+<td>MAR v3.11 (ERA), 1961–1990</td>
+<td>FesmData v2 <code>SMB-RACMO2.3p2-1981-2010</code> (<code>T_srf</code>: skin temperature)</td>
 </tr>
 </tbody>
 </table>
@@ -392,7 +397,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>The shared per-module files (<code>yelmo.nc</code>, <code>yelmo_ts.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>smbpal.nc</code>, <code>htopo.nc</code>; Antarctica also <code>yelmo_ts_APIS/WAIS/EAIS.nc</code>) and the restart bundles <code>restart-&lt;kyr&gt;-kyr/</code>. For ISMIP7 submissions, <code>[output] write_cmip = True</code> writes <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code> every <code>dt_cmip</code>; <code>write_clim = True</code> adds the ESM forcing (<code>esm.nc</code>, <code>esm_ts.nc</code>).</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>yelmo_ts.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>chion.nc</code>, <code>htopo.nc</code>; Antarctica also <code>yelmo_ts_APIS/WAIS/EAIS.nc</code>) and the restart bundles <code>restart-&lt;kyr&gt;-kyr/</code>. For ISMIP7 submissions, <code>[output] write_cmip = True</code> writes <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code> every <code>dt_cmip</code>; <code>write_clim = True</code> adds the ESM forcing (<code>esm.nc</code>, <code>esm_ts.nc</code>).</p>
 
 
 </section>

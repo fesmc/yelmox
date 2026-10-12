@@ -206,23 +206,24 @@ ul.task-list li input[type="checkbox"] {
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
 <ul>
 <li><strong>Run phase and calendar.</strong> <code>[ctrl] run_step</code> names the group holding the timeline (<code>"spinup"</code> or <code>"transient"</code>), with <code>calendar = True</code> and <code>calendar_ref = 2000.0</code>: the timeline is in calendar years. The same group holds the ESM periods (<code>time_ref</code>, <code>time_hist</code>, <code>time_proj</code>, <code>time_esm_ref</code>) and the variability switches (<code>clim_var</code>, <code>clim_seed</code>).</li>
-<li><strong>Experiment.</strong> <code>[esm]</code>: <code>par_file</code> (the ESM data configuration in <code>input/esm/</code>), <code>experiment</code>, <code>esm_name</code>, <code>use_esm</code> / <code>use_var</code> / <code>use_hist</code> / <code>use_proj</code>, and the physical parameters <code>lapse</code>, <code>f_p</code>, <code>f_ocn</code>, <code>f_polar</code>, <code>dT_threshold</code>, <code>grid_src</code>.</li>
-<li><strong>Surface mass balance.</strong> <code>[comps] surface_method = "climate"</code> takes the ESM’s own SMB (reference + anomaly, corrected from the present-day surface with the SMB elevation gradient); <code>"smbpal"</code> computes it from the ESM temperature and precipitation.</li>
-<li><strong>Update cadence.</strong> <code>[comps] dt_clim = 1.0</code>: the forcing is updated every step.</li>
+<li><strong>Experiment.</strong> <code>[esm]</code>: <code>par_file</code> (the ESM data configuration in <code>input/esm/</code>), <code>experiment</code>, <code>esm_name</code>, <code>use_esm</code> / <code>use_var</code> / <code>use_hist</code> / <code>use_proj</code>, and the physical parameters <code>lapse</code>, <code>f_p</code>, <code>f_ocn</code>, <code>f_polar</code>, <code>dT_threshold</code>.</li>
+<li><strong>Forcing on other grids.</strong> A field group of the <code>par_file</code> is normally read on the climate grid. With <code>remap</code> (a kernel: <code>bilinear</code>, <code>shepard</code>, <code>nn</code>, <code>quadrant</code>, <code>con</code>) and <code>grid_src</code> (a name for the file’s grid, e.g.&nbsp;<code>"{gcm}-atm"</code>) it is read on its own grid and remapped online: a regular lon-lat grid from its 1D axes (the map is cached in <code>maps/</code>), or a curvilinear grid (e.g.&nbsp;a tripolar ocean) from the 2D lon/lat named in the variable’s <code>coordinates</code> attribute. The 1pctCO2 configs read the global CMIP fields this way.</li>
+<li><strong>Surface mass balance.</strong> <code>[comps] surface_method = "climate"</code> takes the ESM’s own SMB (reference + anomaly, corrected from the present-day surface with the SMB elevation gradient); <code>"chion"</code> (the default) or <code>"smbpal"</code> computes it from the ESM temperature and precipitation.</li>
+<li><strong>Update cadence.</strong> <code>[comps] dt_clim = 1.0</code>: the forcing is updated every step. The spin-up scripts pass <code>comps.dt_clim=10</code>: the forcing of a spin-up is a fixed climatology, so only the geometry correction changes between updates.</li>
 <li><strong>Cold start.</strong> <code>[sim] init_kill_shelves</code> (no ice where the present-day bed is ocean) and <code>init_time_thrm</code> (equilibration with topography fixed), shared with the other configurations.</li>
 </ul>
 </section>
 <section id="what-the-backend-supplies" class="level2">
 <h2 class="anchored" data-anchor-id="what-the-backend-supplies">What the backend supplies</h2>
 <ul>
-<li>the atmosphere (<code>tas</code>, <code>pr</code>) for smbpal, or the surface mass balance directly;</li>
+<li>the atmosphere (<code>tas</code>, <code>pr</code>) for chion or smbpal, or the surface mass balance directly;</li>
 <li>the ocean <strong>at the shelf base</strong> (<code>T_shlf</code>, <code>S_shlf</code> and their anomalies), interpolated from the reference ocean with the marine-shelf parameters, so <code>step_shelf</code> passes it straight to the marine shelf;</li>
 <li>subglacial discharge <code>Qd</code>, landed on Yelmo by <code>couple_to_yelmo</code>.</li>
 </ul>
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>smbpal.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>esm.nc</code> (the ESM fields on the climate grid) and <code>esm_ts.nc</code> (the forcing averaged over the ice and the floating ice), and, with <code>[output] write_cmip</code> (every <code>dt_cmip</code>), the CMIP-formatted <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code>.</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>chion.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>esm.nc</code> (the ESM fields on the climate grid) and <code>esm_ts.nc</code> (the forcing averaged over the ice and the floating ice), and, with <code>[output] write_cmip</code> (every <code>dt_cmip</code>), the CMIP-formatted <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code>.</p>
 
 
 </section>

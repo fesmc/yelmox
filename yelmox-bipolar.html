@@ -240,12 +240,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="whats-distinct" class="level2">
 <h2 class="anchored" data-anchor-id="whats-distinct">What’s distinct</h2>
 <ul>
-<li><strong>Two <code>kryos_domain</code>s</strong> (<code>dom_north</code>, <code>dom_south</code>), each set up via <code>setup_domain</code> → <code>domain_startup</code>. Either can be individually deactivated (<code>active_north</code> / <code>active_south</code>).</li>
+<li><strong>Two <code>kryos_domain</code>s</strong> (<code>dom_north</code>, <code>dom_south</code>), each set up via <code>setup_domain</code> → <code>domain_startup</code>. Either can be individually deactivated (<code>active_north</code> / <code>active_south</code>); with neither, the ocean box model runs alone (<code>active_obm</code>, the <code>atm2obm</code>/<code>ism2obm</code>/<code>obm2ism</code> couplings off).</li>
 <li><strong>Shared <code>bsl</code></strong> — one barystatic sea level for the run, restored once at startup (<code>bsl_startup</code>) and written to the run restart bundle.</li>
 <li><strong>Shared OBM</strong> (<code>obm</code>) — an ocean box model stepped once per timestep, configured via <code>obm_ctl_load</code> and coupled to the domains through <code>obm_coupling.f90</code> (<code>obm_masks_init</code>, <code>obm_exchange</code>). The OBM writes its own 1D output; its restart (<code>obm_restart.nc</code>) goes into the run restart bundle next to <code>bsl_restart.nc</code>.</li>
 <li><strong>One restart bundle per run</strong> — <code>restart-&lt;kyr&gt;-kyr/</code> holds the shared <code>bsl_restart.nc</code> and <code>obm_restart.nc</code>, and each domain in a subfolder named after it (<code>Greenland/</code>, <code>Antarctica/</code>). <code>[ctrl] restart</code> is the bundle to start from.</li>
 </ul>
-<p>Climate/SMB per domain is still <strong>snapclim + smbpal</strong>, exactly as in the single-domain driver; the OBM’s contribution is folded into the ocean forcing — <code>obm_exchange</code> writes the OBM ocean temperature back into each domain’s snapclim <code>to_ann</code> before the marine-shelf step reads it.</p>
+<p>Climate/SMB per domain is still <strong>snapclim + chion (north) / smbpal PDD (south)</strong>, exactly as in the single-domain driver; the OBM’s contribution is folded into the ocean forcing — <code>obm_exchange</code> writes the OBM ocean temperature back into each domain’s snapclim <code>to_ann</code> before the marine-shelf step reads it.</p>
 </section>
 <section id="stepping-order" class="level2">
 <h2 class="anchored" data-anchor-id="stepping-order">Stepping order</h2>
