@@ -38,6 +38,8 @@ annotated git tag. Dates are release (tag) dates.
   OBM coupling) are `real(dp)`, as are the snapclim series time axes and snapshot times
   and the esm reference periods. Forcing values stay `wp`. In single precision the
   spacing of the time is 0.008 yr at 130 kyr.
+- `input/yelmo_defaults.nml` synced with Yelmo dev (`[ytrc]` horizontal advection keys,
+  needed to run; `bkt_floating_mode` default 2, the par files keep 0).
 
 ### Added
 - `[comps] dt_isos` [yr]: isostasy update interval (10 in all par files; was every step).
