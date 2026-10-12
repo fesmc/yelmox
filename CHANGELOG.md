@@ -521,6 +521,8 @@ annotated git tag. Dates are release (tag) dates.
 ### Removed
 - `libs/ismip6.f90` (module `ismip6`, unused since the `yelmox_ismip6` and
   `yelmox_nahosmip` flavors were retired).
+- `libs/hyster.f90` (module `hyster`, unused since tsgen replaced it) and the dead
+  `yelmox_hysteresis_help` make rule (its source was never in the repository).
 - `libs/simpleclim.f90` (empty stub) and the unreachable `"const"` branch of
   the LGM-north cold start.
 - `timeline_init` (replaced by `tstep_init`) and `domain_ctl%dt_restart`.

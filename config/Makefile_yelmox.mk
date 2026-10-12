@@ -9,9 +9,6 @@
 $(objdir)/geothermal.o: $(libdir)/geothermal.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/hyster.o: $(libdir)/hyster.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
 $(objdir)/latinhypercube.o: $(libdir)/latinhypercube.f90
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
@@ -179,10 +176,6 @@ $(objdir)/nautilus.o: $(libdir)/obm/nautilus.f90
 $(objdir)/obm.o: $(libdir)/obm/obm.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# General yelmox helper modules for different applications
-$(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_YELMO) -c -o $@ $^
-
 #############################################################
 ##							
 ## List of library files
@@ -190,7 +183,6 @@ $(objdir)/yelmox_hysteresis_help.o: yelmox_hysteresis_help.f90 $(yelmox_libs)
 #############################################################
 
 yelmox_libs = 			$(objdir)/geothermal.o \
-					    $(objdir)/hyster.o \
 					    $(objdir)/interp1D.o \
 					    $(objdir)/insolation.o \
 					    $(objdir)/esm_forcing.o \
@@ -229,8 +221,6 @@ obm_libs = 				$(objdir)/obm_defs.o\
 						$(objdir)/nautilus.o\
 						$(objdir)/obm.o\
 						$(objdir)/obm_coupling.o
-
-yelmox_help = 			$(objdir)/yelmox_hysteresis_help.o
 
 # yelmox objects embed fesm-utils, yelmo, isostasy (and rembo) types: rebuild
 # them when one of these archives changes, or objects keep a stale type layout
