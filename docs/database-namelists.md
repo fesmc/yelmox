@@ -194,7 +194,7 @@ Static surface elevation (single slice, no unit change):
 
 ```fortran
 &gcm_zs_ref
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "z_srf"
     units       = "m" "m"
     scaling     = 1.0 0.0

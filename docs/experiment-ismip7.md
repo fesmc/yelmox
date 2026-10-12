@@ -82,13 +82,14 @@ to `time_esm_ref` (1960--1989), applied over `time_hist` (1850--2014) and
 
 | | Greenland | Antarctica |
 |---|---|---|
-| Reference atmosphere | MAR v3.11 (ERA), 1961--1990 monthly | RACMO2.3p2 (ERA5), 1985--2014 (`time_ref`) |
+| Reference atmosphere | MAR v3.11 (ERA), 1961--1990 monthly | RACMO2.3p2 (ERA5), monthly climatology 1985--2014 (`time_ref`), FesmData v2 `SMB-RACMO2.3p2-1985-2014` |
 | Reference ocean | ORAS4 1981--2010 annual mean | meltMIP observational climatology (extrapolated) |
 | ESM atmosphere | ISMIP7 SDBN1 `tas`, `pr`, `acabf`, `dacabfdz` | same, `v2` |
 | ESM ocean | ISMIP7 `tf`, `so` (2D) | ISMIP7 `thetao`, `so` (3D, `v3`) |
 | Subglacial discharge | ISMIP7 `sgd` | -- |
 | Shelf melt | `bmb_method = "anom"`, `tf_method = 2` | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Topography, basins | ISMIP7 obs v1.3 (GrIMP surface) | ISMIP7 obs v1.1 (Bedmap3) |
+| Present-day smb, `T_srf` (comparison) | MAR v3.11 (ERA), 1961--1990 | FesmData v2 `SMB-RACMO2.3p2-1981-2010` (`T_srf`: skin temperature) |
 
 ESMs and scenarios on Levante (`ice_data/ISMIP7/<domain>/<grid>/`):
 
