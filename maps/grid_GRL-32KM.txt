@@ -1,6 +1,6 @@
 gridtype = projection
-gridsize =       4914
-xsize    =         54
+gridsize =       4823
+xsize    =         53
 ysize    =         91
 xname    = xc
 xunits   = km

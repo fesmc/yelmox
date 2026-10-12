@@ -427,6 +427,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `maps/grid_GRL-32KM.txt`: 53 columns, as the GRL-32KM data and the FesmData v2 grid (was 54;
+  the ncio size check stopped `yelmox_bipolar` on the GRL-32KM climate). Delete cached
+  `maps/scrip-*GRL-32KM*.nc` maps.
 - Cold start: the surface is updated once more on the final initial geometry (after the
   `[sim]` ice init), so chion's active columns match the initial ice; before, new margin
   ice had smb = 0 until the next surface update.
