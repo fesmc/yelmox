@@ -7,7 +7,8 @@
 ! names also let 'runme -p group.name=val' target one domain unambiguously.
 !
 ! [ctrl] active_north / active_south select the hemispheres (suffixes _north =
-! Greenland, _south = Antarctica). Physics groups are shared here (taken from
+! Greenland, _south = Antarctica); with neither, active_obm runs the ocean box
+! model alone. Physics groups are shared here (taken from
 ! the south domain); suffix them + repoint the [yelmo_<sfx>] nml_ydyn/... fields
 ! for per-domain physics.
 

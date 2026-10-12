@@ -20,7 +20,8 @@ across both domains plus the OBM.
 
 - **Two `kryos_domain`s** (`dom_north`, `dom_south`), each set up via `setup_domain`
   → `domain_startup`. Either can be individually deactivated (`active_north` /
-  `active_south`).
+  `active_south`); with neither, the ocean box model runs alone (`active_obm`, the
+  `atm2obm`/`ism2obm`/`obm2ism` couplings off).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup
   (`bsl_startup`) and written to the run restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured

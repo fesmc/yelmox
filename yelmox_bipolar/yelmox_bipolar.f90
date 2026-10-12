@@ -10,7 +10,8 @@ program yelmox_bipolar
     ! Distinct group names also let `runme -p group.name=val` target one
     ! hemisphere unambiguously.
     !
-    ! [ctrl] active_north / active_south select which hemispheres run; a bipolar
+    ! [ctrl] active_north / active_south select which hemispheres run (none: the
+    ! ocean box model alone, active_obm); a bipolar
     ! run is never more than these two domains, so they are held as two explicit
     ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
@@ -87,13 +88,20 @@ program yelmox_bipolar
     ! Which hemispheres are active ([ctrl]).
     call nml_read(path_par, "ctrl", "active_north", active_north)
     call nml_read(path_par, "ctrl", "active_south", active_south)
-    if (.not. (active_north .or. active_south)) then
-        write(*,*) "yelmox_bipolar: error -- neither active_north nor active_south is set."
-        stop 1
-    end if
 
     ! Ocean coupling control ([ctrl] switches + nautilus hysteresis parameters).
     call obm_ctl_load(oc, path_par)
+
+    ! At least one component runs: an ice-sheet domain or the ocean box model
+    ! alone. The atmosphere/ice <-> ocean couplings need an ice-sheet domain.
+    if (.not. (active_north .or. active_south .or. oc%active_obm)) then
+        write(*,*) "yelmox_bipolar: error -- none of active_north, active_south, active_obm is set."
+        stop 1
+    end if
+    if (.not. (active_north .or. active_south) .and. (oc%atm2obm .or. oc%ism2obm .or. oc%obm2ism)) then
+        write(*,*) "yelmox_bipolar: error -- atm2obm, ism2obm and obm2ism need active_north or active_south."
+        stop 1
+    end if
 
     ! === Shared, driver-owned barystatic sea level (one per run, common to both
     !     domains). Restored once from the run restart bundle ([ctrl] restart,

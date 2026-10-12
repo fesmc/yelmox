@@ -42,6 +42,9 @@ annotated git tag. Dates are release (tag) dates.
   needed to run; `bkt_floating_mode` default 2, the par files keep 0).
 
 ### Added
+- `yelmox_bipolar`: the ocean box model alone (`active_obm` without `active_north`/
+  `active_south`); `atm2obm`, `ism2obm` and `obm2ism` then stop the run (they need an
+  ice-sheet domain).
 - `[comps] dt_isos` [yr]: isostasy update interval (10 in all par files; was every step).
   FastIsostasy integrates the interval in one call; the bedrock is held in between. Its
   yearly `tsit54` step was ~37% of the ANT-16KM ISMIP7 spin-up wall time (11% at 8KM).
