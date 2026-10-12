@@ -1841,7 +1841,7 @@ contains
 
         type(marshelf_class), intent(IN) :: mshlf
         character(len=*),     intent(IN) :: filename
-        real(wp),             intent(IN) :: time 
+        real(dp),             intent(IN) :: time 
         logical,              intent(IN), optional :: init 
         integer,              intent(IN), optional :: irange(2)
         integer,              intent(IN), optional :: jrange(2)
@@ -1884,7 +1884,7 @@ contains
             call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
             call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
             call nc_write_dim(filename,"month", x=1,dx=1,nx=12,       units="month")            
-            call nc_write_dim(filename,"time",  x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
+            call nc_write_dim(filename,"time",  x=time,dx=1.0_dp,nx=1,units="years",unlimited=.TRUE.)
 
         end if 
         

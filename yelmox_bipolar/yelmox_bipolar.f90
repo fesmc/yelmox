@@ -26,6 +26,7 @@ program yelmox_bipolar
     use nml
     use timestepping
     use timeout
+    use precision,    only : dp
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
     use kryos,          only : kryos_domain, domain_init
@@ -75,7 +76,7 @@ program yelmox_bipolar
                           tt_obm_exchange = 12, tt_shelf = 13
     logical :: timing_init = .TRUE.   ! timing.txt is created on the first 1D write
 
-    real(wp) :: dtt
+    real(dp) :: dtt
 
     ! Single parameter file from the command line (holds both domains + the obm).
     call yelmo_load_command_line_args(path_par)
@@ -150,7 +151,7 @@ program yelmox_bipolar
         if (active_south) call write_domain_step(dom_south, outfldr_south)
         if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
         if (do_1D) then
-            call timer_write_totals(tmr, real(ts%time,8), "s", "timing.txt", init=timing_init)
+            call timer_write_totals(tmr, ts%time, "s", "timing.txt", init=timing_init)
             timing_init = .FALSE.
         end if
 
@@ -193,7 +194,7 @@ program yelmox_bipolar
         end if
 
         ! Ocean box model: one step, using last step's freshwater/atmos forcing.
-        if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)
+        if (oc%active_obm) call obm_update(obox, real(dtt,wp), oc%obm_name)
         call timer_step(tmr, tt_obm)
 
         ! Ice sheet, hub refresh, climate + surface mass balance (each domain).

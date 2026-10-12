@@ -26,10 +26,10 @@ contains
 
     subroutine rembo_clim_init(time, nx, ny)
         ! Initialize REMBO and check that its grid is the climate grid (nx, ny).
-        real(wp), intent(in) :: time
+        real(dp), intent(in) :: time
         integer,  intent(in) :: nx, ny
 
-        call rembo_init(real(time, dp))
+        call rembo_init(time)
 
         if (size(rembo_ann%smb,1) /= nx .or. size(rembo_ann%smb,2) /= ny) then
             write(*,*) "rembo_clim_init:: error: REMBO's grid must be the climate grid (grid_clim)."
@@ -46,18 +46,18 @@ contains
         ! it (cold start); return its annual and summer near-surface air
         ! temperature [K], precipitation [mm/a], surface mass balance [mm/a w.e.]
         ! and surface temperature [K].
-        real(wp), intent(in)  :: time            ! [yr] model time
-        real(wp), intent(in)  :: time_ins        ! [yr] time of the insolation
+        real(dp), intent(in)  :: time            ! [yr] model time
+        real(dp), intent(in)  :: time_ins        ! [yr] time of the insolation
         real(wp), intent(in)  :: dT_summer       ! [K] summer temperature anomaly
         real(wp), intent(in)  :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
         logical,  intent(in)  :: equil
         real(wp), intent(out) :: ta_ann(:,:), ta_sum(:,:), pr_ann(:,:), smb(:,:), tsrf(:,:)
 
         if (equil) then
-            call rembo_equilibrate(real(time, dp), real(z_srf, dp), real(H_ice, dp), &
+            call rembo_equilibrate(time, real(z_srf, dp), real(H_ice, dp), &
                                    real(z_sl, dp), time_tot=10.0_dp)
         else
-            call rembo_update(real(time, dp), real(time_ins, dp), real(dT_summer, dp), &
+            call rembo_update(time, time_ins, real(dT_summer, dp), &
                               real(z_srf, dp), real(H_ice, dp), real(z_sl, dp))
         end if
 
@@ -72,10 +72,10 @@ contains
     subroutine rembo_clim_restart_write(filename, time, z_srf, H_ice, z_sl)
         ! REMBO's restart, with the geometry on its grid.
         character(len=*), intent(in) :: filename
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
 
-        call rembo_restart_write(filename, real(time, dp), real(z_srf, dp), &
+        call rembo_restart_write(filename, time, real(z_srf, dp), &
                                  real(H_ice, dp), real(z_sl, dp))
 
     end subroutine rembo_clim_restart_write

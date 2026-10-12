@@ -27,26 +27,28 @@ module snapclim
     
     type series_type
         character(len=512) :: filename 
-        real(wp), allocatable :: time(:), var(:), sigma(:)
+        real(dp), allocatable :: time(:)
+        real(wp), allocatable :: var(:), sigma(:)
     end type 
 
     type series_2D_type
         character(len=512) :: filename 
-        real(wp), allocatable :: time(:), var(:,:), sigma(:,:)
+        real(dp), allocatable :: time(:)
+        real(wp), allocatable :: var(:,:), sigma(:,:)
     end type     
 
     type snapshot_param_class 
         character(len=512) :: clim_path 
         character(len=56)  :: clim_names(4)
         logical            :: clim_monthly 
-        real(wp)         :: clim_time 
+        real(dp)         :: clim_time 
         character(len=512) :: clim_stdev_path 
         character(len=56)  :: clim_stdev_name
 
         character(len=512) :: ocn_path 
         character(len=56)  :: ocn_names(4)
         logical            :: ocn_monthly 
-        real(wp)         :: ocn_time 
+        real(dp)         :: ocn_time 
         
     end type 
 
@@ -55,13 +57,13 @@ module snapclim
         character(len=56)       :: clim_names(4)
         character(len=56)       :: clim_type 
         logical                 :: clim_monthly 
-        real(wp), allocatable :: clim_times(:) 
+        real(dp), allocatable :: clim_times(:) 
 
         character(len=512)      :: ocn_path
         character(len=56)       :: ocn_names(4)
         character(len=56)       :: ocn_type
         logical                 :: ocn_monthly
-        real(wp), allocatable :: ocn_times(:)
+        real(dp), allocatable :: ocn_times(:)
 
     end type 
 
@@ -141,6 +143,11 @@ module snapclim
         type(recon_param_class)    :: recon
 
     end type 
+
+    ! Linear interpolation of a point along a depth (wp) or time (dp) axis
+    interface interp_linear
+        module procedure interp_linear_wp, interp_linear_dp
+    end interface
 
     private
     public :: snapclim_class 
@@ -390,7 +397,7 @@ contains
 
         type(snapclim_class), intent(INOUT) :: snp
         real(wp), intent(IN)    :: z_srf(:,:) 
-        real(wp), intent(IN)    :: time    ! Current simulation year
+        real(dp), intent(IN)    :: time    ! Current simulation year
         real(wp), intent(IN), optional :: dTa   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dTo   ! For atm_type='anom'
         real(wp), intent(IN), optional :: dSo   ! For atm_type='anom'
@@ -405,7 +412,7 @@ contains
 
         real(wp) :: dT_mean 
         real(wp) :: f_corr 
-        real(wp) :: t1, t2 
+        real(dp) :: t1, t2 
         real(wp), allocatable :: clim0_tsl_smooth(:,:) 
         real(wp), allocatable :: clim0_tsl_corr(:,:,:) 
         real(wp), allocatable :: clim0_prcor_smooth(:,:) 
@@ -1157,12 +1164,13 @@ contains
         real(wp),       intent(IN) :: z_srf(:,:) 
         real(wp),       intent(IN) :: lapse(2) 
         real(wp),       intent(IN) :: f_p 
-        real(wp),       intent(IN) :: time 
+        real(dp),       intent(IN) :: time 
         logical,        intent(IN) :: south     ! southern hemisphere
 
         ! Local variables 
         integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j   
-        real(wp) :: t0, t1, alpha
+        real(dp) :: t0, t1
+        real(wp) :: alpha
         character(len=56) :: varnm
         real(wp) :: lapse_now_south, lapse_now_north  
         real(wp), allocatable :: var0(:,:,:)
@@ -1344,12 +1352,13 @@ contains
         type(snapclim_state_class), intent(INOUT) :: ocn
         type(recon_param_class), intent(IN)       :: par
         real(wp),       intent(IN) :: depth(:)
-        real(wp),       intent(IN) :: time
+        real(dp),       intent(IN) :: time
 
         ! Local variables 
         integer    :: k0, k1, k, q, m, nt, nx, ny, nm, i, j
         integer    :: nz, nz0
-        real(wp) :: t0, t1, alpha
+        real(dp) :: t0, t1
+        real(wp) :: alpha
         character(len=56) :: varnm
         real(wp), allocatable :: var0(:,:,:,:)
         real(wp), allocatable :: var1(:,:,:,:)
@@ -2156,7 +2165,8 @@ contains
 
         integer :: i, stat, n 
         character(len=256) :: str, str1 
-        real(wp) :: x(nmax), y(nmax) 
+        real(dp) :: x(nmax)
+        real(wp) :: y(nmax) 
 
         ! Open file for reading 
         open(f,file=filename,status="old")
@@ -2258,7 +2268,7 @@ contains
         implicit none 
 
         type(series_2D_type), intent(IN) :: series 
-        real(wp),           intent(IN) :: time 
+        real(dp),           intent(IN) :: time 
         
         real(wp) :: var(size(series%var,1))
         
@@ -2282,7 +2292,7 @@ contains
         implicit none
 
         type(snapclim_class), intent(IN) :: snp
-        real(wp),             intent(IN) :: time
+        real(dp),             intent(IN) :: time
         real(wp) :: dT
 
         dT = series_interp(snp%at,time)*snp%par%dTa_const
@@ -2297,7 +2307,7 @@ contains
         implicit none 
 
         type(series_type) :: series 
-        real(wp) :: time 
+        real(dp) :: time 
         real(wp) :: var 
         integer :: nt, i 
 
@@ -2308,7 +2318,7 @@ contains
 
     end function series_interp
 
-    function interp_linear(x,y,xout) result(yout)
+    function interp_linear_wp(x,y,xout) result(yout)
         ! Simple linear interpolation of a point
 
         implicit none 
@@ -2343,7 +2353,45 @@ contains
 
         return 
 
-    end function interp_linear
+    end function interp_linear_wp
+
+    function interp_linear_dp(x,y,xout) result(yout)
+        ! Simple linear interpolation of a point along a time axis
+
+        implicit none 
+ 
+        real(dp), dimension(:), intent(IN) :: x
+        real(wp), dimension(:), intent(IN) :: y
+        real(dp), intent(IN) :: xout
+        real(wp) :: yout 
+        integer :: i, j, n, nout 
+        real(wp) :: alph
+
+        n    = size(x) 
+
+        if (xout .lt. x(1)) then
+            yout = y(1)
+        else if (xout .gt. x(n)) then
+            yout = y(n)
+        else
+            do j = 1, n 
+                if (x(j) .ge. xout) exit 
+            end do
+
+            if (j .eq. 1) then 
+                yout = y(1) 
+            else if (j .eq. n+1) then 
+                yout = y(n)
+            else 
+                alph = (xout - x(j-1)) / (x(j) - x(j-1))
+                yout = y(j-1) + alph*(y(j) - y(j-1))
+
+            end if 
+        end if 
+
+        return 
+
+    end function interp_linear_dp
         
     ! ==================================================
     !
@@ -2643,7 +2691,7 @@ contains
         character(len=*),  intent(IN) :: filename
         real(wp),          intent(IN) :: xc(:)
         real(wp),          intent(IN) :: yc(:)
-        real(wp),          intent(IN) :: time
+        real(dp),          intent(IN) :: time
         character(len=*),  intent(IN) :: units 
         integer,           intent(IN), optional :: irange(2)
         integer,           intent(IN), optional :: jrange(2)
@@ -2674,7 +2722,7 @@ contains
         call nc_write_dim(filename,"month", x=1,dx=1,nx=12, units="month")
         call nc_write_dim(filename,"depth", x=snp%now%depth, units="meters")
 
-        call nc_write_dim(filename,"time",  x=time,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",  x=time,dx=1.0_dp,nx=1,units=trim(units),unlimited=.TRUE.)
 
         ! Write static fields
         ! ...
@@ -2690,7 +2738,7 @@ contains
         type(snapclim_class),   intent(IN) :: snp 
         
         character(len=*),  intent(IN) :: filename
-        real(wp), intent(IN) :: time
+        real(dp), intent(IN) :: time
         integer,           intent(IN), optional :: irange(2)
         integer,           intent(IN), optional :: jrange(2)
         

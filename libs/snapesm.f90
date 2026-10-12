@@ -62,7 +62,7 @@ module snapesm
         character(len=64) :: name
         logical           :: is_ref         ! the distinguished reference state
         logical           :: monthly        ! raw atm fields are monthly (else annual+summer -> synthesized)
-        real(wp)          :: time           ! reference time [yr] of this snapshot (index normalization)
+        real(dp)          :: time           ! reference time [yr] of this snapshot (index normalization)
         real(wp)          :: idx_coord(2)   ! position on the 1-D / 2-D index manifold
     end type
 
@@ -161,7 +161,7 @@ contains
         character(len=*),      intent(IN)    :: domain
         character(len=*),      intent(IN)    :: grid_name
         integer,               intent(IN)    :: nx, ny
-        real(wp),              intent(IN)    :: time
+        real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
         character(len=*),      intent(IN), optional :: group
 
@@ -195,7 +195,7 @@ contains
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
-        real(wp),              intent(IN)    :: time
+        real(dp),              intent(IN)    :: time
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
 
         real(wp), allocatable :: ta_ann_lag(:,:)
@@ -240,7 +240,7 @@ contains
         ! so the model-response argument is a dummy.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        real(wp),              intent(IN)    :: time
+        real(dp),              intent(IN)    :: time
         integer  :: k
         real(wp) :: response
         response = 0.0_wp
@@ -256,7 +256,7 @@ contains
         ! follows once the reduction is implemented.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        real(wp),              intent(IN)    :: time
+        real(dp),              intent(IN)    :: time
         integer :: s, f, k
         logical :: touched
         do s = 1, sc%par%n_snap
@@ -287,7 +287,7 @@ contains
         ! aa is the field's index normalized to those snapshots' times.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        real(wp),              intent(IN)    :: time
+        real(dp),              intent(IN)    :: time
         integer  :: f, iref, is0, is1
         real(wp) :: aa
 
@@ -391,11 +391,12 @@ contains
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: idx_name
-        real(wp),              intent(IN) :: time
+        real(dp),              intent(IN) :: time
         integer,               intent(IN) :: is0, is1
         real(wp) :: aa
         integer  :: k, i
-        real(wp) :: t0, t1, snow, s0v, s1v
+        real(dp) :: t0, t1
+        real(wp) :: snow, s0v, s1v
 
         k = 0
         do i = 1, sc%par%n_idx
@@ -414,7 +415,7 @@ contains
         s1v  = series_interp1(sc%idx(k)%ser, t1)
         if (s1v /= s0v) aa = (snow - s0v) / (s1v - s0v)
 
-        if (aa > 1.0_wp .and. time > -12.0e3_wp .and. time < -1.0e3_wp) aa = aa*sc%par%f_hol
+        if (aa > 1.0_wp .and. time > -12.0e3_dp .and. time < -1.0e3_dp) aa = aa*sc%par%f_hol
 
         return
     end function norm_index
@@ -624,7 +625,7 @@ contains
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: fldr
-        real(wp),              intent(IN) :: time
+        real(dp),              intent(IN) :: time
 
         character(len=512)  :: fnm
         character(len=1024) :: snaps, fields
@@ -807,7 +808,7 @@ contains
         ss%name      = name
         ss%is_ref    = .FALSE.
         ss%monthly   = .FALSE.
-        ss%time      = 0.0_wp
+        ss%time      = 0.0_dp
         ss%idx_coord = 0.0_wp
         call nml_read(filename, group, "monthly",   ss%monthly,   init=.TRUE.)
         call nml_read(filename, group, "time",      ss%time,      init=.TRUE.)
@@ -828,7 +829,7 @@ contains
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
-        real(wp),              intent(IN)    :: time
+        real(dp),              intent(IN)    :: time
 
         integer            :: s, f, k, nsrc
         character(len=64)  :: refs(2)
@@ -1021,7 +1022,7 @@ contains
         integer,               intent(IN)    :: s, f_to, f_so
 
         integer  :: nx, ny, nz0, nzo, i, j, k, nt
-        real(wp) :: tlo, thi
+        real(dp) :: tlo, thi
         real(wp), allocatable :: depth0(:), depthm(:), to0(:,:,:), so0(:,:,:)
 
         nx = sc%par%nx
@@ -1034,7 +1035,7 @@ contains
         ! rep=12 selects the sub-annual axis via whole-year matching (get_indices uses
         ! floor(month)==year), which is robust to the sp/dp rounding of the fractional
         ! month positions that a direct fractional range would trip on.
-        tlo = real(floor(minval(vt%time)), wp)   ! the (single) whole year of the axis
+        tlo = real(floor(minval(vt%time)), dp)   ! the (single) whole year of the axis
         call varslice_update(vt, [tlo,tlo], method="range", rep=12)
         call varslice_update(vs, [tlo,tlo], method="range", rep=12)
 

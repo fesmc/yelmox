@@ -24,7 +24,7 @@
     type smbpal_param_class
         type(itm_par_class) :: itm
         logical    :: const_insol
-        real(prec) :: const_kabp
+        real(dp)   :: const_kabp
         character(len=512)  :: insol_fldr 
         character(len=16)   :: abl_method 
         real(prec) :: sigma_snow, sigma_melt, sigma_land
@@ -166,7 +166,7 @@ contains
         type(smbpal_class), intent(INOUT) :: smb
         real(prec), intent(IN) :: t2m_ann(:,:), t2m_sum(:,:)
         real(prec), intent(IN) ::  pr_ann(:,:), z_srf(:,:), H_ice(:,:)
-        real(prec), intent(IN) :: time_bp       ! years BP 
+        real(dp),   intent(IN) :: time_bp       ! years BP 
         real(prec), intent(IN), optional :: sf_ann(:,:)
         character(len=*), intent(IN), optional :: file_out      ! Annual output
         character(len=*), intent(IN), optional :: file_out_mon  ! Monthly output
@@ -210,7 +210,7 @@ contains
         type(smbpal_class), intent(INOUT) :: smb
         real(prec), intent(IN) :: t2m(:,:,:), pr(:,:,:)
         real(prec), intent(IN) ::  z_srf(:,:), H_ice(:,:)
-        real(prec), intent(IN) :: time_bp       ! years BP 
+        real(dp),   intent(IN) :: time_bp       ! years BP 
         real(prec), intent(IN) :: time_equil    ! years to equilibrate
         real(prec), intent(IN), optional :: sf(:,:,:)
 
@@ -247,7 +247,7 @@ contains
         real(prec),         intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
         real(prec),         intent(IN) :: z_srf(:,:)                ! [m] Surface elevation 
         real(prec),         intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
-        real(prec),         intent(IN) :: time_bp                   ! [years BP] Current time (for insolation) 
+        real(dp),           intent(IN) :: time_bp                   ! [years BP] Current time (for insolation) 
         real(prec),         intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
         character(len=*),   intent(IN), optional :: file_out        ! Annual output filename
         character(len=*),   intent(IN), optional :: file_out_mon    ! Monthly output filename
@@ -359,12 +359,12 @@ contains
         type(smbpal_param_class),       intent(IN)  :: par 
         real(prec), intent(IN) :: t2m(:,:,:)                ! [K] Monthly temperature fields
         real(prec), intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
-        real(prec), intent(IN) :: time_bp                   ! [years BP] Current time (for insolation) 
+        real(dp),   intent(IN) :: time_bp                   ! [years BP] Current time (for insolation) 
         real(prec), intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
 
         ! Local variables
         integer :: nx, ny, k, n, day 
-        real(8) :: insol_time
+        real(dp) :: insol_time
         double precision, allocatable :: tmp(:,:,:)
 
         nx = size(t2m,1)
@@ -799,14 +799,14 @@ contains
 
         type(smbpal_state_class), intent(IN) :: now 
         character(len=*),         intent(IN) :: filename 
-        real(prec),               intent(IN) :: time_bp  
+        real(dp),                 intent(IN) :: time_bp  
         character(len=*),         intent(IN) :: step  
         integer, intent(IN), optional        :: nstep 
 
         ! Local variables 
-        real(prec) :: ka_bp 
+        real(dp) :: ka_bp 
         integer :: ndat, nx, ny, nt   
-        real(prec), allocatable :: time(:) 
+        real(dp), allocatable :: time(:) 
         character(len=56) :: step_name 
 
         ka_bp = time_bp * 1e-3 
@@ -899,7 +899,7 @@ contains
 
         type(smbpal_class), intent(IN) :: smb
         character(len=*),   intent(IN) :: filename
-        real(prec),         intent(IN) :: time
+        real(dp),           intent(IN) :: time
 
         ! Local variables
         integer :: ncid, nx, ny
@@ -910,7 +910,7 @@ contains
         call nc_create(filename)
         call nc_write_dim(filename,"xc",  x=smb%par%x)
         call nc_write_dim(filename,"yc",  x=smb%par%y)
-        call nc_write_dim(filename,"time",x=time,dx=1.0_prec,nx=1,units="year",unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",x=time,dx=1.0_dp,nx=1,units="year",unlimited=.TRUE.)
 
         call nc_open(filename,ncid,writable=.TRUE.)
         call nc_write(filename,"H_snow",smb%now%H_snow,dim1="xc",dim2="yc",dim3="time", &

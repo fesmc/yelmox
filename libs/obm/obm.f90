@@ -76,11 +76,11 @@ contains
 
         implicit none 
         character(len=*),  intent(IN)   :: filename, units
-        real(wp),          intent(IN)   :: time_init
+        real(dp),          intent(IN)   :: time_init
 
         ! Initialize netcdf file and dimensions
         call nc_create(filename)
-        call nc_write_dim(filename,"time", x=time_init,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+        call nc_write_dim(filename,"time", x=time_init,dx=1.0_dp,nx=1,units=trim(units),unlimited=.TRUE.)
         
         return 
 
@@ -91,12 +91,12 @@ contains
         implicit none 
         type(obm_class),    intent(IN) :: obm_object 
         character(len=*),     intent(IN) :: filename, name
-        real(wp),             intent(IN) :: t
+        real(dp),             intent(IN) :: t
         real(wp) :: factor
 
         ! Local variables
         integer    :: ncid, n
-        real(wp) :: t_prev 
+        real(dp) :: t_prev 
 
         select case(name)
                 case("stommel")
@@ -168,13 +168,13 @@ contains
 
         type(obm_class), intent(IN) :: obm_object
         character(len=*),  intent(IN) :: filename, units 
-        real(wp),          intent(IN) :: t 
+        real(dp),          intent(IN) :: t 
         logical, optional, intent(IN) :: init 
 
         ! Local variables
         integer  :: ncid, n, nx, ny, nz, nz_ac, nz_r   
         logical  :: initialize_file 
-        real(wp) :: t_prev         
+        real(dp) :: t_prev         
 
         initialize_file = .TRUE. 
         if (present(init)) initialize_file = init
@@ -186,7 +186,7 @@ contains
 
         if (initialize_file) then
             call nc_create(filename)
-            call nc_write_dim(filename,"time", x=t,dx=1.0_wp,nx=1,units=trim(units),unlimited=.TRUE.)
+            call nc_write_dim(filename,"time", x=t,dx=1.0_dp,nx=1,units=trim(units),unlimited=.TRUE.)
         end if 
 
         ! == Begin writing data ==============================================

@@ -3,6 +3,7 @@ module kryos_regions
     ! for 1D output, the LGM-like marine-ice initial state, the NEGIS
     ! basal-friction modification and the glacial SMB scaling.
 
+    use precision,    only : dp
     use yelmo,        only : yelmo_class, wp
     use yelmo_defs,   only : MASK_ICE_NONE
     use basal_dragging, only : calc_cb_ref
@@ -64,7 +65,7 @@ contains
         ! in domain_init when [sim] use_negis is set.
         type(yelmo_class),  intent(inout) :: ylmo
         type(negis_params), intent(inout) :: ngs
-        real(wp),           intent(in)    :: time
+        real(dp),           intent(in)    :: time
 
         if (time < -11e3_wp) then
             ngs%cf_x = ngs%cf_0

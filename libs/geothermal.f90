@@ -148,7 +148,7 @@ contains
 
         type(geothermal_class) :: sed 
 
-        real(wp) :: year_bp 
+        real(dp) :: year_bp 
 
         ! === To do ====
 

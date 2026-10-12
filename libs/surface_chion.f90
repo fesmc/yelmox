@@ -69,7 +69,7 @@ module surface_chion
 
     type surface_chion_param_class
         logical            :: const_insol   ! insolation at const_kabp instead of the model time
-        real(wp)           :: const_kabp    ! [kyr BP] insolation time when const_insol
+        real(dp)           :: const_kabp    ! [kyr BP] insolation time when const_insol
         character(len=512) :: insol_fldr    ! folder of the orbital-parameter tables
         real(wp)           :: sf_a, sf_b    ! snowfall fraction, -0.5*tanh(sf_a*(T-sf_b))+0.5
         real(wp)           :: sigma_pdd     ! [K] temperature standard deviation for the PDDs
@@ -189,7 +189,7 @@ contains
         type(surface_chion_class), intent(inout) :: sc
         real(wp), intent(in) :: t2m(:,:,:), pr(:,:,:)       ! [K], [mm w.e./d] monthly
         real(wp), intent(in) :: z_srf(:,:), z_bed(:,:), H_ice(:,:), z_sl(:,:)
-        real(wp), intent(in) :: time_bp
+        real(dp), intent(in) :: time_bp
 
         integer :: n
 
@@ -208,7 +208,7 @@ contains
         real(wp), intent(in) :: z_bed(:,:)          ! [m]
         real(wp), intent(in) :: H_ice(:,:)          ! [m]
         real(wp), intent(in) :: z_sl(:,:)           ! [m]
-        real(wp), intent(in) :: time_bp             ! [yr] model time, for the insolation
+        real(dp), intent(in) :: time_bp             ! [yr] model time, for the insolation
 
         real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:), t_ann(:)
         real(wp), allocatable :: t_sum(:), pr_sum(:), sf_sum(:), S_sum(:), PDDs(:)
@@ -231,8 +231,8 @@ contains
         na  = sc%chn%grd%n_active
         idx = sc%chn%grd%active_idx(1:na)
 
-        insol_time = real(time_bp, dp)
-        if (sc%par%const_insol) insol_time = real(sc%par%const_kabp, dp)*1e3_dp
+        insol_time = time_bp
+        if (sc%par%const_insol) insol_time = sc%par%const_kabp*1e3_dp
         call insol_update(sc%ins, insol_time, sc%par%dt_days, trim(sc%par%insol_fldr))
 
         ! Mean-preserving daily control values, (nmon,na) so a column is contiguous.
@@ -364,7 +364,7 @@ contains
     subroutine surface_chion_restart_write(sc, filename, time)
         type(surface_chion_class), intent(in) :: sc
         character(len=*),          intent(in) :: filename
-        real(wp),                  intent(in) :: time
+        real(dp),                  intent(in) :: time
 
         call chion_restart_write(sc%chn, filename, time)
     end subroutine surface_chion_restart_write
@@ -375,7 +375,7 @@ contains
         type(surface_chion_class), intent(inout) :: sc
         character(len=*),          intent(in)    :: filename
 
-        real(wp) :: time_file
+        real(dp) :: time_file
 
         call chion_restart_read(sc%chn, filename, time_file)
     end subroutine surface_chion_restart_read

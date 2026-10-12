@@ -179,7 +179,7 @@ contains
         character(len=*), intent(IN), optional :: run_type, gcm, experiment
         logical,          intent(IN), optional :: use_esm, use_smb, use_var
         logical,          intent(IN), optional :: use_hist, use_proj
-        real(wp),         intent(IN), optional :: time_hist(2), time_proj(2)
+        real(dp),         intent(IN), optional :: time_hist(2), time_proj(2)
     
         ! Local variables 
         character(len=256) :: grid_name
@@ -441,8 +441,8 @@ contains
 
         type(esm_forcing_class), intent(INOUT) :: esm
         real(wp),                intent(IN)    :: z_srf_ylm(:,:)
-        real(wp),                intent(IN)    :: time
-        real(wp),                intent(IN)    :: time_ref(2)
+        real(dp),                intent(IN)    :: time
+        real(dp),                intent(IN)    :: time_ref(2)
         logical,                 intent(IN)    :: use_smb
         logical,                 intent(IN)    :: south     ! southern hemisphere
 
@@ -527,10 +527,10 @@ contains
     
         type(esm_forcing_class), intent(INOUT) :: esm
         type(marshelf_class),    intent(IN)    :: mshlf
-        real(wp), intent(IN) :: time
-        real(wp), intent(IN) :: dtt
+        real(dp), intent(IN) :: time
+        real(dp), intent(IN) :: dtt
         character(len=*), intent(IN) :: clim_var
-        real(wp), intent(IN) :: time_ref(2)
+        real(dp), intent(IN) :: time_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_var
         logical,  intent(IN), optional :: use_ref_atm 
@@ -539,7 +539,8 @@ contains
         ! Local variables 
         integer  :: m, year, step_idx
         real(wp) :: tmp, lapse
-        real(wp) :: rand, year_rand
+        real(wp) :: rand
+        real(dp) :: year_rand
         real(wp), allocatable :: to_ref(:,:,:), so_ref(:,:,:)   ! the ocean fields, extrapolated
         real(wp), allocatable :: to_now(:,:,:), so_now(:,:,:)
 
@@ -665,9 +666,9 @@ contains
     
         type(esm_forcing_class), intent(INOUT) :: esm
         type(marshelf_class),    intent(IN)    :: mshlf
-        real(wp), intent(IN) :: time
+        real(dp), intent(IN) :: time
         logical,  intent(IN) :: use_esm
-        real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
+        real(dp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
         logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
@@ -897,7 +898,7 @@ contains
         type(marshelf_class), intent(IN)    :: mshlf
         type(varslice_class), intent(INOUT) :: vs
         real(wp),             intent(IN)    :: var_ref(:,:,:)
-        real(wp),             intent(IN)    :: time
+        real(dp),             intent(IN)    :: time
         real(wp),             intent(IN)    :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
 
         ! Local variables
@@ -959,7 +960,7 @@ contains
         character(len=*),   intent(IN) :: filename
         real(wp),           intent(IN) :: xc(:)
         real(wp),           intent(IN) :: yc(:)
-        real(wp),           intent(IN) :: time
+        real(dp),           intent(IN) :: time
         real(wp),           intent(IN) :: lon(:,:)
         real(wp),           intent(IN) :: lat(:,:)
         real(wp),           intent(IN) :: area(:,:)
@@ -987,7 +988,7 @@ contains
         call nc_write_attr(filename,ynm,"_CoordinateAxisType","GeoY")
         
         ! Add time axis with current value 
-        call nc_write_dim(filename,"time", x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
+        call nc_write_dim(filename,"time", x=time,dx=1.0_dp,nx=1,units="years",unlimited=.TRUE.)
         
         ! Projection information 
         call nc_write_map(filename,map_name,dble(lambda),phi=dble(phi))

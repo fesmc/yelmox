@@ -20,6 +20,7 @@ module kryos
     !   kryos_output    per-module 2D/1D output
     !   kryos_forcing   driver-owned transient forcing (tsgen)
 
+    use precision,    only : dp
     use nml,          only : nml_read, nml_replace
     use coords,       only : grid_class, grid_cdo_read_desc
     use phys_constants, only : phys_const_class, phys_const_load
@@ -53,7 +54,7 @@ module kryos
         character(len=512) :: path_par = ""
         ! Shared timeline (read from the driver's timeline group, e.g. [ctrl]).
         character(len=56) :: tstep_method = "const"
-        real(wp) :: dtt         = 10.0_wp
+        real(dp) :: dtt         = 10.0_dp
         ! Components ([comps]): which are active in the coupling sequence, with
         ! which model, how often.
         logical :: with_ice_sheet = .true.
@@ -63,8 +64,8 @@ module kryos
         logical :: with_shelf     = .true.   ! shelf-base melt + temperature (needs climate)
         character(len=56) :: climate        = ""         ! climate backend: snapclim | snapesm | esm | rembo
         character(len=56) :: surface_method = "chion"    ! chion | smbpal | smb_simple | climate (from the backend)
-        real(wp) :: dt_clim     = 10.0_wp   ! [yr] climate update interval
-        real(wp) :: dt_isos     = 10.0_wp   ! [yr] isostasy update interval
+        real(dp) :: dt_clim     = 10.0_dp   ! [yr] climate update interval
+        real(dp) :: dt_isos     = 10.0_dp   ! [yr] isostasy update interval
 
         ! Simulation conditions ([sim]). Cold-start ice state: init_kill_shelves,
         ! then init_marine_H, then init_method, then init_time_thrm.
@@ -115,7 +116,7 @@ module kryos
         logical :: write_htopo = .true.
         ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc), every dt_cmip.
         logical  :: write_cmip = .false.
-        real(wp) :: dt_cmip    = 1.0_wp
+        real(dp) :: dt_cmip    = 1.0_dp
     end type domain_ctl
 
     ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters.
@@ -203,10 +204,10 @@ contains
     function cadence_due(time, dt) result(due)
         ! Cadence predicate (dt_clim, dt_isos, dt_cmip): true when `time` falls on the dt grid (0.01-yr
         ! precision). dt <= 0 disables the cadence (never due).
-        real(wp), intent(in) :: time, dt
+        real(dp), intent(in) :: time, dt
         logical :: due
         due = .false.
-        if (dt > 0.0_wp) due = (mod(nint(time*100), nint(dt*100)) == 0)
+        if (dt > 0.0_dp) due = (mod(nint(time*100), nint(dt*100)) == 0)
     end function cadence_due
 
     subroutine domain_init(dom, path_par, time, group_suffix, timeline_group)
@@ -233,7 +234,7 @@ contains
         ! tstep_init -- from which the domain reads tstep_method/dtt itself.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
-        real(wp),         intent(in)    :: time       ! model time
+        real(dp),         intent(in)    :: time       ! model time
         character(len=*), intent(in), optional :: group_suffix
         character(len=*), intent(in), optional :: timeline_group
 
@@ -549,7 +550,7 @@ contains
         end select
         call nml_read(path_par, gc, "dt_clim",        ctl%dt_clim)
         call nml_read(path_par, gc, "dt_isos",        ctl%dt_isos)
-        if (ctl%with_isostasy .and. ctl%dt_isos <= 0.0_wp) then
+        if (ctl%with_isostasy .and. ctl%dt_isos <= 0.0_dp) then
             write(*,*) "domain_ctl_load:: error: "//trim(gc)//".dt_isos must be > 0 &
                        &(with_isostasy = False switches isostasy off)."
             stop 1

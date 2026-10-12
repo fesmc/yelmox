@@ -10,6 +10,7 @@ program yelmox
     use nml
     use timestepping
     use timeout
+    use precision, only : dp
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use kryos,          only : kryos_domain, domain_init
@@ -37,14 +38,14 @@ program yelmox
     type(timeout_class) :: tm_2D, tm_2Dsm, tm_1D, tm_rst
 
     character(len=512) :: outfldr
-    real(wp)           :: dtt
+    real(dp)           :: dtt
 
     ! Run control ([ctrl]): the group holding this run phase's timeline (e.g.
     ! "spinup", "transient"; "ctrl" = [ctrl] itself), and whether the timeline
     ! is in calendar years (tstep_const then a calendar time, against calendar_ref).
     character(len=56)  :: run_step
     logical            :: calendar
-    real(wp)           :: calendar_ref
+    real(dp)           :: calendar_ref
 
     ! Restart bundle folder to start from ([ctrl]); "None" = cold start.
     character(len=512) :: restart
@@ -153,7 +154,7 @@ program yelmox
         if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
             call domain_write_1D(dom, trim(outfldr), ts%time)
             call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
-            call timer_write_totals(tmr, real(ts%time,8), "s", trim(outfldr)//"timing.txt", &
+            call timer_write_totals(tmr, ts%time, "s", trim(outfldr)//"timing.txt", &
                                     init=timing_init)
             timing_init = .FALSE.
         end if

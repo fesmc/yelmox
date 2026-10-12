@@ -5,6 +5,7 @@ module kryos_coupling
     ! Yelmo runs. Every primitive is a no-op when its component is inactive.
 
     use timestepping, only : tstep_class
+    use precision,    only : dp
     use yelmo,        only : wp, yelmo_update
     use marine_shelf, only : marshelf_update, marshelf_update_shelf
     use fastisostasy, only : isos_update, bsl_class

@@ -5,6 +5,7 @@ module kryos_startup
 
     use ncio
     use timestepping, only : tstep_class
+    use precision,    only : dp
     use yelmo,        only : wp, yelmo_update_equil, yelmo_init_state, yelmo_init_topo, &
                              yelmo_print_bound, yelmo_restart_write, yelmo_restart_init, &
                              yelmo_regions_update, mask_bed_ocean
@@ -94,7 +95,7 @@ contains
         ! write the run-level files themselves, each domain into a subfolder.
         type(kryos_domain),      intent(inout)        :: dom
         type(bsl_class),       intent(inout)        :: bsl
-        real(wp),              intent(in)           :: time
+        real(dp),              intent(in)           :: time
         type(tsforcing_class), intent(in), optional :: tsf
         character(len=*),      intent(in), optional :: fldr
 
@@ -249,7 +250,7 @@ contains
 
         if (dom%ctl%with_ice_sheet .and. dom%ctl%init_time_thrm > 0.0_wp) &
             call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%init_time_thrm, &
-                                    dt=dom%ctl%dtt, topo_fixed=.TRUE.)
+                                    dt=real(dom%ctl%dtt,wp), topo_fixed=.TRUE.)
 
     end subroutine domain_init_ice
 
@@ -313,7 +314,7 @@ contains
         ! Auto-named per-time restart bundle folder of the run: "restart-<kyr>-kyr".
         ! A single-domain run writes the domain's files into it; a multi-domain
         ! run writes each domain into a subfolder named after the domain.
-        real(wp), intent(in) :: time
+        real(dp), intent(in) :: time
         character(len=1024)  :: bundle
 
         character(len=32) :: time_str
@@ -326,7 +327,7 @@ contains
         ! Create the auto-named restart bundle folder (mkdir -p). Multi-domain
         ! drivers use this for the run-level files (bsl, obm), written outside
         ! domain_restart_write (which creates its own folder).
-        real(wp), intent(in) :: time
+        real(dp), intent(in) :: time
         call execute_command_line('mkdir -p "'//trim(restart_bundle_dir(time))//'"')
     end subroutine restart_bundle_mkdir
 
@@ -338,7 +339,7 @@ contains
         ! The shared barystatic sea level is NOT written here -- the driver owns it
         ! and writes a single bsl_restart.nc for the whole run.
         type(kryos_domain), intent(inout) :: dom
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
         character(len=*), intent(in)    :: fldr
 
         character(len=1024) :: bundle

@@ -10,7 +10,7 @@ program test_snapclim_ref
     !
     ! Run from the yelmox root so relative paths (yelmox/, ice_data/, input/, logs/) resolve.
 
-    use precision, only : wp, sp
+    use precision, only : wp, sp, dp
     use ncio
     use snapclim
 
@@ -22,7 +22,7 @@ program test_snapclim_ref
     real(sp) :: z_srf_sp(nx,ny)
     real(wp) :: z_srf(nx,ny)
     real(wp) :: xc(nx), yc(ny)
-    real(wp) :: times(3)
+    real(dp) :: times(3)
     character(len=256) :: path_par, outfile, domain, grid
     integer :: i, j, it, nt
 
@@ -41,7 +41,7 @@ program test_snapclim_ref
     do i = 1, nx; xc(i) = (i-1)*16.0_wp; end do
     do j = 1, ny; yc(j) = (j-1)*16.0_wp; end do
 
-    times = [0.0_wp, -21000.0_wp, -120000.0_wp]
+    times = [0.0_dp, -21000.0_dp, -120000.0_dp]
     nt = size(times)
 
     call snapclim_init(snp, trim(path_par), trim(domain), trim(grid), nx, ny, &
@@ -64,20 +64,21 @@ contains
     subroutine dump_init(filename, snp, xc, yc, time0)
         character(len=*),      intent(IN) :: filename
         type(snapclim_class),  intent(IN) :: snp
-        real(wp),              intent(IN) :: xc(:), yc(:), time0
+        real(wp),              intent(IN) :: xc(:), yc(:)
+        real(dp),              intent(IN) :: time0
         call nc_create(filename)
         call nc_write_dim(filename,"xc",    x=xc, units="km")
         call nc_write_dim(filename,"yc",    x=yc, units="km")
         call nc_write_dim(filename,"month", x=1,dx=1,nx=12, units="month")
         call nc_write_dim(filename,"depth", x=snp%now%depth, units="meters")
-        call nc_write_dim(filename,"time",  x=time0,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
+        call nc_write_dim(filename,"time",  x=time0,dx=1.0_dp,nx=1,units="years",unlimited=.TRUE.)
         return
     end subroutine dump_init
 
     subroutine dump_step(filename, snp, time, n)
         character(len=*),      intent(IN) :: filename
         type(snapclim_class),  intent(IN) :: snp
-        real(wp),              intent(IN) :: time
+        real(dp),              intent(IN) :: time
         integer,               intent(IN) :: n
         integer :: ncid
         call nc_open(filename, ncid, writable=.TRUE.)

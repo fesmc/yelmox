@@ -5,6 +5,7 @@ module kryos_output
 
     use ncio
     use coords,       only : grid_class, grid_cdo_read_desc
+    use precision,    only : dp
     use yelmo,        only : wp, yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use marine_shelf, only : marshelf_class
     use fastisostasy, only : isos_class
@@ -55,7 +56,7 @@ contains
         ! Create the enabled per-module 2D output files (dims + static fields).
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
 
         if (dom%ctl%write_yelmo) &
             call yelmo_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo")), &
@@ -80,7 +81,7 @@ contains
         ! or extend it for a specific context (see YELMO_VARS_2D above).
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
         character(len=*), intent(in), optional :: nms(:)
 
         character(len=56), allocatable :: yvars(:)
@@ -117,7 +118,7 @@ contains
         ! and file conventions as the heavy yelmo.nc.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
 
         if (dom%ctl%write_yelmo) &
             call yelmo_write_init(dom%yelmo, trim(io_fname(outfldr,"yelmo_sm")), &
@@ -131,7 +132,7 @@ contains
         ! YELMO_VARS_2D_SM; pass `nms` to override or extend it for a context.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
         character(len=*), intent(in), optional :: nms(:)
 
         character(len=56), allocatable :: yvars(:)
@@ -151,7 +152,7 @@ contains
         ! Write 1D timeseries: Yelmo regional aggregates + isostasy diagnostics.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
         logical, intent(in), optional   :: init
 
         logical :: is_init
@@ -214,13 +215,13 @@ contains
     subroutine io_dims_init(filename, grid_name, time)
         ! Create a 2D output file with xc/yc (from the grid table) + time dims.
         character(len=*), intent(in) :: filename, grid_name
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         type(grid_class) :: g
         call grid_cdo_read_desc(g, trim(grid_name), MAP_FLDR)
         call nc_create(filename)
         call nc_write_dim(filename, "xc", x=g%G%x, units="km")
         call nc_write_dim(filename, "yc", x=g%G%y, units="km")
-        call nc_write_dim(filename, "time", x=time, dx=1.0_wp, nx=1, units="year", unlimited=.TRUE.)
+        call nc_write_dim(filename, "time", x=time, dx=1.0_dp, nx=1, units="year", unlimited=.TRUE.)
     end subroutine io_dims_init
 
     subroutine io_var2D(filename, vnm, var, n, ncid, units, long_name)
@@ -243,7 +244,7 @@ contains
     subroutine isos_write_step(isos, filename, time)
         type(isos_class), intent(in) :: isos
         character(len=*), intent(in) :: filename
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
@@ -258,7 +259,7 @@ contains
     subroutine mshlf_write_step(mshlf, filename, time)
         type(marshelf_class), intent(in) :: mshlf
         character(len=*),     intent(in) :: filename
-        real(wp),             intent(in) :: time
+        real(dp),             intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
@@ -272,7 +273,7 @@ contains
     subroutine smb_write_step(smb, filename, time)
         type(smbpal_class), intent(in) :: smb
         character(len=*),   intent(in) :: filename
-        real(wp),           intent(in) :: time
+        real(dp),           intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
@@ -294,7 +295,7 @@ contains
         ! Annual means of the last chion annual cycle on grid_surface.
         type(surface_chion_class), intent(in) :: sc
         character(len=*),          intent(in) :: filename
-        real(wp),                  intent(in) :: time
+        real(dp),                  intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
@@ -319,7 +320,7 @@ contains
         ! One record of the climate's 2D file (fields chosen by the backend).
         type(kryos_domain), intent(in) :: dom
         character(len=*),   intent(in) :: filename
-        real(wp),           intent(in) :: time
+        real(dp),           intent(in) :: time
         integer :: ncid, n
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
@@ -330,15 +331,15 @@ contains
 
     subroutine isos_write_1D_init(filename, time)
         character(len=*), intent(in) :: filename
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         call nc_create(filename)
-        call nc_write_dim(filename, "time", x=time, dx=1.0_wp, nx=1, units="year", unlimited=.TRUE.)
+        call nc_write_dim(filename, "time", x=time, dx=1.0_dp, nx=1, units="year", unlimited=.TRUE.)
     end subroutine isos_write_1D_init
 
     subroutine isos_write_1D_step(isos, filename, time)
         type(isos_class), intent(in) :: isos
         character(len=*), intent(in) :: filename
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         integer :: ncid, n, np
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)

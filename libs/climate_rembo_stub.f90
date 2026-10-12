@@ -3,7 +3,7 @@ module climate_rembo
     ! without REMBO (rembo=0, the default): the same interface, stopping at
     ! init if climate = "rembo" is chosen.
 
-    use precision, only : wp
+    use precision, only : wp, dp
 
     implicit none
 
@@ -16,7 +16,7 @@ module climate_rembo
 contains
 
     subroutine rembo_clim_init(time, nx, ny)
-        real(wp), intent(in) :: time
+        real(dp), intent(in) :: time
         integer,  intent(in) :: nx, ny
 
         call not_built()
@@ -25,7 +25,8 @@ contains
 
     subroutine rembo_clim_update(time, time_ins, dT_summer, z_srf, H_ice, z_sl, equil, &
                                  ta_ann, ta_sum, pr_ann, smb, tsrf)
-        real(wp), intent(in)  :: time, time_ins, dT_summer
+        real(dp), intent(in)  :: time, time_ins
+        real(wp), intent(in)  :: dT_summer
         real(wp), intent(in)  :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
         logical,  intent(in)  :: equil
         real(wp), intent(out) :: ta_ann(:,:), ta_sum(:,:), pr_ann(:,:), smb(:,:), tsrf(:,:)
@@ -36,7 +37,7 @@ contains
 
     subroutine rembo_clim_restart_write(filename, time, z_srf, H_ice, z_sl)
         character(len=*), intent(in) :: filename
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
 
         call not_built()

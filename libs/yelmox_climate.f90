@@ -12,7 +12,7 @@ module yelmox_climate
     ! The driver's transient forcing (tsforcing: f_now and the gains f_ta, f_to,
     ! f_so) is handed to the backend, which applies it in its own way.
 
-    use precision,     only : wp
+    use precision,     only : wp, dp
     use nml,           only : nml_read
     use ncio
     use coordinates,   only : grid_class
@@ -40,7 +40,7 @@ module yelmox_climate
         character(len=512) :: par_file        ! esm data configuration
         character(len=56)  :: experiment, esm_name
         logical            :: use_esm, use_smb, use_var, use_hist, use_proj
-        real(wp)           :: time_ref(2), time_hist(2), time_proj(2), time_esm_ref(2)
+        real(dp)           :: time_ref(2), time_hist(2), time_proj(2), time_esm_ref(2)
         character(len=56)  :: clim_var
         integer            :: clim_seed
     end type esm_ctl_class
@@ -85,7 +85,7 @@ contains
         character(len=*), intent(in) :: method
         character(len=*), intent(in) :: filename, domain
         type(grid_class), intent(in) :: grid             ! the climate grid
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         type(regions_class), intent(in) :: reg           ! the regions on the climate grid
         logical,          intent(in) :: south
         character(len=*), intent(in) :: sfx              ! namelist group suffix of the domain
@@ -161,13 +161,13 @@ contains
         real(wp),         intent(in) :: z_srf_ref(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
-        real(wp),         intent(in) :: dtt              ! [yr] time step of the run
+        real(dp),         intent(in) :: dtt              ! [yr] time step of the run
         type(marshelf_class),  intent(in) :: mshlf
         type(tsforcing_class), intent(in), optional :: tsf
         logical,               intent(in), optional :: init
 
         logical  :: forced, is_init
-        real(wp) :: time
+        real(dp) :: time
 
         forced = .false.
         if (present(tsf)) forced = tsf%active
@@ -250,7 +250,7 @@ contains
         ! the bipolar ocean box model: snapclim's index series `at` scaled by
         ! dTa_const. snapesm and esm have no such index.
         type(yelmox_climate_class), intent(in) :: cl
-        real(wp),                   intent(in) :: time
+        real(dp),                   intent(in) :: time
         real(wp) :: dT
 
         select case(trim(cl%method))
@@ -360,7 +360,7 @@ contains
         type(yelmox_climate_class), intent(in) :: cl
         type(climate_out_class),    intent(in) :: out
         character(len=*),           intent(in) :: filename
-        real(wp),                   intent(in) :: time
+        real(dp),                   intent(in) :: time
         real(wp),                   intent(in) :: H_ice(:,:), f_grnd(:,:)
         real(wp),                   intent(in) :: dx
         logical,                    intent(in) :: init
@@ -371,7 +371,7 @@ contains
 
         if (init) then
             call nc_create(filename)
-            call nc_write_dim(filename, "time", x=time, dx=1.0_wp, nx=1, units="year", unlimited=.TRUE.)
+            call nc_write_dim(filename, "time", x=time, dx=1.0_dp, nx=1, units="year", unlimited=.TRUE.)
         end if
 
         call nc_open(filename, ncid, writable=.TRUE.)
@@ -506,7 +506,7 @@ contains
         ! and esm hold no state.
         type(yelmox_climate_class), intent(in) :: cl
         character(len=*),           intent(in) :: fldr
-        real(wp),                   intent(in) :: time
+        real(dp),                   intent(in) :: time
         real(wp),                   intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
 
         select case(trim(cl%method))
@@ -598,7 +598,7 @@ contains
         ! the ocean at the shelf base and subglacial discharge.
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
-        real(wp),         intent(in) :: time, dtt
+        real(dp),         intent(in) :: time, dtt
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
         real(wp),         intent(in) :: z_srf_ref(:,:)
         type(marshelf_class), intent(in) :: mshlf
@@ -686,7 +686,7 @@ contains
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
         type(tstep_class),          intent(in)    :: ts
-        real(wp),         intent(in) :: time
+        real(dp),         intent(in) :: time
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx

@@ -9,6 +9,7 @@ module kryos_forcing
     ! shared vs per-domain forcing.
 
     use nml,          only : nml_read
+    use precision,    only : dp
     use yelmo,        only : wp
     use tsgen,        only : tsgen_class, tsgen_init, tsgen_update, tsgen_write_step, &
                              tsgen_restart_write, tsgen_restart_read
@@ -46,7 +47,7 @@ contains
         ! restart run the caller then calls tsforcing_restart_read to resume.
         type(tsforcing_class), intent(inout) :: tsf
         character(len=*),      intent(in)    :: path_par
-        real(wp),              intent(in)    :: time
+        real(dp),              intent(in)    :: time
 
         call nml_read(path_par, "tsforcing", "active",           tsf%active)
         call nml_read(path_par, "tsforcing", "f_ta",             tsf%f_ta)
@@ -71,7 +72,7 @@ contains
         ! `var` is the model response variable (e.g. ice volume [Gt]) that the
         ! feedback methods and the kill switch consume; ignored by open-loop ones.
         type(tsforcing_class), intent(inout) :: tsf
-        real(wp),              intent(in)    :: time
+        real(dp),              intent(in)    :: time
         real(wp),              intent(in)    :: var
 
         if (.not. tsf%active) return
@@ -126,7 +127,7 @@ contains
         ! Persist the tsgen state into fldr/tsgen_restart.nc (no-op if inactive).
         type(tsforcing_class), intent(in) :: tsf
         character(len=*),      intent(in) :: fldr
-        real(wp),              intent(in) :: time
+        real(dp),              intent(in) :: time
         if (.not. tsf%active) return
         call tsgen_restart_write(trim(fldr)//"/tsgen_restart.nc", tsf%tsg, time)
     end subroutine tsforcing_restart_write
@@ -160,7 +161,7 @@ contains
         ! own 1D write so the time index already exists.
         type(tsforcing_class), intent(in) :: tsf
         character(len=*),      intent(in) :: filename
-        real(wp),              intent(in) :: time
+        real(dp),              intent(in) :: time
         if (.not. tsf%active) return
         call tsgen_write_step(filename, tsf%tsg, time)
     end subroutine tsforcing_write_step

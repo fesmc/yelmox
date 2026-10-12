@@ -20,6 +20,7 @@ module obm_coupling
 
     use nml,           only : nml_read
     use ncio,          only : nc_read
+    use precision,     only : dp
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
     use yelmox_climate, only : climate_air_anom
@@ -48,7 +49,7 @@ module obm_coupling
         logical            :: hyster_on = .false.
         character(len=512) :: hyster_forcing = "", hyster_forcing_method = ""
         real(wp)           :: hyster_rate = 0.0_wp
-        real(wp)           :: hyster_positive_branch_time = 0.0_wp
+        real(dp)           :: hyster_positive_branch_time = 0.0_dp
     end type obm_coupling_ctl
 
     public :: obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
@@ -121,7 +122,7 @@ contains
         type(obm_class),        intent(inout) :: obm
         type(kryos_domain),       intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
-        real(wp),               intent(in)    :: time, time_init, dtt
+        real(dp),               intent(in)    :: time, time_init, dtt
 
         if (oc%atm2obm) then
             if (active_north) call coupling_atm2obm(dom_north, obm, "north", time)
@@ -156,7 +157,7 @@ contains
         type(kryos_domain), intent(in)    :: dom
         type(obm_class),  intent(inout) :: obm
         character(len=*), intent(in)    :: hemisphere
-        real(wp),         intent(in)    :: time
+        real(dp),         intent(in)    :: time
 
         real(wp) :: dTa
 
@@ -235,10 +236,11 @@ contains
                                              rate, forcing, forc_method)
         ! Hysteresis forcing for the nautilus box model: nudge one obm control
         ! (phit/phin/fs/fn, or fn+fs) along a prescribed path.
-        real(wp),          intent(in)    :: t, t0
+        real(dp),          intent(in)    :: t, t0
         type(obm_class),   intent(inout) :: obm
-        real(wp),          intent(in)    :: dt
-        real(wp),          intent(in)    :: branch_time_thr, rate
+        real(dp),          intent(in)    :: dt
+        real(dp),          intent(in)    :: branch_time_thr
+        real(wp),          intent(in)    :: rate
         character(len=*),  intent(in)    :: forcing, forc_method
 
         real(wp) :: factor

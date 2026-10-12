@@ -26,7 +26,7 @@ contains
         ! where ice is allowed.
         type(yelmo_class), intent(in) :: ylmo
         character(len=*),  intent(in) :: file2D, file1D
-        real(wp),          intent(in) :: time
+        real(dp),          intent(in) :: time
 
         call yelmo_write_init(ylmo, file2D, time_init=time, units="years")
         call yelmo_write_reg_init(ylmo, file1D, time_init=time, units="years", &
@@ -43,7 +43,7 @@ contains
         type(yelmo_class),    intent(IN) :: ylmo
         type(marshelf_class), intent(IN) :: mshlf
         character(len=*),     intent(IN) :: filename
-        real(wp),             intent(IN) :: time
+        real(dp),             intent(IN) :: time
         
         ! ---- local variables ------------------------------------------------
         integer  :: ncid, n, i, j, k, nz
@@ -354,7 +354,7 @@ contains
         type(yelmo_class),    intent(IN) :: ylmo
         type(marshelf_class), intent(IN) :: mshlf
         character(len=*),     intent(IN) :: filename
-        real(wp),             intent(IN) :: time
+        real(dp),             intent(IN) :: time
         
         ! ---- local variables ------------------------------------------------
         type(yregions_class) :: reg

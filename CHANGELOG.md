@@ -31,6 +31,13 @@ annotated git tag. Dates are release (tag) dates.
   the forcing slices (fesm-utils varslice now reads data without time once). Fixes the
   repeated extrapolation of slices that were not re-read (ESM reference ocean of the
   transient runs, variability) with `extrap_shlf = True`; results otherwise unchanged.
+- Model time in double precision (needs fesm-utils, Yelmo, FastIsostasy and chion with
+  `real(dp)` time). The drivers' step `dtt`, `[comps] dt_clim`/`dt_isos`, `[output]
+  dt_cmip` and the time arguments of the kryos modules and of the climate, surface and
+  shelf components (snapclim, snapesm, esm, rembo, smbpal, chion surface, marine_shelf,
+  OBM coupling) are `real(dp)`, as are the snapclim series time axes and snapshot times
+  and the esm reference periods. Forcing values stay `wp`. In single precision the
+  spacing of the time is 0.008 yr at 130 kyr.
 
 ### Added
 - `[comps] dt_isos` [yr]: isostasy update interval (10 in all par files; was every step).
