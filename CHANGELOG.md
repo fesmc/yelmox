@@ -430,6 +430,8 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `tests/test_timestepping.f90`: current fesm-utils API (double-precision time, methods
+  rel/cal/const); checks the end time, step count and calendar/relative times.
 - `maps/grid_GRL-32KM.txt`: 53 columns, as the GRL-32KM data and the FesmData v2 grid (was 54;
   the ncio size check stopped `yelmox_bipolar` on the GRL-32KM climate). Delete cached
   `maps/scrip-*GRL-32KM*.nc` maps.
