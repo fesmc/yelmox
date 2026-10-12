@@ -6,6 +6,9 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Sediment thickness (`[sed] obs_path`) from FesmData v2 `Sediment-CRUST1` (CRUST1.0,
+  Laske et al., 2013, successor of the Laske and Masters (1997) `SED-L97`); SRG keeps
+  `SED-L97` (no v2 grid).
 - ISMIP7 Antarctica: present-day smb and surface temperature from FesmData v2 RACMO2.3p2
   1981-2010 (`ice_data/v2/`); `T_srf` is now the skin temperature (was 2 m). The smb is in
   kg m-2 yr-1: needs Yelmo with the pd smb units read from the file.
