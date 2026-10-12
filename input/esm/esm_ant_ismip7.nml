@@ -2,33 +2,34 @@
 
 ! ======== Reference period ========
 &gcm_ts_ref
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    ! RACMO2.3p2 (ERA5) monthly climatology 1985-2014 (FesmData v2): the ISMIP7 reference
+    ! period, filled over the whole grid
+    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "t2m"
     units       = "K" "K"
     scaling     = 1.0 0.0
-    time        = 1, 1979.0, 2022.0, 1.0, 12.0
+    time        = 0, 1985.0, 2014.0, 0, 12.0
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
-    name        = "precip"
-    units       = "kg m-2 month-1" "mm d-1"
-    scaling     = 0.0329 0.0
-    time        = 1, 1979.0, 2022.0, 1.0, 12.0
+    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
+    name        = "pr"
+    units       = "kg m-2 yr-1" "mm d-1"
+    scaling     = 2.73785e-3 0.0
+    time        = 0, 1985.0, 2014.0, 0, 12.0
 /
 
 &gcm_smb_ref
-    ! RACMO2.3 monthly climatology (van Wessem et al.): the ERA5 1979-2022 file
-    ! above has no smb.
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_RACMO23-VW23.nc"
+    ! smb complete: pr + subl off the glaciated surfaces
+    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "smb"
-    units       = "kg m-2 d-1" "mm yr-1"
-    scaling     = 365.0 0.0
-    time        = 0, 1979.0, 2022.0, 0, 12.0
+    units       = "kg m-2 yr-1" "mm yr-1"
+    scaling     = 1.0 0.0
+    time        = 0, 1985.0, 2014.0, 0, 12.0
 /
 
 &gcm_zs_ref
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "z_srf"
     units       = "m" "m"
     scaling     = 1.0 0.0

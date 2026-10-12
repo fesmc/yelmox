@@ -17,7 +17,7 @@
     ! Time intervals (check with ESM forcings)
     time_hist       = 1850, 2014        ! [yr] Year interval used as Historical period
     time_proj       = 2015, 2300        ! [yr] Year interval used as Projection period
-    time_ref        = 1985, 2014        ! [yr] RACMO2.3 reference climatology (within its 1979-2022 axis)
+    time_ref        = 1985, 2014        ! [yr] Year interval used as Reference (RACMO2.3p2 climatology 1985-2014)
                                         ! If "opt" this time interval will be used as optimization
     time_esm_ref    = 1960, 1989        ! [yr] Year interval used as Reference of ESM
     clim_var        = False             ! include climate variability
