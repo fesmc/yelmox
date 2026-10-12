@@ -10,6 +10,7 @@ module marine_shelf
     use ncio 
     use mapping,     only : map_class, map_read
     use ncio_interp, only : nc_read_interp
+    use interp2D,    only : fill_nearest
 
     use pico 
     use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
@@ -722,6 +723,7 @@ contains
         ! Local variables
         integer  :: k
         real(wp) :: grd_dx 
+        real(wp), parameter :: mv = -9999.0_wp   ! missing value marker
 
         ! Load parameters
         call marshelf_par_load(mshlf%par,filename,group,domain,grid_name)
@@ -771,7 +773,14 @@ contains
         if (mshlf%par%use_obs) then
 
             ! Load observed field from file
-            call nc_read(mshlf%par%obs_path,mshlf%par%obs_name,mshlf%now%bmb_ref) 
+            call nc_read(mshlf%par%obs_path,mshlf%par%obs_name,mshlf%now%bmb_ref,missing_value=mv)
+
+            ! Fill the cells without data (e.g. outside the present-day ice shelves)
+            ! from the nearest valid value
+            if (any(mshlf%now%bmb_ref .eq. mv)) then
+                call fill_nearest(mshlf%now%bmb_ref,mv)
+                write(*,*) "marshelf_init:: bmb_ref: missing values filled from the nearest valid value."
+            end if
 
             ! Make negative since bmb is defined with melt negative, but observed field has melt positive
             mshlf%now%bmb_ref = -mshlf%now%bmb_ref
