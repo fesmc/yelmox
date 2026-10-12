@@ -6,6 +6,9 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Antarctica: the observed basal melt (`[marine_shelf] use_obs`) from FesmData v2
+  `BasalMelt-Rignot2013`, `bmelt_eq_reese` (was `BMELT-R13`, `bm_eq_reese`), missing
+  values filled from the nearest valid value; Greenland, North, LIS and SRG keep `BMELT-R13`.
 - Sediment thickness (`[sed] obs_path`) from FesmData v2 `Sediment-CRUST1` (CRUST1.0,
   Laske et al., 2013, successor of the Laske and Masters (1997) `SED-L97`); SRG keeps
   `SED-L97` (no v2 grid).
