@@ -6,6 +6,9 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- ISMIP7 Antarctica: present-day smb and surface temperature from FesmData v2 RACMO2.3p2
+  1981-2010 (`ice_data/v2/`); `T_srf` is now the skin temperature (was 2 m). The smb is in
+  kg m-2 yr-1: needs Yelmo with the pd smb units read from the file.
 - **FesmData v2 regions** (needs FesmData v2 data, `ice_data/v2/`): the topography is in
   `[topo]` and the regions, zones and basins in `[regions]` (fesm-utils `topodata`,
   `regions`); htopo moved to fesm-utils. Each component makes its own masks from the
