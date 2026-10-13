@@ -10,6 +10,7 @@ module kryos_output
     use marine_shelf, only : marshelf_class
     use fastisostasy, only : isos_class
     use smbpal,       only : smbpal_class
+    use smb_simple_m, only : smb_simple_class
     use surface_chion, only : surface_chion_class
     use htopo,        only : htopo_write_init, htopo_write_step
     use timestepping, only : tstep_class
@@ -67,8 +68,8 @@ contains
             call io_dims_init(trim(io_fname(outfldr,"isos")),   dom%ctl%grid_isos,  time)
         if (dom%ctl%write_shelf) &
             call io_dims_init(trim(io_fname(outfldr,"mshlf")),  dom%ctl%grid_shelf, time)
-        if (dom%ctl%write_surface) &
-            call io_dims_init(trim(io_fname(outfldr,surface_file_base(dom))), dom%ctl%grid_surface, time)
+        if (dom%ctl%write_surface .and. trim(dom%ctl%surface_method) /= "climate") &
+            call io_dims_init(trim(io_fname(outfldr,trim(dom%ctl%surface_method))), dom%ctl%grid_surface, time)
         if (dom%ctl%write_clim) then
             call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
             call climate_write_init(dom%cl, trim(io_fname(outfldr,climate_file_base(dom%cl))))
@@ -101,12 +102,17 @@ contains
             call isos_write_step(dom%isos, trim(io_fname(outfldr,"isos")), time)
         if (dom%ctl%write_shelf) &
             call mshlf_write_step(dom%mshlf, trim(io_fname(outfldr,"mshlf")), time)
+        ! The surface model's file, <surface_method>.nc; with surface_method =
+        ! "climate" the smb is the climate's, written to the climate's file.
         if (dom%ctl%write_surface) then
-            if (trim(dom%ctl%surface_method) == "chion") then
-                call surface_chion_write_step(dom%schn, trim(io_fname(outfldr,"chion")), time)
-            else
-                call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
-            end if
+            select case(trim(dom%ctl%surface_method))
+                case("chion")
+                    call surface_chion_write_step(dom%schn, trim(io_fname(outfldr,"chion")), time)
+                case("smbpal")
+                    call smb_write_step(dom%smb, trim(io_fname(outfldr,"smbpal")), time)
+                case("smb_simple")
+                    call smb_simple_write_step(dom%smbs, trim(io_fname(outfldr,"smb_simple")), time)
+            end select
         end if
         if (dom%ctl%write_clim) &
             call clim_write_step(dom, trim(io_fname(outfldr,climate_file_base(dom%cl))), time)
@@ -283,13 +289,18 @@ contains
         call nc_close(ncid)
     end subroutine smb_write_step
 
-    function surface_file_base(dom) result(base)
-        ! The surface model's 2D output file: chion.nc for chion, else smbpal.nc.
-        type(kryos_domain), intent(in) :: dom
-        character(len=56) :: base
-        base = "smbpal"
-        if (trim(dom%ctl%surface_method) == "chion") base = "chion"
-    end function surface_file_base
+    subroutine smb_simple_write_step(smbs, filename, time)
+        type(smb_simple_class), intent(in) :: smbs
+        character(len=*),       intent(in) :: filename
+        real(dp),               intent(in) :: time
+        integer :: ncid, n
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_var2D(filename, "smb",  real(smbs%smb, wp),   n, ncid, "mm w.e./yr", "Surface mass balance")
+        call io_var2D(filename, "tsrf", real(smbs%t_srf, wp), n, ncid, "K", "Surface temperature")
+        call nc_close(ncid)
+    end subroutine smb_simple_write_step
 
     subroutine surface_chion_write_step(sc, filename, time)
         ! Annual means of the last chion annual cycle on grid_surface.

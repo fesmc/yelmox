@@ -358,7 +358,8 @@ contains
         if (dom%ctl%with_ice_sheet) &
             call yelmo_restart_write(dom%yelmo,  trim(bundle)//"/yelmo_restart.nc", time)
         call marshelf_restart_write(dom%mshlf, trim(bundle)//"/marine_shelf.nc", time)
-        call smbpal_restart_write(dom%smb,   trim(bundle)//"/smbpal_restart.nc", time)
+        if (trim(dom%ctl%surface_method) == "smbpal") &
+            call smbpal_restart_write(dom%smb, trim(bundle)//"/smbpal_restart.nc", time)
         if (trim(dom%ctl%surface_method) == "chion") &
             call surface_chion_restart_write(dom%schn, trim(bundle)//"/chion_restart.nc", time)
 
@@ -436,7 +437,8 @@ contains
 
         ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
-        call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc")
+        if (trim(dom%ctl%surface_method) == "smbpal") &
+            call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc")
         if (trim(dom%ctl%surface_method) == "chion") &
             call surface_chion_restart_read(dom%schn, trim(fldr)//"/chion_restart.nc")
 

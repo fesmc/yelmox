@@ -376,7 +376,8 @@
     refreezing_fraction = 0.6               ! [1] Fraction of SNOW melt that refreezes
     temperature_sigma   = 5.0               ! [K] Std dev of unresolved temperature variability
     H_snow_max          = 5000.0            ! [kg m-2] Snowpack cap; the excess is converted to ice
-    pdd_method          = "simple"          ! PDD integral: "simple" | "pism"
+    pdd_method          = "simple"          ! PDD integral: "simple" | "cg05"
+    firn_fac            = 0.0266            ! [K (mm w.e. yr-1)-1] Firn warming per annual refreezing
 /
 
 ! Notes on &pdd
@@ -385,16 +386,22 @@
 !   "simple"  max(T-T0,0)*dt. Ignores sub-step temperature variability
 !             entirely, so it produces no melt at all below freezing.
 !             Appropriate when dt resolves the temperature cycle (daily).
-!   "pism"    the Calov–Greve expectation integral
+!   "cg05"    the Calov and Greve (2005) expectation integral (Chion.jl's :pism)
 !             dt*(sigma*phi(z) + Tbar*Phi(z)), z = Tbar/sigma.
 !             Use it for monthly steps, or wherever sub-step variability
 !             matters: at daily dt the simple form loses 1.25 kg m-2 d-1
 !             of melt at -5 C and 5.98 at 0 C, concentrated at the
 !             equilibrium line. smbpal always uses the integral, so a host
-!             replacing smbpal sets pdd_method = "pism" explicitly.
+!             replacing smbpal sets pdd_method = "cg05" explicitly.
 !
 !   The choice is explicit in both models; Chion.jl formerly selected it
 !   implicitly from the timestep length (docs/pdd_defects.md D4).
+!
+! firn_fac
+!   smbpal's firn warming, as ITM's: chion_tsrf_annual warms the annual-mean
+!   air temperature by firn_fac times the annual refreezing, capped at
+!   freezing over ice. Per step, PDD's surface temperature is the air
+!   temperature capped at freezing over ice.
 !
 ! refreezing_fraction
 !   refrozen = min(refreezing_fraction*H_snow, snow_melt), with H_snow the
@@ -464,9 +471,11 @@
 !   Lives in smbpal_param_class, not in smbpal's itm_par_class, because
 !   smbpal applies the surface-temperature adjustment once per year
 !   outside the ITM module. chion computes it inside itm_step, so the
-!   parameter travels with the ITM parameters. It is calibrated against the
-!   ANNUAL net melt [mm w.e. yr-1] on a 360-day year; itm_step scales its
-!   per-step rate accordingly.
+!   parameter travels with the ITM parameters. It is calibrated on annual
+!   means: chion_tsrf_annual warms the annual-mean air temperature by
+!   firn_fac times the annual refreezing [mm w.e. yr-1], capped at freezing
+!   over ice. itm_step's per-step tsrf has no firn term (per step on the
+!   daily melt_net only under legacy_chion, as Chion.jl).
 !
 ! ITM takes rho_w, L_m and T0 from the shared constants, like the other
 ! models (docs/porting_notes.md D26, D28). itm_c and itm_t were

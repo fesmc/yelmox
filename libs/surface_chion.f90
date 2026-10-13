@@ -9,7 +9,7 @@ module surface_chion
     ! units so couple_surface_to_yelmo treats both models alike.
     !
     ! Inputs chion does not own, supplied here (as smbpal does internally):
-    !   - daily top-of-atmosphere insolation (libs/insol) from a per-day latitude
+    !   - daily top-of-atmosphere insolation (ITM, BESSI; libs/insol) from a per-day latitude
     !     table (insol_dlat) interpolated to the columns, as shortwave_down: as is
     !     for ITM (which applies its own transmissivity), times a constant
     !     transmissivity trans_sw for BESSI (surface shortwave), and as the
@@ -31,18 +31,20 @@ module surface_chion
     ! cold state. Inactive columns: smb = 0, tsrf = annual-mean air temperature.
     !
     ! smb is the surface mass balance, sf + rf - runoff - subl (smbpal's smb),
-    ! not chion_get_smb's ice-facing flux. tsrf and alb_s are the annual means
-    ! of chion's per-step surface state (chion_get_surface), as for any chion
-    ! model. For ITM this differs from smbpal, which applies the firn warming
-    ! and the freezing-point cap once to annual means: per step, summer days
-    ! are capped, so tsrf is colder in the ablation zone.
+    ! not chion_get_smb's ice-facing flux. tsrf: for ITM and PDD chion's
+    ! chion_tsrf_annual, smbpal's calc_temp_surf on the annual means (the
+    ! annual-mean air temperature warmed by the annual refreezing, firn_fac,
+    ! capped at freezing over ice); for BESSI the annual mean of its per-step
+    ! surface temperature (chion_get_surface). alb_s is the annual mean of
+    ! chion's per-step albedo (missing for PDD, which has none).
     !
     ! The per-column host work (forcing, accumulation, PDDs, insolation lookup)
     ! is OpenMP-parallel over the active columns, like chion's own step.
     !
-    ! Supported chion models: "itm" and "bessi". BESSI's downwelling longwave
-    ! is chion's own (longwave_scheme; default "cloud_proxy", whose cloudiness
-    ! 1 - SWdn/(TOA*tau_clear) is elevation-only here, SWdn/TOA = trans_sw).
+    ! Supported chion models: "itm", "bessi" and "pdd". BESSI's downwelling
+    ! longwave is chion's own (longwave_scheme; default "cloud_proxy", whose
+    ! cloudiness 1 - SWdn/(TOA*tau_clear) is elevation-only here, SWdn/TOA =
+    ! trans_sw). PDD takes the air temperature and the snowfall/rainfall only.
 
     use nml,        only : nml_read
     use phys_constants, only : phys_const_class, sec_day
@@ -53,7 +55,7 @@ module surface_chion
                            chion_restart_write, chion_restart_read, &
                            monthly_to_daily_class, monthly_to_daily_init, &
                            monthly_to_daily_controls, interp_monthly_to_day, &
-                           pdd_expected_positive_temperature
+                           pdd_expected_positive_temperature, chion_tsrf_annual
 
     implicit none
 
@@ -94,7 +96,7 @@ module surface_chion
         real(wp), allocatable :: smb(:,:)       ! [mm w.e./yr] sf + rf - runoff - subl
         real(wp), allocatable :: tsrf(:,:)      ! [K] surface temperature
         real(wp), allocatable :: alb_s(:,:)     ! [1] surface albedo
-        real(wp), allocatable :: H_snow(:,:)    ! [mm w.e.] end-of-year snowpack (itm)
+        real(wp), allocatable :: H_snow(:,:)    ! [mm w.e.] end-of-year snowpack (itm, pdd)
     end type surface_chion_ann_class
 
     type surface_chion_insol_class
@@ -116,6 +118,7 @@ module surface_chion
         type(surface_chion_ann_class)   :: ann
         integer                         :: nx, ny, ncol
         logical                         :: itm      ! model = "itm" (ITM-only forcing)
+        logical                         :: insol    ! the model takes insolation (itm, bessi)
         real(wp)                        :: sw_fac   ! shortwave_down = sw_fac * TOA insolation
     end type surface_chion_class
 
@@ -150,12 +153,18 @@ contains
         select case(trim(sc%chn%par%model))
             case("itm")
                 sc%itm    = .true.
+                sc%insol  = .true.
                 sc%sw_fac = 1.0_wp
             case("bessi")
                 sc%itm    = .false.
+                sc%insol  = .true.
                 sc%sw_fac = sc%par%trans_sw
+            case("pdd")
+                sc%itm    = .false.
+                sc%insol  = .false.
+                sc%sw_fac = 0.0_wp
             case default
-                write(*,*) "surface_chion_init:: error: chion model must be itm or bessi &
+                write(*,*) "surface_chion_init:: error: chion model must be itm, bessi or pdd &
                            &(the host supplies no forcing for others); got "//trim(sc%chn%par%model)
                 stop 1
         end select
@@ -170,7 +179,7 @@ contains
 
         ! Column icol = i + (j-1)*nx: reshape order.
         sc%chn%forc%latitude_deg = reshape(lats, [sc%ncol])
-        call insol_init(sc%ins, sc%chn%forc%latitude_deg, sc%md%nday_year)
+        if (sc%insol) call insol_init(sc%ins, sc%chn%forc%latitude_deg, sc%md%nday_year)
 
         ! Constant for the run.
         sc%chn%forc%wind_speed            = sc%par%wind_speed
@@ -213,6 +222,7 @@ contains
         real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:), t_ann(:)
         real(wp), allocatable :: t_sum(:), pr_sum(:), sf_sum(:), S_sum(:), PDDs(:)
         real(wp), allocatable :: tsrf_c(:), alb_c(:), ts_sum(:), alb_sum(:)
+        real(wp), allocatable :: t_air_c(:), refrz_c(:), tsrf_ann_c(:)
         real(wp_acc), allocatable :: melt0(:), runoff0(:), refrz0(:), subl0(:)
         real(wp_acc), allocatable :: melt1(:), runoff1(:), refrz1(:), subl1(:)
         real(wp), allocatable :: melt_a(:), runoff_a(:), refrz_a(:), subl_a(:)
@@ -231,9 +241,11 @@ contains
         na  = sc%chn%grd%n_active
         idx = sc%chn%grd%active_idx(1:na)
 
-        insol_time = time_bp
-        if (sc%par%const_insol) insol_time = sc%par%const_kabp*1e3_dp
-        call insol_update(sc%ins, insol_time, sc%par%dt_days, trim(sc%par%insol_fldr))
+        if (sc%insol) then
+            insol_time = time_bp
+            if (sc%par%const_insol) insol_time = sc%par%const_kabp*1e3_dp
+            call insol_update(sc%ins, insol_time, sc%par%dt_days, trim(sc%par%insol_fldr))
+        end if
 
         ! Mean-preserving daily control values, (nmon,na) so a column is contiguous.
         allocate(mon(na,nmon), ctl(na,nmon))
@@ -301,8 +313,11 @@ contains
                 ! The mean-preserving controls can undershoot zero for a peaked field.
                 p_d  = max(p_d, 0.0_wp)
                 sf_d = p_d*calc_snowfrac(t_d, sc%par%sf_a, sc%par%sf_b)
-                j0   = sc%ins%j0(icol)
-                S_d  = (1.0_wp - sc%ins%w1(icol))*sc%ins%S(j0,day) + sc%ins%w1(icol)*sc%ins%S(j0+1,day)
+                S_d  = 0.0_wp
+                if (sc%insol) then
+                    j0  = sc%ins%j0(icol)
+                    S_d = (1.0_wp - sc%ins%w1(icol))*sc%ins%S(j0,day) + sc%ins%w1(icol)*sc%ins%S(j0+1,day)
+                end if
 
                 sc%chn%forc%air_temperature(icol) = t_d
                 sc%chn%forc%snowfall_rate(icol)   = sf_d/spd             ! [mm/d] -> [kg m-2 s-1]
@@ -352,13 +367,29 @@ contains
         sc%ann%smb    = unpack_col(pr_sum - runoff_a - subl_a,   idx, sc, 0.0_wp)
         sc%ann%alb_s  = unpack_col(alb_sum/real(nday, wp),       idx, sc, MV)
 
-        ! Surface temperature: chion's annual mean; inactive columns keep t2m.
+        ! Surface temperature (inactive columns keep t2m): ITM and PDD, chion's
+        ! on the annual means (chion_tsrf_annual; H_ice is chion's forcing of
+        ! the year); BESSI, the annual mean of its per-step surface temperature.
         sc%ann%tsrf = sc%ann%t2m
-        call scatter(sc%ann%tsrf, ts_sum/real(nday, wp), idx, sc)
+        if (trim(sc%chn%par%model) == "bessi") then
+            call scatter(sc%ann%tsrf, ts_sum/real(nday, wp), idx, sc)
+        else
+            allocate(t_air_c(sc%ncol), refrz_c(sc%ncol), tsrf_ann_c(sc%ncol))
+            t_air_c = MV
+            refrz_c = MV
+            t_air_c(idx) = t_sum/real(nday, wp)
+            refrz_c(idx) = refrz_a
+            call chion_tsrf_annual(sc%chn, t_air_c, refrz_c, tsrf_ann_c)
+            call scatter(sc%ann%tsrf, tsrf_ann_c(idx), idx, sc)
+        end if
 
         sc%ann%H_snow = MV
-        if (trim(sc%chn%par%model) == "itm") &
-            call scatter(sc%ann%H_snow, sc%chn%itm%now%H_snow(idx), idx, sc)
+        select case(trim(sc%chn%par%model))
+            case("itm")
+                call scatter(sc%ann%H_snow, sc%chn%itm%now%H_snow(idx), idx, sc)
+            case("pdd")
+                call scatter(sc%ann%H_snow, sc%chn%pdd%now%snowpack_swe(idx), idx, sc)
+        end select
     end subroutine surface_chion_update
 
     subroutine surface_chion_restart_write(sc, filename, time)

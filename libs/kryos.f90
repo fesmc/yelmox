@@ -156,7 +156,7 @@ module kryos
         type(isos_class)       :: isos
         type(yelmox_climate_class) :: cl    ! climate backend ([comps] climate)
         type(climate_out_class)    :: clim  ! backend-agnostic climate output (now/ref)
-        type(smbpal_class)     :: smb     ! smbpal (surface_method="smbpal"; always initialized)
+        type(smbpal_class)     :: smb     ! smbpal (surface_method="smbpal")
         type(smb_simple_class) :: smbs    ! alternative SMB (surface_method="smb_simple")
         type(surface_chion_class) :: schn ! chion, the default SMB (surface_method="chion")
         type(sediments_class)  :: sed
@@ -336,7 +336,7 @@ contains
         call regions_end(reg_c)
 
         ! --- smb on its configured grid (grid_surface) ---
-        ! smbpal reads no grid-specific data; only lats (insolation) is physical.
+        ! The surface models read no grid-specific data; only lats (insolation) is physical.
         call grid_cdo_read_desc(grid_s, trim(dom%ctl%grid_surface), MAP_FLDR)
         nx_s = grid_s%G%nx
         ny_s = grid_s%G%ny
@@ -344,8 +344,9 @@ contains
         xs     = real(grid_s%G%x, wp)
         ys     = real(grid_s%G%y, wp)
         lats_s = real(grid_s%lat, wp)
-        call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s, &
-                         group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx))
+        if (trim(dom%ctl%surface_method) == "smbpal") &
+            call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s, &
+                             group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx))
 
         ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
         ! smbpal (1D axes), smb_simple takes 2D projected coordinates.

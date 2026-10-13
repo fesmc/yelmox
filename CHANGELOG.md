@@ -6,6 +6,23 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
+  `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
+  `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD
+  (`pdd_method = "cg05"`, Calov and Greve, 2005). The chion host supports PDD (no
+  insolation), and takes the surface temperature of ITM and PDD from chion's
+  `chion_tsrf_annual` (smbpal's firn warming by the annual refreezing, on annual means).
+  Needs chion with PDD melt/refreezing, `cg05` and `chion_tsrf_annual`;
+  `input/chion_defaults.nml` synced.
+- Surface output: one file per surface model, `<surface_method>.nc` (`chion.nc`,
+  `smbpal.nc`, `smb_simple.nc`, new); with `surface_method = "climate"` none, the climate's
+  file has the smb applied (`smb_ann`, `tsrf_ann`, for esm and rembo). The climate's smb is
+  landed on Yelmo from the climate (no longer through smbpal), and smbpal is initialized
+  and restarted (`smbpal_restart.nc`) only when it is the surface model.
+- ISMIP7 (`yelmox_esm_Antarctica_ismip7.nml`, `yelmox_esm_Greenland.nml`,
+  `yelmox_esm_Greenland_k24.nml`): `[comps] surface_method = "climate"`, the ESM smb of
+  the protocol (was chion since the chion default, smbpal before), so that
+  `run_ismip7_*.sh` and the `opt_*.sh` spin-ups (which set it themselves before) impose it.
 - ISMIP7 Antarctica: the reference climate of `esm` (`t2m`, `pr`, `smb`, `z_srf`) from
   FesmData v2 `SMB-RACMO2.3p2-1985-2014`, the RACMO2.3p2 monthly climatology of the ISMIP7
   reference period, complete over the grid (was the RACMO2.3p2 ERA5 1979-2022 series and

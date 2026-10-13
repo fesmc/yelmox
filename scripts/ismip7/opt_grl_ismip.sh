@@ -27,7 +27,6 @@ res_params=(
 ctrl_params=(
     "ctrl.run_step=spinup"
     "comps.dt_clim=10"
-    "comps.surface_method=climate"
     "sim.relax=True"
     "sim.opt=True"
     "spinup.time_end=15e3"
