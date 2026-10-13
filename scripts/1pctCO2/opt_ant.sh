@@ -7,7 +7,6 @@ ctrl_params=(
     "domain.grid_hub=${resolution}"
     "ctrl.run_step=spinup"
     "comps.dt_clim=10"
-    "comps.surface_method=smbpal"
     "sim.relax=True"
     "sim.opt=True"
     "spinup.time_end=20.0e3"
