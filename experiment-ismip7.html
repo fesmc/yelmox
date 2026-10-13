@@ -306,7 +306,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="tuned-spin-ups" class="level2">
 <h2 class="anchored" data-anchor-id="tuned-spin-ups">Tuned spin-ups</h2>
-<p><code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code> (L. Gutierrez Gonzalez) and <code>opt_ant.sh</code> are 15-kyr optimization spin-ups with tuned parameters on top of the par files: the SMB taken from the ESM (<code>comps.surface_method=climate</code>), <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>, the <code>ytill</code> parameters), a short relaxation (<code>relax.time1/2 = 100</code>), equilibrium calving, DIVA dynamics and shelf enhancement 0.5; <code>opt_grl_ismip.sh</code> uses von Mises calving (<code>vm-l19</code>) and a linear melt law. To run the scenarios from one of them, set <code>BUNDLE</code> in the workflow script to its last restart bundle.</p>
+<p><code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code> (L. Gutierrez Gonzalez) and <code>opt_ant.sh</code> are 15-kyr optimization spin-ups with tuned parameters on top of the par files: <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>, the <code>ytill</code> parameters), a short relaxation (<code>relax.time1/2 = 100</code>), equilibrium calving, DIVA dynamics and shelf enhancement 0.5; <code>opt_grl_ismip.sh</code> uses von Mises calving (<code>vm-l19</code>) and a linear melt law. To run the scenarios from one of them, set <code>BUNDLE</code> in the workflow script to its last restart bundle.</p>
 </section>
 <section id="forcing" class="level2">
 <h2 class="anchored" data-anchor-id="forcing">Forcing</h2>
@@ -341,26 +341,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>same, <code>v2</code></td>
 </tr>
 <tr class="even">
+<td>Surface mass balance</td>
+<td>the ESM smb, reference + <code>acabf</code> anomaly + <code>dacabfdz</code> elevation correction (<code>[comps] surface_method = "climate"</code>)</td>
+<td>same</td>
+</tr>
+<tr class="odd">
 <td>ESM ocean</td>
 <td>ISMIP7 <code>tf</code>, <code>so</code> (2D)</td>
 <td>ISMIP7 <code>thetao</code>, <code>so</code> (3D, <code>v3</code>)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Subglacial discharge</td>
 <td>ISMIP7 <code>sgd</code></td>
 <td>–</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Shelf melt</td>
 <td><code>bmb_method = "anom"</code>, <code>tf_method = 2</code></td>
 <td><code>bmb_method = "quad-nl"</code>, <code>tf_method = 1</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Topography, basins</td>
 <td>ISMIP7 obs v1.3 (GrIMP surface)</td>
 <td>ISMIP7 obs v1.1 (Bedmap3)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Present-day smb, <code>T_srf</code> (comparison)</td>
 <td>MAR v3.11 (ERA), 1961–1990</td>
 <td>FesmData v2 <code>SMB-RACMO2.3p2-1981-2010</code> (<code>T_srf</code>: skin temperature)</td>
@@ -397,7 +402,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>The shared per-module files (<code>yelmo.nc</code>, <code>yelmo_ts.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>chion.nc</code>, <code>htopo.nc</code>; Antarctica also <code>yelmo_ts_APIS/WAIS/EAIS.nc</code>) and the restart bundles <code>restart-&lt;kyr&gt;-kyr/</code>. For ISMIP7 submissions, <code>[output] write_cmip = True</code> writes <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code> every <code>dt_cmip</code>; <code>write_clim = True</code> adds the ESM forcing (<code>esm.nc</code>, <code>esm_ts.nc</code>).</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>yelmo_ts.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>htopo.nc</code>; Antarctica also <code>yelmo_ts_APIS/WAIS/EAIS.nc</code>) and the restart bundles <code>restart-&lt;kyr&gt;-kyr/</code>. For ISMIP7 submissions, <code>[output] write_cmip = True</code> writes <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code> every <code>dt_cmip</code>; <code>write_clim = True</code> adds the ESM forcing (<code>esm.nc</code>, <code>esm_ts.nc</code>), with the smb applied (<code>smb_ann</code>, <code>tsrf_ann</code>).</p>
 
 
 </section>
