@@ -6,6 +6,10 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- ISMIP7 (`yelmox_esm_Antarctica_ismip7.nml`, `yelmox_esm_Greenland.nml`,
+  `yelmox_esm_Greenland_k24.nml`): `[comps] surface_method = "climate"`, the ESM smb of
+  the protocol (was chion since the chion default, smbpal before), so that
+  `run_ismip7_*.sh` and the `opt_*.sh` spin-ups (which set it themselves before) impose it.
 - ISMIP7 Antarctica: the reference climate of `esm` (`t2m`, `pr`, `smb`, `z_srf`) from
   FesmData v2 `SMB-RACMO2.3p2-1985-2014`, the RACMO2.3p2 monthly climatology of the ISMIP7
   reference period, complete over the grid (was the RACMO2.3p2 ERA5 1979-2022 series and

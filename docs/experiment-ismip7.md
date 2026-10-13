@@ -67,7 +67,7 @@ is then lost within the first years.
 
 `opt_grl.sh`, `opt_grl_ismip.sh` (L. Gutierrez Gonzalez) and `opt_ant.sh` are
 15-kyr optimization spin-ups with tuned parameters on top of the par files:
-the SMB taken from the ESM (`comps.surface_method=climate`), `cb_ref` started from
+`cb_ref` started from
 the till friction of the bed (`opt.cf_init=-1`, the `ytill` parameters), a short
 relaxation (`relax.time1/2 = 100`), equilibrium calving, DIVA dynamics and
 shelf enhancement 0.5; `opt_grl_ismip.sh` uses von Mises calving (`vm-l19`) and a
@@ -85,6 +85,7 @@ to `time_esm_ref` (1960--1989), applied over `time_hist` (1850--2014) and
 | Reference atmosphere | MAR v3.11 (ERA), 1961--1990 monthly | RACMO2.3p2 (ERA5), monthly climatology 1985--2014 (`time_ref`), FesmData v2 `SMB-RACMO2.3p2-1985-2014` |
 | Reference ocean | ORAS4 1981--2010 annual mean | meltMIP observational climatology (extrapolated) |
 | ESM atmosphere | ISMIP7 SDBN1 `tas`, `pr`, `acabf`, `dacabfdz` | same, `v2` |
+| Surface mass balance | the ESM smb, reference + `acabf` anomaly + `dacabfdz` elevation correction (`[comps] surface_method = "climate"`) | same |
 | ESM ocean | ISMIP7 `tf`, `so` (2D) | ISMIP7 `thetao`, `so` (3D, `v3`) |
 | Subglacial discharge | ISMIP7 `sgd` | -- |
 | Shelf melt | `bmb_method = "anom"`, `tf_method = 2` | `bmb_method = "quad-nl"`, `tf_method = 1` |
@@ -101,7 +102,7 @@ ESMs and scenarios on Levante (`ice_data/ISMIP7/<domain>/<grid>/`):
 ## Output
 
 The shared per-module files (`yelmo.nc`, `yelmo_ts.nc`, `isos.nc`, `mshlf.nc`,
-`chion.nc`, `htopo.nc`; Antarctica also `yelmo_ts_APIS/WAIS/EAIS.nc`) and the
+`smbpal.nc` (the surface fields), `htopo.nc`; Antarctica also `yelmo_ts_APIS/WAIS/EAIS.nc`) and the
 restart bundles `restart-<kyr>-kyr/`. For ISMIP7 submissions, `[output]
 write_cmip = True` writes `yelmo_cmip.nc` and `yelmo_ts_cmip.nc` every `dt_cmip`;
 `write_clim = True` adds the ESM forcing (`esm.nc`, `esm_ts.nc`).
