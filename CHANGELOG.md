@@ -6,6 +6,14 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
+  `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
+  `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD
+  (`pdd_method = "cg05"`, Calov and Greve, 2005). The chion host supports PDD (no
+  insolation), and takes the surface temperature of ITM and PDD from chion's
+  `chion_tsrf_annual` (smbpal's firn warming by the annual refreezing, on annual means).
+  Needs chion with PDD melt/refreezing, `cg05` and `chion_tsrf_annual`;
+  `input/chion_defaults.nml` synced.
 - Surface output: one file per surface model, `<surface_method>.nc` (`chion.nc`,
   `smbpal.nc`, `smb_simple.nc`, new); with `surface_method = "climate"` none, the climate's
   file has the smb applied (`smb_ann`, `tsrf_ann`, for esm and rembo). The climate's smb is

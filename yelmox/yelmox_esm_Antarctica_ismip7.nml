@@ -675,7 +675,7 @@
 /
 
 &chion
-    model           = "itm"                          ! Snowpack model: "itm" or "bessi"
+    model           = "itm"                          ! Snowpack model: "itm", "bessi" or "pdd"
     nml_itm         = "itm"                          ! ITM parameters: shared with smbpal
 /
 

@@ -709,7 +709,7 @@
 /
 
 &chion
-    model           = "itm"                          ! Snowpack model: "itm" or "bessi"
+    model           = "itm"                          ! Snowpack model: "itm", "bessi" or "pdd"
     nml_itm         = "itm_chion"                    ! ITM parameters (chion's own group)
 /
 
