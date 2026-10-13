@@ -48,7 +48,7 @@
     write_yelmo   = True         ! per-module 2D + 1D output switches
     write_isos    = True
     write_shelf   = True
-    write_surface = False        ! smbpal.nc (unused with REMBO: its smb is in rembo.nc)
+    write_surface = False        ! <surface_method>.nc (none with REMBO: its smb is in rembo.nc)
     write_clim    = True         ! the climate's files (rembo.nc + rembo_ts.nc)
     write_htopo   = True
     write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)

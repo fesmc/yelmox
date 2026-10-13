@@ -102,7 +102,7 @@ ESMs and scenarios on Levante (`ice_data/ISMIP7/<domain>/<grid>/`):
 ## Output
 
 The shared per-module files (`yelmo.nc`, `yelmo_ts.nc`, `isos.nc`, `mshlf.nc`,
-`smbpal.nc` (the surface fields), `htopo.nc`; Antarctica also `yelmo_ts_APIS/WAIS/EAIS.nc`) and the
-restart bundles `restart-<kyr>-kyr/`. For ISMIP7 submissions, `[output]
-write_cmip = True` writes `yelmo_cmip.nc` and `yelmo_ts_cmip.nc` every `dt_cmip`;
-`write_clim = True` adds the ESM forcing (`esm.nc`, `esm_ts.nc`).
+`htopo.nc`; Antarctica also `yelmo_ts_APIS/WAIS/EAIS.nc`) and the restart bundles
+`restart-<kyr>-kyr/`. For ISMIP7 submissions, `[output] write_cmip = True` writes
+`yelmo_cmip.nc` and `yelmo_ts_cmip.nc` every `dt_cmip`; `write_clim = True` adds
+the ESM forcing (`esm.nc`, `esm_ts.nc`), with the smb applied (`smb_ann`, `tsrf_ann`).

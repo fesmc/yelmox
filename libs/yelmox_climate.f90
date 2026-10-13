@@ -308,6 +308,12 @@ contains
         call write2D("t2m_ann", out%now%ta_ann, "K", "Near-surface air temperature (ann)")
         if (allocated(out%now%pr_ann)) &
             call write2D("pr_ann", out%now%pr_ann, "mm/a", "Precipitation (ann)")
+        if (out%has_smb) then
+            ! The climate's own surface fields (with surface_method = "climate",
+            ! those landed on Yelmo).
+            call write2D("smb_ann",  1e-3_wp*out%now%smb, "m/a water equiv.", "Surface mass balance (ann)")
+            call write2D("tsrf_ann", out%now%tsrf, "K", "Surface temperature (ann)")
+        end if
 
         select case(trim(cl%method))
             case("snapesm")
@@ -316,8 +322,6 @@ contains
                 call write_esm()
             case("rembo")
                 call write2D("t2m_sum", cl%rembo%ta_sum, "K", "Near-surface air temperature (sum)")
-                call write2D("smb_ann", 1e-3_wp*out%now%smb, "m/a water equiv.", &
-                             "Surface mass balance (ann)")
         end select
 
     contains

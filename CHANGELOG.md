@@ -6,6 +6,11 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Surface output: one file per surface model, `<surface_method>.nc` (`chion.nc`,
+  `smbpal.nc`, `smb_simple.nc`, new); with `surface_method = "climate"` none, the climate's
+  file has the smb applied (`smb_ann`, `tsrf_ann`, for esm and rembo). The climate's smb is
+  landed on Yelmo from the climate (no longer through smbpal), and smbpal is initialized
+  and restarted (`smbpal_restart.nc`) only when it is the surface model.
 - ISMIP7 (`yelmox_esm_Antarctica_ismip7.nml`, `yelmox_esm_Greenland.nml`,
   `yelmox_esm_Greenland_k24.nml`): `[comps] surface_method = "climate"`, the ESM smb of
   the protocol (was chion since the chion default, smbpal before), so that

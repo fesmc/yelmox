@@ -272,11 +272,13 @@ contains
         ! Surface mass balance + surface temperature from the active SMB model
         ! (grid_surface -> Yelmo, conservative), with the we->ie unit scaling and the
         ! optional Greenland modifications. The producing step (step_surface,
-        ! or the climate's own) leaves smb/tsrf on grid_surface in the SMB model's
-        ! own fields; this coupler is the single place that lands them on Yelmo.
+        ! leaves smb/tsrf on grid_surface in the SMB model's own fields, or the
+        ! climate has them (surface_method = "climate"); this coupler is the
+        ! single place that lands them on Yelmo.
         type(kryos_domain), intent(inout) :: dom
 
         real(wp), allocatable :: smb_y(:,:), tsrf_y(:,:), ta_y(:,:), ta_pd_y(:,:)
+        real(wp), allocatable :: smb_s(:,:), tsrf_s(:,:)
         character(len=256) :: gs, gc, gy
 
         if (.not. dom%ctl%with_surface) return
@@ -285,16 +287,24 @@ contains
         gc = trim(dom%ctl%grid_clim)
         gy = trim(dom%ctl%grid_ice)
 
-        if (trim(dom%ctl%surface_method) == "smb_simple") then
-            call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
-            call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
-        else if (trim(dom%ctl%surface_method) == "chion") then
-            call remap(dom, dom%schn%ann%smb,  gs, smb_y,  gy, "con")
-            call remap(dom, dom%schn%ann%tsrf, gs, tsrf_y, gy, "con")
-        else
-            call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
-            call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
-        end if
+        select case(trim(dom%ctl%surface_method))
+            case("climate")
+                ! The climate's own surface mass balance and surface temperature,
+                ! through grid_surface as the surface models' fields.
+                call remap(dom, dom%clim%now%smb,  gc, smb_s,  gs, "bilin")
+                call remap(dom, dom%clim%now%tsrf, gc, tsrf_s, gs, "bilin")
+                call remap(dom, smb_s,  gs, smb_y,  gy, "con")
+                call remap(dom, tsrf_s, gs, tsrf_y, gy, "con")
+            case("smb_simple")
+                call remap(dom, dom%smbs%smb,   gs, smb_y,  gy, "con")
+                call remap(dom, dom%smbs%t_srf, gs, tsrf_y, gy, "con")
+            case("chion")
+                call remap(dom, dom%schn%ann%smb,  gs, smb_y,  gy, "con")
+                call remap(dom, dom%schn%ann%tsrf, gs, tsrf_y, gy, "con")
+            case("smbpal")
+                call remap(dom, dom%smb%ann%smb,  gs, smb_y,  gy, "con")
+                call remap(dom, dom%smb%ann%tsrf, gs, tsrf_y, gy, "con")
+        end select
 
         dom%yelmo%bnd%smb   = smb_y * dom%yelmo%bnd%c%conv_we_ie * 1e-3
         dom%yelmo%bnd%T_srf = tsrf_y
@@ -391,21 +401,21 @@ contains
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)
-        ! Surface mass balance on grid_surface. Four methods: smbpal (default; monthly,
-        ! needs tas/pr + geometry), chion (monthly, as smbpal, + bed and sea level
-        ! for its land/ice mask), smb_simple (needs z_srf + sea-level temperature) or the
-        ! climate's own (climate: esm, rembo). Geometry comes from the hi-res hub,
-        ! atmospheric forcing from the climate (grid_clim). init=.true. runs the
-        ! ITM snowpack equilibration (smbpal, chion) before the first update. The
-        ! result stays on grid_surface in the SMB model's fields (dom%smb%ann,
-        ! dom%schn%ann or dom%smbs); couple_surface_to_yelmo lands it on the Yelmo grid.
+        ! Surface mass balance on grid_surface. Four methods: chion (default; monthly,
+        ! needs tas/pr + geometry, with bed and sea level for its land/ice mask),
+        ! smbpal (monthly, as chion), smb_simple (needs z_srf + sea-level temperature)
+        ! or the climate's own (climate: esm, rembo; nothing to step here). Geometry
+        ! comes from the hi-res hub, atmospheric forcing from the climate (grid_clim).
+        ! init=.true. runs the snowpack equilibration (chion; smbpal ITM) before the
+        ! first update. The result stays on grid_surface in the SMB model's fields
+        ! (dom%schn%ann, dom%smb%ann or dom%smbs); couple_surface_to_yelmo lands it
+        ! (or the climate's) on the Yelmo grid.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         logical, intent(in), optional    :: init
 
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
         real(wp), allocatable :: tsl_s(:,:), Href_s(:,:), z_bed_s(:,:), z_sl_s(:,:)
-        real(wp), allocatable :: smb_s(:,:), tsrf_s(:,:)
         character(len=256) :: gc, gs, gh, gy
         logical :: is_init
 
@@ -419,14 +429,9 @@ contains
         gh = trim(dom%ctl%grid_hub)
         gy = trim(dom%ctl%grid_ice)
 
-        if (trim(dom%ctl%surface_method) == "climate") then
-            ! The climate's own surface mass balance and surface temperature, at
-            ! the current surface.
-            call remap(dom, dom%clim%now%smb,  gc, smb_s,  gs, "bilin")
-            call remap(dom, dom%clim%now%tsrf, gc, tsrf_s, gs, "bilin")
-            dom%smb%ann%smb  = smb_s
-            dom%smb%ann%tsrf = tsrf_s
-        else if (trim(dom%ctl%surface_method) == "smb_simple") then
+        ! surface_method = "climate": nothing to do, the climate has the smb
+        ! (couple_surface_to_yelmo lands it).
+        if (trim(dom%ctl%surface_method) == "smb_simple") then
             ! smb_simple: surface elevation + sea-level temperature, masked to the
             ! reference ice extent (refreshed each call in case H_ice_ref changed).
             call remap(dom, dom%topo%z_srf,          gh, z_srf_s, gs, "bilin")
@@ -446,7 +451,7 @@ contains
                                                    z_sl_s, ts%time_rel)
             call surface_chion_update(dom%schn, tas_s, pr_s, z_srf_s, z_bed_s, H_ice_s, z_sl_s, &
                                       ts%time_rel)
-        else
+        else if (trim(dom%ctl%surface_method) == "smbpal") then
             ! smbpal (monthly)
             call remap(dom, dom%clim%now%tas, gc, tas_s, gs, "bilin")
             call remap(dom, dom%clim%now%pr,  gc, pr_s,  gs, "bilin")
