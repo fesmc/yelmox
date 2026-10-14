@@ -11,7 +11,13 @@ annotated git tag. Dates are release (tag) dates.
   runme (`.runme/info.json` links). SRG topography `TOPO-GLO90-GEBCO2026`.
 - Isochrones from `Stratigraphy-MacGregor2025` (`pd_age_names = "age" "depth_iso"`; was
   `STRAT-M15`). `input/yelmo_defaults.nml` synced with yelmo.
-- Pyrenees: hub `PYR-250M` (`TOPO-GLO90-GEBCO2026`), Yelmo grid `PYR-1KM`.
+- Pyrenees on FesmData: ice sheet and surface on the hub `PYR-250M` (`TOPO-GLO90-GEBCO2026`),
+  climate (`Atmosphere-ERA5-1981-2010`, was WorldClim) and isostasy on `PYR-2KM`, GHF
+  `GHF-Lucazeau2019` from `PYR-2KM`; no ocean, no pd T_srf/velocity (the PYR-1KM `ice_data`
+  folders are empty).
+- GHF and sediment obs are remapped (bilinear) onto the Yelmo grid when the file is on another
+  grid (FesmData global attribute `grid_name`; fesm-utils `fesmdata_read_field`), so a par file
+  can name a coarser data grid in `obs_path`. `geothermal_init`/`sediments_init` take the Yelmo grid.
 - Greenland present-day climate MAR v3.14 1961-1990 (FesmData `SMB-MARv3.14-1961-1990`, was
   MARv3.11-ERA): snapclim/snapesm reference climatology (`t2m`, `sf`, `rf`, `z_srf`), the esm
   reference blocks (`esm_grl_*.nml`) and the yelmo pd smb/T_srf (`-annual-mean`, `T_srf` skin
