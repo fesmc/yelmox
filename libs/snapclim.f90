@@ -5,6 +5,7 @@ module snapclim
     !use yelmo_defs !,only :: sp, dp, prec, pi, yelmo_parse_path
     use ncio 
     use nml 
+    use fesmdata, only : fesmdata_flux_conv, fesmdata_temp_ref
     
     implicit none 
 
@@ -1693,7 +1694,7 @@ contains
         real(wp) :: lapse_mon(12)   
         real(wp), allocatable :: rf(:,:,:)
         logical, allocatable :: mask_missing(:,:,:)
-        character(len=56)  :: tmp_str 
+        real(wp) :: t_ref, pr_conv
         integer :: m 
 
 
@@ -1742,7 +1743,6 @@ contains
                 ! Read in monthly climate fields, then get the averages
 
                 call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%tas,missing_value=MV)
-                call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
 
                 where(clim%tas .eq. MV) 
                     mask_missing = .TRUE.
@@ -1750,9 +1750,9 @@ contains
                     mask_missing = .FALSE.
                 end where
 
-                if (minval(clim%tas,mask=.not.mask_missing) .lt. 100.0) then
-                    clim%tas=clim%tas+273.15
-                end if
+                ! Convert from the units of the file to Kelvin
+                t_ref = fesmdata_temp_ref(clim%par%clim_path,clim%par%clim_names(2))
+                where(.not.mask_missing) clim%tas = clim%tas + t_ref
 
                 ! Fix missing values
                 where(mask_missing) clim%tas = sum(clim%tas,mask=.not.mask_missing)/count(.not.mask_missing)
@@ -1767,8 +1767,14 @@ contains
                 
                 ! Check the rainfall field also needs to be loaded, or if 
                 ! precip was provided as the second name 
+                ! Convert from the units of the file to [mm/d]
+                pr_conv = fesmdata_flux_conv(clim%par%clim_path,clim%par%clim_names(3),"mm d-1")
+                where(.not.mask_missing) clim%sf = clim%sf*pr_conv
+
                 if (trim(clim%par%clim_names(3)) .eq. "sf") then 
                     call nc_read(clim%par%clim_path,clim%par%clim_names(4),rf,missing_value=MV)
+                    pr_conv = fesmdata_flux_conv(clim%par%clim_path,clim%par%clim_names(4),"mm d-1")
+                    where(rf .ne. MV) rf = rf*pr_conv
                     clim%pr = clim%sf+rf        ! [mm/d]
                 else
                     clim%pr = clim%sf           ! [mm/d]
@@ -1790,7 +1796,9 @@ contains
                     ! Load stdev field for precipitation too 
 
                     call nc_read(clim%par%clim_stdev_path,clim%par%clim_stdev_name,clim%pr_stdev_frac)
-                    
+                    clim%pr_stdev_frac = clim%pr_stdev_frac * &
+                        fesmdata_flux_conv(clim%par%clim_stdev_path,clim%par%clim_stdev_name,"mm d-1")
+
                     where(clim%pr .ne. 0.0) 
                         clim%pr_stdev_frac = clim%pr_stdev_frac / clim%pr 
                     elsewhere
@@ -1828,7 +1836,6 @@ contains
 
                 call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%ta_ann,missing_value=MV)
                 call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%ta_sum,missing_value=MV)
-                call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
                 
                 where(clim%ta_ann .eq. MV) 
                     mask_missing(:,:,1) = .TRUE.
@@ -1836,10 +1843,11 @@ contains
                     mask_missing(:,:,1) = .FALSE.
                 end where
                 
-                if (minval(clim%ta_ann,mask=.not.mask_missing(:,:,1)) .lt. 100.0) then
-                   clim%ta_ann = clim%ta_ann + 273.15
-                   clim%ta_sum = clim%ta_sum + 273.15
-                end if
+                ! Convert from the units of the file to Kelvin
+                t_ref = fesmdata_temp_ref(clim%par%clim_path,clim%par%clim_names(2))
+                where(.not.mask_missing(:,:,1)) clim%ta_ann = clim%ta_ann + t_ref
+                t_ref = fesmdata_temp_ref(clim%par%clim_path,clim%par%clim_names(3))
+                where(.not.mask_missing(:,:,1)) clim%ta_sum = clim%ta_sum + t_ref
 
                 ! Fix missing values
                 where(mask_missing(:,:,1)) 
@@ -1847,18 +1855,22 @@ contains
                     clim%ta_sum = sum(clim%ta_sum,mask=.not.mask_missing(:,:,1))/count(.not.mask_missing(:,:,1))
                 end where
 
-                ! Read in precip field [mm/d]
+                ! Read in precip field, converted from the units of the file to [mm/d]
                 call nc_read(clim%par%clim_path,clim%par%clim_names(4),clim%pr_ann,missing_value=MV)
-            
+                pr_conv = fesmdata_flux_conv(clim%par%clim_path,clim%par%clim_names(4),"mm d-1")
+                where(clim%pr_ann .ne. MV) clim%pr_ann = clim%pr_ann*pr_conv
+
                 where(clim%pr_ann .eq. MV) clim%pr_ann = sum(clim%pr_ann,mask=clim%pr_ann.ne.MV)/count(clim%pr_ann.ne.MV)
 
                 if ( (.not.  trim(clim%par%clim_stdev_path) .eq. "None") .and. &
                      (.not.  trim(clim%par%clim_stdev_path) .eq. "none") .and. &    
                      (.not.  trim(clim%par%clim_stdev_path) .eq. "") ) then 
-                    ! Load stdev field for precipitation too [initially mm/d]
+                    ! Load stdev field for precipitation too [mm/d]
 
                     call nc_read(clim%par%clim_stdev_path,clim%par%clim_stdev_name,clim%pr_ann_stdev_frac)
-                    
+                    clim%pr_ann_stdev_frac = clim%pr_ann_stdev_frac * &
+                        fesmdata_flux_conv(clim%par%clim_stdev_path,clim%par%clim_stdev_name,"mm d-1")
+
                     where(clim%pr_ann .ne. 0.0) 
                         clim%pr_ann_stdev_frac = clim%pr_ann_stdev_frac / clim%pr_ann 
                     elsewhere
@@ -1890,7 +1902,7 @@ contains
                     ! Precip distributed evenly throughout the year 
                     clim%pr(:,:,m) = clim%pr_ann/365.0             ! [mm/d]
                     clim%pr_stdev_frac(:,:,m) = clim%pr_ann_stdev_frac ! [fraction] Assume variability constant throughout year
-                    clim%sf(:,:,m) = clim%pr(:,:,m)/365.0          ! [mm/d]
+                    clim%sf(:,:,m) = clim%pr(:,:,m)                ! [mm/d] (no snowfall field: total precip, as in the monthly case)
                 end do 
         
             end if 
@@ -2097,10 +2109,8 @@ contains
 
             end if 
 
-            ! Ensure units are in Kelvin
-            if (minval(tocn3D) .lt. 100.0) then
-                tocn3D = tocn3D + 273.15 
-            end if 
+            ! Convert from the units of the file to Kelvin
+            tocn3D = tocn3D + fesmdata_temp_ref(ocn%par%ocn_path,ocn%par%ocn_names(3))
 
             ! Determine the length of output depth dimension
             ! and allocate the ocn object
