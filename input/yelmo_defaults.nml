@@ -392,13 +392,13 @@
     pd_topo_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
     pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1981-2010.nc"
+    pd_tsrf_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
-    pd_tsrf_monthly   = True                         ! MAR monthly file
+    pd_tsrf_monthly   = False
     pd_smb_load       = True 
-    pd_smb_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1981-2010.nc"
+    pd_smb_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
-    pd_smb_monthly    = True                         ! MAR monthly file
+    pd_smb_monthly    = False
     pd_vel_load       = True 
     pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Joughin2018.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 

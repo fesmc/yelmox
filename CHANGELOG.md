@@ -12,6 +12,10 @@ annotated git tag. Dates are release (tag) dates.
 - Isochrones from `Stratigraphy-MacGregor2025` (`pd_age_names = "age" "depth_iso"`; was
   `STRAT-M15`). `input/yelmo_defaults.nml` synced with yelmo.
 - Pyrenees: hub `PYR-250M` (`TOPO-GLO90-GEBCO2026`), Yelmo grid `PYR-1KM`.
+- Greenland present-day climate MAR v3.14 1961-1990 (FesmData `SMB-MARv3.14-1961-1990`, was
+  MARv3.11-ERA): snapclim/snapesm reference climatology (`t2m`, `sf`, `rf`, `z_srf`), the esm
+  reference blocks (`esm_grl_*.nml`) and the yelmo pd smb/T_srf (`-annual-mean`, `T_srf` skin
+  temperature). snapclim reads precipitation and temperature units from the files.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD

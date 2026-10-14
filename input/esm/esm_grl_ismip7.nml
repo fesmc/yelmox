@@ -3,31 +3,31 @@
 ! ======== Reference period ========
 
 &gcm_ts_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
-    name        = "tas"
-    units       = "degrees C" "K"
-    scaling     = 1.0 273.15
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name        = "t2m"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
     time        = 0, 1961, 1990, 0, 12.0
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name        = "pr"
-    units       = "mm d-1" "mm d-1"
-    scaling     = 1 0.0
+    units       = "kg m-2 yr-1" "mm d-1"
+    scaling     = 2.73785e-3 0.0
     time        = 0, 1961, 1990, 0, 12.0
 /
 
 &gcm_smb_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name        = "smb"
-    units       = "mm d-1" "mm yr-1"
-    scaling     = 365.25 0.0
+    units       = "kg m-2 yr-1" "mm yr-1"
+    scaling     = 1.0 0.0
     time        = 0, 1961, 1990, 0, 12.0
 /
 
 &gcm_zs_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name        = "z_srf"
     units       = "m" "m"
     scaling     = 1.0 0.0

@@ -8,41 +8,41 @@
 ! (active>=0.5 => time axis; nsub>1 => sub-annual/monthly axis).
 !
 ! Sources mirror snapclim &snap_clim0..2 for atm_type=snap_1ind_new:
-!   pd        = MARv3.11-ERA (monthly)          [clim0, reference]
+!   pd        = MARv3.14 1961-1990 (monthly)    [clim0, reference]
 !   picontrol = PMIP3 piControl (annual+summer) [clim1]
 !   lgm       = PMIP3 LGM      (annual+summer)  [clim2]
 ! Only pd supplies the 3-D ocean (to/so); the fraction ocean rule derives the
 ! rest from the atmospheric anomaly, so picontrol/lgm need no ocean here.
 ! =====================================================================
 
-! ---- pd (present day, MARv3.11-ERA, monthly) --------------------------------
+! ---- pd (present day, MARv3.14 1961-1990, monthly) -------------------------
 
 &clim_pd_tas
-    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
-    name     = "tas"
-    units    = "degC" "K"
-    scaling  = 1.0 273.15
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name     = "t2m"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
     time     = 0 0 0 0 1
 /
 
 &clim_pd_pr_sf
-    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name     = "sf"
-    units    = "mm d-1" "mm d-1"
-    scaling  = 1.0 0.0
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
     time     = 0 0 0 0 1
 /
 
 &clim_pd_pr_rf
-    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name     = "rf"
-    units    = "mm d-1" "mm d-1"
-    scaling  = 1.0 0.0
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
     time     = 0 0 0 0 1
 /
 
 &clim_pd_zs
-    filename = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name     = "z_srf"
     units    = "m" "m"
     scaling  = 1.0 0.0
