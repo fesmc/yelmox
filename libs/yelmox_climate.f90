@@ -94,10 +94,12 @@ contains
 
         character(len=256) :: grid_name
         integer :: nx, ny
+        real(wp) :: dx_km
 
         grid_name = trim(grid%name)
         nx        = grid%G%nx
         ny        = grid%G%ny
+        dx_km     = real(grid%G%dx*grid%cs%xy_conv*1e-3_dp, wp)   ! [km] grid spacing
 
         cl%method    = trim(method)
         cl%grid_name = trim(grid_name)
@@ -116,17 +118,17 @@ contains
 
         select case(trim(cl%method))
             case("snapclim")
-                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, &
+                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, dx_km, &
                                    south, group="snap"//trim(sfx))
             case("snapesm")
-                call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, time, &
+                call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, dx_km, time, &
                                   south, group="snap"//trim(sfx))
             case("esm")
                 call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &
                               smb_direct, reg)
             case("rembo")
                 ! REMBO for the atmosphere and smb, snapclim for the ocean.
-                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, &
+                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, dx_km, &
                                    south, group="snap"//trim(sfx))
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))

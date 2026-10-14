@@ -69,14 +69,14 @@
 /
 
 &topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
     remap = "con"
 /
 
 &regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
 /
 
@@ -248,16 +248,16 @@
 
 &sed
     method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
     obs_name  = "z_sed"
 
 /
 
 &ghf
     use_obs   = False 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M05.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-FoxMaule2005.nc"
     obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
+    obs_err_name = "None"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
 
@@ -524,19 +524,19 @@
 &yelmo_data 
     ! The present-day topography comes from the hub ([domain])
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_tsrf_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_smb_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
+    pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Joughin2018.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = True 
-    pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Stratigraphy-MacGregor2025.nc"
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
 
 /
 
@@ -613,6 +613,7 @@
     monthly   = False
     time      = 0.0
     idx_coord = 0.0 0.0
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
     pr  = "clim_picontrol_pr_ann"
     zs  = "clim_picontrol_zs"
@@ -624,6 +625,7 @@
     monthly   = False
     time      = -21000.0
     idx_coord = 1.0 0.0
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
     pr  = "clim_lgm_pr_ann"
     zs  = "clim_lgm_zs"

@@ -27,6 +27,6 @@
     },
 
     "links" :
-        ["input","ice_data","isostasy_data","maps"]
+        ["input","ice_data","fesmdata","isostasy_data","maps"]
 
 }

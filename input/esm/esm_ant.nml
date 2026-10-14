@@ -198,14 +198,6 @@
 
 ! === Other fields ===
 
-&basins
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name        = "basin_reese"
-    units       = "1" "1"
-    scaling     = 1.0 0.0
-    time        = 0, 2020, 2020, 0, 1
-/
-
 ! =====================================================
 !
 ! CMIP output variable list

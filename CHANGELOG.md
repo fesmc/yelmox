@@ -6,6 +6,39 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- FesmData v2 products from the link `fesmdata` (`$FESMDATA/products`, e.g.
+  `/work/ba1442/fesmdata/products`; was `ice_data/v2`), copied into the run folders by
+  runme (`.runme/info.json` links). SRG topography `TOPO-GLO90-GEBCO2026`.
+- Isochrones from `Stratigraphy-MacGregor2025` (`pd_age_names = "age" "depth_iso"`; was
+  `STRAT-M15`). `input/yelmo_defaults.nml` synced with yelmo.
+- Pyrenees on FesmData: ice sheet and surface on the hub `PYR-250M` (`TOPO-GLO90-GEBCO2026`),
+  climate (`Atmosphere-ERA5-1981-2010`, was WorldClim) and isostasy on `PYR-2KM`, GHF
+  `GHF-Lucazeau2019` from `PYR-2KM`; no ocean, no pd T_srf/velocity (the PYR-1KM `ice_data`
+  folders are empty). Climate and surface every 50 yr (`dt_clim`), chion `time_equil = 10`
+  (chion costs ~15 s per year on PYR-250M).
+- GHF and sediment obs are remapped (bilinear) onto the Yelmo grid when the file is on another
+  grid (FesmData global attribute `grid_name`; fesm-utils `fesmdata_read_field`), so a par file
+  can name a coarser data grid in `obs_path`. `geothermal_init`/`sediments_init` take the Yelmo grid.
+- Greenland present-day climate MAR v3.14 1961-1990 (FesmData `SMB-MARv3.14-1961-1990`, was
+  MARv3.11-ERA): snapclim/snapesm reference climatology (`t2m`, `sf`, `rf`, `z_srf`), the esm
+  reference blocks (`esm_grl_*.nml`) and the yelmo pd smb/T_srf (`-annual-mean`, `T_srf` skin
+  temperature). snapclim reads precipitation and temperature units from the files.
+- FesmData v2 velocities (`Velocity-Joughin2018`, `Velocity-Rignot2011`), GHF
+  (`GHF-Shapiro2004`, `-FoxMaule2005`, `-Loesing2021`, `-HazzardRichards2024`; error `ghf_sd`)
+  and North/LIS reference climate `Atmosphere-ERA5-1981-2010` (was ERA-Interim). rembo1 on
+  `TOPO-BedMachine-v6` and MAR v3.14. Unused esm `&basins` (BASINS-nasa) removed.
+- Paleo climate snapshots from FesmData `Paleoclimate-PMIP3-{piControl,lgm}-{mean,stdev}` (was
+  `PMIP3_sig50km`, smoothed with 50 km) and ocean from `Ocean-ORAS5-1981-2010` (was ORAS4): snapclim,
+  snapesm (`greenland_clim.nml`) and the esm ocean reference (`esm_grl_*.nml`, monthly climatology,
+  `fill = "nearest"`; read from `GRL-16KM` and remapped bilinearly onto the run grid, since ORAS5
+  is cropped on GRL-16KM/32KM only). snapclim reads ocean fields with missing values and fills them
+  (fesm-utils `fill_nearest_levels`: each level from the nearest valid cell, else from the level
+  above); the ocean mask comes from the data where `ocn_names(2) = "none"` (PMIP3 `sst_ann`).
+  A 2D ocean without salinity gets 0 (salinity was read into an unallocated array).
+- snapclim/snapesm snapshot keys `clim_sigma` and `ocn_sigma` [km] (optional, default 0): Gaussian
+  smoothing (fesm-utils `filter_gaussian`) of the atmosphere / ocean of the snapshot at loading.
+  The PMIP3 snapshots use 50 km (as the v1 `PMIP3_sig50km` files); `snapclim_init`/`snapesm_init`
+  take the grid spacing.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD

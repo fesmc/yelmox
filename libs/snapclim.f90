@@ -5,6 +5,9 @@ module snapclim
     !use yelmo_defs !,only :: sp, dp, prec, pi, yelmo_parse_path
     use ncio 
     use nml 
+    use fesmdata, only : fesmdata_flux_conv, fesmdata_temp_ref
+    use interp2D, only : fill_nearest_levels
+    use gaussian_filter, only : filter_gaussian
     
     implicit none 
 
@@ -44,11 +47,13 @@ module snapclim
         real(dp)         :: clim_time 
         character(len=512) :: clim_stdev_path 
         character(len=56)  :: clim_stdev_name
+        real(wp)           :: clim_sigma        ! [km] Gaussian smoothing of the snapshot at loading (0: none)
 
         character(len=512) :: ocn_path 
         character(len=56)  :: ocn_names(4)
         logical            :: ocn_monthly 
         real(dp)         :: ocn_time 
+        real(wp)           :: ocn_sigma         ! [km] Gaussian smoothing of the ocean at loading (0: none)
         
     end type 
 
@@ -210,7 +215,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,south,group)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,dx,south,group)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -222,6 +227,7 @@ contains
         character(len=*),     intent(IN)    :: filename 
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
+        real(wp), intent(IN) :: dx          ! [km] grid spacing (snapshot smoothing, clim_sigma)
         logical,  intent(IN) :: south       ! southern hemisphere
         character(len=*),  intent(IN), optional :: group
 
@@ -328,15 +334,15 @@ contains
         ! == clim0: reference climate (eg, present day) ==
 
         call snapshot_par_load(snp%clim0%par,filename,trim(nml_group)//"_clim0",domain,grid_name,init=.TRUE.)
-        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-        call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
+        call read_climate_snapshot(snp%clim0,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+        call read_ocean_snapshot(snp%clim0,nx,ny,dx,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,trim(nml_group)//"_clim1",domain,grid_name,init=.TRUE.)                
-            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-            if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+            if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,dx,depth=depth)
 
         end if 
 
@@ -344,8 +350,8 @@ contains
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,trim(nml_group)//"_clim2",domain,grid_name,init=.TRUE.)                
-            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-            if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+            if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,dx,depth=depth)
 
         end if 
 
@@ -353,8 +359,8 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,trim(nml_group)//"_clim3",domain,grid_name,init=.TRUE.)
-            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-            if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+            if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,dx,depth=depth)
 
         end if 
 
@@ -1653,11 +1659,17 @@ contains
         call nml_read(filename,name,"clim_time",        par%clim_time,          init=init_pars)
         call nml_read(filename,name,"clim_stdev_path",  par%clim_stdev_path,    init=init_pars)
         call nml_read(filename,name,"clim_stdev_name",  par%clim_stdev_name,    init=init_pars)
+        par%clim_sigma = 0.0_wp
+        if (nml_has_param(filename,name,"clim_sigma")) &
+            call nml_read(filename,name,"clim_sigma",   par%clim_sigma,         init=init_pars)
         
         call nml_read(filename,name,"ocn_path",         par%ocn_path,           init=init_pars)
         call nml_read(filename,name,"ocn_names",        par%ocn_names,          init=init_pars)
         call nml_read(filename,name,"ocn_monthly",      par%ocn_monthly,        init=init_pars)
         call nml_read(filename,name,"ocn_time",         par%ocn_time,           init=init_pars)
+        par%ocn_sigma = 0.0_wp
+        if (nml_has_param(filename,name,"ocn_sigma")) &
+            call nml_read(filename,name,"ocn_sigma",    par%ocn_sigma,          init=init_pars)
         
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
@@ -1672,7 +1684,7 @@ contains
 
     end subroutine snapshot_par_load
 
-    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_stdev,south)
+    subroutine read_climate_snapshot(clim,nx,ny,dx,lapse,f_p,f_stdev,south)
         ! `names` is a vector of names in the netcdf file that 
         ! correspond to the fields to be read in:
         ! (1) 2D elevation field
@@ -1684,6 +1696,7 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: clim
         integer,          intent(IN) :: nx, ny  
+        real(wp),       intent(IN) :: dx            ! [km] grid spacing
         real(wp),       intent(IN) :: lapse(2)
         real(wp),       intent(IN) :: f_p 
         real(wp),       intent(IN) :: f_stdev
@@ -1693,7 +1706,7 @@ contains
         real(wp) :: lapse_mon(12)   
         real(wp), allocatable :: rf(:,:,:)
         logical, allocatable :: mask_missing(:,:,:)
-        character(len=56)  :: tmp_str 
+        real(wp) :: t_ref, pr_conv
         integer :: m 
 
 
@@ -1742,7 +1755,6 @@ contains
                 ! Read in monthly climate fields, then get the averages
 
                 call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%tas,missing_value=MV)
-                call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
 
                 where(clim%tas .eq. MV) 
                     mask_missing = .TRUE.
@@ -1750,9 +1762,9 @@ contains
                     mask_missing = .FALSE.
                 end where
 
-                if (minval(clim%tas,mask=.not.mask_missing) .lt. 100.0) then
-                    clim%tas=clim%tas+273.15
-                end if
+                ! Convert from the units of the file to Kelvin
+                t_ref = fesmdata_temp_ref(clim%par%clim_path,clim%par%clim_names(2))
+                where(.not.mask_missing) clim%tas = clim%tas + t_ref
 
                 ! Fix missing values
                 where(mask_missing) clim%tas = sum(clim%tas,mask=.not.mask_missing)/count(.not.mask_missing)
@@ -1767,8 +1779,14 @@ contains
                 
                 ! Check the rainfall field also needs to be loaded, or if 
                 ! precip was provided as the second name 
+                ! Convert from the units of the file to [mm/d]
+                pr_conv = fesmdata_flux_conv(clim%par%clim_path,clim%par%clim_names(3),"mm d-1")
+                where(.not.mask_missing) clim%sf = clim%sf*pr_conv
+
                 if (trim(clim%par%clim_names(3)) .eq. "sf") then 
                     call nc_read(clim%par%clim_path,clim%par%clim_names(4),rf,missing_value=MV)
+                    pr_conv = fesmdata_flux_conv(clim%par%clim_path,clim%par%clim_names(4),"mm d-1")
+                    where(rf .ne. MV) rf = rf*pr_conv
                     clim%pr = clim%sf+rf        ! [mm/d]
                 else
                     clim%pr = clim%sf           ! [mm/d]
@@ -1790,7 +1808,9 @@ contains
                     ! Load stdev field for precipitation too 
 
                     call nc_read(clim%par%clim_stdev_path,clim%par%clim_stdev_name,clim%pr_stdev_frac)
-                    
+                    clim%pr_stdev_frac = clim%pr_stdev_frac * &
+                        fesmdata_flux_conv(clim%par%clim_stdev_path,clim%par%clim_stdev_name,"mm d-1")
+
                     where(clim%pr .ne. 0.0) 
                         clim%pr_stdev_frac = clim%pr_stdev_frac / clim%pr 
                     elsewhere
@@ -1828,7 +1848,6 @@ contains
 
                 call nc_read(clim%par%clim_path,clim%par%clim_names(2),clim%ta_ann,missing_value=MV)
                 call nc_read(clim%par%clim_path,clim%par%clim_names(3),clim%ta_sum,missing_value=MV)
-                call nc_read_attr(clim%par%clim_path,clim%par%clim_names(2),"units",tmp_str)
                 
                 where(clim%ta_ann .eq. MV) 
                     mask_missing(:,:,1) = .TRUE.
@@ -1836,10 +1855,11 @@ contains
                     mask_missing(:,:,1) = .FALSE.
                 end where
                 
-                if (minval(clim%ta_ann,mask=.not.mask_missing(:,:,1)) .lt. 100.0) then
-                   clim%ta_ann = clim%ta_ann + 273.15
-                   clim%ta_sum = clim%ta_sum + 273.15
-                end if
+                ! Convert from the units of the file to Kelvin
+                t_ref = fesmdata_temp_ref(clim%par%clim_path,clim%par%clim_names(2))
+                where(.not.mask_missing(:,:,1)) clim%ta_ann = clim%ta_ann + t_ref
+                t_ref = fesmdata_temp_ref(clim%par%clim_path,clim%par%clim_names(3))
+                where(.not.mask_missing(:,:,1)) clim%ta_sum = clim%ta_sum + t_ref
 
                 ! Fix missing values
                 where(mask_missing(:,:,1)) 
@@ -1847,18 +1867,22 @@ contains
                     clim%ta_sum = sum(clim%ta_sum,mask=.not.mask_missing(:,:,1))/count(.not.mask_missing(:,:,1))
                 end where
 
-                ! Read in precip field [mm/d]
+                ! Read in precip field, converted from the units of the file to [mm/d]
                 call nc_read(clim%par%clim_path,clim%par%clim_names(4),clim%pr_ann,missing_value=MV)
-            
+                pr_conv = fesmdata_flux_conv(clim%par%clim_path,clim%par%clim_names(4),"mm d-1")
+                where(clim%pr_ann .ne. MV) clim%pr_ann = clim%pr_ann*pr_conv
+
                 where(clim%pr_ann .eq. MV) clim%pr_ann = sum(clim%pr_ann,mask=clim%pr_ann.ne.MV)/count(clim%pr_ann.ne.MV)
 
                 if ( (.not.  trim(clim%par%clim_stdev_path) .eq. "None") .and. &
                      (.not.  trim(clim%par%clim_stdev_path) .eq. "none") .and. &    
                      (.not.  trim(clim%par%clim_stdev_path) .eq. "") ) then 
-                    ! Load stdev field for precipitation too [initially mm/d]
+                    ! Load stdev field for precipitation too [mm/d]
 
                     call nc_read(clim%par%clim_stdev_path,clim%par%clim_stdev_name,clim%pr_ann_stdev_frac)
-                    
+                    clim%pr_ann_stdev_frac = clim%pr_ann_stdev_frac * &
+                        fesmdata_flux_conv(clim%par%clim_stdev_path,clim%par%clim_stdev_name,"mm d-1")
+
                     where(clim%pr_ann .ne. 0.0) 
                         clim%pr_ann_stdev_frac = clim%pr_ann_stdev_frac / clim%pr_ann 
                     elsewhere
@@ -1890,9 +1914,28 @@ contains
                     ! Precip distributed evenly throughout the year 
                     clim%pr(:,:,m) = clim%pr_ann/365.0             ! [mm/d]
                     clim%pr_stdev_frac(:,:,m) = clim%pr_ann_stdev_frac ! [fraction] Assume variability constant throughout year
-                    clim%sf(:,:,m) = clim%pr(:,:,m)/365.0          ! [mm/d]
+                    clim%sf(:,:,m) = clim%pr(:,:,m)                ! [mm/d] (no snowfall field: total precip, as in the monthly case)
                 end do 
         
+            end if 
+
+            ! Smooth the snapshot (e.g. coarse GCM fields), then the land mask
+            ! of the smoothed elevation
+            if (clim%par%clim_sigma .gt. 0.0_wp) then 
+                call filter_gaussian(clim%z_srf,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%ta_ann,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%ta_sum,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%pr_ann,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%pr_ann_stdev_frac,clim%par%clim_sigma,dx)
+                do m = 1, 12
+                    call filter_gaussian(clim%tas(:,:,m),clim%par%clim_sigma,dx)
+                    call filter_gaussian(clim%pr(:,:,m),clim%par%clim_sigma,dx)
+                    call filter_gaussian(clim%sf(:,:,m),clim%par%clim_sigma,dx)
+                    call filter_gaussian(clim%pr_stdev_frac(:,:,m),clim%par%clim_sigma,dx)
+                end do 
+                clim%mask = 0.0 
+                where(clim%z_srf .gt. 0.0) clim%mask = 1.0 
+                write(*,"(a,f8.1,a)") "read_climate_snapshot:: smoothed with sigma = ", clim%par%clim_sigma, " km"
             end if 
 
             ! ====================================
@@ -1952,14 +1995,14 @@ contains
 
     end subroutine read_climate_snapshot
 
-    subroutine read_ocean_snapshot(ocn,nx,ny,depth)
+    subroutine read_ocean_snapshot(ocn,nx,ny,dx,depth)
         ! Read oceanic snapshot from netcdf file
         ! Parameters loaded earlier via snapshot_par_load()
         ! The oceanic snapshot needs the following information:
         ! (1) depth dimension of 3D/4D field (ie, nz of [nx,ny,nz])
         ! (2) 3D land-ocean mask specifying original boundaries of the simulation
-        ! (3) 3D [nx,ny,nz0] or 4D [nx,ny,nz0,nmonth] ocean temperature field with no missing values
-        !     (ie, interpolated even where there was land to be safe) 
+        ! (3) 3D [nx,ny,nz0] or 4D [nx,ny,nz0,nmonth] ocean temperature field; cells
+        !     without data (missing values) are filled here (fill_nearest_levels)
         !
         ! Subroutine will output the ocn (climate) object with the input field [nx,ny,nz0]
         ! interpolated vertically to the desired depth levels [nx,ny,nz]
@@ -1968,6 +2011,7 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: ocn 
         integer,    intent(IN) :: nx, ny
+        real(wp), intent(IN) :: dx              ! [km] grid spacing
         real(wp), intent(IN) :: depth(:)
 
         ! Local helping variables 
@@ -1975,9 +2019,7 @@ contains
         integer,    allocatable :: mask3D(:,:,:)
         real(wp), allocatable :: tocn3D(:,:,:)
         real(wp), allocatable :: socn3D(:,:,:)
-        real(wp), allocatable :: tocn4D(:,:,:,:)
-        real(wp), allocatable :: socn4D(:,:,:,:)
-        integer :: nz, nz0, m 
+        integer :: nz, nz0 
         integer :: i, j, k 
 
         logical :: is_monthly 
@@ -2015,25 +2057,13 @@ contains
         else 
             ! Read data from parameters 
 
-            ! Determine the length of the input depth dimension 
-            ! and define the input depth dimension vector
+            ! Input depth axis: one level for a 2D (surface) ocean, else
+            ! the depth dimension of the file
             if (is_2D_ocn) then 
-                ! Ocean will be a 2D field, set nz0 to 1 layer 
                 nz0 = 1
                 allocate(depth0(nz0))
                 depth0 = 0.0_wp
-
-                ! Allocate additional arrays
-                allocate(mask3D(nx,ny,nz0))
-                allocate(tocn3D(nx,ny,nz0))
-
-                ! Read in the 2D ocean mask 
-                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D(:,:,1))
-
             else 
-                ! Ocean includes a depth dimension 
-
-                ! Read in depth dimension size from file
                 nz0 = nc_size(ocn%par%ocn_path,ocn%par%ocn_names(1))
                 allocate(depth0(nz0))
                 call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(1),depth0)
@@ -2044,62 +2074,50 @@ contains
                 ! e.g. the ISMIP6-J20 file). Without this, both the vertical
                 ! interpolation (interp_linear below) and the ocean-mask depth
                 ! test deliver the wrong water mass / mask to marine_shelf.
-                ! To reproduce the previous (incorrect) behaviour for comparison,
-                ! comment the FIX line and uncomment the LEGACY line.
-                depth0 = abs(depth0)        ! FIX: positive-down depth axis
-                !depth0 = depth0            ! LEGACY: raw file axis (wrong for positive-up 'z')
-
-                ! Allocate additional arrays
-                allocate(mask3D(nx,ny,nz0))
-                allocate(tocn3D(nx,ny,nz0))
-                allocate(socn3D(nx,ny,nz0))
-
-                ! Read in the ocean mask 
-                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
-
+                depth0 = abs(depth0)
             end if 
-             
-            if (is_monthly) then 
-                ! Read in monthly field(s), then get the averages
 
-                allocate(tocn4D(nx,ny,nz0,12))
-                allocate(socn4D(nx,ny,nz0,12))
-                
-                if (is_2D_ocn) then
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D(:,:,1,:))
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn4D(:,:,1,:))
-                else 
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D)
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn4D)
-                end if 
+            allocate(mask3D(nx,ny,nz0))
+            allocate(tocn3D(nx,ny,nz0))
+            allocate(socn3D(nx,ny,nz0))
 
-                ! Calculate annual mean temperature [degrees C]
-                tocn3D = sum(tocn4D,dim=4)
-                tocn3D = tocn3D/12.0
-                socn3D = sum(socn4D,dim=4)
-                socn3D = socn3D/12.0
- 
+            ! Temperature (annual mean of monthly fields), missing values as MV,
+            ! converted from the units of the file to Kelvin
+            call read_ocean_field(tocn3D,ocn%par%ocn_path,ocn%par%ocn_names(3),is_monthly,is_2D_ocn)
+            where (tocn3D .ne. MV) tocn3D = tocn3D + fesmdata_temp_ref(ocn%par%ocn_path,ocn%par%ocn_names(3))
 
-                ! Delete working array to be safe
-                deallocate(tocn4D)
-                deallocate(socn4D) 
-
+            ! Salinity, if given (a surface ocean, e.g. PMIP sst, has none: 0)
+            if (name_given(ocn%par%ocn_names(4))) then 
+                call read_ocean_field(socn3D,ocn%par%ocn_path,ocn%par%ocn_names(4),is_monthly,is_2D_ocn)
             else
-                ! Read in specific field(s)
-
-                if (is_2D_ocn) then 
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D(:,:,1))
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn3D(:,:,1))
-                else 
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D)
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn3D)
-                end if 
-
+                socn3D = 0.0_wp
             end if 
 
-            ! Ensure units are in Kelvin
-            if (minval(tocn3D) .lt. 100.0) then
-                tocn3D = tocn3D + 273.15 
+            ! Ocean mask: from the file, else where the temperature has data
+            if (name_given(ocn%par%ocn_names(2))) then 
+                if (is_2D_ocn) then 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D(:,:,1))
+                else 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
+                end if 
+            else 
+                mask3D = 0
+                where (tocn3D .ne. MV) mask3D = 1
+            end if 
+
+            ! Fill the cells without data (e.g. land, or beyond the source
+            ! coverage) so that the ocean is defined wherever the ice sheet
+            ! may meet it: per level from the nearest valid cell, else from
+            ! the level above
+            call fill_nearest_levels(tocn3D,MV)
+            call fill_nearest_levels(socn3D,MV)
+
+            ! Smooth the ocean (ocn_sigma of the snapshot), level by level
+            if (ocn%par%ocn_sigma .gt. 0.0_wp) then 
+                do k = 1, nz0
+                    call filter_gaussian(tocn3D(:,:,k),ocn%par%ocn_sigma,dx)
+                    call filter_gaussian(socn3D(:,:,k),ocn%par%ocn_sigma,dx)
+                end do 
             end if 
 
             ! Determine the length of output depth dimension
@@ -2150,6 +2168,54 @@ contains
         return 
 
     end subroutine read_ocean_snapshot
+
+    subroutine read_ocean_field(var,path,varname,is_monthly,is_2D_ocn)
+        ! An ocean field [nx,ny,nz0] (a single level for a 2D ocean), the
+        ! annual mean of monthly fields if is_monthly; missing values as MV
+        ! (a month without data makes the mean missing).
+
+        implicit none
+
+        real(wp),         intent(OUT) :: var(:,:,:)
+        character(len=*), intent(IN)  :: path, varname
+        logical,          intent(IN)  :: is_monthly, is_2D_ocn
+
+        real(wp), allocatable :: var4D(:,:,:,:)
+
+        if (is_monthly) then 
+            allocate(var4D(size(var,1),size(var,2),size(var,3),12))
+            if (is_2D_ocn) then 
+                call nc_read(path,varname,var4D(:,:,1,:),missing_value=MV)
+            else 
+                call nc_read(path,varname,var4D,missing_value=MV)
+            end if 
+            where (any(var4D .eq. MV,dim=4))
+                var = MV
+            elsewhere
+                var = sum(var4D,dim=4) / 12.0_wp
+            end where
+        else 
+            if (is_2D_ocn) then 
+                call nc_read(path,varname,var(:,:,1),missing_value=MV)
+            else 
+                call nc_read(path,varname,var,missing_value=MV)
+            end if 
+        end if 
+
+        return
+
+    end subroutine read_ocean_field
+
+    logical function name_given(name)
+        ! A variable name is given (not "", "none" or "None").
+
+        implicit none
+
+        character(len=*), intent(IN) :: name
+
+        name_given = .not. (trim(name) .eq. "" .or. trim(name) .eq. "none" .or. trim(name) .eq. "None")
+
+    end function name_given
 
     subroutine read_series(series,filename)
         ! This subroutine will read a time series of

@@ -312,12 +312,10 @@ contains
         call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
                        dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%cnst)
 
-        call sediments_init(dom%sed, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
-                            domain, dom%ctl%grid_ice, group="sed"//trim(sfx))
+        call sediments_init(dom%sed, path_par, grid_y, domain, group="sed"//trim(sfx))
         dom%yelmo%bnd%H_sed = dom%sed%now%H
 
-        call geothermal_init(dom%gthrm, path_par, dom%yelmo%grd%G%nx, dom%yelmo%grd%G%ny, &
-                             domain, dom%ctl%grid_ice, group="ghf"//trim(sfx))
+        call geothermal_init(dom%gthrm, path_par, grid_y, domain, group="ghf"//trim(sfx))
         dom%yelmo%bnd%Q_geo = dom%gthrm%now%ghf
 
         ! --- climate on its configured grid (grid_clim) ---

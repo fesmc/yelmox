@@ -5,6 +5,9 @@ module geothermal
     use nml 
     use ncio 
     use interp2D, only : fill_nearest
+    use coordinates, only : grid_class
+    use mapping,  only : map_class
+    use fesmdata, only : fesmdata_map_init, fesmdata_read_field
 
     implicit none 
 
@@ -44,7 +47,7 @@ module geothermal
 
 contains 
 
-    subroutine geothermal_init(gthrm,filename,nx,ny,domain,grid_name,group)
+    subroutine geothermal_init(gthrm,filename,grid,domain,group)
         ! Eventually interface should use 'sed' object directly
         ! instead of input/output arrays 
 
@@ -52,18 +55,22 @@ contains
 
         type(geothermal_class), intent(OUT) :: gthrm  
         character(len=*),       intent(IN)  :: filename 
-        integer,                intent(IN)  :: nx, ny 
-        character(len=*),       intent(IN)  :: domain, grid_name
+        type(grid_class),       intent(IN)  :: grid         ! Yelmo grid
+        character(len=*),       intent(IN)  :: domain
         character(len=*),       intent(IN), optional :: group
 
         ! Local variables
         character(len=32) :: nml_group
+        integer :: nx, ny
         
         real(wp), parameter :: ghf_min = 0.1  ! [mW/m2] Minimum allowed ghf value
         real(wp), parameter :: ghf_mv  = -9999.0_wp   ! missing value marker
 
         ! Load geothermal parameters
-        call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.,group=group)
+        call geothermal_par_load(gthrm%par,filename,domain,grid%name,init=.TRUE.,group=group)
+
+        nx = grid%G%nx
+        ny = grid%G%ny
 
         ! Allocate the geothermal object 
         call geothermal_allocate(gthrm%now,nx,ny)
@@ -76,8 +83,9 @@ contains
         
         ! Read in array 
         if (gthrm%par%use_obs) then 
-            ! Load geothermal heat flow data from file 
-            call nc_read(gthrm%par%obs_path,gthrm%par%obs_name,gthrm%now%ghf)
+            ! Load geothermal heat flow data from file, remapped from the grid
+            ! of the file (FesmData global attribute grid_name) if not the Yelmo grid
+            call read_on_grid(gthrm%now%ghf,gthrm%par%obs_path,gthrm%par%obs_name,grid)
             write(*,*) "geothermal_init:: geothermal heat flux loaded from: "
             write(*,*) trim(gthrm%par%obs_path)//" : "//trim(gthrm%par%obs_name)
 
@@ -102,7 +110,7 @@ contains
                  (.not.  trim(gthrm%par%obs_err_name) .eq. "")   ) then 
                 ! Load stdev field too
 
-                call nc_read(gthrm%par%obs_path,gthrm%par%obs_err_name,gthrm%now%ghf_err)
+                call read_on_grid(gthrm%now%ghf_err,gthrm%par%obs_path,gthrm%par%obs_err_name,grid)
                 gthrm%now%ghf_err = gthrm%now%ghf_err * ghf_to_mW(gthrm%par%obs_path,gthrm%par%obs_err_name)
 
                 ! Offset GHF field by desired sigma level
@@ -140,6 +148,32 @@ contains
         return 
 
     end subroutine geothermal_init
+
+    subroutine read_on_grid(var,path,varname,grid)
+        ! A 2D field of a file on grid: remapped (bilinear) from the grid of the
+        ! file (FesmData global attribute grid_name) if it is another grid,
+        ! else read as it is. Missing values: mv of fesm-utils (negative).
+
+        implicit none
+
+        real(wp),         intent(OUT) :: var(:,:)
+        character(len=*), intent(IN)  :: path, varname
+        type(grid_class), intent(IN)  :: grid
+
+        type(map_class) :: map
+        logical :: remap
+        integer :: nx, ny
+        real(wp), allocatable :: tmp(:,:)
+
+        call fesmdata_map_init(map,remap,nx,ny,path,varname,"bilin",grid=grid)
+        call fesmdata_read_field(path,varname,tmp,nx,ny,remap,map)
+        var = tmp
+
+        if (remap) write(*,*) "geothermal_init:: "//trim(varname)//" remapped onto "//trim(grid%name)
+
+        return
+
+    end subroutine read_on_grid
 
 
     subroutine geothermal_update(sed,year_bp)

@@ -15,10 +15,9 @@
 
 &comps
     ! Components: which are active, with which model, how often.
-    ! Pyrenees is single-grid (PYR-1KM): every component runs on the Yelmo grid.
-    ! NOTE: ported to the multigrid driver but UNTESTED -- the PYR-1KM data are
-    ! no longer available on this machine, so the htopo paths below are the
-    ! standard templates, not verified against real files.
+    ! Pyrenees: ice sheet and surface on the hub PYR-250M (FesmData topography);
+    ! climate (ERA5) and isostasy on PYR-2KM, the grid of the FesmData climate;
+    ! the GHF is remapped from PYR-2KM onto the Yelmo grid when loaded.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
@@ -26,7 +25,7 @@
     with_shelf        = False  ! Ocean forcing off (mountain glacier: no ocean)
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 50.0     ! [yr] Frequency of snapclim snapshot updates (and of the surface: 250 m grid)
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -64,23 +63,23 @@
     ! A blank component grid takes the default given in brackets.
     name         = "Pyrenees"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "PYR-1KM"          ! hi-res geometry hub
+    grid_hub     = "PYR-250M"         ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
-    grid_isos    = "PYR-1KM"          ! isostasy [grid_ice]
-    grid_clim    = "PYR-1KM"          ! reference climate + transient forcing [grid_ice]
-    grid_surface = "PYR-1KM"          ! surface mass balance [grid_clim]
-    grid_shelf   = "PYR-1KM"          ! marine shelf [grid_hub]
+    grid_isos    = "PYR-2KM"          ! isostasy [grid_ice]
+    grid_clim    = "PYR-2KM"          ! reference climate + transient forcing [grid_ice]
+    grid_surface = "PYR-250M"         ! surface mass balance [grid_clim]
+    grid_shelf   = ""                 ! marine shelf [grid_hub]
     basins       = "domain"  ! basin ids of the hub output: <set>, <set>.group, None or domain
 /
 
 &topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-GLO90-GEBCO2026.nc"
     vars  = "z_bed" "z_srf" "H_ice"
     remap = "con"
 /
 
 &regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
 /
 
 ! ===== Output timing =====
@@ -221,9 +220,9 @@
 
 &ghf
     use_obs   = True 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF_L19.nc"
+    obs_path  = "fesmdata/{domain}/PYR-2KM/PYR-2KM_GHF-Lucazeau2019.nc"   ! remapped onto the Yelmo grid
     obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
+    obs_err_name = "ghf_sd"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
 
@@ -488,20 +487,20 @@
 
 &yelmo_data 
     ! The present-day topography comes from the hub ([domain])
-    pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM_WorldClim.nc"
+    pd_tsrf_load      = False 
+    pd_tsrf_path      = "none"
     pd_tsrf_name      = "t2m"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = True
     pd_smb_load       = False 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM_WorldClim.nc"
+    pd_smb_path       = "none"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = False 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL.nc"
+    pd_vel_path       = "none"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "none"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
 
 /
 
@@ -537,13 +536,13 @@
 /
 
 &snap_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM_WorldClim.nc"
-    clim_names      = "z_srf" "t2m" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
+    clim_names      = "zs" "t2m" "pr" ""                                                      ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
     clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN.nc"
+    ocn_path        = "none"                                                                  ! no ocean (with_shelf = False)
     ocn_names       = "depth" "mask_ocn" "to" "so"
     ocn_monthly     = False
     ocn_time        = 0
@@ -690,7 +689,7 @@
     sf_a        = 0.273   ! Snow fraction function (parameter a)
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs (itm)
-    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
+    time_equil  = 10.0    ! [yr] Cold-start snowpack spin-up (annual cycles)
     dt_days     = 1       ! [d] chion step (divides the 360-day year)
     trans_sw    = 0.6     ! [1] TOA -> surface shortwave transmissivity (bessi)
     wind_speed  = 5.0     ! [m s-1] Constant wind speed (bessi)

@@ -419,14 +419,14 @@
 /
 
 &topo_south
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
     remap = "con"
 /
 
 &regions_south
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
     masks        = "APIS" "WAIS" "EAIS"
     mask_APIS    = "region:Antarctic_Peninsula"
@@ -543,16 +543,16 @@
 
 &sed_south
     method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
     obs_name  = "z_sed"
 
 /
 
 &ghf_south
     use_obs   = True 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-S04.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-Shapiro2004.nc"
     obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
+    obs_err_name = "ghf_sd"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
 
@@ -620,17 +620,17 @@
     pd_tsrf_load      = True 
     pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc" 
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
-    pd_tsrf_monthly   = True
+    pd_tsrf_monthly   = False
     pd_smb_load       = True 
     pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
-    pd_smb_monthly    = True 
+    pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
+    pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Rignot2011.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "none"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
 
 /
 
@@ -679,12 +679,13 @@
 /
 
 &snap_south_clim1
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
     clim_monthly    = False
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
     ocn_names       = "depth" "mask_ocn" "to"
     ocn_monthly     = False
@@ -692,12 +693,13 @@
 /
 
 &snap_south_clim2
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
     clim_monthly    = False
     clim_time       = -21000
-    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
+    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
     clim_stdev_name = "pr_ann" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
     ocn_names       = "depth" "mask_ocn" "to"
     ocn_monthly     = False
@@ -899,7 +901,7 @@
 
     ! bmb_method == anom, bmb_ref parameters 
     use_obs         = False         ! Load obs for bmb_ref
-    obs_path        = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BasalMelt-Rignot2013.nc"
+    obs_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_BasalMelt-Rignot2013.nc"
     obs_name        = "bmelt_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
@@ -979,14 +981,14 @@
 /
 
 &topo_north
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
     remap = "con"
 /
 
 &regions_north
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
 /
 
@@ -1089,16 +1091,16 @@
 
 &sed_north
     method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
     obs_name  = "z_sed"
 
 /
 
 &ghf_north
     use_obs   = False 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M05.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-FoxMaule2005.nc"
     obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
+    obs_err_name = "None"
     f_stdev   = 0.0
     ghf_const = 50.0           ! [mW/m^2]
 
@@ -1164,19 +1166,19 @@
 &yelmo_data_north
     ! The present-day topography comes from the hub ([domain_north])
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_tsrf_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_smb_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
+    pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Joughin2018.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = True 
-    pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Stratigraphy-MacGregor2025.nc"
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
 
 /
 
@@ -1221,42 +1223,46 @@
 /
 
 &snap_north_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
-    clim_names      = "z_srf" "tas" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    clim_names      = "z_srf" "t2m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
     clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
     ocn_names       = "depth" "mask_ocn" "to" "so"
     ocn_monthly     = True
     ocn_time        = 0
 /
 
 &snap_north_clim1
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
     clim_monthly    = False
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
-    ocn_names       = "none" "mask" "sst_ann"
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
+    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
+    ocn_names       = "none" "none" "sst_ann"
     ocn_monthly     = False
     ocn_time        = 0
+    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
 /
 
 &snap_north_clim2
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
     clim_monthly    = False
     clim_time       = -21000
-    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
+    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
     clim_stdev_name = "pr_ann" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
-    ocn_names       = "none" "mask" "sst_ann"
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
+    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
+    ocn_names       = "none" "none" "sst_ann"
     ocn_monthly     = False
     ocn_time        = -21000
+    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
 /
 
 &snap_north_clim3

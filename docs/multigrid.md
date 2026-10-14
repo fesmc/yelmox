@@ -140,7 +140,7 @@ One `[domain]` group (`[domain_north]`/`[domain_south]` in bipolar) defines the
 domain: its name, its physical constants and the grid of every component. Its
 topography is in `[topo]` and its regions, zones and basins in `[regions]`
 (`[topo_south]`, `[regions_south]`, ... in bipolar), all from
-[FesmData](https://github.com/fesmc/FesmData) v2 (`ice_data/v2/`). Yelmo takes
+[FesmData](https://github.com/fesmc/FesmData) v2 (`fesmdata/`). Yelmo takes
 the domain name and its grid from `[domain]` (`[yelmo]` no longer sets
 `domain`/`grid_name`). A blank component grid takes its default:
 
@@ -157,13 +157,13 @@ the domain name and its grid from `[domain]` (`[yelmo]` no longer sets
     basins       = "Zwally2012" ! basin ids of the hub output
 /
 &topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
     remap = "con"
 /
 &regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
     masks        = "APIS" "WAIS" "EAIS"           ! named regions for 1D output
     mask_APIS    = "region:Antarctic_Peninsula"

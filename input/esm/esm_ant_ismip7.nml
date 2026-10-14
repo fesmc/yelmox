@@ -4,7 +4,7 @@
 &gcm_ts_ref
     ! RACMO2.3p2 (ERA5) monthly climatology 1985-2014 (FesmData v2): the ISMIP7 reference
     ! period, filled over the whole grid
-    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "t2m"
     units       = "K" "K"
     scaling     = 1.0 0.0
@@ -12,7 +12,7 @@
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "pr"
     units       = "kg m-2 yr-1" "mm d-1"
     scaling     = 2.73785e-3 0.0
@@ -21,7 +21,7 @@
 
 &gcm_smb_ref
     ! smb complete: pr + subl off the glaciated surfaces
-    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "smb"
     units       = "kg m-2 yr-1" "mm yr-1"
     scaling     = 1.0 0.0
@@ -29,7 +29,7 @@
 /
 
 &gcm_zs_ref
-    filename    = "ice_data/v2/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "z_srf"
     units       = "m" "m"
     scaling     = 1.0 0.0
