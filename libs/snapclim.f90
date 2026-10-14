@@ -7,6 +7,7 @@ module snapclim
     use nml 
     use fesmdata, only : fesmdata_flux_conv, fesmdata_temp_ref
     use interp2D, only : fill_nearest_levels
+    use gaussian_filter, only : filter_gaussian
     
     implicit none 
 
@@ -46,11 +47,13 @@ module snapclim
         real(dp)         :: clim_time 
         character(len=512) :: clim_stdev_path 
         character(len=56)  :: clim_stdev_name
+        real(wp)           :: clim_sigma        ! [km] Gaussian smoothing of the snapshot at loading (0: none)
 
         character(len=512) :: ocn_path 
         character(len=56)  :: ocn_names(4)
         logical            :: ocn_monthly 
         real(dp)         :: ocn_time 
+        real(wp)           :: ocn_sigma         ! [km] Gaussian smoothing of the ocean at loading (0: none)
         
     end type 
 
@@ -212,7 +215,7 @@ contains
 
     end subroutine snapclim_var_to_ocn
 
-    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,south,group)
+    subroutine snapclim_init(snp,filename,domain,grid_name,nx,ny,dx,south,group)
         ! This subroutine will initialize four climate snapshots
         ! (clim0,clim1,clim2,clim3) which will be used for temporal
         ! interpolation to determine the current climate forcing. 
@@ -224,6 +227,7 @@ contains
         character(len=*),     intent(IN)    :: filename 
         character(len=*),     intent(IN)    :: domain, grid_name
         integer,    intent(IN) :: nx, ny  
+        real(wp), intent(IN) :: dx          ! [km] grid spacing (snapshot smoothing, clim_sigma)
         logical,  intent(IN) :: south       ! southern hemisphere
         character(len=*),  intent(IN), optional :: group
 
@@ -330,15 +334,15 @@ contains
         ! == clim0: reference climate (eg, present day) ==
 
         call snapshot_par_load(snp%clim0%par,filename,trim(nml_group)//"_clim0",domain,grid_name,init=.TRUE.)
-        call read_climate_snapshot(snp%clim0,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-        call read_ocean_snapshot(snp%clim0,nx,ny,depth=depth)
+        call read_climate_snapshot(snp%clim0,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+        call read_ocean_snapshot(snp%clim0,nx,ny,dx,depth=depth)
             
         if (load_atm1 .or. load_ocn1) then
             ! == clim1: snapshot 1 (eg, present day from model) == 
 
             call snapshot_par_load(snp%clim1%par,filename,trim(nml_group)//"_clim1",domain,grid_name,init=.TRUE.)                
-            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-            if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,depth=depth)
+            if (load_atm1) call read_climate_snapshot(snp%clim1,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+            if (load_ocn1) call read_ocean_snapshot(snp%clim1,nx,ny,dx,depth=depth)
 
         end if 
 
@@ -346,8 +350,8 @@ contains
             ! == clim2: snapshot 2 (eg, LGM with strong AMOC) == 
 
             call snapshot_par_load(snp%clim2%par,filename,trim(nml_group)//"_clim2",domain,grid_name,init=.TRUE.)                
-            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-            if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,depth=depth)
+            if (load_atm2) call read_climate_snapshot(snp%clim2,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+            if (load_ocn2) call read_ocean_snapshot(snp%clim2,nx,ny,dx,depth=depth)
 
         end if 
 
@@ -355,8 +359,8 @@ contains
             ! == clim3: snapshot 3 (eg, LGM with weak AMOC) == 
 
             call snapshot_par_load(snp%clim3%par,filename,trim(nml_group)//"_clim3",domain,grid_name,init=.TRUE.)
-            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
-            if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,depth=depth)
+            if (load_atm3) call read_climate_snapshot(snp%clim3,nx,ny,dx,snp%par%lapse,snp%par%f_p,snp%par%f_stdev,snp%par%south)
+            if (load_ocn3) call read_ocean_snapshot(snp%clim3,nx,ny,dx,depth=depth)
 
         end if 
 
@@ -1655,11 +1659,17 @@ contains
         call nml_read(filename,name,"clim_time",        par%clim_time,          init=init_pars)
         call nml_read(filename,name,"clim_stdev_path",  par%clim_stdev_path,    init=init_pars)
         call nml_read(filename,name,"clim_stdev_name",  par%clim_stdev_name,    init=init_pars)
+        par%clim_sigma = 0.0_wp
+        if (nml_has_param(filename,name,"clim_sigma")) &
+            call nml_read(filename,name,"clim_sigma",   par%clim_sigma,         init=init_pars)
         
         call nml_read(filename,name,"ocn_path",         par%ocn_path,           init=init_pars)
         call nml_read(filename,name,"ocn_names",        par%ocn_names,          init=init_pars)
         call nml_read(filename,name,"ocn_monthly",      par%ocn_monthly,        init=init_pars)
         call nml_read(filename,name,"ocn_time",         par%ocn_time,           init=init_pars)
+        par%ocn_sigma = 0.0_wp
+        if (nml_has_param(filename,name,"ocn_sigma")) &
+            call nml_read(filename,name,"ocn_sigma",    par%ocn_sigma,          init=init_pars)
         
         ! Subsitute domain/grid_name (equivalent to yelmo_parse_path)
         call parse_path(par%clim_path,domain,grid_name)
@@ -1674,7 +1684,7 @@ contains
 
     end subroutine snapshot_par_load
 
-    subroutine read_climate_snapshot(clim,nx,ny,lapse,f_p,f_stdev,south)
+    subroutine read_climate_snapshot(clim,nx,ny,dx,lapse,f_p,f_stdev,south)
         ! `names` is a vector of names in the netcdf file that 
         ! correspond to the fields to be read in:
         ! (1) 2D elevation field
@@ -1686,6 +1696,7 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: clim
         integer,          intent(IN) :: nx, ny  
+        real(wp),       intent(IN) :: dx            ! [km] grid spacing
         real(wp),       intent(IN) :: lapse(2)
         real(wp),       intent(IN) :: f_p 
         real(wp),       intent(IN) :: f_stdev
@@ -1908,6 +1919,25 @@ contains
         
             end if 
 
+            ! Smooth the snapshot (e.g. coarse GCM fields), then the land mask
+            ! of the smoothed elevation
+            if (clim%par%clim_sigma .gt. 0.0_wp) then 
+                call filter_gaussian(clim%z_srf,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%ta_ann,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%ta_sum,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%pr_ann,clim%par%clim_sigma,dx)
+                call filter_gaussian(clim%pr_ann_stdev_frac,clim%par%clim_sigma,dx)
+                do m = 1, 12
+                    call filter_gaussian(clim%tas(:,:,m),clim%par%clim_sigma,dx)
+                    call filter_gaussian(clim%pr(:,:,m),clim%par%clim_sigma,dx)
+                    call filter_gaussian(clim%sf(:,:,m),clim%par%clim_sigma,dx)
+                    call filter_gaussian(clim%pr_stdev_frac(:,:,m),clim%par%clim_sigma,dx)
+                end do 
+                clim%mask = 0.0 
+                where(clim%z_srf .gt. 0.0) clim%mask = 1.0 
+                write(*,"(a,f8.1,a)") "read_climate_snapshot:: smoothed with sigma = ", clim%par%clim_sigma, " km"
+            end if 
+
             ! ====================================
             !
             ! Additional calculations
@@ -1965,7 +1995,7 @@ contains
 
     end subroutine read_climate_snapshot
 
-    subroutine read_ocean_snapshot(ocn,nx,ny,depth)
+    subroutine read_ocean_snapshot(ocn,nx,ny,dx,depth)
         ! Read oceanic snapshot from netcdf file
         ! Parameters loaded earlier via snapshot_par_load()
         ! The oceanic snapshot needs the following information:
@@ -1981,6 +2011,7 @@ contains
 
         type(snapclim_state_class), intent(INOUT) :: ocn 
         integer,    intent(IN) :: nx, ny
+        real(wp), intent(IN) :: dx              ! [km] grid spacing
         real(wp), intent(IN) :: depth(:)
 
         ! Local helping variables 
@@ -2080,6 +2111,14 @@ contains
             ! the level above
             call fill_nearest_levels(tocn3D,MV)
             call fill_nearest_levels(socn3D,MV)
+
+            ! Smooth the ocean (ocn_sigma of the snapshot), level by level
+            if (ocn%par%ocn_sigma .gt. 0.0_wp) then 
+                do k = 1, nz0
+                    call filter_gaussian(tocn3D(:,:,k),ocn%par%ocn_sigma,dx)
+                    call filter_gaussian(socn3D(:,:,k),ocn%par%ocn_sigma,dx)
+                end do 
+            end if 
 
             ! Determine the length of output depth dimension
             ! and allocate the ocn object

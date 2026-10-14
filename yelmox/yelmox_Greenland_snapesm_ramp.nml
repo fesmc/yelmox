@@ -613,6 +613,7 @@
     monthly   = False
     time      = 0.0
     idx_coord = 0.0 0.0
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
     pr  = "clim_picontrol_pr_ann"
     zs  = "clim_picontrol_zs"
@@ -624,6 +625,7 @@
     monthly   = False
     time      = -21000.0
     idx_coord = 1.0 0.0
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
     pr  = "clim_lgm_pr_ann"
     zs  = "clim_lgm_zs"

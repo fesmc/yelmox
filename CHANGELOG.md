@@ -34,6 +34,10 @@ annotated git tag. Dates are release (tag) dates.
   (fesm-utils `fill_nearest_levels`: each level from the nearest valid cell, else from the level
   above); the ocean mask comes from the data where `ocn_names(2) = "none"` (PMIP3 `sst_ann`).
   A 2D ocean without salinity gets 0 (salinity was read into an unallocated array).
+- snapclim/snapesm snapshot keys `clim_sigma` and `ocn_sigma` [km] (optional, default 0): Gaussian
+  smoothing (fesm-utils `filter_gaussian`) of the atmosphere / ocean of the snapshot at loading.
+  The PMIP3 snapshots use 50 km (as the v1 `PMIP3_sig50km` files); `snapclim_init`/`snapesm_init`
+  take the grid spacing.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD

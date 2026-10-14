@@ -23,6 +23,7 @@ module snapesm
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use tsgen,    only : tsgen_class, tsgen_init, tsgen_update, &
                          tsgen_restart_write, tsgen_restart_read
+    use gaussian_filter, only : filter_gaussian
 
     implicit none
 
@@ -64,6 +65,8 @@ module snapesm
         logical           :: monthly        ! raw atm fields are monthly (else annual+summer -> synthesized)
         real(dp)          :: time           ! reference time [yr] of this snapshot (index normalization)
         real(wp)          :: idx_coord(2)   ! position on the 1-D / 2-D index manifold
+        real(wp)          :: clim_sigma     ! [km] Gaussian smoothing of the atmosphere at loading (0: none)
+        real(wp)          :: ocn_sigma      ! [km] Gaussian smoothing of the ocean at loading (0: none)
     end type
 
     ! A climate state. Option A: named members for the hot path, unallocated when a
@@ -110,6 +113,7 @@ module snapesm
         character(len=256) :: var_defs      ! path to the varslice variable-database nml
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
+        real(wp)           :: dx_km         ! [km] grid spacing (snapshot smoothing)
         logical            :: south         ! southern hemisphere (seasons, lapse rates)
         character(len=16)  :: combine       ! default combine mode
         integer            :: manifold      ! index-manifold dimension (0/1/2)
@@ -152,7 +156,7 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, time, south, group)
+    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, dx_km, time, south, group)
         ! Mirrors snapclim_init, plus `time` (required to initialize the tsgen indices,
         ! which anchor ramp-type series to their start time).
         implicit none
@@ -161,6 +165,7 @@ contains
         character(len=*),      intent(IN)    :: domain
         character(len=*),      intent(IN)    :: grid_name
         integer,               intent(IN)    :: nx, ny
+        real(wp),              intent(IN)    :: dx_km     ! [km] grid spacing (clim_sigma)
         real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
         character(len=*),      intent(IN), optional :: group
@@ -175,6 +180,7 @@ contains
         call snapesm_par_load(sc, filename, trim(base_group), domain, grid_name)
         sc%par%nx = nx
         sc%par%ny = ny
+        sc%par%dx_km = dx_km
         sc%par%south = south
 
         ! Initialize the driving indices (tsgen). Group is &<base_group>_idx_<idxname>.
@@ -813,6 +819,12 @@ contains
         call nml_read(filename, group, "monthly",   ss%monthly,   init=.TRUE.)
         call nml_read(filename, group, "time",      ss%time,      init=.TRUE.)
         call nml_read(filename, group, "idx_coord", ss%idx_coord, init=.TRUE.)
+        ss%clim_sigma = 0.0_wp
+        if (nml_has_param(filename, group, "clim_sigma")) &
+            call nml_read(filename, group, "clim_sigma", ss%clim_sigma, init=.TRUE.)
+        ss%ocn_sigma = 0.0_wp
+        if (nml_has_param(filename, group, "ocn_sigma")) &
+            call nml_read(filename, group, "ocn_sigma", ss%ocn_sigma, init=.TRUE.)
         ! The reference snapshot is designated solely by the top-level ref_name
         ! (an is_ref namelist key would have to be present in every snapshot group,
         ! given nml's error-on-missing behavior).
@@ -977,6 +989,21 @@ contains
             st%pr_ann = st%pr_ann * 365.0_wp
         end if
 
+        ! Smooth the snapshot (spec%clim_sigma, e.g. coarse GCM fields), then the
+        ! land mask of the smoothed elevation (snapclim read_climate_snapshot).
+        if (spec%clim_sigma > 0.0_wp) then
+            call filter_gaussian(st%z_srf,  spec%clim_sigma, sc%par%dx_km)
+            call filter_gaussian(st%ta_ann, spec%clim_sigma, sc%par%dx_km)
+            call filter_gaussian(st%ta_sum, spec%clim_sigma, sc%par%dx_km)
+            call filter_gaussian(st%pr_ann, spec%clim_sigma, sc%par%dx_km)
+            do m = 1, NMONTH
+                call filter_gaussian(st%tas(:,:,m), spec%clim_sigma, sc%par%dx_km)
+                call filter_gaussian(st%pr(:,:,m),  spec%clim_sigma, sc%par%dx_km)
+            end do
+            st%mask = 0.0_wp
+            where (st%z_srf > 0.0_wp) st%mask = 1.0_wp
+        end if
+
         ! Precip variability scaling (snapclim 1926-1927); f_stdev=0 -> no-op here.
         ! (pr_stdev_frac == 0 for this config, so the monthly scaling is identity.)
 
@@ -1045,6 +1072,14 @@ contains
         allocate(to0(nx,ny,nz0), so0(nx,ny,nz0))
         to0 = sum(vt%var, dim=4) / real(nt,wp)
         so0 = sum(vs%var, dim=4) / real(size(vs%var,4),wp)
+
+        ! Smooth the ocean (spec%ocn_sigma), level by level
+        if (sc%snap(s)%spec%ocn_sigma > 0.0_wp) then
+            do k = 1, nz0
+                call filter_gaussian(to0(:,:,k), sc%snap(s)%spec%ocn_sigma, sc%par%dx_km)
+                call filter_gaussian(so0(:,:,k), sc%snap(s)%spec%ocn_sigma, sc%par%dx_km)
+            end do
+        end if
 
         call model_depth(depthm)
         nzo = size(depthm)

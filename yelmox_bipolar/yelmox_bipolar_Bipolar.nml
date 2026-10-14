@@ -685,6 +685,7 @@
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
     ocn_names       = "depth" "mask_ocn" "to"
     ocn_monthly     = False
@@ -698,6 +699,7 @@
     clim_time       = -21000
     clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
     clim_stdev_name = "pr_ann" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
     ocn_names       = "depth" "mask_ocn" "to"
     ocn_monthly     = False
@@ -1240,10 +1242,12 @@
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
     ocn_names       = "none" "none" "sst_ann"
     ocn_monthly     = False
     ocn_time        = 0
+    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
 /
 
 &snap_north_clim2
@@ -1253,10 +1257,12 @@
     clim_time       = -21000
     clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
     clim_stdev_name = "pr_ann" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
     ocn_names       = "none" "none" "sst_ann"
     ocn_monthly     = False
     ocn_time        = -21000
+    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
 /
 
 &snap_north_clim3

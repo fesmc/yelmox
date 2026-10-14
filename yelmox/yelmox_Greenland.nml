@@ -612,10 +612,12 @@
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
     ocn_names       = "none" "none" "sst_ann"
     ocn_monthly     = False
     ocn_time        = 0
+    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
 /
 
 &snap_clim2
@@ -625,10 +627,12 @@
     clim_time       = -21000
     clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
     clim_stdev_name = "pr_ann" 
+    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
     ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
     ocn_names       = "none" "none" "sst_ann"
     ocn_monthly     = False
     ocn_time        = -21000
+    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
 /
 
 &snap_clim3
