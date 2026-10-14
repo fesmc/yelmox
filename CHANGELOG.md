@@ -27,6 +27,13 @@ annotated git tag. Dates are release (tag) dates.
   (`GHF-Shapiro2004`, `-FoxMaule2005`, `-Loesing2021`, `-HazzardRichards2024`; error `ghf_sd`)
   and North/LIS reference climate `Atmosphere-ERA5-1981-2010` (was ERA-Interim). rembo1 on
   `TOPO-BedMachine-v6` and MAR v3.14. Unused esm `&basins` (BASINS-nasa) removed.
+- Paleo climate snapshots from FesmData `Paleoclimate-PMIP3-{piControl,lgm}-{mean,stdev}` (was
+  `PMIP3_sig50km`, smoothed with 50 km) and ocean from `Ocean-ORAS5-1981-2010` (was ORAS4): snapclim,
+  snapesm (`greenland_clim.nml`) and the esm ocean reference (`esm_grl_*.nml`, monthly climatology,
+  `fill = "nearest"`). snapclim reads ocean fields with missing values and fills them
+  (fesm-utils `fill_nearest_levels`: each level from the nearest valid cell, else from the level
+  above); the ocean mask comes from the data where `ocn_names(2) = "none"` (PMIP3 `sst_ann`).
+  A 2D ocean without salinity gets 0 (salinity was read into an unallocated array).
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD

@@ -549,7 +549,7 @@
     clim_time       = 0
     clim_stdev_path = "None"
     clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
+    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
     ocn_names       = "depth" "mask_ocn" "to" "so"
     ocn_monthly     = True                                                                  ! Default (=True)
     ocn_time        = 0
@@ -557,7 +557,7 @@
 
 &snap_clim1
     ! clim_path      = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
     clim_monthly    = False
     clim_time       = 0
@@ -571,11 +571,11 @@
 
 &snap_clim2
     ! clim_path     = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7weak.nc"
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
     clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
     clim_monthly    = False
     clim_time       = -21000
-    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
+    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
     clim_stdev_name = "pr_ann" 
     ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
     ocn_names       = "depth" "mask_ocn" "to"

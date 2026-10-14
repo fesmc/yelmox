@@ -1,7 +1,7 @@
 ! ============================================================================
 ! 1pctCO2 Greenland ESM forcing.
 ! Greenland counterpart of esm_ant_1pctCO2.nml: same 1pctCO2 experiment structure,
-! with the Greenland reference conventions (MAR atmosphere + ORAS4 ocean).
+! with the Greenland reference conventions (MAR atmosphere + ORAS5 ocean).
 !
 ! Idealized CMIP experiment: atmospheric CO2 rises +1%/yr (compounding), reaching
 ! 4xCO2 at ~yr 140. Consumes ABSOLUTE CMIP fields (tas/pr/thetao/so), NOT precomputed
@@ -105,19 +105,21 @@
 
 ! ======== Reference period ========
 &gcm_to_ref
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
     name        = "to"
-    units       = "degrees C" "K"
+    units       = "degC" "K"
     scaling     = 1.0 273.15
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    fill        = "nearest"
 /
 
 &gcm_so_ref
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    fill        = "nearest"
 /
 
 ! ======== ESM Reference period ========

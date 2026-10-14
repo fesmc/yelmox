@@ -6,6 +6,7 @@ module snapclim
     use ncio 
     use nml 
     use fesmdata, only : fesmdata_flux_conv, fesmdata_temp_ref
+    use interp2D, only : fill_nearest_levels
     
     implicit none 
 
@@ -1970,8 +1971,8 @@ contains
         ! The oceanic snapshot needs the following information:
         ! (1) depth dimension of 3D/4D field (ie, nz of [nx,ny,nz])
         ! (2) 3D land-ocean mask specifying original boundaries of the simulation
-        ! (3) 3D [nx,ny,nz0] or 4D [nx,ny,nz0,nmonth] ocean temperature field with no missing values
-        !     (ie, interpolated even where there was land to be safe) 
+        ! (3) 3D [nx,ny,nz0] or 4D [nx,ny,nz0,nmonth] ocean temperature field; cells
+        !     without data (missing values) are filled here (fill_nearest_levels)
         !
         ! Subroutine will output the ocn (climate) object with the input field [nx,ny,nz0]
         ! interpolated vertically to the desired depth levels [nx,ny,nz]
@@ -1987,9 +1988,7 @@ contains
         integer,    allocatable :: mask3D(:,:,:)
         real(wp), allocatable :: tocn3D(:,:,:)
         real(wp), allocatable :: socn3D(:,:,:)
-        real(wp), allocatable :: tocn4D(:,:,:,:)
-        real(wp), allocatable :: socn4D(:,:,:,:)
-        integer :: nz, nz0, m 
+        integer :: nz, nz0 
         integer :: i, j, k 
 
         logical :: is_monthly 
@@ -2027,25 +2026,13 @@ contains
         else 
             ! Read data from parameters 
 
-            ! Determine the length of the input depth dimension 
-            ! and define the input depth dimension vector
+            ! Input depth axis: one level for a 2D (surface) ocean, else
+            ! the depth dimension of the file
             if (is_2D_ocn) then 
-                ! Ocean will be a 2D field, set nz0 to 1 layer 
                 nz0 = 1
                 allocate(depth0(nz0))
                 depth0 = 0.0_wp
-
-                ! Allocate additional arrays
-                allocate(mask3D(nx,ny,nz0))
-                allocate(tocn3D(nx,ny,nz0))
-
-                ! Read in the 2D ocean mask 
-                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D(:,:,1))
-
             else 
-                ! Ocean includes a depth dimension 
-
-                ! Read in depth dimension size from file
                 nz0 = nc_size(ocn%par%ocn_path,ocn%par%ocn_names(1))
                 allocate(depth0(nz0))
                 call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(1),depth0)
@@ -2056,61 +2043,43 @@ contains
                 ! e.g. the ISMIP6-J20 file). Without this, both the vertical
                 ! interpolation (interp_linear below) and the ocean-mask depth
                 ! test deliver the wrong water mass / mask to marine_shelf.
-                ! To reproduce the previous (incorrect) behaviour for comparison,
-                ! comment the FIX line and uncomment the LEGACY line.
-                depth0 = abs(depth0)        ! FIX: positive-down depth axis
-                !depth0 = depth0            ! LEGACY: raw file axis (wrong for positive-up 'z')
-
-                ! Allocate additional arrays
-                allocate(mask3D(nx,ny,nz0))
-                allocate(tocn3D(nx,ny,nz0))
-                allocate(socn3D(nx,ny,nz0))
-
-                ! Read in the ocean mask 
-                call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
-
+                depth0 = abs(depth0)
             end if 
-             
-            if (is_monthly) then 
-                ! Read in monthly field(s), then get the averages
 
-                allocate(tocn4D(nx,ny,nz0,12))
-                allocate(socn4D(nx,ny,nz0,12))
-                
-                if (is_2D_ocn) then
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D(:,:,1,:))
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn4D(:,:,1,:))
-                else 
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn4D)
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn4D)
-                end if 
+            allocate(mask3D(nx,ny,nz0))
+            allocate(tocn3D(nx,ny,nz0))
+            allocate(socn3D(nx,ny,nz0))
 
-                ! Calculate annual mean temperature [degrees C]
-                tocn3D = sum(tocn4D,dim=4)
-                tocn3D = tocn3D/12.0
-                socn3D = sum(socn4D,dim=4)
-                socn3D = socn3D/12.0
- 
+            ! Temperature (annual mean of monthly fields), missing values as MV,
+            ! converted from the units of the file to Kelvin
+            call read_ocean_field(tocn3D,ocn%par%ocn_path,ocn%par%ocn_names(3),is_monthly,is_2D_ocn)
+            where (tocn3D .ne. MV) tocn3D = tocn3D + fesmdata_temp_ref(ocn%par%ocn_path,ocn%par%ocn_names(3))
 
-                ! Delete working array to be safe
-                deallocate(tocn4D)
-                deallocate(socn4D) 
-
+            ! Salinity, if given (a surface ocean, e.g. PMIP sst, has none: 0)
+            if (name_given(ocn%par%ocn_names(4))) then 
+                call read_ocean_field(socn3D,ocn%par%ocn_path,ocn%par%ocn_names(4),is_monthly,is_2D_ocn)
             else
-                ! Read in specific field(s)
-
-                if (is_2D_ocn) then 
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D(:,:,1))
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn3D(:,:,1))
-                else 
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(3),tocn3D)
-                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(4),socn3D)
-                end if 
-
+                socn3D = 0.0_wp
             end if 
 
-            ! Convert from the units of the file to Kelvin
-            tocn3D = tocn3D + fesmdata_temp_ref(ocn%par%ocn_path,ocn%par%ocn_names(3))
+            ! Ocean mask: from the file, else where the temperature has data
+            if (name_given(ocn%par%ocn_names(2))) then 
+                if (is_2D_ocn) then 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D(:,:,1))
+                else 
+                    call nc_read(ocn%par%ocn_path,ocn%par%ocn_names(2),mask3D)
+                end if 
+            else 
+                mask3D = 0
+                where (tocn3D .ne. MV) mask3D = 1
+            end if 
+
+            ! Fill the cells without data (e.g. land, or beyond the source
+            ! coverage) so that the ocean is defined wherever the ice sheet
+            ! may meet it: per level from the nearest valid cell, else from
+            ! the level above
+            call fill_nearest_levels(tocn3D,MV)
+            call fill_nearest_levels(socn3D,MV)
 
             ! Determine the length of output depth dimension
             ! and allocate the ocn object
@@ -2160,6 +2129,54 @@ contains
         return 
 
     end subroutine read_ocean_snapshot
+
+    subroutine read_ocean_field(var,path,varname,is_monthly,is_2D_ocn)
+        ! An ocean field [nx,ny,nz0] (a single level for a 2D ocean), the
+        ! annual mean of monthly fields if is_monthly; missing values as MV
+        ! (a month without data makes the mean missing).
+
+        implicit none
+
+        real(wp),         intent(OUT) :: var(:,:,:)
+        character(len=*), intent(IN)  :: path, varname
+        logical,          intent(IN)  :: is_monthly, is_2D_ocn
+
+        real(wp), allocatable :: var4D(:,:,:,:)
+
+        if (is_monthly) then 
+            allocate(var4D(size(var,1),size(var,2),size(var,3),12))
+            if (is_2D_ocn) then 
+                call nc_read(path,varname,var4D(:,:,1,:),missing_value=MV)
+            else 
+                call nc_read(path,varname,var4D,missing_value=MV)
+            end if 
+            where (any(var4D .eq. MV,dim=4))
+                var = MV
+            elsewhere
+                var = sum(var4D,dim=4) / 12.0_wp
+            end where
+        else 
+            if (is_2D_ocn) then 
+                call nc_read(path,varname,var(:,:,1),missing_value=MV)
+            else 
+                call nc_read(path,varname,var,missing_value=MV)
+            end if 
+        end if 
+
+        return
+
+    end subroutine read_ocean_field
+
+    logical function name_given(name)
+        ! A variable name is given (not "", "none" or "None").
+
+        implicit none
+
+        character(len=*), intent(IN) :: name
+
+        name_given = .not. (trim(name) .eq. "" .or. trim(name) .eq. "none" .or. trim(name) .eq. "None")
+
+    end function name_given
 
     subroutine read_series(series,filename)
         ! This subroutine will read a time series of

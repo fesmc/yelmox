@@ -137,19 +137,21 @@
 
 ! ======== Reference period ========
 &gcm_to_ref
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
     name        = "to"
-    units       = "degrees C" "K"
+    units       = "degC" "K"
     scaling     = 1.0 273.15
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    fill        = "nearest"
 /
 
 &gcm_so_ref
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    fill        = "nearest"
 /
 
 ! ======== ESM Reference period ========
