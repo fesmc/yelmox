@@ -15,10 +15,10 @@
 
 &comps
     ! Components: which are active, with which model, how often.
-    ! Pyrenees is single-grid (PYR-1KM): every component runs on the Yelmo grid.
-    ! NOTE: ported to the multigrid driver but UNTESTED -- the PYR-1KM data are
-    ! no longer available on this machine, so the htopo paths below are the
-    ! standard templates, not verified against real files.
+    ! Pyrenees: hub PYR-250M (FesmData topography); every component runs on the
+    ! Yelmo grid PYR-1KM. NOTE: ported to the multigrid driver but UNTESTED --
+    ! the PYR-1KM data (ice_data) are no longer available on this machine, so
+    ! those paths are the standard templates, not verified against real files.
     with_ice_sheet    = True   ! Is the ice sheet active?
     with_isostasy     = True   ! Is isostasy active?
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
@@ -64,8 +64,8 @@
     ! A blank component grid takes the default given in brackets.
     name         = "Pyrenees"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "PYR-1KM"          ! hi-res geometry hub
-    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_hub     = "PYR-250M"         ! hi-res geometry hub
+    grid_ice     = "PYR-1KM"          ! Yelmo [grid_hub]
     grid_isos    = "PYR-1KM"          ! isostasy [grid_ice]
     grid_clim    = "PYR-1KM"          ! reference climate + transient forcing [grid_ice]
     grid_surface = "PYR-1KM"          ! surface mass balance [grid_clim]
@@ -74,7 +74,7 @@
 /
 
 &topo
-    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-GLO90-GEBCO2026.nc"
     vars  = "z_bed" "z_srf" "H_ice"
     remap = "con"
 /
@@ -501,7 +501,7 @@
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "none"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
 
 /
 

@@ -9,6 +9,9 @@ annotated git tag. Dates are release (tag) dates.
 - FesmData v2 products from the link `fesmdata` (`$FESMDATA/products`, e.g.
   `/work/ba1442/fesmdata/products`; was `ice_data/v2`), copied into the run folders by
   runme (`.runme/info.json` links). SRG topography `TOPO-GLO90-GEBCO2026`.
+- Isochrones from `Stratigraphy-MacGregor2025` (`pd_age_names = "age" "depth_iso"`; was
+  `STRAT-M15`). `input/yelmo_defaults.nml` synced with yelmo.
+- Pyrenees: hub `PYR-250M` (`TOPO-GLO90-GEBCO2026`), Yelmo grid `PYR-1KM`.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD
