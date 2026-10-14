@@ -16,6 +16,10 @@ annotated git tag. Dates are release (tag) dates.
   MARv3.11-ERA): snapclim/snapesm reference climatology (`t2m`, `sf`, `rf`, `z_srf`), the esm
   reference blocks (`esm_grl_*.nml`) and the yelmo pd smb/T_srf (`-annual-mean`, `T_srf` skin
   temperature). snapclim reads precipitation and temperature units from the files.
+- FesmData v2 velocities (`Velocity-Joughin2018`, `Velocity-Rignot2011`), GHF
+  (`GHF-Shapiro2004`, `-FoxMaule2005`, `-Loesing2021`, `-HazzardRichards2024`; error `ghf_sd`)
+  and North/LIS reference climate `Atmosphere-ERA5-1981-2010` (was ERA-Interim). rembo1 on
+  `TOPO-BedMachine-v6` and MAR v3.14. Unused esm `&basins` (BASINS-nasa) removed.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD

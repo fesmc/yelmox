@@ -1,11 +1,11 @@
 &rembo
     domain              = "GRL"
     restart_file        = "none"
-    topo_file           = "ice_data/Greenland/GRL-16KM/GRL-16KM_TOPO-M17-v5.nc"
+    topo_file           = "fesmdata/Greenland/GRL-16KM/GRL-16KM_TOPO-BedMachine-v6.nc"
     forcing_file        = "in_rembo/forcing/mis11.climber_paleo.dat"
     emb_clim_file       = "ice_data/Greenland/GRL-80KM/ERA-40/GRL-80KM_ERA-40_195801-200112.nc"
-    clim_file           = "ice_data/Greenland/GRL-16KM/GRL-16KM_MARv3.11-ERA_annmean_1961-1990.nc"
-    precip_mon_file     = "ice_data/Greenland/GRL-16KM/GRL-16KM_MARv3.11-ERA_monmean_1961-1990.nc"
+    clim_file           = "fesmdata/Greenland/GRL-16KM/GRL-16KM_SMB-MARv3.14-1961-1990-annual-mean.nc"
+    precip_mon_file     = "fesmdata/Greenland/GRL-16KM/GRL-16KM_SMB-MARv3.14-1961-1990.nc"
     precip_mon_nms      = "rf" "sf"
     dppcorr_max         = 0.0 
 
@@ -191,6 +191,6 @@
 
 &emb_init_topo
     init_topo_load    = False 
-    init_topo_path    = "ice_data/Greenland/GRL-16KM/GRL-16KM_TOPO-M17-v5.nc"
+    init_topo_path    = "fesmdata/Greenland/GRL-16KM/GRL-16KM_TOPO-BedMachine-v6.nc"
     init_topo_names   = "H_ice" "z_bed"         ! Ice thickness, bedrock elevation
 /

@@ -270,7 +270,7 @@
 
 &ghf
     use_obs   = True 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF_L21.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-Loesing2021.nc"
     obs_name  = "ghf"
     obs_err_name = "None"
     f_stdev   = 0.0
@@ -547,7 +547,7 @@
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = True 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
+    pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Rignot2011.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = False 
     pd_age_path       = "none"
