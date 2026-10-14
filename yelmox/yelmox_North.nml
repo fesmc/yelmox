@@ -72,13 +72,13 @@
 /
 
 &topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
     vars  = "z_bed" "z_srf" "H_ice"
     remap = "con"
 /
 
 &regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
 /
 
 ! ===== Output timing =====
@@ -212,7 +212,7 @@
 
 &sed
     method    = 1               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
     obs_name  = "z_sed"
 
 /

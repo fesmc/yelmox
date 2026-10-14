@@ -20,7 +20,7 @@ your behalf.
    (~10-30 min), which is why it is folded into the install rather than run
    separately.
 6. **Extras** — install `runme` if it is missing, create `.runme_config`, and
-   link the external data paths (`ice_data`, `isostasy_data`).
+   link the external data paths (`ice_data`, `fesmdata`, `isostasy_data`).
 
 Each run also writes the exact commands it executed to a `.install.sh` script in
 the checkout, so any install is reproducible. The script below is the
@@ -66,5 +66,6 @@ command -v runme >/dev/null 2>&1 || pip install git+https://github.com/fesmc/run
 # runme_config: create .runme_config and set hpc/account
 runme --config  # or: cp .runme/runme_config .runme_config
 # data_link ice_data: ln -s <path> ice_data
+# data_link fesmdata: ln -s <$FESMDATA/products> fesmdata   (FesmData v2 products, e.g. /work/ba1442/fesmdata/products)
 # data_link isostasy_data: ln -s <path> isostasy_data
 ```

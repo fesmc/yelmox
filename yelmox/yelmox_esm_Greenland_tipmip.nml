@@ -116,7 +116,7 @@
 /
 
 &regions
-    path_regions       = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_regions       = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     layers             = "ismip7"
     path_ismip7        = "ice_data/ISMIP7/{domain}/{grid_name}/obs/{grid_name}_ObsISMIP7-v1.3.nc"
     var_ismip7         = "mouginot_basins"
@@ -299,7 +299,7 @@
 
 &sed
     method    = 1               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
     obs_name  = "z_sed"
 
 /

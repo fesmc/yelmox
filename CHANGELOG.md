@@ -6,6 +6,9 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- FesmData v2 products from the link `fesmdata` (`$FESMDATA/products`, e.g.
+  `/work/ba1442/fesmdata/products`; was `ice_data/v2`), copied into the run folders by
+  runme (`.runme/info.json` links). SRG topography `TOPO-GLO90-GEBCO2026`.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
   `surface_method = "chion"`, `[chion] model = "pdd"`, `[pdd_chion]` from smbpal's PDD

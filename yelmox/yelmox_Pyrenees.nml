@@ -74,13 +74,13 @@
 /
 
 &topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-GEBCO2026.nc"
     vars  = "z_bed" "z_srf" "H_ice"
     remap = "con"
 /
 
 &regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
 /
 
 ! ===== Output timing =====
