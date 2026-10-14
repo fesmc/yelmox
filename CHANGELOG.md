@@ -14,7 +14,8 @@ annotated git tag. Dates are release (tag) dates.
 - Pyrenees on FesmData: ice sheet and surface on the hub `PYR-250M` (`TOPO-GLO90-GEBCO2026`),
   climate (`Atmosphere-ERA5-1981-2010`, was WorldClim) and isostasy on `PYR-2KM`, GHF
   `GHF-Lucazeau2019` from `PYR-2KM`; no ocean, no pd T_srf/velocity (the PYR-1KM `ice_data`
-  folders are empty).
+  folders are empty). Climate and surface every 50 yr (`dt_clim`), chion `time_equil = 10`
+  (chion costs ~15 s per year on PYR-250M).
 - GHF and sediment obs are remapped (bilinear) onto the Yelmo grid when the file is on another
   grid (FesmData global attribute `grid_name`; fesm-utils `fesmdata_read_field`), so a par file
   can name a coarser data grid in `obs_path`. `geothermal_init`/`sediments_init` take the Yelmo grid.

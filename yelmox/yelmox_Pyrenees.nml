@@ -25,7 +25,7 @@
     with_shelf        = False  ! Ocean forcing off (mountain glacier: no ocean)
     climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 50.0     ! [yr] Frequency of snapclim snapshot updates (and of the surface: 250 m grid)
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -689,7 +689,7 @@
     sf_a        = 0.273   ! Snow fraction function (parameter a)
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs (itm)
-    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
+    time_equil  = 10.0    ! [yr] Cold-start snowpack spin-up (annual cycles)
     dt_days     = 1       ! [d] chion step (divides the 360-day year)
     trans_sw    = 0.6     ! [1] TOA -> surface shortwave transmissivity (bessi)
     wind_speed  = 5.0     ! [m s-1] Constant wind speed (bessi)
