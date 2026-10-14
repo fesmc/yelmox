@@ -30,7 +30,8 @@ annotated git tag. Dates are release (tag) dates.
 - Paleo climate snapshots from FesmData `Paleoclimate-PMIP3-{piControl,lgm}-{mean,stdev}` (was
   `PMIP3_sig50km`, smoothed with 50 km) and ocean from `Ocean-ORAS5-1981-2010` (was ORAS4): snapclim,
   snapesm (`greenland_clim.nml`) and the esm ocean reference (`esm_grl_*.nml`, monthly climatology,
-  `fill = "nearest"`). snapclim reads ocean fields with missing values and fills them
+  `fill = "nearest"`; read from `GRL-16KM` and remapped bilinearly onto the run grid, since ORAS5
+  is cropped on GRL-16KM/32KM only). snapclim reads ocean fields with missing values and fills them
   (fesm-utils `fill_nearest_levels`: each level from the nearest valid cell, else from the level
   above); the ocean mask comes from the data where `ocn_names(2) = "none"` (PMIP3 `sst_ann`).
   A 2D ocean without salinity gets 0 (salinity was read into an unallocated array).
