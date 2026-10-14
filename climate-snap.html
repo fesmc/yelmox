@@ -282,25 +282,54 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tbody>
 </table>
 <p>The transient forcing (<code>[tsforcing]</code>/<code>[tsgen]</code>, see <a href="./yelmox.html">yelmox</a>) reaches snapclim only in the <code>anom</code> methods.</p>
+<p>A snapshot group reads the atmosphere (<code>clim_path</code>, <code>clim_names</code>, <code>clim_monthly</code>, <code>clim_stdev_path</code>/<code>clim_stdev_name</code>) and the ocean (<code>ocn_path</code>, <code>ocn_names</code>, <code>ocn_monthly</code>) of one snapshot, from the <a href="https://github.com/fesmc/FesmData">FesmData</a> v2 products (<code>fesmdata/</code>), e.g.&nbsp;the Greenland reference and LGM snapshot:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_clim0</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    clim_path       <span class="kw">=</span> <span class="st">"fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    clim_names      <span class="kw">=</span> <span class="st">"z_srf"</span> <span class="st">"t2m"</span> <span class="st">"sf"</span> <span class="st">"rf"</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    clim_monthly    <span class="kw">=</span> True</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    ...</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    ocn_path        <span class="kw">=</span> <span class="st">"fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    ocn_names       <span class="kw">=</span> <span class="st">"depth"</span> <span class="st">"mask_ocn"</span> <span class="st">"to"</span> <span class="st">"so"</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    ocn_monthly     <span class="kw">=</span> True</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_clim2</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    clim_path       <span class="kw">=</span> <span class="st">"fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    clim_names      <span class="kw">=</span> <span class="st">"z_srf"</span> <span class="st">"t2m_ann"</span> <span class="st">"t2m_jja"</span> <span class="st">"pr_ann"</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    clim_monthly    <span class="kw">=</span> False</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    clim_time       <span class="kw">=</span> <span class="kw">-</span><span class="dv">21000</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    clim_stdev_path <span class="kw">=</span> <span class="st">"fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    clim_stdev_name <span class="kw">=</span> <span class="st">"pr_ann"</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    clim_sigma      <span class="kw">=</span> <span class="fl">50.0</span>      <span class="co">! [km] smoothing of the atmosphere</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    ocn_path        <span class="kw">=</span> <span class="st">"fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    ocn_names       <span class="kw">=</span> <span class="st">"none"</span> <span class="st">"none"</span> <span class="st">"sst_ann"</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    ocn_monthly     <span class="kw">=</span> False</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    ocn_time        <span class="kw">=</span> <span class="kw">-</span><span class="dv">21000</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    ocn_sigma       <span class="kw">=</span> <span class="fl">50.0</span>      <span class="co">! [km] smoothing of the ocean</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li><strong>Units</strong> come from the <code>units</code> attribute of each variable: temperatures in K or °C, precipitation in any water-flux unit (kg m⁻² or mm w.e. per s, d or yr); an unknown unit stops the run.</li>
+<li><strong>Smoothing.</strong> <code>clim_sigma</code> and <code>ocn_sigma</code> (km, optional, default 0) smooth the snapshot’s atmosphere and ocean with a Gaussian filter when it is loaded; the land mask follows the smoothed elevation. The PMIP3 snapshots use 50 km (the v1 files were smoothed in preprocessing, <code>PMIP3_sig50km</code>).</li>
+<li><strong>Ocean gaps.</strong> Cells without ocean data (land, or beyond the coverage of the product) are filled level by level from the nearest valid cell, and a level without data from the level above, so the ocean is defined wherever the ice sheet meets it. The ocean mask (<code>ocn_names(2)</code>) is read from the file, or taken from where the data exist with <code>"none"</code>. A surface ocean (<code>ocn_names(1) = "none"</code>, e.g.&nbsp;PMIP3 <code>sst_ann</code>) has salinity 0.</li>
+</ul>
 </section>
 <section id="snapesm" class="level2">
 <h2 class="anchored" data-anchor-id="snapesm">snapesm</h2>
 <p>A rewrite of snapclim on the fesm-utils <code>varslice</code> reader and <code>tsgen</code> series: the snapclim methods become configurations of one blend model, over any number of snapshots, fields and indices. Example: <code>yelmox/yelmox_Greenland_snapesm.nml</code>, which reproduces snapclim <code>snap_1ind_new</code> / <code>fraction</code> (<code>yelmox_Greenland_snapclim.nml</code>).</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    var_defs  <span class="kw">=</span> <span class="st">"input/greenland_clim.nml"</span>   <span class="co">! database of the input files</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    combine   <span class="kw">=</span> <span class="st">"anomaly"</span>                    <span class="co">! snapshots as anomalies from the reference</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    manifold  <span class="kw">=</span> <span class="dv">1</span>                            <span class="co">! number of indices spanning the blend (0/1/2)</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    ref_name  <span class="kw">=</span> <span class="st">"pd"</span>                         <span class="co">! the reference snapshot</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    snapshots <span class="kw">=</span> <span class="st">"pd"</span> <span class="st">"picontrol"</span> <span class="st">"lgm"</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    fields    <span class="kw">=</span> <span class="st">"tas"</span> <span class="st">"pr"</span> <span class="st">"to"</span> <span class="st">"so"</span> <span class="st">"zs"</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    indices   <span class="kw">=</span> <span class="st">"at"</span> <span class="st">"ap"</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">! lapse, f_p, f_p_ne, f_stdev, f_to, f_hol, dTa_const, dTo_const, dSo_const</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">! as in snapclim</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    var_defs  <span class="kw">=</span> <span class="st">"input/greenland_clim.nml"</span>   <span class="co">! database of the input files</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    combine   <span class="kw">=</span> <span class="st">"anomaly"</span>                    <span class="co">! snapshots as anomalies from the reference</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    manifold  <span class="kw">=</span> <span class="dv">1</span>                            <span class="co">! number of indices spanning the blend (0/1/2)</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    ref_name  <span class="kw">=</span> <span class="st">"pd"</span>                         <span class="co">! the reference snapshot</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    snapshots <span class="kw">=</span> <span class="st">"pd"</span> <span class="st">"picontrol"</span> <span class="st">"lgm"</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    fields    <span class="kw">=</span> <span class="st">"tas"</span> <span class="st">"pr"</span> <span class="st">"to"</span> <span class="st">"so"</span> <span class="st">"zs"</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    indices   <span class="kw">=</span> <span class="st">"at"</span> <span class="st">"ap"</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">! lapse, f_p, f_p_ne, f_stdev, f_to, f_hol, dTa_const, dTo_const, dSo_const</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">! as in snapclim</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Three kinds of group follow:</p>
 <ul>
 <li><strong>Fields</strong>, <code>[snap_field_&lt;name&gt;]</code>: <code>kind</code> (<code>atm_temp</code>, <code>atm_precip</code>, <code>ocn</code>, <code>ocn_salt</code>, <code>elev</code>), <code>blend</code> (<code>linear</code>, <code>ratio</code>, <code>fraction</code>, <code>const</code>) and the driving <code>index</code> (<code>""</code> = none).</li>
-<li><strong>Snapshots</strong>, <code>[snap_&lt;name&gt;]</code>: <code>monthly</code>, <code>time</code>, <code>idx_coord</code> (the snapshot’s position on the index manifold) and, per field, the <code>var_defs</code> group(s) holding it (one = monthly; two = annual + summer, from which the seasonal cycle is built). See <a href="./database-namelists.html">Database namelists</a>.</li>
+<li><strong>Snapshots</strong>, <code>[snap_&lt;name&gt;]</code>: <code>monthly</code>, <code>time</code>, <code>idx_coord</code> (the snapshot’s position on the index manifold), optionally <code>clim_sigma</code>/<code>ocn_sigma</code> (as in snapclim) and, per field, the <code>var_defs</code> group(s) holding it (one = monthly; two = annual + summer, from which the seasonal cycle is built). See <a href="./database-namelists.html">Database namelists</a>.</li>
 <li><strong>Indices</strong>, <code>[snap_idx_&lt;name&gt;]</code>: a <code>tsgen</code> series (<code>method</code>, <code>series_file</code>, <code>sigma</code>).</li>
 </ul>
 <p>Restart bundles hold the state of each index, <code>snapesm_idx_&lt;name&gt;_restart.nc</code>, with the configuration (snapshots, fields, reference) as attributes.</p>

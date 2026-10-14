@@ -223,7 +223,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Link</strong> each component into the directories where the build expects it.</li>
 <li><strong>Configure</strong> — generate a system-specific <code>Makefile</code> for every package from shared machine/compiler fragments, with the netCDF paths detected automatically.</li>
 <li><strong>Build</strong> <code>fesm-utils</code> (LIS + FFTW + utils). This is the slow step (~10-30 min), which is why it is folded into the install rather than run separately.</li>
-<li><strong>Extras</strong> — install <code>runme</code> if it is missing, create <code>.runme_config</code>, and link the external data paths (<code>ice_data</code>, <code>isostasy_data</code>).</li>
+<li><strong>Extras</strong> — install <code>runme</code> if it is missing, create <code>.runme_config</code>, and link the external data paths (<code>ice_data</code>, <code>fesmdata</code>, <code>isostasy_data</code>).</li>
 </ol>
 <p>Each run also writes the exact commands it executed to a <code>.install.sh</code> script in the checkout, so any install is reproducible. The script below is the equivalent for the <code>dkrz_levante</code> machine with the <code>ifx</code> compiler; substitute your own machine and compiler, and note that the netCDF paths (<code>NC_FROOT</code> / <code>NC_CROOT</code>) and the install root are filled in automatically for your system.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/usr/bin/env bash</span></span>
@@ -263,7 +263,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="co"># runme_config: create .runme_config and set hpc/account</span></span>
 <span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">--config</span>  <span class="co"># or: cp .runme/runme_config .runme_config</span></span>
 <span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="co"># data_link ice_data: ln -s &lt;path&gt; ice_data</span></span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="co"># data_link isostasy_data: ln -s &lt;path&gt; isostasy_data</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="co"># data_link fesmdata: ln -s &lt;$FESMDATA/products&gt; fesmdata   (FesmData v2 products, e.g. /work/ba1442/fesmdata/products)</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="co"># data_link isostasy_data: ln -s &lt;path&gt; isostasy_data</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>

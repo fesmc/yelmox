@@ -307,7 +307,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <p>The climate reaches the rest of the domain only through <code>climate_out_class</code> (<code>now</code> and <code>ref</code>): the atmosphere, the ocean as depth profiles or at the shelf base, and, when the backend has them, the surface mass balance and subglacial discharge. Nothing downstream depends on which backend produced them.</p>
 <section id="domain-definition-domain-the-hi-res-hub-htopo-and-the-regions" class="level3">
 <h3 class="anchored" data-anchor-id="domain-definition-domain-the-hi-res-hub-htopo-and-the-regions">Domain definition (<code>[domain]</code>), the hi-res hub (htopo) and the regions</h3>
-<p>One <code>[domain]</code> group (<code>[domain_north]</code>/<code>[domain_south]</code> in bipolar) defines the domain: its name, its physical constants and the grid of every component. Its topography is in <code>[topo]</code> and its regions, zones and basins in <code>[regions]</code> (<code>[topo_south]</code>, <code>[regions_south]</code>, … in bipolar), all from <a href="https://github.com/fesmc/FesmData">FesmData</a> v2 (<code>ice_data/v2/</code>). Yelmo takes the domain name and its grid from <code>[domain]</code> (<code>[yelmo]</code> no longer sets <code>domain</code>/<code>grid_name</code>). A blank component grid takes its default:</p>
+<p>One <code>[domain]</code> group (<code>[domain_north]</code>/<code>[domain_south]</code> in bipolar) defines the domain: its name, its physical constants and the grid of every component. Its topography is in <code>[topo]</code> and its regions, zones and basins in <code>[regions]</code> (<code>[topo_south]</code>, <code>[regions_south]</code>, … in bipolar), all from <a href="https://github.com/fesmc/FesmData">FesmData</a> v2 (<code>fesmdata/</code>). Yelmo takes the domain name and its grid from <code>[domain]</code> (<code>[yelmo]</code> no longer sets <code>domain</code>/<code>grid_name</code>). A blank component grid takes its default:</p>
 <pre><code>&amp;domain
     name         = "Antarctica"
     phys_const   = "Earth"      ! physical constants: group of input/yelmo_phys_const.nml
@@ -320,13 +320,13 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
     basins       = "Zwally2012" ! basin ids of the hub output
 /
 &amp;topo
-    path  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
     remap = "con"
 /
 &amp;regions
-    path_regions = "ice_data/v2/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    path_basins  = "ice_data/v2/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
     masks        = "APIS" "WAIS" "EAIS"           ! named regions for 1D output
     mask_APIS    = "region:Antarctic_Peninsula"
@@ -334,6 +334,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
     mask_EAIS    = "region:East_Antarctica"
 /</code></pre>
 <p><code>{domain}/{grid_name}</code> in the paths resolve to <code>name</code>/<code>grid_hub</code>. The groups are those of fesm-utils <code>topodata</code> and <code>regions</code> (see the fesm-utils docs), which also describe the selection expressions used below (<code>"region:Greenland &amp; ~zone:open_ocean"</code>) and layers of other files (<code>layers</code>, <code>path_&lt;layer&gt;</code>, <code>var_&lt;layer&gt;</code>, e.g.&nbsp;the ISMIP7 basins).</p>
+<p>The other inputs are FesmData v2 products as well (<code>fesmdata/</code>, the link to <code>$FESMDATA/products</code> that runme copies into each run folder), on the grid of the component that reads them. The geothermal heat flux (<code>[ghf]</code>) and the sediments (<code>[sed]</code>) are remapped (bilinear) onto the Yelmo grid when their file is on another grid (its global attribute <code>grid_name</code>), so <code>obs_path</code> may name a coarser grid, e.g.&nbsp;<code>fesmdata/{domain}/PYR-2KM/PYR-2KM_GHF-Lucazeau2019.nc</code> on PYR-250M.</p>
 <p>The domain loads its physical constants once (<code>phys_const_load</code>, the group <code>phys_const</code> of <code>input/yelmo_phys_const.nml</code>) and hands the same record to every component: the hub, Yelmo (<code>yelmo_init</code> <code>cnst</code>), isostasy, the marine shelf and <code>smb_simple</code>. Yelmo’s own <code>yelmo.phys_const</code> then only selects its calendar year (<code>sec_year</code>).</p>
 <p><code>htopo</code> (fesm-utils) holds the hub. It sits <em>above</em> every physics module (including Yelmo): its grid (<code>grid_hub</code>) is the finest resolution in the setup, and it is the reference geometry the coupler remaps <em>from</em>. On the hub grid it holds the reference topography (<code>topo%ref</code>: <code>z_bed</code>, <code>H_ice</code>, <code>z_srf</code>, <code>z_bed_sd</code>), the regions (<code>topo%reg</code>) and the current geometry <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>f_grnd</code>/<code>z_sl</code> (refreshed each step, see below). <code>htopo_init</code> resolves the grid from <code>grid_&lt;name&gt;.txt</code> (the disk grid table). Gaps in the topography (missing values, e.g.&nbsp;outside the coverage of the source dataset) are filled: no ice, the bed from the nearest valid cell, the surface from the bed and the ice thickness (sea level 0).</p>
 <p>Yelmo is populated from the domain like the other components. Its grid comes from <code>maps/grid_&lt;grid_ice&gt;.txt</code> (<code>yelmo_init_grid</code>, <code>grid_def="none"</code>), and the hub’s <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>z_bed_sd</code>, remapped conservatively to <code>grid_ice</code>, are both its initial topography and its present-day reference (<code>yelmo_init</code> <code>topo_init</code>/<code>topo_pd</code>). Yelmo then processes them as it would its own files (<code>[yelmo_init_topo]</code> keeps <code>init_topo_state</code>, <code>z_bed_f_sd</code>, smoothing; its <code>grad_lim_zb</code> applies). Where <code>grid_ice = grid_hub</code> the remap is a copy.</p>
