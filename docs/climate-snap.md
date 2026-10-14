@@ -38,6 +38,51 @@ the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 The transient forcing (`[tsforcing]`/`[tsgen]`, see [yelmox](yelmox.md))
 reaches snapclim only in the `anom` methods.
 
+A snapshot group reads the atmosphere (`clim_path`, `clim_names`, `clim_monthly`,
+`clim_stdev_path`/`clim_stdev_name`) and the ocean (`ocn_path`, `ocn_names`,
+`ocn_monthly`) of one snapshot, from the [FesmData](https://github.com/fesmc/FesmData)
+v2 products (`fesmdata/`), e.g. the Greenland reference and LGM snapshot:
+
+```fortran
+&snap_clim0
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    clim_names      = "z_srf" "t2m" "sf" "rf"
+    clim_monthly    = True
+    ...
+    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
+    ocn_names       = "depth" "mask_ocn" "to" "so"
+    ocn_monthly     = True
+/
+&snap_clim2
+    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
+    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
+    clim_monthly    = False
+    clim_time       = -21000
+    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
+    clim_stdev_name = "pr_ann"
+    clim_sigma      = 50.0      ! [km] smoothing of the atmosphere
+    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
+    ocn_names       = "none" "none" "sst_ann"
+    ocn_monthly     = False
+    ocn_time        = -21000
+    ocn_sigma       = 50.0      ! [km] smoothing of the ocean
+/
+```
+
+- **Units** come from the `units` attribute of each variable: temperatures in K
+  or °C, precipitation in any water-flux unit (kg m⁻² or mm w.e. per s, d or yr);
+  an unknown unit stops the run.
+- **Smoothing.** `clim_sigma` and `ocn_sigma` (km, optional, default 0) smooth the
+  snapshot's atmosphere and ocean with a Gaussian filter when it is loaded; the
+  land mask follows the smoothed elevation. The PMIP3 snapshots use 50 km (the v1
+  files were smoothed in preprocessing, `PMIP3_sig50km`).
+- **Ocean gaps.** Cells without ocean data (land, or beyond the coverage of the
+  product) are filled level by level from the nearest valid cell, and a level
+  without data from the level above, so the ocean is defined wherever the ice
+  sheet meets it. The ocean mask (`ocn_names(2)`) is read from the file, or
+  taken from where the data exist with `"none"`. A surface ocean
+  (`ocn_names(1) = "none"`, e.g. PMIP3 `sst_ann`) has salinity 0.
+
 ## snapesm
 
 A rewrite of snapclim on the fesm-utils `varslice` reader and `tsgen` series:
@@ -66,9 +111,10 @@ Three kinds of group follow:
   `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `fraction`, `const`) and the
   driving `index` (`""` = none).
 - **Snapshots**, `[snap_<name>]`: `monthly`, `time`, `idx_coord` (the snapshot's
-  position on the index manifold) and, per field, the `var_defs` group(s) holding
-  it (one = monthly; two = annual + summer, from which the seasonal cycle is
-  built). See [Database namelists](database-namelists.md).
+  position on the index manifold), optionally `clim_sigma`/`ocn_sigma` (as in
+  snapclim) and, per field, the `var_defs` group(s) holding it (one = monthly;
+  two = annual + summer, from which the seasonal cycle is built). See
+  [Database namelists](database-namelists.md).
 - **Indices**, `[snap_idx_<name>]`: a `tsgen` series (`method`, `series_file`,
   `sigma`).
 

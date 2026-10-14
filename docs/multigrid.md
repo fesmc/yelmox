@@ -178,6 +178,13 @@ also describe the selection expressions used below
 (`"region:Greenland & ~zone:open_ocean"`) and layers of other files
 (`layers`, `path_<layer>`, `var_<layer>`, e.g. the ISMIP7 basins).
 
+The other inputs are FesmData v2 products as well (`fesmdata/`, the link to
+`$FESMDATA/products` that runme copies into each run folder), on the grid of the
+component that reads them. The geothermal heat flux (`[ghf]`) and the sediments
+(`[sed]`) are remapped (bilinear) onto the Yelmo grid when their file is on
+another grid (its global attribute `grid_name`), so `obs_path` may name a coarser
+grid, e.g. `fesmdata/{domain}/PYR-2KM/PYR-2KM_GHF-Lucazeau2019.nc` on PYR-250M.
+
 The domain loads its physical constants once (`phys_const_load`, the group
 `phys_const` of `input/yelmo_phys_const.nml`) and hands the same record to every
 component: the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and

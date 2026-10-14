@@ -127,6 +127,11 @@ How the reader interprets these:
   time = 0, 1961, 1990, 0, 12     ! 12-month climatology, averaged over 1961–1990
   ```
 
+  The last dimension of the variable is the cycle: `t2m(x,y,month)` or, with
+  depth, `to(x,y,depth,month)`. An update with `method = "range_mean"` and
+  `rep = 1` gives its mean over the cycle (e.g. the annual-mean reference ocean
+  of `esm_forcing`); any other update keeps the cycle.
+
 - **Collapse to a single slice.** For a *time-varying* field, setting `dx = 0`
   collapses `x1` to `x0`, i.e. read exactly one record at `x0`. (For a static
   field, `dx = 0` is normal and `x0..x1` are left untouched.)
@@ -236,6 +241,9 @@ of them — a group is a group regardless of which module owns it.
 ## Quick reference
 
 - All five keys are mandatory; always write them for provenance.
+- Optional: `fill` (`"none"`, `"nearest"`: each level from the nearest valid cell,
+  a level without data from the level above, or `"const"` with `fill_value`), and
+  `remap` (kernel) with `grid_src` (the file's grid) to read a field on another grid.
 - `units` = two documentation labels; `scaling` = `[scale, offset]` does the real
   `out = in*scale + offset` conversion.
 - `time = [active, x0, x1, dx, sub]`:

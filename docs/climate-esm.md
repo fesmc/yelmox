@@ -28,10 +28,13 @@ projection periods, optional climate variability and subglacial discharge.
 - **Forcing on other grids.** A field group of the `par_file` is normally read on
   the climate grid. With `remap` (a kernel: `bilinear`, `shepard`, `nn`, `quadrant`,
   `con`) and `grid_src` (a name for the file's grid, e.g. `"{gcm}-atm"`) it is read
-  on its own grid and remapped online: a regular lon-lat grid from its 1D axes (the
-  map is cached in `maps/`), or a curvilinear grid (e.g. a tripolar ocean) from the
-  2D lon/lat named in the variable's `coordinates` attribute. The 1pctCO2 configs
-  read the global CMIP fields this way.
+  on its own grid and remapped online: a projected grid with a cdo description
+  `grid_<grid_src>.txt` next to the file (as FesmData writes it) or in `maps/`, a
+  regular lon-lat grid from its 1D axes (the map is cached in `maps/`), or a
+  curvilinear grid (e.g. a tripolar ocean) from the 2D lon/lat named in the
+  variable's `coordinates` attribute. The 1pctCO2 configs read the global CMIP
+  fields this way, and the Greenland configs the ORAS5 reference ocean, which
+  FesmData provides on GRL-16KM and GRL-32KM only, from GRL-16KM.
 - **Surface mass balance.** `[comps] surface_method = "climate"` takes the ESM's
   own SMB (reference + anomaly, corrected from the present-day surface with the SMB
   elevation gradient); `"chion"` (the default) or `"smbpal"` computes it from the
