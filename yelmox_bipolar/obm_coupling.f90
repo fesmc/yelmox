@@ -112,7 +112,7 @@ contains
     end subroutine obm_masks_init
 
     subroutine obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
-                            time, time_init, dtt)
+                            time, time_rel, time_init, dtt)
         ! One coupling pass, in the yelmox_bipolar order: atmosphere -> obm,
         ! ice-sheet freshwater flux -> obm, hysteresis forcing (nautilus), then
         ! obm ocean temperature -> ice sheets (read by the marine-shelf step).
@@ -123,10 +123,11 @@ contains
         type(kryos_domain),       intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         real(dp),               intent(in)    :: time, time_init, dtt
+        real(dp),               intent(in)    :: time_rel   ! forcing time of the climate index
 
         if (oc%atm2obm) then
-            if (active_north) call coupling_atm2obm(dom_north, obm, "north", time)
-            if (active_south) call coupling_atm2obm(dom_south, obm, "south", time)
+            if (active_north) call coupling_atm2obm(dom_north, obm, "north", time_rel)
+            if (active_south) call coupling_atm2obm(dom_south, obm, "south", time_rel)
         end if
 
         if (oc%ism2obm) then

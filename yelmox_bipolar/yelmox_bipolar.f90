@@ -234,7 +234,7 @@ program yelmox_bipolar
         ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
         ! flux, hysteresis forcing, obm->ism ocean temperature.
         call obm_exchange(oc, obox, dom_north, dom_south, active_north, active_south, &
-                          ts%time, ts%time_init, dtt)
+                          ts%time, ts%time_rel, ts%time_init, dtt)
         call timer_step(tmr, tt_obm_exchange)
 
         ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.

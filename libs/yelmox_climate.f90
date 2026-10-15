@@ -154,8 +154,9 @@ contains
         ! snapesm adds them on top in every mode; esm has its own forcing; rembo
         ! maps them its own way (see rembo_update).
         !
-        ! The cold start (init) evaluates snapclim/snapesm at time_rel, the time
-        ! loop at time; esm always at time. rembo equilibrates at the cold start.
+        ! snapclim, snapesm and rembo are evaluated at the forcing time time_rel
+        ! (with tstep_method = "const", time is the elapsed time and time_rel the
+        ! fixed forcing time); esm at time. rembo equilibrates at the cold start.
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
         type(tstep_class),          intent(in)    :: ts
@@ -177,8 +178,7 @@ contains
         is_init = .false.
         if (present(init)) is_init = init
 
-        time = ts%time
-        if (is_init) time = ts%time_rel
+        time = ts%time_rel
 
         select case(trim(cl%method))
             case("snapclim")
