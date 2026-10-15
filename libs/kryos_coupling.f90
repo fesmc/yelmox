@@ -376,6 +376,7 @@ contains
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
         real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:)
         character(len=256) :: gc, gh
+        character(len=32)  :: mth
         logical :: is_init
 
         if (.not. dom%ctl%with_climate) return
@@ -388,12 +389,15 @@ contains
         gc = trim(dom%ctl%grid_clim)
         gh = trim(dom%ctl%grid_hub)
 
-        call remap(dom, dom%topo%z_srf,  gh, z_srf_c,  gc, "bilin")
-        call remap(dom, dom%topo%H_ice,  gh, H_ice_c,  gc, "bilin")
-        call remap(dom, dom%topo%z_bed,  gh, z_bed_c,  gc, "bilin")
-        call remap(dom, dom%topo%f_grnd, gh, f_grnd_c, gc, "bilin")
-        call remap(dom, dom%topo%z_sl,   gh, z_sl_c,   gc, "bilin")
-        call remap(dom, dom%topo%ref%z_srf, gh, z_srf_ref_c, gc, "bilin")
+        ! The hub geometry on grid_clim: averaged over the climate cell when the
+        ! hub is finer (conservative), else interpolated.
+        mth = remap_method_smooth(dom%ctl%dx_hub, dom%ctl%dx_clim)
+        call remap(dom, dom%topo%z_srf,  gh, z_srf_c,  gc, mth)
+        call remap(dom, dom%topo%H_ice,  gh, H_ice_c,  gc, mth)
+        call remap(dom, dom%topo%z_bed,  gh, z_bed_c,  gc, mth)
+        call remap(dom, dom%topo%f_grnd, gh, f_grnd_c, gc, mth)
+        call remap(dom, dom%topo%z_sl,   gh, z_sl_c,   gc, mth)
+        call remap(dom, dom%topo%ref%z_srf, gh, z_srf_ref_c, gc, mth)
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
                             z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
@@ -417,6 +421,7 @@ contains
         real(wp), allocatable :: tas_s(:,:,:), pr_s(:,:,:), z_srf_s(:,:), H_ice_s(:,:)
         real(wp), allocatable :: tsl_s(:,:), Href_s(:,:), z_bed_s(:,:), z_sl_s(:,:)
         character(len=256) :: gc, gs, gh, gy
+        character(len=32)  :: mth
         logical :: is_init
 
         if (.not. dom%ctl%with_surface) return
@@ -429,34 +434,36 @@ contains
         gh = trim(dom%ctl%grid_hub)
         gy = trim(dom%ctl%grid_ice)
 
+        ! The hub geometry on grid_surface: averaged over the surface cell when the
+        ! hub is finer (conservative), else interpolated.
+        mth = remap_method_smooth(dom%ctl%dx_hub, dom%ctl%dx_surface)
+
         ! surface_method = "climate": nothing to do, the climate has the smb
         ! (couple_surface_to_yelmo lands it).
         if (trim(dom%ctl%surface_method) == "smb_simple") then
             ! smb_simple: surface elevation + sea-level temperature, masked to the
             ! reference ice extent (refreshed each call in case H_ice_ref changed).
-            call remap(dom, dom%topo%z_srf,          gh, z_srf_s, gs, "bilin")
+            call remap(dom, dom%topo%z_srf,          gh, z_srf_s, gs, mth)
             call remap(dom, dom%clim%now%tsl_ann,     gc, tsl_s,   gs, "bilin")
             call remap(dom, dom%yelmo%bnd%H_ice_ref,  gy, Href_s,  gs, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)
             call smb_simple_update(dom%smbs, z_srf_s, tsl_s)
         else if (trim(dom%ctl%surface_method) == "chion") then
             ! chion (monthly -> daily annual cycle)
-            call remap(dom, dom%clim%now%tas, gc, tas_s,   gs, "bilin")
-            call remap(dom, dom%clim%now%pr,  gc, pr_s,    gs, "bilin")
-            call remap(dom, dom%topo%z_srf,   gh, z_srf_s, gs, "bilin")
-            call remap(dom, dom%topo%H_ice,   gh, H_ice_s, gs, "bilin")
-            call remap(dom, dom%topo%z_bed,   gh, z_bed_s, gs, "bilin")
-            call remap(dom, dom%topo%z_sl,    gh, z_sl_s,  gs, "bilin")
+            call remap(dom, dom%topo%z_srf,   gh, z_srf_s, gs, mth)
+            call remap(dom, dom%topo%H_ice,   gh, H_ice_s, gs, mth)
+            call remap(dom, dom%topo%z_bed,   gh, z_bed_s, gs, mth)
+            call remap(dom, dom%topo%z_sl,    gh, z_sl_s,  gs, mth)
+            call remap_atm_to_surface(dom, z_srf_s, tas_s, pr_s)
             if (is_init) call surface_chion_spinup(dom%schn, tas_s, pr_s, z_srf_s, z_bed_s, H_ice_s, &
                                                    z_sl_s, ts%time_rel)
             call surface_chion_update(dom%schn, tas_s, pr_s, z_srf_s, z_bed_s, H_ice_s, z_sl_s, &
                                       ts%time_rel)
         else if (trim(dom%ctl%surface_method) == "smbpal") then
             ! smbpal (monthly)
-            call remap(dom, dom%clim%now%tas, gc, tas_s, gs, "bilin")
-            call remap(dom, dom%clim%now%pr,  gc, pr_s,  gs, "bilin")
-            call remap(dom, dom%topo%z_srf,  gh, z_srf_s, gs, "bilin")
-            call remap(dom, dom%topo%H_ice,  gh, H_ice_s, gs, "bilin")
+            call remap(dom, dom%topo%z_srf,  gh, z_srf_s, gs, mth)
+            call remap(dom, dom%topo%H_ice,  gh, H_ice_s, gs, mth)
+            call remap_atm_to_surface(dom, z_srf_s, tas_s, pr_s)
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
                 call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
                         ts%time_rel, time_equil=100.0_wp)
@@ -464,6 +471,39 @@ contains
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if
     end subroutine step_surface
+
+    subroutine remap_atm_to_surface(dom, z_srf_s, tas_s, pr_s)
+        ! Monthly tas and pr from grid_clim onto grid_surface at its surface
+        ! elevation z_srf_s: interpolated (bilinear), then moved from the surface
+        ! they were computed for (clim z_srf, interpolated) to z_srf_s with the
+        ! backend's monthly lapse rate and precipitation sensitivity:
+        !   tas_s = tas - lapse*dz,  pr_s = pr*exp(-beta_p*lapse*dz),  dz = z_srf_s - z_srf.
+        ! For a bilinear remap this equals interpolating the sea-level fields and
+        ! lifting them to z_srf_s. On the same grid dz = 0: a plain copy.
+        type(kryos_domain),    intent(inout) :: dom
+        real(wp),              intent(in)    :: z_srf_s(:,:)
+        real(wp), allocatable, intent(inout) :: tas_s(:,:,:), pr_s(:,:,:)
+
+        real(wp), allocatable :: zc_s(:,:), bp_s(:,:), dz(:,:)
+        character(len=256) :: gc, gs
+        integer :: m
+
+        gc = trim(dom%ctl%grid_clim)
+        gs = trim(dom%ctl%grid_surface)
+
+        call remap(dom, dom%clim%now%tas,    gc, tas_s, gs, "bilin")
+        call remap(dom, dom%clim%now%pr,     gc, pr_s,  gs, "bilin")
+        if (trim(gc) == trim(gs)) return
+
+        call remap(dom, dom%clim%now%z_srf,  gc, zc_s,  gs, "bilin")
+        call remap(dom, dom%clim%now%beta_p, gc, bp_s,  gs, "bilin")
+        dz = z_srf_s - zc_s
+        do m = 1, size(tas_s,3)
+            tas_s(:,:,m) = tas_s(:,:,m) - dom%clim%lapse(m)*dz
+            pr_s(:,:,m)  = pr_s(:,:,m) * exp(-bp_s*dom%clim%lapse(m)*dz)
+        end do
+
+    end subroutine remap_atm_to_surface
 
     subroutine couple_yelmo_to_htopo(dom)
         ! Land Yelmo's state on the hub's current geometry. On the Yelmo grid

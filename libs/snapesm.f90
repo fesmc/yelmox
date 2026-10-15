@@ -155,6 +155,7 @@ module snapesm
     public :: snapesm_write_step
     public :: snapesm_restart_write
     public :: snapesm_restart_read
+    public :: snapesm_lapse_monthly
 
 contains
 
@@ -383,11 +384,10 @@ contains
         real(wp),              intent(IN)    :: z_srf(:,:)
         integer  :: m
         logical  :: south
-        real(wp) :: l1, l2
+        real(wp) :: lapse(NMONTH)
 
         south = sc%par%south
-        l1 = sc%par%lapse(1)
-        l2 = sc%par%lapse(2)
+        lapse = snapesm_lapse_monthly(sc)
 
         if (allocated(sc%now%z_srf)) sc%now%z_srf = z_srf
         if (allocated(sc%now%mask)) then
@@ -397,13 +397,7 @@ contains
 
         ! 3a: monthly tas from tsl via seasonal lapse rate to the current elevation.
         do m = 1, NMONTH
-            if (south) then
-                sc%now%tas(:,:,m) = sc%now%tsl(:,:,m) - &
-                    z_srf*(l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp))
-            else
-                sc%now%tas(:,:,m) = sc%now%tsl(:,:,m) - &
-                    z_srf*(l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp))
-            end if
+            sc%now%tas(:,:,m) = sc%now%tsl(:,:,m) - z_srf*lapse(m)
         end do
 
         ! 3b: monthly precip re-sensitized to the current elevation.
@@ -427,6 +421,26 @@ contains
 
         return
     end subroutine snapesm_transform
+
+    function snapesm_lapse_monthly(sc) result(lapse)
+        ! Monthly lapse rate [K/m] that lifts tsl to the surface (snapclim 788-795):
+        ! annual lapse(1) with a seasonal cosine of amplitude lapse(1)-lapse(2),
+        ! phase m*30-15, summer at lapse(2).
+        implicit none
+        type(snapesm_class), intent(IN) :: sc
+        real(wp) :: lapse(NMONTH)
+        integer  :: m
+        real(wp) :: l1, l2
+        l1 = sc%par%lapse(1)
+        l2 = sc%par%lapse(2)
+        do m = 1, NMONTH
+            if (sc%par%south) then
+                lapse(m) = l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp)
+            else
+                lapse(m) = l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp)
+            end if
+        end do
+    end function snapesm_lapse_monthly
 
     subroutine snapesm_derive(sc, ta_ann_lag, dTa, dTo, dSo)
         ! Coupled/derived rules applied after the blend. The `fraction` ocean rule

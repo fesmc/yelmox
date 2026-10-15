@@ -6,6 +6,12 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- Climate on a coarser grid than the surface: `tas`/`pr` are moved from the climate grid's
+  surface elevation to the surface grid's with the backend's monthly lapse rate and
+  precipitation sensitivity (`climate_out`: `now%z_srf`, `lapse(12)`, `now%beta_p`;
+  `kryos_coupling` `remap_atm_to_surface`). Unchanged when `grid_clim = grid_surface`.
+- The hub geometry reaches `grid_clim` and `grid_surface` conservatively when the hub is
+  finer (`remap_method_smooth`; was bilinear), which changes runs with a finer hub.
 - snapesm indices are coordinates: each `[snap_idx_<name>]` spans an axis `snap_lo` ->
   `snap_hi` and its tsgen value is the position on it (any tsgen method, e.g. `const` for a
   steady state); a field may take several indices (`index = "at" "bt"`), whose axes are

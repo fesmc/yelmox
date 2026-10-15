@@ -159,6 +159,7 @@ module snapclim
     public :: snapclim_init 
     public :: snapclim_update 
     public :: snapclim_air_anom
+    public :: snapclim_lapse_monthly
 
     public :: snapclim_var_to_ocn
 
@@ -413,6 +414,7 @@ contains
         real(wp) :: dTa_now, dTo_now, dSo_now  
         real(wp) :: dT(12) 
         logical :: south 
+        real(wp) :: lapse_mon(12)
         integer :: m 
         integer :: nx, ny, i, j
 
@@ -785,14 +787,9 @@ contains
 
         ! 3a: Calculate monthly `tas` from `tsl` a seasonal lapse rate to correct for current elevation
 
+        lapse_mon = snapclim_lapse_monthly(snp)
         do m = 1, 12 
-            if (south) then 
-                snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-15.0)/360.0))
-            else 
-                snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - &
-                    z_srf*(snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-15.0)/360.0))
-            end if 
+            snp%now%tas(:,:,m) = snp%now%tsl(:,:,m) - z_srf*lapse_mon(m)
         end do 
            
         ! 3b: Calculate monthly precipitation accounting for current surface elevation
@@ -2350,6 +2347,21 @@ contains
         return 
 
     end function series_2D_interp 
+
+    function snapclim_lapse_monthly(snp) result(lapse)
+        ! Monthly lapse rate [K/m] that lifts tsl to the surface elevation:
+        ! annual lapse(1) with a seasonal cosine (phase m*30-15), summer lapse(2).
+        type(snapclim_class), intent(IN) :: snp
+        real(wp) :: lapse(12)
+        integer  :: m
+        do m = 1, 12
+            if (snp%par%south) then
+                lapse(m) = snp%par%lapse(1)+(snp%par%lapse(2)-snp%par%lapse(1))*cos(2*pi*(m*30.0-15.0)/360.0)
+            else
+                lapse(m) = snp%par%lapse(1)+(snp%par%lapse(1)-snp%par%lapse(2))*cos(2*pi*(m*30.0-15.0)/360.0)
+            end if
+        end do
+    end function snapclim_lapse_monthly
 
     function snapclim_air_anom(snp,time) result(dT)
         ! [K] Air-temperature anomaly from the index series at `time`, scaled by

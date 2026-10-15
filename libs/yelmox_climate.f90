@@ -18,12 +18,14 @@ module yelmox_climate
     use coordinates,   only : grid_class
     use timestepping,  only : tstep_class
     use climate_out,   only : climate_out_class
-    use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom
+    use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom, &
+                              snapclim_lapse_monthly
     use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
                               snapesm_write_init, snapesm_write_step, &
-                              snapesm_restart_write, snapesm_restart_read
+                              snapesm_restart_write, snapesm_restart_read, snapesm_lapse_monthly
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
-                              esm_forcing_update, esm_variability_update, esm_summer_mean
+                              esm_forcing_update, esm_variability_update, esm_summer_mean, &
+                              esm_lapse_monthly
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
     use kryos_forcing, only : tsforcing_class
     use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_restart_write
@@ -243,6 +245,26 @@ contains
             case("rembo")
                 call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
                                   forced, is_init, tsf)
+        end select
+
+        ! The elevation dependence of the atmosphere, to move it to another surface
+        ! (kryos_coupling): its surface z_srf, the monthly lapse rate and the
+        ! precipitation sensitivity, as the backend applies them. rembo: none.
+        out%now%z_srf = z_srf
+        if (.not. allocated(out%now%beta_p)) allocate(out%now%beta_p(size(z_srf,1),size(z_srf,2)))
+        select case(trim(cl%method))
+            case("snapclim")
+                out%lapse       = snapclim_lapse_monthly(cl%snapclim)
+                out%now%beta_p  = cl%snapclim%now%beta_p
+            case("snapesm")
+                out%lapse       = snapesm_lapse_monthly(cl%snapesm)
+                out%now%beta_p  = cl%snapesm%now%beta_p
+            case("esm")
+                out%lapse       = esm_lapse_monthly(cl%esm, cl%south)
+                out%now%beta_p  = cl%esm%beta_p
+            case default
+                out%lapse       = 0.0_wp
+                out%now%beta_p  = 0.0_wp
         end select
 
     end subroutine climate_update

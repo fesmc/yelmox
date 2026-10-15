@@ -9,6 +9,11 @@ module climate_out
     ! profiles (to_ann/so_ann, interpolated by the marine shelf) or already at the
     ! shelf base (T_shlf/S_shlf, has_ocn_shelf). A backend may also supply the
     ! surface mass balance directly (has_smb) and subglacial discharge (has_Qd).
+    !
+    ! The atmosphere is valid at the surface elevation z_srf of grid_clim. With
+    ! the monthly lapse rate and the precipitation sensitivity beta_p, the coupling
+    ! moves it to another surface elevation (another grid, kryos_coupling):
+    !   tas(z) = tas - lapse*(z - z_srf),  pr(z) = pr*exp(-beta_p*lapse*(z - z_srf)).
 
     use precision, only : wp
 
@@ -23,6 +28,8 @@ module climate_out
         real(wp), allocatable :: tsl_ann(:,:)   ! sea-level air temperature, annual [K]
         real(wp), allocatable :: ta_ann(:,:)    ! near-surface air temperature, annual [K]
         real(wp), allocatable :: pr_ann(:,:)    ! precipitation, annual [mm/a]
+        real(wp), allocatable :: z_srf(:,:)     ! surface elevation of tas/pr [m]
+        real(wp), allocatable :: beta_p(:,:)    ! precipitation sensitivity to temperature [1/K]
         ! ocean as depth profiles
         real(wp), allocatable :: to_ann(:,:,:)  ! ocean temperature over depth, annual [K]
         real(wp), allocatable :: so_ann(:,:,:)  ! ocean salinity over depth, annual [psu]
@@ -42,6 +49,7 @@ module climate_out
     type climate_out_class
         type(clim_state_class) :: now           ! current climate
         type(clim_state_class) :: ref           ! reference climate (anomaly baseline)
+        real(wp) :: lapse(12) = 0.0_wp          ! monthly lapse rate of tas [K/m] (0: no elevation dependence)
         logical :: has_ocn_shelf = .false.      ! ocean given at the shelf base (now%T_shlf...)
         logical :: has_smb       = .false.      ! surface mass balance given (now%smb...)
         logical :: has_Qd        = .false.      ! subglacial discharge given (now%Qd)

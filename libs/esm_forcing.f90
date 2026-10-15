@@ -160,6 +160,7 @@ module esm_forcing
     public :: esm_variability_update
     public :: esm_clim_update
     public :: esm_summer_mean
+    public :: esm_lapse_monthly
     
     public :: esm_write_init
 
@@ -448,8 +449,7 @@ contains
 
         ! Local variables 
         integer :: m
-        real(wp) :: tmp, lapse
-        real(wp), parameter :: pi = 3.14159265359 
+        real(wp) :: tmp, lapse, lapse_mon(12)
         character(len=56)   :: slice_method
 
         ! Get slices for current time
@@ -473,12 +473,9 @@ contains
         call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
 
         ! Convert atmospheric fields to model elevation
+        lapse_mon = esm_lapse_monthly(esm, south)
         do m = 1,12 
-            if(south) then ! Southern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.4375-30.4375)/365.25))
-            else ! Northern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
-            end if    
+            lapse = lapse_mon(m)
             esm%t2m(:,:,m) = esm%ts_ref%var(:,:,m,1) + lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
             if (use_smb) then
                 esm%smb(:,:,m) = esm%smb_ref%var(:,:,m,1) !No model elevation changes for SMB
@@ -500,6 +497,23 @@ contains
         return
 
     end subroutine esm_clim_update
+
+    function esm_lapse_monthly(esm, south) result(lapse)
+        ! Monthly lapse rate [K/m] of the reference atmosphere: annual lapse(1)
+        ! with a seasonal cosine (phase of the month start), summer lapse(2).
+        type(esm_forcing_class), intent(IN) :: esm
+        logical,                 intent(IN) :: south
+        real(wp) :: lapse(12)
+        real(wp), parameter :: pi = 3.14159265359
+        integer :: m
+        do m = 1, 12
+            if (south) then
+                lapse(m) = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.4375-30.4375)/365.25))
+            else
+                lapse(m) = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
+            end if
+        end do
+    end function esm_lapse_monthly
 
     function esm_summer_mean(var, south) result(var_sum)
         ! Mean of a monthly field over the summer months: DJF in the southern

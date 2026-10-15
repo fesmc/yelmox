@@ -92,6 +92,7 @@ module kryos
         character(len=256) :: domain     = ""   ! e.g. "Antarctica"
         character(len=56)  :: phys_const = ""   ! group of PHYS_CONST_FILE, e.g. "Earth"
         character(len=256) :: grid_hub   = ""   ! hi-res geometry hub, highest res
+        real(wp) :: dx_hub = 0.0_wp             ! hub grid spacing (Yelmo dx units)
         character(len=256) :: grid_ice   = ""   ! Yelmo grid (default = grid_hub)
         character(len=256) :: grid_shelf = ""   ! marine-shelf grid (default = grid_hub)
         real(wp) :: dx_shelf = 0.0_wp           ! marine-shelf grid spacing (Yelmo dx units)
@@ -107,6 +108,7 @@ module kryos
         real(wp) :: dx_clim = 0.0_wp            ! climate grid spacing (Yelmo dx units)
         logical  :: south   = .false.           ! southern hemisphere (from the grid_clim latitude)
         character(len=256) :: grid_surface = ""     ! smb grid (default = grid_clim)
+        real(wp) :: dx_surface = 0.0_wp             ! smb grid spacing (Yelmo dx units)
 
         ! Per-module output switches ([output]); each module -> its own file.
         logical :: write_yelmo = .true.
@@ -241,7 +243,7 @@ contains
 
         character(len=256)    :: domain, tgroup
         character(len=64)     :: sfx
-        type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s
+        type(grid_class)      :: grid_m, grid_y, grid_i, grid_c, grid_s, grid_h
         integer               :: nx_m, ny_m, nx_i, ny_i, nx_s, ny_s
         type(regions_class)   :: reg_y, reg_c, reg_m
         real(wp), allocatable :: xs(:), ys(:), lats_s(:,:), Href_s(:,:)
@@ -277,6 +279,8 @@ contains
         ! and makes its masks from them ([yelmo_masks]: where ice is allowed,
         ! relaxation, basins; Yelmo's mask_border then sets the border).
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
+        call grid_cdo_read_desc(grid_h, trim(dom%ctl%grid_hub), MAP_FLDR)
+        dom%ctl%dx_hub = dom%yelmo%grd%G%dx * (grid_h%G%dx / grid_y%G%dx)
         call yelmo_init_grid(dom%yelmo%grd, grid_y)
 
         call remap(dom, dom%topo%ref%z_bed,    dom%ctl%grid_hub, topo_y%z_bed,    dom%ctl%grid_ice, "con")
@@ -337,6 +341,7 @@ contains
         ! --- smb on its configured grid (grid_surface) ---
         ! The surface models read no grid-specific data; only lats (insolation) is physical.
         call grid_cdo_read_desc(grid_s, trim(dom%ctl%grid_surface), MAP_FLDR)
+        dom%ctl%dx_surface = dom%yelmo%grd%G%dx * (grid_s%G%dx / grid_y%G%dx)
         nx_s = grid_s%G%nx
         ny_s = grid_s%G%ny
         allocate(xs(nx_s), ys(ny_s), lats_s(nx_s, ny_s))

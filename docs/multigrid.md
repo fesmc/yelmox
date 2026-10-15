@@ -265,6 +265,22 @@ reallocation cost is negligible against the physics.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
 - `step_climate` — climate on `grid_clim` from the backend, with the transient forcing, on the `dt_clim` cadence.
 - `step_surface` — surface mass balance on `grid_surface` (`surface_method`: chion, smbpal, smb_simple, or the climate's own, `climate`).
+
+The hub geometry reaches `grid_clim` and `grid_surface` averaged over the target
+cell when the hub is finer (conservative), else interpolated
+(`remap_method_smooth`). The atmosphere is computed on `grid_clim` for the
+surface elevation there (`clim%now%z_srf`). On a different `grid_surface`, the
+monthly `tas` and `pr` are interpolated (bilinear) and moved to the surface
+elevation of `grid_surface` with the backend's monthly lapse rate
+(`clim%lapse`) and precipitation sensitivity (`clim%now%beta_p`):
+
+```
+tas_s = tas - lapse*dz,   pr_s = pr*exp(-beta_p*lapse*dz),   dz = z_srf_s - z_srf_c
+```
+
+the same elevation dependence the backend applies on its own grid (snapclim,
+snapesm, esm; none for rembo). A coarse `grid_clim` thus keeps the elevation
+detail of the surface grid; on the same grid nothing changes.
 - `step_shelf` — sub-shelf melt on `grid_shelf`, from the climate's ocean as depth profiles or at the shelf base.
 
 Every driver writes the sequence out in its time loop, so the coupling order can
