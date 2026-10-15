@@ -6,6 +6,13 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
+- snapesm indices are coordinates: each `[snap_idx_<name>]` spans an axis `snap_lo` ->
+  `snap_hi` and its tsgen value is the position on it (any tsgen method, e.g. `const` for a
+  steady state); a field may take several indices (`index = "at" "bt"`), whose axes are
+  summed (`linear`) or multiplied (`ratio`) on the reference, as snapclim `snap_2ind`
+  (Banderas et al., 2018). Normalising a proxy series is done in tsgen (`norm_t0`,
+  `norm_t1`; fesm-utils). Removed `manifold`, `f_hol` and the snapshot keys `time`,
+  `idx_coord`. Needs fesm-utils with tsgen normalisation.
 - FesmData v2 products from the link `fesmdata` (`$FESMDATA/products`, e.g.
   `/work/ba1442/fesmdata/products`; was `ice_data/v2`), copied into the run folders by
   runme (`.runme/info.json` links). SRG topography `TOPO-GLO90-GEBCO2026`.

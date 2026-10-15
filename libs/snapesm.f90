@@ -12,6 +12,12 @@ module snapesm
     ! per-file variable metadata); each climate-state group &<group>_<snapshot> names
     ! the group(s) supplying each field (1 = monthly, 2 = [ann, sum] -> synthesized).
     !
+    ! Indices: each driving index &<group>_idx_<name> (a tsgen group) spans one axis
+    ! between two snapshots (snap_lo -> snap_hi); its value f_now is the position on
+    ! that axis (0 at snap_lo, 1 at snap_hi). A field sums the axes of its indices
+    ! on top of the reference snapshot (Banderas et al., 2018, for two indices).
+    ! Turning a proxy into an index (normalisation) is tsgen's job (norm_t0/norm_t1).
+    !
     ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
     ! checked against snapclim (tests/test_snapesm_ref.f90); output and restart
     ! (snapesm_write_*, snapesm_restart_*) are in place; snapesm_end is a stub.
@@ -19,7 +25,6 @@ module snapesm
     use precision, only : wp, sp, dp
     use ncio
     use nml
-    use series,   only : series_interp1
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use tsgen,    only : tsgen_class, tsgen_init, tsgen_update, &
                          tsgen_restart_write, tsgen_restart_read
@@ -32,6 +37,7 @@ module snapesm
     private
 
     integer, parameter :: SNP_MAX = 32   ! max entries in a snapshots/fields/indices list
+    integer, parameter :: IDX_MAX = 8    ! max driving indices of one field
     integer, parameter :: NMONTH   = 12
 
     ! =====================================================================
@@ -51,7 +57,9 @@ module snapesm
         character(len=16) :: kind           ! "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
         character(len=16) :: blend          ! "linear" | "ratio" | "fraction" | "const"
-        character(len=16) :: index          ! name of the driving index (idx) for this field, or ""
+        character(len=64) :: index(IDX_MAX) ! names of the driving indices of this field ("" = none)
+        integer           :: n_index        ! number of driving indices
+        integer           :: idx_k(IDX_MAX) ! their positions in snapesm_class%idx
         logical           :: enabled        ! off by default for exotic fields
         logical           :: apply_lapse
         logical           :: precip_scaling
@@ -63,8 +71,6 @@ module snapesm
         character(len=64) :: name
         logical           :: is_ref         ! the distinguished reference state
         logical           :: monthly        ! raw atm fields are monthly (else annual+summer -> synthesized)
-        real(dp)          :: time           ! reference time [yr] of this snapshot (index normalization)
-        real(wp)          :: idx_coord(2)   ! position on the 1-D / 2-D index manifold
         real(wp)          :: clim_sigma     ! [km] Gaussian smoothing of the atmosphere at loading (0: none)
         real(wp)          :: ocn_sigma      ! [km] Gaussian smoothing of the ocean at loading (0: none)
     end type
@@ -116,7 +122,6 @@ module snapesm
         real(wp)           :: dx_km         ! [km] grid spacing (snapshot smoothing)
         logical            :: south         ! southern hemisphere (seasons, lapse rates)
         character(len=16)  :: combine       ! default combine mode
-        integer            :: manifold      ! index-manifold dimension (0/1/2)
         character(len=64)  :: ref_name      ! which snapshot is the reference
         real(wp)           :: lapse(2)      ! [annual, summer] lapse rate [K/m]
         ! precip / ocean sensitivity parameters (snapclim &snap)
@@ -124,7 +129,6 @@ module snapesm
         real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (snapclim hardcodes 1.0)
         real(wp)           :: f_stdev       ! precip-variability multiplier
         real(wp)           :: f_to          ! ocean/atm anomaly ratio (fraction ocean rule)
-        real(wp)           :: f_hol         ! Holocene index scaling (snap_1ind_new)
         ! bipolar/obm compatibility (obm_coupling reads par%dTa_const today)
         real(wp)           :: dTa_const, dTo_const, dSo_const
         integer            :: n_snap, n_field, n_idx
@@ -137,6 +141,8 @@ module snapesm
         type(snapshot_class),    allocatable :: snap(:)      ! was clim0..clim3
         type(tsgen_class),       allocatable :: idx(:)       ! was at..bs (each may be nc-channel)
         character(len=64),       allocatable :: idx_name(:)  ! index names (for labels/accessors)
+        integer,                 allocatable :: idx_lo(:)    ! snapshot at index = 0 (snap_lo)
+        integer,                 allocatable :: idx_hi(:)    ! snapshot at index = 1 (snap_hi)
         type(climate_state_class)            :: now          ! current output
         type(climate_state_class)            :: ref          ! distinguished reference (was clim0)
     end type
@@ -213,7 +219,7 @@ contains
         call snapesm_refresh_loads(sc, time)
 
         ! 3. Combine the reduced snapshot states into `now`, per field.
-        call snapesm_combine(sc, time)
+        call snapesm_combine(sc)
 
         ! 3b. Driver transient forcing: a spatially-homogeneous atmospheric anomaly
         !     (dTa = [tsforcing] f_now*f_ta) added on top of the blended base
@@ -283,148 +289,90 @@ contains
         return
     end subroutine snapesm_refresh_loads
 
-    subroutine snapesm_combine(sc, time)
+    subroutine snapesm_combine(sc)
         ! Blend the reduced snapshot states into `now`, per field, from the reference
-        ! baseline (was clim0). Each field uses its blend rule and driving index:
-        !   linear (temp/salinity): now = ref + aa*(s1 - s0)        [calc_temp_1ind]
-        !   ratio  (precip):        now = ref*(aa*(s1/s0 - 1) + 1)  [calc_precip_1ind]
+        ! baseline (was clim0). Each driving index k of a field adds its axis
+        ! (lo_k -> hi_k, the snapshots snap_lo/snap_hi of the index) with weight
+        ! a_k = f_now of the index:
+        !   linear (temp/salinity): now = ref + sum_k a_k*(hi_k - lo_k)
+        !   ratio  (precip):        now = ref * prod_k (a_k*(hi_k/lo_k - 1) + 1)
         !   fraction / const:       now = ref  (fraction ocean is finished in derive)
-        ! s0,s1 are the manifold-endpoint snapshots (idx_coord min/max among non-ref);
-        ! aa is the field's index normalized to those snapshots' times.
+        ! One index reproduces snapclim calc_temp_1ind/calc_precip_1ind, two indices
+        ! calc_temp_2ind/calc_precip_2ind (Banderas et al., 2018).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
-        real(dp),              intent(IN)    :: time
-        integer  :: f, iref, is0, is1
+        integer  :: f, j, k, lo, hi
         real(wp) :: aa
-
-        call find_endpoints(sc, iref, is0, is1)
+        logical  :: blended
 
         do f = 1, sc%par%n_field
             if (.not. sc%registry(f)%enabled) cycle
-            aa = 0.0_wp
-            if (len_trim(sc%registry(f)%index) > 0) &
-                aa = norm_index(sc, trim(sc%registry(f)%index), time, is0, is1)
 
+            ! Start from the reference state.
             select case(trim(sc%registry(f)%kind))
                 case("atm_temp")
-                    call blend_field(sc%registry(f)%blend, sc%now%tsl, sc%ref%tsl, &
-                         sc%snap(is0)%state%tsl, sc%snap(is1)%state%tsl, aa)
+                    if (allocated(sc%now%tsl)    .and. allocated(sc%ref%tsl))    sc%now%tsl    = sc%ref%tsl
                 case("atm_precip")
-                    call blend_field(sc%registry(f)%blend, sc%now%prcor, sc%ref%prcor, &
-                         sc%snap(is0)%state%prcor, sc%snap(is1)%state%prcor, aa)
+                    if (allocated(sc%now%prcor)  .and. allocated(sc%ref%prcor))  sc%now%prcor  = sc%ref%prcor
                 case("ocn")
-                    call blend_field(sc%registry(f)%blend, sc%now%to_ann, sc%ref%to_ann, &
-                         sc%snap(is0)%state%to_ann, sc%snap(is1)%state%to_ann, aa)
+                    if (allocated(sc%now%to_ann) .and. allocated(sc%ref%to_ann)) sc%now%to_ann = sc%ref%to_ann
                 case("ocn_salt")
-                    call blend_field(sc%registry(f)%blend, sc%now%so_ann, sc%ref%so_ann, &
-                         sc%snap(is0)%state%so_ann, sc%snap(is1)%state%so_ann, aa)
+                    if (allocated(sc%now%so_ann) .and. allocated(sc%ref%so_ann)) sc%now%so_ann = sc%ref%so_ann
                 case default
-                    ! "elev" and other non-blended fields: nothing to combine.
+                    cycle   ! "elev" and other non-blended fields: nothing to combine.
             end select
+
+            ! linear/ratio fields add the axes of their indices; fraction/const
+            ! fields stay at the reference.
+            blended = trim(sc%registry(f)%blend) == "linear" .or. &
+                      trim(sc%registry(f)%blend) == "ratio"
+            if (.not. blended) cycle
+
+            do j = 1, sc%registry(f)%n_index
+                k  = sc%registry(f)%idx_k(j)
+                lo = sc%idx_lo(k)
+                hi = sc%idx_hi(k)
+                aa = sc%idx(k)%f_now
+
+                associate(blend => sc%registry(f)%blend, x0 => sc%snap(lo)%state, x1 => sc%snap(hi)%state)
+                select case(trim(sc%registry(f)%kind))
+                    case("atm_temp")
+                        call blend_axis(blend, sc%now%tsl,    x0%tsl,    x1%tsl,    aa)
+                    case("atm_precip")
+                        call blend_axis(blend, sc%now%prcor,  x0%prcor,  x1%prcor,  aa)
+                    case("ocn")
+                        call blend_axis(blend, sc%now%to_ann, x0%to_ann, x1%to_ann, aa)
+                    case("ocn_salt")
+                        call blend_axis(blend, sc%now%so_ann, x0%so_ann, x1%so_ann, aa)
+                end select
+                end associate
+            end do
         end do
 
         return
     end subroutine snapesm_combine
 
-    subroutine blend_field(mode, dst, ref, x0, x1, aa)
-        ! Combine a single reduced field. `linear`/`ratio` need the endpoint states
-        ! (x0,x1) allocated; `fraction`/`const` only copy the reference. No-op unless
-        ! the required arrays are allocated (skips fields a snapshot does not supply).
+    subroutine blend_axis(mode, dst, x0, x1, aa)
+        ! Add one index axis (x0 -> x1, weight aa) to dst, which holds the reference
+        ! plus the axes added so far. No-op when the axis snapshots do not supply
+        ! the field (x0 or x1 unallocated).
         implicit none
         character(len=*),      intent(IN)    :: mode
         real(wp), allocatable, intent(INOUT) :: dst(:,:,:)
-        real(wp), allocatable, intent(IN)    :: ref(:,:,:), x0(:,:,:), x1(:,:,:)
+        real(wp), allocatable, intent(IN)    :: x0(:,:,:), x1(:,:,:)
         real(wp),              intent(IN)    :: aa
 
-        if (.not. (allocated(dst) .and. allocated(ref))) return
+        if (.not. (allocated(dst) .and. allocated(x0) .and. allocated(x1))) return
 
         select case(trim(mode))
-            case("fraction","const")
-                dst = ref
             case("ratio")
-                if (.not. (allocated(x0) .and. allocated(x1))) then
-                    dst = ref; return
-                end if
-                where (x0 /= 0.0_wp)
-                    dst = ref*(aa*(x1/x0 - 1.0_wp) + 1.0_wp)
-                elsewhere
-                    dst = ref
-                end where
+                where (x0 /= 0.0_wp) dst = dst*(aa*(x1/x0 - 1.0_wp) + 1.0_wp)
             case default   ! "linear"
-                if (.not. (allocated(x0) .and. allocated(x1))) then
-                    dst = ref; return
-                end if
-                dst = ref + aa*(x1 - x0)
+                dst = dst + aa*(x1 - x0)
         end select
 
         return
-    end subroutine blend_field
-
-    subroutine find_endpoints(sc, iref, is0, is1)
-        ! Identify the reference snapshot and the 1-D manifold endpoints (the non-ref
-        ! snapshots with the smallest and largest idx_coord). Falls back to the
-        ! reference when there are no non-ref snapshots (e.g. the `const` method).
-        implicit none
-        type(snapesm_class), intent(IN)  :: sc
-        integer,              intent(OUT) :: iref, is0, is1
-        integer  :: s
-        real(wp) :: cmin, cmax
-        iref = 0; is0 = 0; is1 = 0
-        cmin =  huge(1.0_wp); cmax = -huge(1.0_wp)
-        do s = 1, sc%par%n_snap
-            if (sc%snap(s)%spec%is_ref) then
-                if (iref == 0) iref = s
-                cycle
-            end if
-            if (sc%snap(s)%spec%idx_coord(1) < cmin) then
-                cmin = sc%snap(s)%spec%idx_coord(1); is0 = s
-            end if
-            if (sc%snap(s)%spec%idx_coord(1) > cmax) then
-                cmax = sc%snap(s)%spec%idx_coord(1); is1 = s
-            end if
-        end do
-        if (iref == 0) iref = 1
-        if (is0  == 0) is0  = iref
-        if (is1  == 0) is1  = iref
-        return
-    end subroutine find_endpoints
-
-    function norm_index(sc, idx_name, time, is0, is1) result(aa)
-        ! Normalize a driving index to the manifold endpoints' snapshot times:
-        !   aa = (S(time) - S(t0)) / (S(t1) - S(t0))   (snapclim 439-445)
-        ! so aa=0 at snapshot is0's time and aa=1 at is1's time. Optional Holocene
-        ! scaling (snap_1ind_new): aa *= f_hol when aa>1 within (-12 ka, -1 ka).
-        implicit none
-        type(snapesm_class), intent(IN) :: sc
-        character(len=*),      intent(IN) :: idx_name
-        real(dp),              intent(IN) :: time
-        integer,               intent(IN) :: is0, is1
-        real(wp) :: aa
-        integer  :: k, i
-        real(dp) :: t0, t1
-        real(wp) :: snow, s0v, s1v
-
-        k = 0
-        do i = 1, sc%par%n_idx
-            if (trim(sc%idx_name(i)) == trim(idx_name)) then
-                k = i; exit
-            end if
-        end do
-
-        aa = 0.0_wp
-        if (k == 0) return
-
-        t0 = sc%snap(is0)%spec%time
-        t1 = sc%snap(is1)%spec%time
-        snow = series_interp1(sc%idx(k)%ser, time)
-        s0v  = series_interp1(sc%idx(k)%ser, t0)
-        s1v  = series_interp1(sc%idx(k)%ser, t1)
-        if (s1v /= s0v) aa = (snow - s0v) / (s1v - s0v)
-
-        if (aa > 1.0_wp .and. time > -12.0e3_dp .and. time < -1.0e3_dp) aa = aa*sc%par%f_hol
-
-        return
-    end function norm_index
+    end subroutine blend_axis
 
     subroutine snapesm_transform(sc, z_srf)
         ! Inflate the blended sea-level fields to the current model elevation and
@@ -650,6 +598,8 @@ contains
             fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
             call tsgen_restart_write(trim(fnm), sc%idx(k), time)
             call nc_write_attr(trim(fnm), "snapesm_index",     trim(sc%idx_name(k)))
+            call nc_write_attr(trim(fnm), "snapesm_axis",      trim(sc%snap(sc%idx_lo(k))%spec%name)// &
+                                                               " -> "//trim(sc%snap(sc%idx_hi(k))%spec%name))
             call nc_write_attr(trim(fnm), "snapesm_var_defs",  trim(sc%par%var_defs))
             call nc_write_attr(trim(fnm), "snapesm_ref_name",  trim(sc%par%ref_name))
             call nc_write_attr(trim(fnm), "snapesm_snapshots", trim(adjustl(snaps)))
@@ -698,8 +648,9 @@ contains
 
     subroutine snapesm_par_load(sc, filename, group, domain, grid_name)
         ! Read the full configuration: top-level knobs, the field registry
-        ! (&<group>_field_<name>), the snapshot specs (&<group>_snap_<name>), and
-        ! the index names (each an &tsgen_<group>_<name> group, read by tsgen_init).
+        ! (&<group>_field_<name>), the snapshot specs (&<group>_<name>), and the
+        ! indices (&<group>_idx_<name>: the tsgen parameters, read by tsgen_init,
+        ! plus the axis snap_lo/snap_hi read here).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
@@ -708,7 +659,9 @@ contains
         character(len=*),      intent(IN)    :: grid_name
 
         character(len=64) :: names(SNP_MAX)
-        integer           :: i
+        character(len=64) :: snap_lo, snap_hi
+        character(len=256):: igroup
+        integer           :: i, j
 
         sc%par%group     = group
         sc%par%domain    = domain
@@ -717,27 +670,23 @@ contains
         ! --- top-level --------------------------------------------------------
         sc%par%var_defs  = ""
         sc%par%combine   = "anomaly"
-        sc%par%manifold  = 1
         sc%par%ref_name  = ""
         sc%par%lapse     = 0.0_wp
         sc%par%f_p       = 0.0_wp
         sc%par%f_p_ne    = 1.0_wp
         sc%par%f_stdev   = 0.0_wp
         sc%par%f_to      = 0.0_wp
-        sc%par%f_hol     = 1.0_wp
         sc%par%dTa_const = 0.0_wp
         sc%par%dTo_const = 0.0_wp
         sc%par%dSo_const = 0.0_wp
         call nml_read(filename, group, "var_defs",  sc%par%var_defs,  init=.TRUE.)
         call nml_read(filename, group, "combine",   sc%par%combine,   init=.TRUE.)
-        call nml_read(filename, group, "manifold",  sc%par%manifold,  init=.TRUE.)
         call nml_read(filename, group, "ref_name",  sc%par%ref_name,  init=.TRUE.)
         call nml_read(filename, group, "lapse",     sc%par%lapse,     init=.TRUE.)
         call nml_read(filename, group, "f_p",       sc%par%f_p,       init=.TRUE.)
         call nml_read(filename, group, "f_p_ne",    sc%par%f_p_ne,    init=.TRUE.)
         call nml_read(filename, group, "f_stdev",   sc%par%f_stdev,   init=.TRUE.)
         call nml_read(filename, group, "f_to",      sc%par%f_to,      init=.TRUE.)
-        call nml_read(filename, group, "f_hol",     sc%par%f_hol,     init=.TRUE.)
         call nml_read(filename, group, "dTa_const", sc%par%dTa_const, init=.TRUE.)
         call nml_read(filename, group, "dTo_const", sc%par%dTo_const, init=.TRUE.)
         call nml_read(filename, group, "dSo_const", sc%par%dSo_const, init=.TRUE.)
@@ -766,20 +715,61 @@ contains
                                     trim(names(i)), sc%par%ref_name)
         end do
 
-        ! --- indices (names only; tsgen_init reads the &tsgen_* groups) --------
+        ! --- indices: names and axes (tsgen_init reads the rest of the group) ---
         names = ""
         call nml_read(filename, group, "indices", names, init=.TRUE.)
         sc%par%n_idx = count(len_trim(names) > 0)
         if (allocated(sc%idx))      deallocate(sc%idx)
         if (allocated(sc%idx_name)) deallocate(sc%idx_name)
+        if (allocated(sc%idx_lo))   deallocate(sc%idx_lo)
+        if (allocated(sc%idx_hi))   deallocate(sc%idx_hi)
         allocate(sc%idx(sc%par%n_idx))
         allocate(sc%idx_name(sc%par%n_idx))
+        allocate(sc%idx_lo(sc%par%n_idx))
+        allocate(sc%idx_hi(sc%par%n_idx))
         do i = 1, sc%par%n_idx
             sc%idx_name(i) = trim(names(i))
+            igroup = trim(group)//"_idx_"//trim(names(i))
+            call nml_read(filename, trim(igroup), "snap_lo", snap_lo, init=.TRUE.)
+            call nml_read(filename, trim(igroup), "snap_hi", snap_hi, init=.TRUE.)
+            sc%idx_lo(i) = snapshot_position(sc, snap_lo, "snap_lo of &"//trim(igroup))
+            sc%idx_hi(i) = snapshot_position(sc, snap_hi, "snap_hi of &"//trim(igroup))
+        end do
+
+        ! --- field indices -> positions in sc%idx -------------------------------
+        do i = 1, sc%par%n_field
+            do j = 1, sc%registry(i)%n_index
+                sc%registry(i)%idx_k(j) = index_position(sc, sc%registry(i)%index(j), &
+                                "field "//trim(sc%registry(i)%name))
+            end do
         end do
 
         return
     end subroutine snapesm_par_load
+
+    integer function snapshot_position(sc, name, what) result(s)
+        ! Position of the snapshot `name` in sc%snap; stops if it is not listed.
+        type(snapesm_class), intent(IN) :: sc
+        character(len=*),    intent(IN) :: name, what
+        do s = 1, sc%par%n_snap
+            if (trim(sc%snap(s)%spec%name) == trim(name)) return
+        end do
+        write(*,*) "snapesm:: Error: snapshot '"//trim(name)//"' ("//trim(what)// &
+                   ") is not in the snapshots list."
+        stop
+    end function snapshot_position
+
+    integer function index_position(sc, name, what) result(k)
+        ! Position of the index `name` in sc%idx; stops if it is not listed.
+        type(snapesm_class), intent(IN) :: sc
+        character(len=*),    intent(IN) :: name, what
+        do k = 1, sc%par%n_idx
+            if (trim(sc%idx_name(k)) == trim(name)) return
+        end do
+        write(*,*) "snapesm:: Error: index '"//trim(name)//"' ("//trim(what)// &
+                   ") is not in the indices list."
+        stop
+    end function index_position
 
     subroutine read_field_spec(fs, filename, group, name, combine_default)
         implicit none
@@ -791,6 +781,8 @@ contains
         fs%combine        = combine_default
         fs%blend          = "linear"
         fs%index          = ""
+        fs%n_index        = 0
+        fs%idx_k          = 0
         fs%enabled        = .TRUE.
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
@@ -802,6 +794,7 @@ contains
         call nml_read(filename, group, "kind",  fs%kind,  init=.TRUE.)
         call nml_read(filename, group, "blend", fs%blend, init=.TRUE.)
         call nml_read(filename, group, "index", fs%index, init=.TRUE.)
+        fs%n_index = count(len_trim(fs%index) > 0)
 
         return
     end subroutine read_field_spec
@@ -814,11 +807,7 @@ contains
         ss%name      = name
         ss%is_ref    = .FALSE.
         ss%monthly   = .FALSE.
-        ss%time      = 0.0_dp
-        ss%idx_coord = 0.0_wp
         call nml_read(filename, group, "monthly",   ss%monthly,   init=.TRUE.)
-        call nml_read(filename, group, "time",      ss%time,      init=.TRUE.)
-        call nml_read(filename, group, "idx_coord", ss%idx_coord, init=.TRUE.)
         ss%clim_sigma = 0.0_wp
         if (nml_has_param(filename, group, "clim_sigma")) &
             call nml_read(filename, group, "clim_sigma", ss%clim_sigma, init=.TRUE.)
