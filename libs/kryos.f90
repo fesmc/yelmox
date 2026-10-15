@@ -73,6 +73,7 @@ module kryos
         real(wp)           :: init_equil_time   = 10.0_wp   ! [yr] equil: equilibration time
         character(len=512) :: recon_path = ""               ! recon*: ice reconstruction file
         character(len=56)  :: recon_var  = ""               ! recon*: its ice-thickness variable
+        real(dp)           :: recon_time = 0.0_dp           ! recon*: [yr] model time of the state (nearest slice)
         character(len=1000) :: recon_regions = ""           ! recon: where its ice is imposed (selection expression)
         logical            :: init_marine_H     = .false.   ! impose LGM-like marine ice
         logical            :: init_kill_shelves = .false.   ! no ice where the present-day bed is ocean
@@ -570,6 +571,7 @@ contains
             case("recon", "recon_ref")
                 call nml_read(path_par, gs, "recon_path", ctl%recon_path)
                 call nml_read(path_par, gs, "recon_var",  ctl%recon_var)
+                call nml_read(path_par, gs, "recon_time", ctl%recon_time)
                 ! {domain}/{grid_name} resolve to the domain name and grid_ice.
                 call nml_replace(ctl%recon_path, "{domain}",    trim(ctl%domain))
                 call nml_replace(ctl%recon_path, "{grid_name}", trim(ctl%grid_ice))

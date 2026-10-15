@@ -262,15 +262,17 @@ contains
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
 
-        integer  :: nx, ny
+        integer  :: nx, ny, k
         real(wp) :: beta_min_save
 
         nx = dom%yelmo%tpo%par%nx
         ny = dom%yelmo%tpo%par%ny
 
-        ! Load the reconstruction (slice 1) into the reference ice thickness.
+        ! Load the reconstruction at recon_time (nearest slice) into the
+        ! reference ice thickness.
+        k = recon_time_index(dom%ctl%recon_path, dom%ctl%recon_time)
         call nc_read(dom%ctl%recon_path, dom%ctl%recon_var, dom%yelmo%bnd%H_ice_ref, &
-                     start=[1,1,1], count=[nx,ny,1])
+                     start=[1,1,k], count=[nx,ny,1])
 
         if (trim(dom%ctl%init_method) == "recon") then
             ! Initial ice from the reconstruction on the given regions.
@@ -309,6 +311,43 @@ contains
         end if
 
     end subroutine domain_init_recon
+
+    function recon_time_index(filename, time) result(k)
+        ! Index of the slice of a reconstruction file nearest to the model time
+        ! `time` [yr]. The time axis is converted to model time from its units:
+        ! "...ago"/"...BP" count positive into the past; a leading "k" (kiloyears,
+        ! kyr, ka) means thousands of years. Stops if `time` lies outside the axis.
+        character(len=*), intent(in) :: filename
+        real(dp),         intent(in) :: time
+        integer :: k
+
+        real(dp), allocatable :: t(:)
+        character(len=256) :: units
+        integer  :: nt
+        real(dp) :: scale
+
+        nt = nc_size(filename, "time")
+        allocate(t(nt))
+        call nc_read(filename, "time", t)
+        units = ""
+        call nc_read_attr(filename, "time", "units", units)
+        units = adjustl(units)
+
+        scale = 1.0_dp
+        if (units(1:1) == "k") scale = 1e3_dp
+        if (index(units, "ago") > 0 .or. index(units, "BP") > 0) scale = -scale
+        t = t*scale
+
+        if (time < minval(t) .or. time > maxval(t)) then
+            write(*,*) "recon_time_index:: error: recon_time = ", time, " is outside the time axis of ", &
+                       trim(filename), " [", minval(t), ", ", maxval(t), "] (units: ", trim(units), ")."
+            stop 1
+        end if
+
+        k = minloc(abs(t - time), dim=1)
+        write(*,*) "recon_time_index:: ", trim(filename), ": slice ", k, " at time ", t(k)
+
+    end function recon_time_index
 
     function restart_bundle_dir(time) result(bundle)
         ! Auto-named per-time restart bundle folder of the run: "restart-<kyr>-kyr".
