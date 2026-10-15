@@ -123,7 +123,7 @@ contains
                 call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, dx_km, &
                                    south, group="snap"//trim(sfx))
             case("snapesm")
-                call snapesm_init(cl%snapesm, filename, domain, grid_name, nx, ny, dx_km, time, &
+                call snapesm_init(cl%snapesm, filename, domain, grid, time, &
                                   south, group="snap"//trim(sfx))
             case("esm")
                 call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &

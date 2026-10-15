@@ -11,12 +11,15 @@ program test_snapesm_ref
     use precision, only : wp, sp, dp
     use ncio
     use snapesm
+    use coordinates, only : grid_class
+    use fesmdata,    only : fesmdata_grid_read
 
     implicit none
 
     integer, parameter :: nx = 106, ny = 181
 
     type(snapesm_class) :: sc
+    type(grid_class)    :: cgrid
     real(sp) :: z_srf_sp(nx,ny)
     real(wp) :: z_srf(nx,ny)
     real(wp) :: xc(nx), yc(ny)
@@ -44,7 +47,9 @@ program test_snapesm_ref
     times = [0.0_dp, -21000.0_dp, -120000.0_dp]
     nt = size(times)
 
-    call snapesm_init(sc, trim(path_par), trim(domain), trim(grid), nx, ny, &
+    call fesmdata_grid_read(cgrid, "fesmdata/Greenland/"//trim(grid)//"/"//trim(grid)// &
+                            "_Atmosphere-ERA5-1981-2010.nc", trim(grid))
+    call snapesm_init(sc, trim(path_par), trim(domain), cgrid, &
                       times(1), south=.FALSE., group="snp")   ! Greenland
 
     call dump_init(trim(outfile), sc, xc, yc, times(1))

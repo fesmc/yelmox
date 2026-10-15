@@ -29,6 +29,7 @@ module snapesm
     use tsgen,    only : tsgen_class, tsgen_init, tsgen_update, &
                          tsgen_restart_write, tsgen_restart_read
     use gaussian_filter, only : filter_gaussian
+    use coordinates, only : grid_class
 
     implicit none
 
@@ -163,16 +164,15 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid_name, nx, ny, dx_km, time, south, group)
-        ! Mirrors snapclim_init, plus `time` (required to initialize the tsgen indices,
-        ! which anchor ramp-type series to their start time).
+    subroutine snapesm_init(sc, filename, domain, grid, time, south, group)
+        ! `grid` is the climate grid: the snapshot fields are read on it, or
+        ! remapped onto it online (var_defs groups with remap/grid_src). `time`
+        ! initializes the tsgen indices (ramp-type series anchor to their start time).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         character(len=*),      intent(IN)    :: domain
-        character(len=*),      intent(IN)    :: grid_name
-        integer,               intent(IN)    :: nx, ny
-        real(wp),              intent(IN)    :: dx_km     ! [km] grid spacing (clim_sigma)
+        type(grid_class),      intent(IN)    :: grid
         real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
         character(len=*),      intent(IN), optional :: group
@@ -184,10 +184,10 @@ contains
         if (present(group)) base_group = trim(group)
 
         ! Read all configuration: top-level, field registry, snapshot specs, index names.
-        call snapesm_par_load(sc, filename, trim(base_group), domain, grid_name)
-        sc%par%nx = nx
-        sc%par%ny = ny
-        sc%par%dx_km = dx_km
+        call snapesm_par_load(sc, filename, trim(base_group), domain, trim(grid%name))
+        sc%par%nx = grid%G%nx
+        sc%par%ny = grid%G%ny
+        sc%par%dx_km = real(grid%G%dx*grid%cs%xy_conv*1e-3_dp, wp)   ! [km] (clim_sigma)
         sc%par%south = south
 
         ! Initialize the driving indices (tsgen). Group is &<base_group>_idx_<idxname>.
@@ -197,7 +197,7 @@ contains
         end do
 
         ! Load the snapshot fields (varslice), reduce them, and set the reference state.
-        call snapesm_load_snapshots(sc, filename, time)
+        call snapesm_load_snapshots(sc, filename, time, grid)
 
         return
     end subroutine snapesm_init
@@ -836,7 +836,7 @@ contains
         return
     end subroutine read_snapshot_spec
 
-    subroutine snapesm_load_snapshots(sc, filename, time)
+    subroutine snapesm_load_snapshots(sc, filename, time, grid)
         ! For each snapshot and each enabled field, read the varslice group reference(s)
         ! from the state group &<group>_<snapshot> (key = field name; 1 group = already
         ! monthly, 2 groups = [ann, sum] synthesized later), load them from the var_defs
@@ -845,6 +845,7 @@ contains
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         real(dp),              intent(IN)    :: time
+        type(grid_class),      intent(IN)    :: grid     ! target grid (online remap)
 
         integer            :: s, f, k, nsrc
         character(len=64)  :: refs(2)
@@ -871,7 +872,8 @@ contains
                 allocate(sc%snap(s)%bind(f)%src(nsrc))
                 do k = 1, nsrc
                     call varslice_init_nml(sc%snap(s)%bind(f)%src(k), trim(vdb), trim(refs(k)), &
-                                           domain=trim(sc%par%domain), grid_name=trim(sc%par%grid_name))
+                                           domain=trim(sc%par%domain), grid_name=trim(sc%par%grid_name), &
+                                           grid=grid)
                     ! Prime: static read once here, time-varying sliced at `time`.
                     if (sc%snap(s)%bind(f)%src(k)%par%with_time) then
                         call varslice_update(sc%snap(s)%bind(f)%src(k), [time], method="extrap")
