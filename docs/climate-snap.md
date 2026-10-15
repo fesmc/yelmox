@@ -95,12 +95,11 @@ which reproduces snapclim `snap_1ind_new` / `fraction`
 &snap
     var_defs  = "input/greenland_clim.nml"   ! database of the input files
     combine   = "anomaly"                    ! snapshots as anomalies from the reference
-    manifold  = 1                            ! number of indices spanning the blend (0/1/2)
     ref_name  = "pd"                         ! the reference snapshot
     snapshots = "pd" "picontrol" "lgm"
     fields    = "tas" "pr" "to" "so" "zs"
     indices   = "at" "ap"
-    ! lapse, f_p, f_p_ne, f_stdev, f_to, f_hol, dTa_const, dTo_const, dSo_const
+    ! lapse, f_p, f_p_ne, f_stdev, f_to, dTa_const, dTo_const, dSo_const
     ! as in snapclim
 /
 ```
@@ -109,14 +108,58 @@ Three kinds of group follow:
 
 - **Fields**, `[snap_field_<name>]`: `kind` (`atm_temp`, `atm_precip`, `ocn`,
   `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `fraction`, `const`) and the
-  driving `index` (`""` = none).
-- **Snapshots**, `[snap_<name>]`: `monthly`, `time`, `idx_coord` (the snapshot's
-  position on the index manifold), optionally `clim_sigma`/`ocn_sigma` (as in
-  snapclim) and, per field, the `var_defs` group(s) holding it (one = monthly;
-  two = annual + summer, from which the seasonal cycle is built). See
+  driving `index`, one or more names (`""` = none).
+- **Snapshots**, `[snap_<name>]`: `monthly`, optionally `clim_sigma`/`ocn_sigma`
+  (as in snapclim) and, per field, the `var_defs` group(s) holding it (one =
+  monthly; two = annual + summer, from which the seasonal cycle is built). See
   [Database namelists](database-namelists.md).
-- **Indices**, `[snap_idx_<name>]`: a `tsgen` series (`method`, `series_file`,
-  `sigma`).
+- **Indices**, `[snap_idx_<name>]`: the axis `snap_lo` -> `snap_hi` (two
+  snapshots) and a `tsgen` generator of any method (`const`, ramps, `series`,
+  ...). The value of the index is the position on its axis: 0 at `snap_lo`, 1 at
+  `snap_hi`.
+
+Each index of a field adds its axis to the reference snapshot, with weight
+`a_k` (the index value):
+
+| blend | now |
+|---|---|
+| `linear` | `ref + sum_k a_k (hi_k - lo_k)` |
+| `ratio` | `ref * prod_k (1 + a_k (hi_k/lo_k - 1))` |
+| `fraction`, `const` | `ref` (the `fraction` ocean is set from the atmospheric anomaly) |
+
+One index gives snapclim `snap_1ind`; two indices give `snap_2ind`, the
+orbital + millennial decomposition of Banderas et al. (2018), e.g. `at` on
+`picontrol` -> `lgm` and `bt` on `lgm_weak` -> `lgm_strong`:
+
+```fortran
+&snap_field_tas
+    kind  = "atm_temp"
+    blend = "linear"
+    index = "at" "bt"
+/
+
+&snap_idx_at
+    snap_lo     = "picontrol"
+    snap_hi     = "lgm"
+    method      = "series"
+    sigma       = 0.0
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0             ! [yr] index 0 here
+    norm_t1     = -21e3           ! [yr] index 1 here (or a window, e.g. -23e3, -19e3)
+/
+
+&snap_idx_bt
+    snap_lo     = "lgm_weak"
+    snap_hi     = "lgm_strong"
+    method      = "series"
+    sigma       = 0.0
+    series_file = "input/beta_ngrip_millennial.dat"
+/
+```
+
+Turning a proxy series into an index is done by tsgen (`norm_t0`/`norm_t1`, see
+the fesm-utils tsgen docs); a steady state is a `const` index (`df_dt_max = 0`,
+value `f_min`), independent of the model time.
 
 Restart bundles hold the state of each index, `snapesm_idx_<name>_restart.nc`,
 with the configuration (snapshots, fields, reference) as attributes.

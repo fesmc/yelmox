@@ -543,19 +543,17 @@
 ! ===== Climate =====
 
 &snap
-    ! snapesm assembly config — reproduces snapclim atm_type=snap_1ind_new,
+    ! snapesm assembly config — reproduces snapclim atm_type=snap_1ind_new (except f_hol),
     ! ocn_type=fraction (see yelmox_Greenland_snapclim.nml &snap). Params copied
     ! verbatim from that block. var_defs database: input/greenland_clim.nml.
     var_defs   = "input/greenland_clim.nml"
     combine    = "anomaly"
-    manifold   = 1
     ref_name   = "pd"
     lapse      = 0.0080 0.0065
     f_p        = 0.06
     f_p_ne     = 1.0
     f_stdev    = 0.0
     f_to       = 0.25
-    f_hol      = 0.5
     dTa_const  = 2.0
     dTo_const  = 0.5
     dSo_const  = 3.0
@@ -600,8 +598,6 @@
 
 &snap_pd
     monthly   = True
-    time      = 0.0
-    idx_coord = 0.0 0.0
     tas = "clim_pd_tas"
     pr  = "clim_pd_pr_sf" "clim_pd_pr_rf"
     zs  = "clim_pd_zs"
@@ -611,8 +607,6 @@
 
 &snap_picontrol
     monthly   = False
-    time      = 0.0
-    idx_coord = 0.0 0.0
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
     pr  = "clim_picontrol_pr_ann"
@@ -623,8 +617,6 @@
 
 &snap_lgm
     monthly   = False
-    time      = -21000.0
-    idx_coord = 1.0 0.0
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
     pr  = "clim_lgm_pr_ann"
@@ -633,18 +625,28 @@
     so  = ""
 /
 
-! ---- driving indices (tsgen series; groups named &snap_idx_<name>) -----------
+! ---- driving indices (tsgen; groups named &snap_idx_<name>) ------------------
+! Each index is the position on the axis snap_lo -> snap_hi (0 -> 1). The
+! orbital series is normalised to 0 at present (piControl) and 1 at 21 ka (LGM).
 
 &snap_idx_at
+    snap_lo     = "picontrol"
+    snap_hi     = "lgm"
     method      = "series"
     sigma       = 0.0
     series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
 /
 
 &snap_idx_ap
+    snap_lo     = "picontrol"
+    snap_hi     = "lgm"
     method      = "series"
     sigma       = 0.0
     series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
 /
 
 ! ===== Surface =====
