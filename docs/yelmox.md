@@ -119,6 +119,35 @@ How the anomalies reach the climate depends on the backend:
 With `active = False` (the default in the shipped configs) `step_climate`
 applies no anomalies.
 
+## Climate bias correction (`[climate_bias]`)
+
+A static spatial correction of the atmosphere, applied on the climate grid to
+the monthly air temperature and precipitation of any backend except rembo
+(annual fields only), after the backend and before the move to the surface
+grid's elevation:
+
+    tas = tas + f_tas*dtas,    pr = pr*(1 + f_pr*(fpr - 1))
+
+The annual means follow (temperature additively, precipitation by the ratio
+of the annual totals); the reference climate and the ocean are unchanged. The
+group is optional; without it, or with `active = False`, nothing changes.
+
+```
+&climate_bias
+    active   = True
+    var_defs = ""             ! file with the groups below ("" = this file)
+    dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
+    fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
+    f_tas    = 1.0            ! weight of dtas
+    f_pr     = 1.0            ! weight of fpr
+/
+```
+
+`dtas` and `fpr` are varslice groups (as snapesm `var_defs`): one field for all
+months (`time = 0 0 0 0 1`) or 12 monthly fields (`time = 0 0 0 0 12`), on the
+climate grid or remapped online (`remap`, `grid_src`). The weighted annual
+fields are written to the climate's 2D file (`bias_dtas_ann`, `bias_fpr_ann`).
+
 ## Configuration
 
 A run is set by these namelist groups. Every key is required (a missing key stops

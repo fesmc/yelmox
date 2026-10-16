@@ -5,6 +5,14 @@ annotated git tag. Dates are release (tag) dates.
 
 ## [Unreleased]
 
+### Added
+- Static climate bias correction `[climate_bias]` (optional): additive temperature and
+  multiplicative precipitation fields (monthly or annual, varslice groups, online remap
+  allowed) with weights `f_tas`, `f_pr`, applied to the monthly atmosphere of snapclim,
+  snapesm and esm before downscaling; written to the climate 2D file.
+- snapesm reads its snapshots on the climate grid (`snapesm_init` takes the `grid_class`),
+  so `var_defs` groups can be remapped online (`remap`, `grid_src`).
+
 ### Changed
 - Climate on a coarser grid than the surface: `tas`/`pr` are moved from the climate grid's
   surface elevation to the surface grid's with the backend's monthly lapse rate and

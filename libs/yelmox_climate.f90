@@ -11,9 +11,12 @@ module yelmox_climate
     ! filling a `climate_out_class`; the domain and its coupling read only that.
     ! The driver's transient forcing (tsforcing: f_now and the gains f_ta, f_to,
     ! f_so) is handed to the backend, which applies it in its own way.
+    ! An optional static bias correction ([climate_bias]) is applied to the
+    ! monthly air temperature and precipitation of any backend but rembo.
 
     use precision,     only : wp, dp
-    use nml,           only : nml_read
+    use nml,           only : nml_read, nml_has_param
+    use varslice,      only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use ncio
     use coordinates,   only : grid_class
     use timestepping,  only : tstep_class
@@ -56,6 +59,18 @@ module yelmox_climate
         real(wp) :: dT_ocn = 0.0_wp              ! [K] ocean temperature anomaly
     end type rembo_state_class
 
+    ! Static bias correction of the atmosphere ([climate_bias]): an additive
+    ! temperature field and a precipitation factor field, monthly (12) or annual
+    ! (1 field, all months), read from var_defs groups on the climate grid
+    ! (online remap allowed), each with a weight:
+    !   tas = tas + f_tas*dtas,   pr = pr*(1 + f_pr*(fpr - 1))
+    type climate_bias_class
+        logical               :: active = .false.
+        real(wp)              :: f_tas = 1.0_wp, f_pr = 1.0_wp
+        real(wp), allocatable :: dtas(:,:,:)     ! [K]  (nx,ny,12), 0 without a dtas group
+        real(wp), allocatable :: fpr(:,:,:)      ! [1]  (nx,ny,12), 1 without a fpr group
+    end type climate_bias_class
+
     type yelmox_climate_class
         character(len=16)       :: method = ""   ! snapclim | snapesm | esm | rembo
         character(len=256)      :: grid_name     ! the climate grid (grid_clim)
@@ -65,6 +80,7 @@ module yelmox_climate
         type(esm_forcing_class) :: esm
         type(esm_ctl_class)     :: esm_ctl
         type(rembo_state_class) :: rembo
+        type(climate_bias_class):: bias
         real(wp), allocatable   :: basins(:,:)   ! basin ids on the climate grid (esm: [esm] basins)
     end type yelmox_climate_class
 
@@ -141,7 +157,104 @@ contains
                 error stop 1
         end select
 
+        call climate_bias_init(cl%bias, filename, domain, grid, "climate_bias"//trim(sfx))
+        if (cl%bias%active .and. trim(cl%method) == "rembo") then
+            write(*,*) "climate_init:: error: [climate_bias] needs monthly air temperature and &
+                       &precipitation; climate = rembo has annual fields only."
+            error stop 1
+        end if
+
     end subroutine climate_init
+
+    subroutine climate_bias_init(bias, filename, domain, grid, group)
+        ! Read [climate_bias] (optional group; inactive without it) and load its
+        ! fields from the var_defs groups it names (static, 1 or 12 slices).
+        type(climate_bias_class), intent(inout) :: bias
+        character(len=*), intent(in) :: filename, domain, group
+        type(grid_class), intent(in) :: grid
+
+        character(len=512) :: var_defs
+        character(len=256) :: grp_dtas, grp_fpr
+        integer :: nx, ny
+
+        bias%active = .false.
+        if (nml_has_param(filename, group, "active")) &
+            call nml_read(filename, group, "active", bias%active)
+        if (.not. bias%active) return
+
+        var_defs = ""
+        grp_dtas = ""
+        grp_fpr  = ""
+        call nml_read(filename, group, "var_defs", var_defs)
+        call nml_read(filename, group, "dtas",     grp_dtas)
+        call nml_read(filename, group, "fpr",      grp_fpr)
+        call nml_read(filename, group, "f_tas",    bias%f_tas)
+        call nml_read(filename, group, "f_pr",     bias%f_pr)
+        if (len_trim(var_defs) == 0) var_defs = filename
+
+        nx = grid%G%nx
+        ny = grid%G%ny
+        allocate(bias%dtas(nx,ny,12), bias%fpr(nx,ny,12))
+        bias%dtas = 0.0_wp
+        bias%fpr  = 1.0_wp
+        if (len_trim(grp_dtas) > 0) call load_monthly(bias%dtas, trim(grp_dtas))
+        if (len_trim(grp_fpr)  > 0) call load_monthly(bias%fpr,  trim(grp_fpr))
+
+        write(*,*) "climate_bias_init:: dtas = ", trim(grp_dtas), ", fpr = ", trim(grp_fpr), &
+                   ", f_tas = ", bias%f_tas, ", f_pr = ", bias%f_pr
+        write(*,*) "climate_bias_init:: range dtas [K]: ", minval(bias%dtas), maxval(bias%dtas), &
+                   ", fpr: ", minval(bias%fpr), maxval(bias%fpr)
+
+    contains
+
+        subroutine load_monthly(var, vgroup)
+            ! One field for all months, or 12 monthly fields.
+            real(wp),         intent(out) :: var(:,:,:)
+            character(len=*), intent(in)  :: vgroup
+            type(varslice_class) :: vs
+            integer :: m, nm
+
+            call varslice_init_nml(vs, trim(var_defs), vgroup, domain=domain, &
+                                   grid_name=trim(grid%name), grid=grid)
+            call varslice_update(vs)
+            nm = size(vs%var, 3)
+            if (nm /= 1 .and. nm /= 12) then
+                write(*,*) "climate_bias_init:: error: ", vgroup, " must have 1 or 12 &
+                           &slices; got ", nm
+                error stop 1
+            end if
+            do m = 1, 12
+                var(:,:,m) = vs%var(:,:,min(m,nm),1)
+            end do
+            call varslice_end(vs)
+
+        end subroutine load_monthly
+
+    end subroutine climate_bias_init
+
+    subroutine climate_bias_apply(bias, out)
+        ! Correct the monthly air temperature and precipitation of `out`, and their
+        ! annual means (the temperature additively, the precipitation by the
+        ! ratio of the annual totals). The reference climate is unchanged.
+        type(climate_bias_class), intent(in)    :: bias
+        type(climate_out_class),  intent(inout) :: out
+
+        real(wp), allocatable :: pr_sum0(:,:)
+        real(wp) :: dtas_ann(size(bias%dtas,1),size(bias%dtas,2))
+
+        dtas_ann = sum(bias%dtas, dim=3) / 12.0_wp
+
+        out%now%tas    = out%now%tas + bias%f_tas*bias%dtas
+        out%now%ta_ann = out%now%ta_ann + bias%f_tas*dtas_ann
+        if (allocated(out%now%tsl_ann)) out%now%tsl_ann = out%now%tsl_ann + bias%f_tas*dtas_ann
+
+        pr_sum0     = sum(out%now%pr, dim=3)
+        out%now%pr  = out%now%pr * (1.0_wp + bias%f_pr*(bias%fpr - 1.0_wp))
+        if (allocated(out%now%pr_ann)) then
+            where (pr_sum0 > 0.0_wp) out%now%pr_ann = out%now%pr_ann * sum(out%now%pr, dim=3) / pr_sum0
+        end if
+
+    end subroutine climate_bias_apply
 
     subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
                               domain, dx, dtt, mshlf, tsf, init)
@@ -247,6 +360,8 @@ contains
                                   forced, is_init, tsf)
         end select
 
+        if (cl%bias%active) call climate_bias_apply(cl%bias, out)
+
         ! The elevation dependence of the atmosphere, to move it to another surface
         ! (kryos_coupling): its surface z_srf, the monthly lapse rate and the
         ! precipitation sensitivity, as the backend applies them. rembo: none.
@@ -317,6 +432,17 @@ contains
             case("snapesm")
                 call snapesm_write_init(cl%snapesm, filename)
         end select
+
+        ! The bias correction (static), weighted, as annual means.
+        if (cl%bias%active) then
+            call nc_write(filename, "bias_dtas_ann", cl%bias%f_tas*sum(cl%bias%dtas, dim=3)/12.0_wp, &
+                          dim1="xc", dim2="yc", units="K", &
+                          long_name="Bias correction of the air temperature (ann)")
+            call nc_write(filename, "bias_fpr_ann", &
+                          1.0_wp + cl%bias%f_pr*(sum(cl%bias%fpr, dim=3)/12.0_wp - 1.0_wp), &
+                          dim1="xc", dim2="yc", units="1", &
+                          long_name="Bias correction factor of the precipitation (ann)")
+        end if
 
     end subroutine climate_write_init
 
