@@ -514,6 +514,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `const_kabp` (surface_chion, smbpal) is kyr BP: the constant insolation used the orbit at
+  +const_kabp kyr (future) instead of -const_kabp kyr. No effect for `const_kabp = 0` or
+  model-time insolation.
 - `tests/test_timestepping.f90`: current fesm-utils API (double-precision time, methods
   rel/cal/const); checks the end time, step count and calendar/relative times.
 - `maps/grid_GRL-32KM.txt`: 53 columns, as the GRL-32KM data and the FesmData v2 grid (was 54;

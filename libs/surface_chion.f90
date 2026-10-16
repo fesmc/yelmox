@@ -192,22 +192,22 @@ contains
         call ann_alloc(sc%ann, sc%nx, sc%ny)
     end subroutine surface_chion_init
 
-    subroutine surface_chion_spinup(sc, t2m, pr, z_srf, z_bed, H_ice, z_sl, time_bp)
+    subroutine surface_chion_spinup(sc, t2m, pr, z_srf, z_bed, H_ice, z_sl, time_rel)
         ! Cold-start snowpack: time_equil annual cycles under the initial climate
         ! and geometry (smbpal's 100-yr ITM equilibration).
         type(surface_chion_class), intent(inout) :: sc
         real(wp), intent(in) :: t2m(:,:,:), pr(:,:,:)       ! [K], [mm w.e./d] monthly
         real(wp), intent(in) :: z_srf(:,:), z_bed(:,:), H_ice(:,:), z_sl(:,:)
-        real(dp), intent(in) :: time_bp
+        real(dp), intent(in) :: time_rel   ! [yr] model time relative to 1950 (past < 0)
 
         integer :: n
 
         do n = 1, nint(sc%par%time_equil)
-            call surface_chion_update(sc, t2m, pr, z_srf, z_bed, H_ice, z_sl, time_bp)
+            call surface_chion_update(sc, t2m, pr, z_srf, z_bed, H_ice, z_sl, time_rel)
         end do
     end subroutine surface_chion_spinup
 
-    subroutine surface_chion_update(sc, t2m, pr, z_srf, z_bed, H_ice, z_sl, time_bp)
+    subroutine surface_chion_update(sc, t2m, pr, z_srf, z_bed, H_ice, z_sl, time_rel)
         ! One annual cycle of daily chion steps from monthly climate, aggregated
         ! to sc%ann.
         type(surface_chion_class), intent(inout) :: sc
@@ -217,7 +217,7 @@ contains
         real(wp), intent(in) :: z_bed(:,:)          ! [m]
         real(wp), intent(in) :: H_ice(:,:)          ! [m]
         real(wp), intent(in) :: z_sl(:,:)           ! [m]
-        real(dp), intent(in) :: time_bp             ! [yr] model time, for the insolation
+        real(dp), intent(in) :: time_rel            ! [yr] model time relative to 1950 (past < 0), for the insolation
 
         real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:), t_ann(:)
         real(wp), allocatable :: t_sum(:), pr_sum(:), sf_sum(:), S_sum(:), PDDs(:)
@@ -242,8 +242,8 @@ contains
         idx = sc%chn%grd%active_idx(1:na)
 
         if (sc%insol) then
-            insol_time = time_bp
-            if (sc%par%const_insol) insol_time = sc%par%const_kabp*1e3_dp
+            insol_time = time_rel
+            if (sc%par%const_insol) insol_time = -sc%par%const_kabp*1e3_dp   ! kyr BP -> model time
             call insol_update(sc%ins, insol_time, sc%par%dt_days, trim(sc%par%insol_fldr))
         end if
 

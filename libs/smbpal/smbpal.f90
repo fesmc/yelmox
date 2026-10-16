@@ -407,7 +407,7 @@ contains
 
         ! Determine year to use for insolation calcs
         insol_time = time_bp
-        if (par%const_insol) insol_time = par%const_kabp*1e3
+        if (par%const_insol) insol_time = -par%const_kabp*1e3   ! kyr BP -> model time
         
         ! Insolation of each itm step at the latitude nodes 
         do n = 1, nstep_itm 
