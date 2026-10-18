@@ -82,9 +82,9 @@ Key ordering points:
 
 ## Forcing
 
-Transient forcing is handled through the OBM/hysteresis machinery
-(`obm_exchange`), **not** the `[tsforcing]` mechanism, which lives only in the
-single-domain [`yelmox`](yelmox.md). The indices registry (`[indices]`,
+Transient forcing of the ocean is handled through the OBM/hysteresis machinery
+(`obm_exchange`). Each domain can take a homogeneous anomaly `[anom_<sfx>]`
+(climate modifier, see [`yelmox`](yelmox.md)). The indices registry (`[indices]`,
 `[idx_<name>]`) is shared by both domains (e.g. for snapesm axes): advanced once
 per step, written to each domain's 1D file, restarted from the run-level bundle
 (`idx_<name>_restart.nc`), with the kill switch and `restart_every_df` bundles

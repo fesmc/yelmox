@@ -56,8 +56,9 @@ yelmox/libs/
   kryos_startup.f90     cold start, restart bundles (domain_startup, ...)
   kryos_output.f90      per-module 2D/1D output, CMIP output
   kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
-  kryos_forcing.f90     driver-owned indices registry (tsgen) and [tsforcing]
+  kryos_forcing.f90     driver-owned indices registry (tsgen)
   yelmox_climate.f90    climate backends behind one interface (climate_out)
+  climate_mods.f90      climate modifiers after the backend (anom)
         │
         ▼
 yelmox/yelmox.f90                 single domain

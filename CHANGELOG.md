@@ -18,6 +18,15 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Climate modifiers (`libs/climate_mods.f90`): optional groups applied to the backend's
+  output in a fixed order, contracts checked at init. First one `[anom<sfx>]` (`active`,
+  `index`, `f_ta`, `f_to`, `f_so`; replaces `[tsforcing]`): homogeneous dTa/dTo/dSo after
+  the backend (snapesm: no longer before the elevation transform, equal up to rounding;
+  its fraction ocean no longer sees dTa), before `[climate_bias]`; refused with the esm
+  smb. rembo reads `[anom]` itself. The recon cold start (`init_method = "recon"`) is now
+  forced too. Removed `[tsforcing]`, the dTa/dTo/dSo arguments of snapesm and its
+  `[snap] dTa_const/dTo_const/dSo_const`. snap.nc `tas`, `pr`, `tsl_ann` are the applied
+  climate (after the modifiers).
 - Indices registry (`libs/kryos_forcing.f90`): named scalar series `[indices] names`, each a
   tsgen group `[idx_<name>]` (optional `units`, `restart_every_df`), owned by the driver,
   advanced once per step on the forcing clock `time_rel` with the ice volume as response,

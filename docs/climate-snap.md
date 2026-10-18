@@ -28,15 +28,15 @@ the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 | Method | Climate |
 |---|---|
 | `const` | the reference snapshot (`clim0`) |
-| `anom` | reference + a homogeneous anomaly (`dTa`/`dTo`/`dSo`): the transient forcing's, else from the index |
+| `anom` | reference + a homogeneous anomaly (`dTa`/`dTo`/`dSo`) from its index series |
 | `snap_1ind`, `snap_1ind_new`, `snap_1ind_abs`, `snap_1ind_miocene` | two snapshots blended by one index |
 | `snap_2ind`, `snap_2ind_abs` | snapshots blended by two indices |
 | `hybrid` | reference + monthly temperature anomalies from a prescribed series (`[snap_hybrid]`), no snapshots |
 | `recon` | reconstructed snapshots, interpolated in time (`[snap_recon]`) |
 | `fraction` (ocean only) | an ocean anomaly of `f_to` × the mean atmospheric anomaly |
 
-The transient forcing (`[tsforcing]`, see [yelmox](yelmox.md))
-reaches snapclim only in the `anom` methods.
+The `[anom]` climate modifier (see [yelmox](yelmox.md)) applies after the
+backend, to any method.
 
 A snapshot group reads the atmosphere (`clim_path`, `clim_names`, `clim_monthly`,
 `clim_stdev_path`/`clim_stdev_name`) and the ocean (`ocn_path`, `ocn_names`,
@@ -99,7 +99,7 @@ which reproduces snapclim `snap_1ind_new` / `fraction`
     snapshots = "pd" "picontrol" "lgm"
     fields    = "tas" "pr" "to" "so" "zs"
     axes      = "at"
-    ! lapse, f_p, f_p_ne, f_stdev, f_to, dTa_const, dTo_const, dSo_const
+    ! lapse, f_p, f_p_ne, f_stdev, f_to
     ! as in snapclim
 /
 ```

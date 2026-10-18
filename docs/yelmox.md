@@ -74,14 +74,14 @@ consumed on the next step.
 The climate is refreshed on the `comps.dt_clim` cadence, isostasy on the
 `comps.dt_isos` cadence (the bedrock is held in between); the smb every step.
 
-## Indices and transient forcing (`[indices]`, `[tsforcing]`)
+## Indices and the homogeneous anomaly (`[indices]`, `[anom]`)
 
 **Indices** are named scalar series, each a `tsgen` time-series generator (the
 modern replacement for the legacy `hyster` module). They are **driver-owned**:
 the program holds one registry (`indices_class`, `idx`, libs/kryos_forcing.f90),
 advances every index once per step on the forcing clock `time_rel`, and passes
 it to `step_climate` (and the cold start); consumers read an index by name
-(the snapesm axes, `[tsforcing]`). Multi-domain drivers share one registry.
+(the snapesm axes, `[anom]`). Multi-domain drivers share one registry.
 
 ```fortran
 &indices
@@ -98,10 +98,10 @@ it to `step_climate` (and the cold start); consumers read an index by name
     !           restart_every_df = 0.5 (a restart bundle each |Δf|)
 /
 
-&tsforcing
+&anom
     active = True     ! a homogeneous anomaly from one index
     index  = "ramp"
-    f_ta   = 1.0      ! dTa = f * f_ta   (atmospheric temperature [K])
+    f_ta   = 1.0      ! dTa = f * f_ta   (air temperature [K])
     f_to   = 0.0      ! dTo = f * f_to   (ocean temperature [K])
     f_so   = 0.0      ! dSo = f * f_so   (ocean salinity [psu])
 /
@@ -116,17 +116,15 @@ moves by more than its `restart_every_df`. Each index restarts from
 `idx_<name>_restart.nc` in the bundle, and is written to the 1D output as
 `idx_<name>` (plus `idx_<name>_df_dt`).
 
-How the anomalies reach the climate depends on the backend:
-
-| Backend | `dTa` / `dTo` / `dSo` |
-|---|---|
-| snapclim | used only in the `"anom"` methods (`snap.atm_type` for `dTa`, `snap.ocn_type` for `dTo`/`dSo`); ignored in the index-based methods (`snap_1ind_new`, `snap_2ind`, `hybrid`, …), as in the legacy `hyster` contract |
-| snapesm | added on top in every configuration |
-| esm | not used: the backend has its own forcing |
-| rembo | mapped onto REMBO's summer, annual and ocean anomalies (see [REMBO](climate-rembo.md)) |
-
-With `active = False` (the default in the shipped configs) `step_climate`
-applies no anomalies.
+`[anom]` is a climate modifier (libs/climate_mods.f90): applied to the
+backend's output after the backend, before `[climate_bias]`, on the climate
+grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
+precipitation sensitivity), ocean profiles + `dTo`/`dSo` (esm: at the shelf
+base). The group is optional (inactive without it) and takes the domain suffix
+(`anom<sfx>`). Checked at init: the index must be in the registry, and a
+backend that supplies the smb (esm with `surface_method = "climate"`) refuses
+it. rembo reads `[anom]` itself, as an input of REMBO (see
+[REMBO](climate-rembo.md)).
 
 ## Climate bias correction (`[climate_bias]`)
 
