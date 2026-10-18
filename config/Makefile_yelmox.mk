@@ -102,7 +102,8 @@ $(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)
 # alongside the bipolar driver in yelmox_bipolar/ -- it is only pertinent to
 # that program -- and is linked via obm_libs (bipolar targets only).
 $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
-						$(objdir)/kryos_forcing.o $(objdir)/climate_mods.o $(objdir)/yelmox_nml.o \
+						$(objdir)/kryos_coupling.o $(objdir)/kryos_forcing.o $(objdir)/climate_mods.o \
+						$(objdir)/yelmox_nml.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
 

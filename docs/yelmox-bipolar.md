@@ -103,7 +103,9 @@ One global index drives the box model and, with regional gains, the domains
 - **`obm2ism`**: per domain, the climate modifier `[ocn_obm_<sfx>]`
   (see [`yelmox`](yelmox.md)): `to_ann` = the box temperature (`absolute`) or
   the reference + the box anomaly (`anomaly`), applied by `obm_exchange` after
-  both climate steps. It needs `active_obm`, and replaces `[ocn_fraction_<sfx>]`
+  both climate steps, and once at the start (`obm_ocean_init`, after the box
+  model's cold start or restart, then the shelf step again), so the first
+  record and the first step see the box. It needs `active_obm`, and replaces `[ocn_fraction_<sfx>]`
   (refused together).
 - **`ism2obm`**: freshwater flux of each domain into the boxes (`fn`, `fs`).
 

@@ -50,7 +50,8 @@ program yelmox_bipolar
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
-    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
+    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_ocean_init, &
+                             obm_exchange
     use timer,        only : timer_class, timer_init, timer_step, &
                              timer_print_totals, timer_write_totals
 
@@ -140,6 +141,10 @@ program yelmox_bipolar
         if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
         call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
+
+        ! The domains' ocean from the box (ocn_obm<sfx>) and their shelf
+        ! forcing, so the first record and the first step see it.
+        call obm_ocean_init(oc, obox, dom_north, dom_south, active_north, active_south, ts)
     end if
 
     ! === Output + restart schedules (shared cadence, from [tm_2D]/[tm_2Dsm]/

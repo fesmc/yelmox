@@ -6,7 +6,6 @@ module ocean2ice
     
     private
     public :: obm_temperature_kelvin
-    public :: calc_ocean_salinity_field
 
     integer,  parameter :: wp = kind(1.0)
 
@@ -33,17 +32,5 @@ function obm_temperature_kelvin(obm_temp, name) result(t_K)
     end select
 
 end function obm_temperature_kelvin
-
-subroutine calc_ocean_salinity_field(orig_osf, obm_salt)
-    ! This subroutine computes a new ocean salinity field (osf)
-    implicit none
-    real(wp), allocatable :: orig_osf(:,:,:)
-    real(wp) :: obm_salt
-
-    orig_osf(:,:,:) = obm_salt
-
-    return
-
-end subroutine calc_ocean_salinity_field
 
 end module ocean2ice
