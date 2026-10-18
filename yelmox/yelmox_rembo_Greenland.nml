@@ -116,8 +116,9 @@
 
 &indices
     ! Indices: named scalar series, read by name (snapesm axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
-    ! units and restart_every_df), advanced on the forcing clock time_rel.
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
+    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
+    ! from the template [idx] of input/yelmox_defaults.nml.
     names  = ""       ! e.g. "at" "ramp"; "" = none
 /
 
@@ -567,36 +568,17 @@
 
 &snap
     ! The ocean of the rembo climate: an ocean-only reference snapshot (ORAS5,
-    ! var_defs database input/greenland_clim.nml), no axes; [anom] adds
-    ! dT_ocn = dT_ann*f_to to it. REMBO supplies the atmosphere, so no tas,
-    ! pr, zs (lapse, f_p, f_p_ne unused).
-    var_defs   = "input/greenland_clim.nml"
-    combine    = "anomaly"
+    ! databases input/clim_db.nml), no axes; [anom] adds dT_ocn = dT_ann*f_to
+    ! to it. REMBO supplies the atmosphere, so no tas, pr, zs. Unset keys:
+    ! input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml"
     ref_name   = "pd"
-    lapse      = 0.0080 0.0065
-    f_p        = 0.06
-    f_p_ne     = 1.0
     snapshots  = "pd"
-    fields     = "to" "so"
-    axes       = ""
-/
-
-&snap_field_to
-    kind  = "ocn"
-    blend = "const"
-    axes  = ""
-/
-
-&snap_field_so
-    kind  = "ocn_salt"
-    blend = "const"
-    axes  = ""
 /
 
 &snap_pd
-    monthly   = True              ! (atmosphere only; none here)
-    to  = "clim_pd_to"            ! ORAS5 1981-2010, monthly climatology
-    so  = "clim_pd_so"
+    to  = "oras5_1981_2010_to"    ! ORAS5 1981-2010, monthly climatology
+    so  = "oras5_1981_2010_so"
 /
 
 ! ===== Surface =====

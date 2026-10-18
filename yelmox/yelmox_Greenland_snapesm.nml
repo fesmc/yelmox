@@ -114,8 +114,9 @@
 
 &indices
     ! Indices: named scalar series, read by name (snapesm axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
-    ! units and restart_every_df), advanced on the forcing clock time_rel.
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
+    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
+    ! from the template [idx] of input/yelmox_defaults.nml.
     names  = "at"
 /
 
@@ -123,7 +124,6 @@
     ! Glacial index: the orbital series normalised to 0 at present (piControl)
     ! and 1 at 21 ka (LGM); the position on the snapesm axis "at".
     method      = "series"
-    sigma       = 0.0
     series_file = "input/alpha_orbital_r2020.dat"
     norm_t0     = 0.0
     norm_t1     = -21e3
@@ -555,79 +555,57 @@
 ! ===== Climate =====
 
 &snap
-    ! snapesm assembly config — reproduces snapclim atm_type=snap_1ind_new (except f_hol)
-    ! (see yelmox_Greenland_snapclim.nml &snap); the ocean held at the reference
-    ! (to: blend = "const"), its anomaly from [ocn_fraction]. Params copied
-    ! verbatim from that block. var_defs database: input/greenland_clim.nml.
-    var_defs   = "input/greenland_clim.nml"
-    combine    = "anomaly"
+    ! Snapshot backend (snapesm): present day (MAR v3.14 1961-1990, ORAS5) and
+    ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
+    ! "at" (snapclim atm_type = snap_1ind_new, without f_hol). The ocean
+    ! follows the reference, its anomaly from [ocn_fraction]. Databases:
+    ! input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml"
     ref_name   = "pd"
+    snapshots  = "pd" "picontrol" "lgm"
+    axes       = "at"
     lapse      = 0.0080 0.0065
     f_p        = 0.06
-    f_p_ne     = 1.0
-    snapshots  = "pd" "picontrol" "lgm"
-    fields     = "tas" "pr" "to" "so" "zs"
-    axes       = "at"
 /
 
-! ---- field registry (semantics + blend rule; no file bindings here) ---------
+! ---- fields (blend rule and axes; the others follow the reference) ---------
 
 &snap_field_tas
-    kind  = "atm_temp"
-    blend = "linear"
     axes  = "at"
 /
 
 &snap_field_pr
-    kind  = "atm_precip"
     blend = "ratio"
     axes  = "at"
 /
 
-&snap_field_to
-    kind  = "ocn"
-    blend = "const"
-    axes  = ""
-/
-
-&snap_field_so
-    kind  = "ocn_salt"
-    blend = "const"
-    axes  = ""
-/
-
-&snap_field_zs
-    kind  = "elev"
-    blend = "const"
-    axes  = ""
-/
-
-! ---- snapshots (state -> var_defs group refs per field) ---------------------
+! ---- snapshots (var_defs groups per field; {exp} of the paths) -------------
 ! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
 
 &snap_pd
-    monthly   = True
-    tas = "clim_pd_tas"
-    pr  = "clim_pd_pr_sf" "clim_pd_pr_rf"
-    zs  = "clim_pd_zs"
-    to  = "clim_pd_to"
-    so  = "clim_pd_so"
+    tas = "mar314_1961_1990_tas"
+    pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
+    zs  = "mar314_1961_1990_zs"
+    to  = "oras5_1981_2010_to"
+    so  = "oras5_1981_2010_so"
 /
 
 &snap_picontrol
-    monthly   = False
+    exp        = "piControl"
+    monthly    = False
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
-    pr  = "clim_picontrol_pr_ann"
-    zs  = "clim_picontrol_zs"
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
 /
 
 &snap_lgm
-    monthly   = False
+    exp        = "lgm"
+    monthly    = False
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
-    pr  = "clim_lgm_pr_ann"
-    zs  = "clim_lgm_zs"
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
 /
 
 ! ---- axes (two snapshots and the index giving the position on them) --------

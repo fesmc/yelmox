@@ -33,7 +33,7 @@ module snapesm
     !
     ! The ocean temperature as a fraction of the air temperature anomaly is the
     ! climate modifier ocn_fraction (climate_mods), on the field `to` held at
-    ! the reference (blend = "const").
+    ! the reference (no axes, or blend = "const").
     !
     ! STATUS: the pipeline (reduce / combine / transform) is ported and
     ! checked against snapclim (tests/test_snapesm_ref.f90); output
