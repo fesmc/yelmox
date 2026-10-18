@@ -14,6 +14,16 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Indices registry (`libs/kryos_forcing.f90`): named scalar series `[indices] names`, each a
+  tsgen group `[idx_<name>]` (optional `units`, `restart_every_df`), owned by the driver,
+  advanced once per step on the forcing clock `time_rel` with the ice volume as response,
+  shared by the domains of `yelmox_bipolar`; kill switch and Δf restarts per index; restart
+  files `idx_<name>_restart.nc`, 1D output `idx_<name>`. snapesm axes `[snap_axis_<name>]`
+  (`lo`, `hi`, `index`), listed in `[snap] axes`; fields list `axes` (was `index`); climate
+  output `axis_<name>` (was `idx_<name>`). `[tsforcing]` takes its value from an index
+  (`index`). Removed `[tsgen]`, `[snap_idx_*]`, `[tsforcing] restart_every_df`,
+  `tsgen_restart.nc` and `snapesm_idx_<name>_restart.nc`. The ramp config runs with
+  `tstep_method = "rel"` (the ramp now advances on `time_rel`).
 - Climate on a coarser grid than the surface: `tas`/`pr` are moved from the climate grid's
   surface elevation to the surface grid's with the backend's monthly lapse rate and
   precipitation sensitivity (`climate_out`: `now%z_srf`, `lapse(12)`, `now%beta_p`;

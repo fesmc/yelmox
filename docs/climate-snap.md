@@ -35,7 +35,7 @@ the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 | `recon` | reconstructed snapshots, interpolated in time (`[snap_recon]`) |
 | `fraction` (ocean only) | an ocean anomaly of `f_to` × the mean atmospheric anomaly |
 
-The transient forcing (`[tsforcing]`/`[tsgen]`, see [yelmox](yelmox.md))
+The transient forcing (`[tsforcing]`, see [yelmox](yelmox.md))
 reaches snapclim only in the `anom` methods.
 
 A snapshot group reads the atmosphere (`clim_path`, `clim_names`, `clim_monthly`,
@@ -87,7 +87,7 @@ v2 products (`fesmdata/`), e.g. the Greenland reference and LGM snapshot:
 
 A rewrite of snapclim on the fesm-utils `varslice` reader and `tsgen` series:
 the snapclim methods become configurations of one blend model, over any number of
-snapshots, fields and indices. Example: `yelmox/yelmox_Greenland_snapesm.nml`,
+snapshots, fields and axes. Example: `yelmox/yelmox_Greenland_snapesm.nml`,
 which reproduces snapclim `snap_1ind_new` / `fraction`
 (`yelmox_Greenland_snapclim.nml`).
 
@@ -98,7 +98,7 @@ which reproduces snapclim `snap_1ind_new` / `fraction`
     ref_name  = "pd"                         ! the reference snapshot
     snapshots = "pd" "picontrol" "lgm"
     fields    = "tas" "pr" "to" "so" "zs"
-    indices   = "at" "ap"
+    axes      = "at"
     ! lapse, f_p, f_p_ne, f_stdev, f_to, dTa_const, dTo_const, dSo_const
     ! as in snapclim
 /
@@ -108,18 +108,18 @@ Three kinds of group follow:
 
 - **Fields**, `[snap_field_<name>]`: `kind` (`atm_temp`, `atm_precip`, `ocn`,
   `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `fraction`, `const`) and the
-  driving `index`, one or more names (`""` = none).
+  `axes`, one or more names (`""` = none).
 - **Snapshots**, `[snap_<name>]`: `monthly`, optionally `clim_sigma`/`ocn_sigma`
   (as in snapclim) and, per field, the `var_defs` group(s) holding it (one =
   monthly; two = annual + summer, from which the seasonal cycle is built). See
   [Database namelists](database-namelists.md).
-- **Indices**, `[snap_idx_<name>]`: the axis `snap_lo` -> `snap_hi` (two
-  snapshots) and a `tsgen` generator of any method (`const`, ramps, `series`,
-  ...). The value of the index is the position on its axis: 0 at `snap_lo`, 1 at
-  `snap_hi`.
+- **Axes**, `[snap_axis_<name>]`: two snapshots `lo` -> `hi` and the `index`
+  giving the position on the axis: 0 at `lo`, 1 at `hi`. The index is a
+  driver-owned `[idx_<name>]` (a `tsgen` generator of any method: `const`,
+  ramps, `series`, ...; see [yelmox](yelmox.md)), listed in `[indices]`.
 
-Each index of a field adds its axis to the reference snapshot, with weight
-`a_k` (the index value):
+Each axis of a field adds to the reference snapshot, with weight `a_k` (the
+index value):
 
 | blend | now |
 |---|---|
@@ -127,20 +127,17 @@ Each index of a field adds its axis to the reference snapshot, with weight
 | `ratio` | `ref * prod_k (1 + a_k (hi_k/lo_k - 1))` |
 | `fraction`, `const` | `ref` (the `fraction` ocean is set from the atmospheric anomaly) |
 
-One index gives snapclim `snap_1ind`; two indices give `snap_2ind`, the
+One axis gives snapclim `snap_1ind`; two axes give `snap_2ind`, the
 orbital + millennial decomposition of Banderas et al. (2018), e.g. `at` on
-`picontrol` -> `lgm` and `bt` on `lgm_weak` -> `lgm_strong`:
+`picontrol` -> `lgm` and `bt` on `lgm_weak` -> `lgm_strong`. Several axes or
+fields may share one index:
 
 ```fortran
-&snap_field_tas
-    kind  = "atm_temp"
-    blend = "linear"
-    index = "at" "bt"
+&indices
+    names = "at" "bt"
 /
 
-&snap_idx_at
-    snap_lo     = "picontrol"
-    snap_hi     = "lgm"
+&idx_at
     method      = "series"
     sigma       = 0.0
     series_file = "input/alpha_orbital_r2020.dat"
@@ -148,12 +145,28 @@ orbital + millennial decomposition of Banderas et al. (2018), e.g. `at` on
     norm_t1     = -21e3           ! [yr] index 1 here (or a window, e.g. -23e3, -19e3)
 /
 
-&snap_idx_bt
-    snap_lo     = "lgm_weak"
-    snap_hi     = "lgm_strong"
+&idx_bt
     method      = "series"
     sigma       = 0.0
     series_file = "input/beta_ngrip_millennial.dat"
+/
+
+&snap_axis_at
+    lo    = "picontrol"
+    hi    = "lgm"
+    index = "at"
+/
+
+&snap_axis_bt
+    lo    = "lgm_weak"
+    hi    = "lgm_strong"
+    index = "bt"
+/
+
+&snap_field_tas
+    kind  = "atm_temp"
+    blend = "linear"
+    axes  = "at" "bt"
 /
 ```
 
@@ -161,7 +174,8 @@ Turning a proxy series into an index is done by tsgen (`norm_t0`/`norm_t1`, see
 the fesm-utils tsgen docs); a steady state is a `const` index (`df_dt_max = 0`,
 value `f_min`), independent of the model time.
 
-Restart bundles hold the state of each index, `snapesm_idx_<name>_restart.nc`,
-with the configuration (snapshots, fields, reference) as attributes.
+snapesm holds no state of its own: the indices restart with the driver
+(`idx_<name>_restart.nc`). The climate output carries the position on each
+axis, `axis_<name>`.
 
 The transient forcing is added on top in every configuration.

@@ -74,38 +74,47 @@ consumed on the next step.
 The climate is refreshed on the `comps.dt_clim` cadence, isostasy on the
 `comps.dt_isos` cadence (the bedrock is held in between); the smb every step.
 
-## Transient time-series forcing (`tsgen`)
+## Indices and transient forcing (`[indices]`, `[tsforcing]`)
 
-`yelmox` can drive a spatially-homogeneous, time-varying anomaly into the climate
-(atmosphere and/or ocean) from the `tsgen` time-series generator (the modern
-replacement for the legacy `hyster` module). It is **driver-owned**: the program
-holds a `tsforcing_class` (`tsf`), advances it each step, and passes it to
-`step_climate` (and the cold start), which apply its `dTa` / `dTo` / `dSo`.
-
-Two namelist groups control it:
+**Indices** are named scalar series, each a `tsgen` time-series generator (the
+modern replacement for the legacy `hyster` module). They are **driver-owned**:
+the program holds one registry (`indices_class`, `idx`, libs/kryos_forcing.f90),
+advances every index once per step on the forcing clock `time_rel`, and passes
+it to `step_climate` (and the cold start); consumers read an index by name
+(the snapesm axes, `[tsforcing]`). Multi-domain drivers share one registry.
 
 ```fortran
-&tsforcing
-    active = True     ! turn transient forcing on
-    f_ta   = 1.0      ! dTa = f_now * f_ta   (atmospheric temperature [K])
-    f_to   = 0.0      ! dTo = f_now * f_to   (ocean temperature [K])
-    f_so   = 0.0      ! dSo = f_now * f_so   (ocean salinity [psu])
+&indices
+    names = "ramp"            ! "" = no indices
 /
 
-&tsgen
-    method    = "ramp-time"   ! const | ramp-slope | ramp-time | ramp-time-step | sin | exp | PI42 | ...
+&idx_ramp                     ! a tsgen group
+    method    = "ramp-time"   ! const | ramp-slope | ramp-time | ramp-time-step | sin | series | exp | PI42 | ...
     f_min     = 0.0
     f_max     = 5.0
     dt_ramp   = 200.0
     ! ... (see tsgen.f90 for the full parameter set)
+    ! optional: units = "K" (label of idx_<name> in the 1D output),
+    !           restart_every_df = 0.5 (a restart bundle each |Δf|)
+/
+
+&tsforcing
+    active = True     ! a homogeneous anomaly from one index
+    index  = "ramp"
+    f_ta   = 1.0      ! dTa = f * f_ta   (atmospheric temperature [K])
+    f_to   = 0.0      ! dTo = f * f_to   (ocean temperature [K])
+    f_so   = 0.0      ! dSo = f * f_so   (ocean salinity [psu])
 /
 ```
 
-`tsgen` produces a single scalar `f_now`, which the `[tsforcing]` gains map onto
-the three anomalies. Time-driven methods (`ramp-*`, `sin`, `const`) are
-analytic; feedback methods (`exp`, PI/PID controllers) modulate the forcing rate
-from the model response — the response variable passed to `tsgen` is total ice
-volume (Gt).
+Time-driven methods (`ramp-*`, `sin`, `const`, `series`) are analytic or
+tabulated; feedback methods (`exp`, PI/PID controllers) modulate the forcing
+rate from the model response — the response variable passed to `tsgen` is
+total ice volume (Gt). The run stops when any index trips its kill switch
+(`with_kill`), and writes a restart bundle `restart-<n>` each time an index
+moves by more than its `restart_every_df`. Each index restarts from
+`idx_<name>_restart.nc` in the bundle, and is written to the 1D output as
+`idx_<name>` (plus `idx_<name>_df_dt`).
 
 How the anomalies reach the climate depends on the backend:
 

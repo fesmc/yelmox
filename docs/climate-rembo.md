@@ -28,8 +28,8 @@ the surface mass balance; the ocean comes from snapclim.
 - **Update cadence.** `[comps] dt_clim = dtt`: REMBO updates its energy balance
   and its smb on its own intervals (`dtime_emb`, `dtime_smb`).
 - **Ocean.** The `[snap]` group, as for snapclim.
-- **Transient forcing.** `[tsforcing]` maps the tsgen value `f_now` onto REMBO's
-  anomalies: the summer air temperature `dT_sum = f_now·f_ta`, the annual
+- **Transient forcing.** `[tsforcing]` maps the value `f` of its index onto REMBO's
+  anomalies: the summer air temperature `dT_sum = f·f_ta`, the annual
   `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6), and the ocean
   `dT_ocn = dT_ann·f_to`, added to a snapclim ocean held at its reference
   (`ocn_type = "const"`).
@@ -40,6 +40,9 @@ the surface mass balance; the ocean comes from snapclim.
 The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, ...), plus, with
 `[output] write_clim`, `rembo.nc` (annual and summer air temperature,
 precipitation, smb) and `rembo_ts.nc` (the applied anomalies, the smb integrated
-over the ice sheet and the accumulation-area ratio). The tsgen forcing goes to
-`yelmo_ts.nc`, as for the other climates. Restart bundles hold REMBO's
+over the ice sheet and the accumulation-area ratio). The indices go to
+the Yelmo 1D file (`idx_<name>`), as for the other climates. The shipped
+`rembo_Greenland` keeps the hysteresis setup as an unlisted `[idx_hyst]`
+(PI42 with kill switch): add `"hyst"` to `[indices] names` and set
+`[tsforcing] active = True, index = "hyst"` to run it. Restart bundles hold REMBO's
 `rembo_restart.nc`; REMBO reads its restart as set in `rembo_Greenland.nml`.
