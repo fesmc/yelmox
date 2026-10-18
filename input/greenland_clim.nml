@@ -67,7 +67,7 @@
     fill     = "nearest"
 /
 
-! ---- picontrol (PMIP3 piControl, annual + summer) ---------------------------
+! ---- picontrol (PMIP3 piControl, annual + summer or winter: tas_season) -----
 
 &clim_picontrol_tas_ann
     filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
@@ -80,6 +80,14 @@
 &clim_picontrol_tas_sum
     filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
     name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_picontrol_tas_djf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
+    name     = "t2m_djf"
     units    = "degC" "K"
     scaling  = 1.0 273.15
     time     = 0 0 0 0 1
@@ -101,7 +109,7 @@
     time     = 0 0 0 0 1
 /
 
-! ---- lgm (PMIP3 LGM, annual + summer) ---------------------------------------
+! ---- lgm (PMIP3 LGM, annual + summer or winter: tas_season) -----------------
 
 &clim_lgm_tas_ann
     filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
@@ -114,6 +122,14 @@
 &clim_lgm_tas_sum
     filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
     name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+/
+
+&clim_lgm_tas_djf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
+    name     = "t2m_djf"
     units    = "degC" "K"
     scaling  = 1.0 273.15
     time     = 0 0 0 0 1
