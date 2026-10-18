@@ -63,7 +63,7 @@ module kryos
         logical :: with_climate   = .true.   ! atmosphere + ocean
         logical :: with_surface   = .true.   ! surface mass balance + temperature (needs climate)
         logical :: with_shelf     = .true.   ! shelf-base melt + temperature (needs climate)
-        character(len=56) :: climate        = ""         ! climate backend: snapclim | snapesm | esm | rembo
+        character(len=56) :: climate        = ""         ! climate backend: snapesm | esm | rembo
         character(len=56) :: surface_method = "chion"    ! chion | smbpal | smb_simple | climate (from the backend)
         real(dp) :: dt_clim     = 10.0_dp   ! [yr] climate update interval
         real(dp) :: dt_isos     = 10.0_dp   ! [yr] isostasy update interval
@@ -550,7 +550,7 @@ contains
             case("smb_simple")
                 if (trim(ctl%climate) == "esm" .or. trim(ctl%climate) == "rembo") then
                     write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method = smb_simple needs &
-                               &a sea-level air temperature (climate = snapclim or snapesm)."
+                               &a sea-level air temperature (climate = snapesm)."
                     stop 1
                 end if
             case default

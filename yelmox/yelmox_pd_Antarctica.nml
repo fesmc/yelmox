@@ -20,9 +20,9 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -561,9 +561,8 @@
 
 &snap
     ! Snapshot backend (snapesm): the present-day reference only, RACMO2.3p2
-    ! 1981-2010 and the ISMIP7 ocean climatology (snapclim atm_type = ocn_type
-    ! = anom with zero series). Databases: input/clim_db.nml; unset keys:
-    ! input/yelmox_defaults.nml.
+    ! 1981-2010 and the ISMIP7 ocean climatology. Databases: input/clim_db.nml;
+    ! unset keys: input/yelmox_defaults.nml.
     snapshots  = "pd"
 /
 
@@ -727,7 +726,7 @@
     corr_pine = "Zwally2012:14"
     corr_abbott = "Zwally2012:15"
     
-    tf_correction   = True         ! no grid-specific tf file: mshlf runs from the remapped snapclim forcing
+    tf_correction   = True         ! no grid-specific tf file: mshlf runs from the remapped climate forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  

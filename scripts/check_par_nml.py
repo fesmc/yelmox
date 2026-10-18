@@ -18,9 +18,9 @@ script reproduces that check offline, with more:
      neither its var_defs files nor the par file itself (searched implicitly
      last) holds, or a var_defs file is missing. Bound groups in the par file
      are not reported by --dead.
-  4. dead (only with --dead): keys in the other groups (ctrl, snapclim,
-     smbpal, isos, ...) whose name appears nowhere in the Fortran sources as a
-     string literal, so no `nml_read` can read them. The match is by key name
+  4. dead (only with --dead): keys in the other groups (ctrl, smbpal, isos,
+     ...) whose name appears nowhere in the Fortran sources as a string
+     literal, so no `nml_read` can read them. The match is by key name
      only (not by group), so it misses keys that are read in another group.
      Also snapshot-backend groups that are not read ([snap_field_x] for a
      field not in [snap] fields, ...). Needs the dependency checkouts (yelmo,

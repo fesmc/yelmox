@@ -33,9 +33,6 @@ $(objdir)/esm_forcing.o: $(libdir)/esm_forcing.f90 $(objdir)/marine_shelf.o
 $(objdir)/sediments.o: $(libdir)/sediments.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/snapclim.o: $(libdir)/snapclim.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
 # Namelist helpers of the forcing modules (var_defs lookup, defaults file).
 $(objdir)/yelmox_nml.o: $(libdir)/yelmox_nml.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -59,10 +56,10 @@ $(objdir)/climate_rembo.o: $(libdir)/climate_rembo.f90
 $(objdir)/climate_rembo_stub.o: $(libdir)/climate_rembo_stub.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# The climate backend of a domain ([comps] climate = snapclim | snapesm | esm
-# | rembo), chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
+# The climate backend of a domain ([comps] climate = snapesm | esm | rembo),
+# chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
 $(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o $(objdir)/climate_mods.o \
-						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/esm_forcing.o \
+						$(objdir)/snapesm.o $(objdir)/esm_forcing.o \
 						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o $(climate_rembo_obj)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
@@ -212,7 +209,6 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/climate_mods.o \
 					    $(climate_rembo_obj) \
 					    $(objdir)/yelmox_climate.o \
-					    $(objdir)/snapclim.o \
 					    $(objdir)/snapesm.o \
 						$(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o \

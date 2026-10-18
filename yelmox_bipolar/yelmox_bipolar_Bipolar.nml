@@ -108,8 +108,8 @@
 &idx_gmt
     ! Global mean air temperature anomaly [K]: the OBM forcing ([obm_forcing])
     ! and, with the regional gains, the homogeneous anomaly of each domain
-    ! ([anom_north], [anom_south]). Zero here (present day), as the snapclim
-    ! anomaly the OBM read before. A series instead, e.g.:
+    ! ([anom_north], [anom_south]). Zero here (present day). A series
+    ! instead, e.g.:
     !   method = "series", series_file = "input/<gmt series>.dat"
     method      = "const"
     f_min       = 0.0
@@ -408,7 +408,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -935,7 +935,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True
-    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0
     dt_isos         = 10.0
@@ -1218,9 +1218,8 @@
 &snap_north
     ! Snapshot backend (snapesm): present day (MAR v3.14 1961-1990, ORAS5) and
     ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
-    ! "at" (snapclim atm_type = snap_1ind_new, without f_hol). The ocean
-    ! follows the reference, its anomaly from [ocn_fraction_north]. Databases:
-    ! input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    ! "at". The ocean follows the reference, its anomaly from [ocn_fraction_north].
+    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
     var_defs   = "input/clim_db.nml"
     ref_name   = "pd"
     snapshots  = "pd" "picontrol" "lgm"

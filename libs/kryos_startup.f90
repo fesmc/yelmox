@@ -132,7 +132,7 @@ contains
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call couple_yelmo_to_htopo(dom)
 
-        ! Climate on grid_clim (init: snapclim/snapesm at time_rel), then the
+        ! Climate on grid_clim (init: snapesm at time_rel), then the
         ! surface mass balance on grid_surface (init=.true. runs the smbpal ITM
         ! equilibration before the first update).
         call step_climate(dom, ts, idx, init=.true.)

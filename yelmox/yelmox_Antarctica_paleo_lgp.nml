@@ -20,9 +20,9 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -127,8 +127,8 @@
 
 &idx_a
     ! Glacial index (alpha_combined_125kyr_interp: 0 at present, ~0.9 at
-    ! 21 ka), the position on the snapesm axis "a", used as is (as snapclim
-    ! snap_1ind: not normalised).
+    ! 21 ka), the position on the snapesm axis "a", used as is (not
+    ! normalised).
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
 /
@@ -594,10 +594,9 @@
 &snap
     ! Snapshot backend (snapesm): present day (RACMO2.3p2 1981-2010, ISMIP7
     ! ocean) and PMIP3 piControl and LGM (global ensemble means, remapped) on
-    ! the axis "a" (snapclim atm_type = snap_1ind, without the 80 km smoothing
-    ! of the reference before 1 ka, f_corr). The ocean follows the reference,
-    ! its anomaly from [ocn_fraction]. Databases: input/clim_db.nml; unset
-    ! keys: input/yelmox_defaults.nml.
+    ! the axis "a". The ocean follows the reference, its anomaly from
+    ! [ocn_fraction]. Databases: input/clim_db.nml; unset keys:
+    ! input/yelmox_defaults.nml.
     snapshots  = "pd" "picontrol" "lgm"
     axes       = "a"
 /
@@ -803,7 +802,7 @@
     corr_b17 = "Zwally2012:17"
     corr_b18 = "Zwally2012:18"
     
-    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped snapclim forcing
+    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped climate forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  

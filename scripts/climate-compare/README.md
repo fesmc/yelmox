@@ -7,8 +7,7 @@ range; the climate 2D files of both runs are then compared: domain means of
 B−A with the time series of the means (one figure per field).
 
 It is the regression check for changes to the climate backends and modifiers
-(e.g. a converted snapesm config against its snapclim original,
-`docs/_forcing-design.md` section 13). It is also where the open data questions
+(`docs/_forcing-design.md` section 13). It is also where the open data questions
 of the forcing refactor are answered: whether `clim_sigma` is still needed after
 the global remap of the snapshots (section 9), and the I/O cost per update of
 time-varying snapshots (GRL paleo; `timing.txt` of each run).
@@ -16,8 +15,8 @@ time-varying snapshots (GRL paleo; `timing.txt` of each run).
 ## Run (Levante)
 
 ```bash
-scripts/climate-compare/run.sh yelmox/yelmox_Greenland_snapclim.nml \
-    yelmox/yelmox_Greenland_snapesm.nml output/climcmp/grl
+scripts/climate-compare/run.sh --pb "ocn_fraction.f_to=0.5" \
+    yelmox/yelmox_Greenland.nml yelmox/yelmox_Greenland.nml output/climcmp/grl
 ```
 
 Options: `--t0`, `--t1` (forcing range, default -130e3 to 0), `--pd` (present

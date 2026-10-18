@@ -21,9 +21,9 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = False  ! Ocean forcing off for now (imposed constant / none)
-    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -550,9 +550,8 @@
 
 &snap
     ! Snapshot backend (snapesm): the present-day reference only, MAR v3.14
-    ! 1960-1990 (groups below; no ocean: with_shelf = False) (snapclim atm_type
-    ! = ocn_type = const). Databases: input/clim_db.nml, then this file; unset
-    ! keys: input/yelmox_defaults.nml.
+    ! 1960-1990 (groups below; no ocean: with_shelf = False). Databases:
+    ! input/clim_db.nml, then this file; unset keys: input/yelmox_defaults.nml.
     snapshots  = "pd"
     f_p        = 0.096
 /

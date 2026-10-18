@@ -27,9 +27,9 @@
 #
 # Output: OUTDIR/A and OUTDIR/B (runme run folders), relative to the repo root.
 #
-# Example (GRL, snapclim vs snapesm, paleo):
-#   scripts/climate-compare/run.sh yelmox/yelmox_Greenland_snapclim.nml \
-#       yelmox/yelmox_Greenland_snapesm.nml output/climcmp/grl
+# Example (GRL, paleo, ocean fraction 0.25 vs 0.5):
+#   scripts/climate-compare/run.sh --pb "ocn_fraction.f_to=0.5" \
+#       yelmox/yelmox_Greenland.nml yelmox/yelmox_Greenland.nml output/climcmp/grl
 #   julia --project=scripts/climate-compare scripts/climate-compare/compare.jl output/climcmp/grl
 #
 set -euo pipefail

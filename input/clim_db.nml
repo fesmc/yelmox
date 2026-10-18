@@ -75,9 +75,7 @@
 /
 
 ! ---- RACMO2.3p2, 1981-2010 (Antarctica), monthly ------------------------
-! tas: 2 m air temperature (the snapclim Antarctica reference "T_srf" of the
-! RACMO2.3 ERA-Interim hybrid file was a 2 m temperature, ERA-Interim t2m
-! renamed); tsrf: surface temperature.
+! tas: 2 m air temperature; tsrf: surface temperature.
 
 &racmo23p2_1981_2010_tas
     filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1981-2010.nc"

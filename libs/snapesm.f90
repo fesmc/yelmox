@@ -5,8 +5,7 @@ module snapesm
     !   Indices   -> the driver's registry (kryos_forcing), read by name
     !   Wrapper   -> this module (blend + transforms + output state)
     !
-    ! Replacement for the monolithic `snapclim`. See docs/climate-snap.md for its
-    ! configuration.
+    ! See docs/climate-snap.md for its configuration.
     !
     ! Config model: the `var_defs` databases (a list of nml files, first file
     ! that has a group wins, then the par file itself for run-specific groups;
@@ -34,10 +33,6 @@ module snapesm
     ! The ocean temperature as a fraction of the air temperature anomaly is the
     ! climate modifier ocn_fraction (climate_mods), on the field `to` held at
     ! the reference (no axes, or blend = "const").
-    !
-    ! STATUS: the pipeline (reduce / combine / transform) is ported and
-    ! checked against snapclim (tests/test_snapesm_ref.f90); output
-    ! (snapesm_write_*) is in place.
 
     use precision, only : wp, sp, dp
     use ncio
@@ -150,9 +145,9 @@ module snapesm
         logical            :: with_atm      ! the reference binds the atmosphere (tas, pr)
         logical            :: with_ocn      ! the reference binds the ocean (to)
         real(wp)           :: lapse(2)      ! [annual, summer] lapse rate [K/m]
-        ! precip sensitivity parameters (snapclim &snap)
+        ! precip sensitivity parameters
         real(wp)           :: f_p           ! precip-temperature Clausius factor -> beta_p [1/K]
-        real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (snapclim hardcodes 1.0)
+        real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (not active)
         integer            :: n_snap, n_field, n_axis
     end type
 
@@ -227,7 +222,7 @@ contains
     end subroutine snapesm_init
 
     subroutine snapesm_update(sc, z_srf, time, idx, dx)
-        ! Mirrors snapclim_update. Pipeline: axis positions from the registry
+        ! Pipeline: axis positions from the registry
         ! (advanced by the driver to `time`) -> refresh loads -> combine ->
         ! transform (the atmosphere, if bound). Homogeneous anomalies and the
         ! ocean fraction rule are climate modifiers (climate_mods), applied by
@@ -301,9 +296,8 @@ contains
         !   ratio  (precip):        now = ref * prod_k (a_k*(hi_k/lo_k - 1) + 1)
         !   const:                  now = ref
         ! An axis with lo = "" adds hi itself: a_k*hi_k (linear) or the factor
-        ! a_k*(hi_k - 1) + 1 (ratio). One axis reproduces snapclim
-        ! calc_temp_1ind/calc_precip_1ind, two axes calc_temp_2ind/calc_precip_2ind
-        ! (Banderas et al., 2018). The snapshots of the axes bind the field
+        ! a_k*(hi_k - 1) + 1 (ratio). Two axes as in Banderas et al. (2018).
+        ! The snapshots of the axes bind the field
         ! (snapesm_check_bindings).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
@@ -408,7 +402,7 @@ contains
 
     subroutine snapesm_transform(sc, z_srf)
         ! Inflate the blended sea-level fields to the current model elevation and
-        ! compute the annual/summer aggregates (snapclim 779-811). Note the cosine
+        ! compute the annual/summer aggregates. Note the cosine
         ! phase here is m*30-15 (vs m*30-30 in the sea-level reduction).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
@@ -452,7 +446,7 @@ contains
     end subroutine snapesm_transform
 
     function snapesm_lapse_monthly(sc) result(lapse)
-        ! Monthly lapse rate [K/m] that lifts tsl to the surface (snapclim 788-795):
+        ! Monthly lapse rate [K/m] that lifts tsl to the surface:
         ! annual lapse(1) with a seasonal cosine of amplitude lapse(1)-lapse(2),
         ! phase m*30-15, summer at lapse(2).
         implicit none
@@ -972,7 +966,7 @@ contains
         end do
 
         ! The reference state (anomaly baseline; clim0-equivalent for callers),
-        ! and the output state seeded from it (mirrors snapclim's `now = clim0`).
+        ! and the output state seeded from it.
         sc%ref = sc%snap(sc%par%iref)%state
         sc%now = sc%ref
 
@@ -993,8 +987,7 @@ contains
     end subroutine snapesm_reduce_snapshot
 
     subroutine reduce_atmosphere(sc, s)
-        ! The atmosphere of snapshot s, reduced to sea level. Faithful port of
-        ! snapclim read_climate_snapshot (1685-1969).
+        ! The atmosphere of snapshot s, reduced to sea level.
         ! Monthly snapshots (spec%monthly): raw tas/pr are monthly (pr = sum of
         ! sources, sf+rf). Annual snapshots: tas = cosine-synthesized from
         ! [ta_ann, ta_seas] (tas_season); pr from pr_ann.
@@ -1026,7 +1019,7 @@ contains
 
         associate(spec => sc%snap(s)%spec, st => sc%snap(s)%state, bind => sc%snap(s)%bind)
 
-        ! --- elevation, mask, beta_p (snapclim 1746-1755) -------------------------
+        ! --- elevation, mask, beta_p ----------------------------------------------
         if (has_zs) then
             call realloc2(st%z_srf, nx, ny)
             call realloc2(st%mask,  nx, ny)
@@ -1041,8 +1034,8 @@ contains
             end if
             st%mask = 0.0_wp
             where (st%z_srf > 0.0_wp) st%mask = 1.0_wp
-            ! beta_p = f_p everywhere (snapclim hardcodes f_p_ne=1.0, so the NE-basin
-            ! branch is dormant); f_p_ne is retained in par for future basin dependence.
+            ! beta_p = f_p everywhere (the NE-basin branch is dormant); f_p_ne is
+            ! retained in par for future basin dependence.
             st%beta_p = sc%par%f_p * 1.0_wp
             if (sc%par%f_p_ne /= 1.0_wp) st%beta_p = sc%par%f_p  ! (kept uniform; see note)
         end if
@@ -1052,14 +1045,13 @@ contains
             call realloc3(st%tas, nx, ny, NMONTH)
             call realloc2(st%ta_ann, nx, ny)
             if (spec%monthly) then
-                ! Monthly climatology (snapclim clim_monthly=True, 1757-1840).
+                ! Monthly climatology.
                 do m = 1, NMONTH
                     st%tas(:,:,m) = bind(f_tas)%src(1)%var(:,:,m,1)
                 end do
                 st%ta_ann = sum(st%tas, dim=3) / 12.0_wp
             else
-                ! Annual mean + one season, cosine-synthesized to monthly (snapclim
-                ! 1842-1910). With c(m) = cos(2*pi*(m-1)/12), +1 in January and -1
+                ! Annual mean + one season, cosine-synthesized to monthly. With c(m) = cos(2*pi*(m-1)/12), +1 in January and -1
                 ! in July, the season's field is put at its extreme month:
                 !   djf: tas(m) = ta_ann + (ta_seas - ta_ann)*c(m)   (January)
                 !   jja: tas(m) = ta_ann - (ta_seas - ta_ann)*c(m)   (July)
@@ -1103,7 +1095,7 @@ contains
         end if
 
         ! Smooth the snapshot (spec%clim_sigma, e.g. coarse GCM fields), then the
-        ! land mask of the smoothed elevation (snapclim read_climate_snapshot).
+        ! land mask of the smoothed elevation.
         if (spec%clim_sigma > 0.0_wp) then
             if (has_zs) call filter_gaussian(st%z_srf, spec%clim_sigma, sc%par%dx_km)
             if (has_tas) then
@@ -1165,9 +1157,8 @@ contains
 
     subroutine reduce_ocean(sc, s)
         ! The ocean of snapshot s: the annual mean of to (and so, if bound; else
-        ! salinity 0, as snapclim), vertically interpolated from the input depth
-        ! profiles to the model depth axis (snapclim read_ocean_snapshot
-        ! 2078-2150; e.g. 75 -> 23 levels, depth0 = abs(file depth)).
+        ! salinity 0), vertically interpolated from the input depth profiles to
+        ! the model depth axis (e.g. 75 -> 23 levels, depth0 = abs(file depth)).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         integer,               intent(IN)    :: s
@@ -1272,8 +1263,7 @@ contains
     end subroutine realloc3
 
     subroutine model_depth(depth)
-        ! Model ocean depth axis: nzo=23, 0..2000 m in 21 steps + [2500, 3000]
-        ! (snapclim snapclim_init 300-307).
+        ! Model ocean depth axis: nzo=23, 0..2000 m in 21 steps + [2500, 3000].
         implicit none
         real(wp), allocatable, intent(OUT) :: depth(:)
         integer, parameter :: nzo = 23
@@ -1318,9 +1308,8 @@ contains
 
     function interp_linear(x, y, xout) result(yout)
         ! Simple linear point interpolation, clamped to the endpoints. Private copy
-        ! (identical to snapclim's) so the ocean vinterp does not depend on which
-        ! interp1D module wins the include path in a full yelmox build, and matches
-        ! snapclim's ocean interpolation exactly.
+        ! so the ocean vinterp does not depend on which interp1D module wins the
+        ! include path in a full yelmox build.
         implicit none
         real(wp), dimension(:), intent(IN) :: x, y
         real(wp),               intent(IN) :: xout
