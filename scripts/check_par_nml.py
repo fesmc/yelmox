@@ -6,24 +6,38 @@ parameter missing from the par file takes its value from
 `input/yelmo_defaults.nml`. Before reading a group, `nml_validate` checks every
 key the par file sets in that group against the same group of the defaults
 file and stops the run on any key it does not know (typos, removed or renamed
-parameters). This script reproduces that check offline, with two more:
+parameters). The yelmox forcing groups are read the same way against
+`input/yelmox_defaults.nml`, named groups against a template group there. This
+script reproduces that check offline, with more:
 
-  1. unknown: keys in a yelmo group that are not in the defaults file
-     (`nml_validate` would stop the run).
+  1. unknown: keys in a yelmo or yelmox forcing group that are not in its
+     group of the defaults file (`nml_validate` would stop the run).
   2. duplicate: a group or key defined twice in one file. `nml_read` takes the
      first occurrence, so later copies are silently ignored.
-  3. dead (only with --dead): keys in non-yelmo groups (ctrl, snapclim,
+  3. var_defs: a snapshot binds a varslice group that none of the [snap]
+     var_defs files holds (or a var_defs file is missing).
+  4. dead (only with --dead): keys in the other groups (ctrl, snapclim,
      smbpal, isos, ...) whose name appears nowhere in the Fortran sources as a
      string literal, so no `nml_read` can read them. The match is by key name
      only (not by group), so it misses keys that are read in another group.
-     Needs the dependency checkouts (yelmo, fesm-utils, FastIsostasy, rembo1, chion)
-     next to the scripts directory.
+     Also snapshot-backend groups that are not read ([snap_field_x] for a
+     field not in [snap] fields, ...). Needs the dependency checkouts (yelmo,
+     fesm-utils, FastIsostasy, rembo1, chion) next to the scripts directory.
 
 The yelmo groups of a file are found from its control blocks: `&yelmo<sfx>`
 for every `&domain<sfx>` group (kryos `domain_init` reads `yelmo` plus the
 domain's group suffix), plus `&yelmo` itself. The `nml_*` keys of a control
 block name its component groups (`nml_ytopo = "ytopo"`, ...), falling back to
 the defaults. Files without a control block are skipped.
+
+The yelmox forcing groups, with <sfx> the same domain suffixes, and their
+group in yelmox_defaults.nml:
+  [indices] -> indices, [idx_<name>] -> idx,
+  [anom<sfx>], [ocn_fraction<sfx>], [bias<sfx>] -> anom, ocn_fraction, bias,
+  with [comps<sfx>] climate = snapesm or rembo (the snapshot backend):
+  [snap<sfx>] -> snap, [snap<sfx>_field_<f>] -> snap_field (f in fields),
+  [snap<sfx>_<s>] -> snap_snapshot (s in snapshots),
+  [snap<sfx>_axis_<a>] -> snap_axis (a in axes); unset lists from the defaults.
 
 Usage:
     scripts/check_par_nml.py                  # all yelmox/*.nml, yelmox_bipolar/*.nml
@@ -40,6 +54,7 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULTS = os.path.join(REPO, "input", "yelmo_defaults.nml")
+YX_DEFAULTS = os.path.join(REPO, "input", "yelmox_defaults.nml")
 PAR_GLOBS = ["yelmox/*.nml", "yelmox_bipolar/*.nml"]
 # Source trees searched by --dead (symlinked checkouts are followed, so yelmo
 # brings its own elsa, tracer, FastHydrology, ...).
@@ -61,7 +76,8 @@ def parse_par(path):
 
     Returns (groups, errors): groups is a list of (name, {key: value}) in file
     order, keeping duplicate groups; errors lists duplicate keys and lines
-    nml_read cannot parse.
+    nml_read cannot parse. Values are kept as written (quotes included, the
+    comment removed); scalar() and listval() read them.
     """
     groups, errors = [], []
     cur = None
@@ -87,8 +103,33 @@ def parse_par(path):
             errors.append("&%s: duplicate key %s (line %d ignored)"
                           % (groups[-1][0], key, i))
             continue
-        cur[key] = val.split("!", 1)[0].strip().rstrip(",").strip("'\"")
+        cur[key] = strip_comment(val).strip().rstrip(",").strip()
     return groups, errors
+
+
+def strip_comment(val):
+    """The value without its inline comment (a ! outside quotes)."""
+    q = None
+    for i, c in enumerate(val):
+        if q:
+            if c == q:
+                q = None
+        elif c in "'\"":
+            q = c
+        elif c == "!":
+            return val[:i]
+    return val
+
+
+def scalar(val):
+    """A scalar value without its quotes."""
+    return val.strip().strip("'\"")
+
+
+def listval(val):
+    """A list value ("a" "b", or unquoted words) as a list, "" entries dropped."""
+    items = re.findall(r'"([^"]*)"|\'([^\']*)\'|([^\s,"\']+)', val)
+    return [a or b or c for a, b, c in items if (a or b or c)]
 
 
 def first_copies(groups):
@@ -114,9 +155,76 @@ def yelmo_groups(groups, defaults):
     for ctrl in control_blocks(groups):
         out[ctrl] = "yelmo"
         for key, def_group in NML_KEY.items():
-            name = groups[ctrl].get(key, defaults["yelmo"].get(key, def_group))
+            name = scalar(groups[ctrl].get(key, defaults["yelmo"].get(key, def_group)))
             out.setdefault(name, def_group)
     return out
+
+
+def domain_suffixes(groups):
+    """The domain suffixes of a file: "" and <sfx> of every &domain<sfx>."""
+    return sorted({""} | {g[len("domain"):] for g in groups if g.startswith("domain")})
+
+
+def yelmox_groups(groups, ydefaults):
+    """User group -> template group of yelmox_defaults.nml for the forcing
+    groups of a file, and the snapshot-backend groups that are not read."""
+    out, stale = {}, []
+    if "indices" in groups:
+        out["indices"] = "indices"
+    for g in groups:
+        if g.startswith("idx_"):
+            out[g] = "idx"
+    for sfx in domain_suffixes(groups):
+        for base in ("anom", "ocn_fraction", "bias"):
+            if base + sfx in groups:
+                out[base + sfx] = base
+        climate = scalar(groups.get("comps" + sfx, {}).get("climate", ""))
+        snap = "snap" + sfx
+        if climate not in ("snapesm", "rembo") or snap not in groups:
+            continue
+        out[snap] = "snap"
+
+        def names(key):
+            return listval(groups[snap].get(key, ydefaults["snap"].get(key, "")))
+        for f in names("fields"):
+            out[snap + "_field_" + f] = "snap_field"
+        for a in names("axes"):
+            out[snap + "_axis_" + a] = "snap_axis"
+        for s_ in names("snapshots"):
+            out.setdefault(snap + "_" + s_, "snap_snapshot")
+        stale += [g for g in groups if g.startswith(snap + "_") and g not in out]
+    return out, stale
+
+
+def var_defs_errors(path, groups, ygroups, ydefaults):
+    """Bindings of the snapshots to varslice groups that no var_defs file holds."""
+    errors = []
+    for snap, tmpl in ygroups.items():
+        if tmpl != "snap":
+            continue
+        files = []
+        for f in listval(groups[snap].get("var_defs", ydefaults["snap"]["var_defs"])):
+            # Relative to the run folder: the repo links (input, ...) or the par
+            # file itself (runme copies it there under its name).
+            cand = [os.path.join(REPO, f), os.path.join(os.path.dirname(path), f)]
+            found = next((c for c in cand if os.path.isfile(c)), None)
+            if found is None:
+                errors.append("&%s: var_defs file not found: %s" % (snap, f))
+            else:
+                files.append(found)
+        db = set()
+        for f in files:
+            g, _ = parse_par(f)
+            db |= {name for name, _ in g}
+        for name, t in ygroups.items():
+            if t != "snap_snapshot" or not name.startswith(snap + "_") or name not in groups:
+                continue
+            for key in ("tas", "pr", "zs", "to", "so"):
+                for ref in listval(groups[name].get(key, "")):
+                    if ref not in db:
+                        errors.append("&%s %s: group %s in none of the var_defs files"
+                                      % (name, key, ref))
+    return errors
 
 
 def source_literals():
@@ -136,7 +244,7 @@ def source_literals():
     return lits
 
 
-def check_file(path, defaults, lits):
+def check_file(path, defaults, ydefaults, lits):
     """Return (errors, dead) for one par file, or None if it has no yelmo group."""
     raw, errors = parse_par(path)
     groups, dup = first_copies(raw)
@@ -151,10 +259,19 @@ def check_file(path, defaults, lits):
             errors.append("&%s: unknown key(s) (not in &%s of defaults): %s"
                           % (name, def_group, ", ".join(unknown)))
 
+    xgroups, stale = yelmox_groups(groups, ydefaults)
+    for name, def_group in xgroups.items():
+        unknown = [k for k in groups.get(name, {}) if k not in ydefaults[def_group]]
+        if unknown:
+            errors.append("&%s: unknown key(s) (not in &%s of yelmox defaults): %s"
+                          % (name, def_group, ", ".join(unknown)))
+    errors += var_defs_errors(path, groups, xgroups, ydefaults)
+
     dead = []
     if lits is not None:
+        dead += ["&%s: group not read by the snapshot backend" % g for g in stale]
         for name, params in groups.items():
-            if name in ygroups:
+            if name in ygroups or name in xgroups or name in stale:
                 continue
             keys = [k for k in params if k not in lits]
             if keys:
@@ -169,18 +286,24 @@ def main(argv):
                     help="par files to check (default: %s)" % ", ".join(PAR_GLOBS))
     ap.add_argument("--defaults", default=DEFAULTS,
                     help="yelmo defaults file (default: input/yelmo_defaults.nml)")
+    ap.add_argument("--yelmox-defaults", default=YX_DEFAULTS,
+                    help="yelmox forcing defaults file (default: input/yelmox_defaults.nml)")
     ap.add_argument("--dead", action="store_true",
-                    help="also report non-yelmo keys no source reads (errors)")
+                    help="also report keys of the other groups no source reads (errors)")
     args = ap.parse_args(argv[1:])
 
-    if not os.path.isfile(args.defaults):
-        print("ERROR: defaults file not found: %s" % args.defaults)
-        return 2
-    defaults, def_errors = parse_par(args.defaults)
-    defaults, dup = first_copies(defaults)
-    if def_errors or dup:
-        print("ERROR: defaults file: " + "; ".join(def_errors + dup))
-        return 2
+    loaded = []
+    for path in (args.defaults, args.yelmox_defaults):
+        if not os.path.isfile(path):
+            print("ERROR: defaults file not found: %s" % path)
+            return 2
+        d, def_errors = parse_par(path)
+        d, dup = first_copies(d)
+        if def_errors or dup:
+            print("ERROR: defaults file %s: %s" % (path, "; ".join(def_errors + dup)))
+            return 2
+        loaded.append(d)
+    defaults, ydefaults = loaded
 
     lits = None
     if args.dead:
@@ -192,13 +315,14 @@ def main(argv):
     files = args.files or sorted(f for g in PAR_GLOBS
                                  for f in glob.glob(os.path.join(REPO, g)))
 
-    print("Defaults: %s" % os.path.relpath(args.defaults, REPO))
+    print("Defaults: %s, %s" % (os.path.relpath(args.defaults, REPO),
+                                os.path.relpath(args.yelmox_defaults, REPO)))
     print()
 
     n_fail = 0
     for path in files:
         rel = os.path.relpath(path, REPO)
-        result = check_file(path, defaults, lits)
+        result = check_file(path, defaults, ydefaults, lits)
         if result is None:
             print("[skip] %-40s no &yelmo control block" % rel)
             continue
