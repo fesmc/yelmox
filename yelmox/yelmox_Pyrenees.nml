@@ -23,7 +23,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = False  ! Ocean forcing off (mountain glacier: no ocean)
-    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 50.0     ! [yr] Frequency of snapclim snapshot updates (and of the surface: 250 m grid)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -116,17 +116,25 @@
 
 &indices
     ! Indices: named scalar series, read by name (snapesm axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
-    ! units and restart_every_df), advanced on the forcing clock time_rel.
-    names  = ""       ! e.g. "at" "ramp"; "" = none
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
+    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
+    ! from the template [idx] of input/yelmox_defaults.nml.
+    names  = "orb"
+/
+
+&idx_orb
+    ! Orbital index (alpha_orbital_t2018: 0 at 21 ka, 1 at present), as is;
+    ! scaled by [anom] f_ta.
+    method      = "series"
+    series_file = "input/alpha_orbital_t2018.dat"
 /
 
 &anom
     ! Homogeneous anomaly from one index, applied after the climate backend:
     ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = False    ! Apply it?
-    index  = ""       ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    active = True     ! Apply it?
+    index  = "orb"    ! the index driving the anomalies ([indices] names)
+    f_ta   = 10.0     ! [K]   dTa = f * f_ta  (air temperature)
     f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
@@ -509,84 +517,19 @@
 ! ===== Climate =====
 
 &snap
-    atm_type           = "anom"
-    ocn_type           = "anom"
-    fname_at           = "input/alpha_orbital_t2018.dat"
-    fname_ao           = "input/zeros.dat"
-    fname_ap           = "input/alpha_orbital_t2018.dat"
-    fname_as           = "input/zeros.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 10.0  
-    dTo_const          = 0.0
-    dSo_const          = 0.0 
-    f_to               = 0.0 
-    f_p                = 0.05
-    f_stdev            = 0.0  
+    ! Snapshot backend (snapesm): the present-day reference only, ERA5
+    ! 1981-2010 (no ocean: with_shelf = False); the anomaly from [anom]
+    ! (snapclim atm_type = anom, alpha_orbital_t2018 x dTa_const = 10 K).
+    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    snapshots  = "pd"
 /
 
-&snap_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 1.0 
-    f_glac             = 1.0 
-    f_hol              = 1.0 
-    f_seas             = 1.0 
-    f_to               = 0.2
-/
+! ---- snapshots (var_defs groups per field) ---------------------------------
 
-&snap_clim0
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
-    clim_names      = "zs" "t2m" "pr" ""                                                      ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "none"                                                                  ! no ocean (with_shelf = False)
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
-
-&snap_clim1
-    clim_path       = "None"
-    clim_names      = "z_srf" "t2m" "pr" ""
-    clim_monthly    = True
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "None"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
-
-&snap_clim2
-    clim_path       = "none"
-    clim_names      = "z_srf" "t2m" "pr" ""
-    clim_monthly    =  True
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr"
-    ocn_path        = "none"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = False
-    ocn_time        = -21000
-/
-
-&snap_clim3
-    clim_path       = "none"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "none"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
+&snap_pd
+    tas = "era5_1981_2010_tas"
+    pr  = "era5_1981_2010_pr"
+    zs  = "era5_1981_2010_zs"
 /
 
 ! ===== Surface =====
