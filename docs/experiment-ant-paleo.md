@@ -8,8 +8,8 @@ ocean thermal-forcing correction (`tf_corr`), then a **transient** from 130 kyr
 ago to 10 kyr in the future, restarted from the spin-up, with the climate scaled
 by a glacial index and the sea level following a reconstruction.
 
-- **Program:** `yelmox` (`make yelmox`) with the snapclim backend
-  (`[comps] climate = "snapclim"`, see [snapclim and snapesm](climate-snap.md)).
+- **Program:** `yelmox` (`make yelmox`) with the snapshot backend
+  (`[comps] climate = "snapesm"`, see [snapclim and snapesm](climate-snap.md)).
 - **Config:** `yelmox/yelmox_Antarctica_paleo_spinup.nml`,
   `yelmox/yelmox_Antarctica_paleo_lgp.nml`.
 - **Scripts:** `scripts/ant-paleo/run_spinup.sh`, `scripts/ant-paleo/run_lgp.sh`.
@@ -42,8 +42,9 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   until 7.5 kyr (`[opt] cf_time_end`, `tf_time_end`), starting from the till
   friction of the bed (`cf_init = -1`); the ice thickness relaxes towards the
   observations until 3 kyr (`[sim] relax = True`, `[relax] time2`).
-- **Climate:** present day (`[snap] atm_type = "anom"` with zero anomaly, and
-  so a zero ocean anomaly).
+- **Climate:** present day (`[snap] snapshots = "pd"`); `[ocn_fraction]`
+  (`f_to = 0.40`) is active but sees no anomaly (the sea-level air temperature
+  is the reference's).
 - **Output:** restart bundles every 15 kyr, so `restart-0.000-kyr` and
   `restart-15.000-kyr`; 2D output every 5 kyr.
 
@@ -53,11 +54,12 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`tstep_method = "rel"`), so that the sea level and the index follow the
   records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
   from the restart.
-- **Climate:** `[snap] atm_type = "snap_1ind"`: the present-day reference plus
-  the PMIP3 LGM -- piControl anomaly, scaled by the glacial index
-  `input/alpha_combined_125kyr_interp.dat` (0 = present day, 1 = LGM; -0.2 in the
-  last interglacial). The ocean anomaly is `f_to = 0.25` times the mean
-  atmospheric one (`ocn_type = "fraction"`). Insolation varies in time
+- **Climate:** snapshots `pd`, `picontrol`, `lgm` and the axis `a`
+  (`[snap_axis_a]`): the present-day reference plus the PMIP3 LGM -- piControl
+  anomaly, scaled by the glacial index `[idx_a]`
+  (`input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
+  21 ka, -0.2 in the last interglacial). The ocean anomaly is `f_to = 0.25`
+  times the mean sea-level air temperature anomaly (`[ocn_fraction]`). Insolation varies in time
   (`[surface_chion] const_insol = False`, and `[smbpal]` for smbpal).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
 - **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_ant_paleo]`): one
@@ -70,8 +72,8 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 |---|---|
 | Grids | `ANT-32KM` for every component (single-grid setup) |
 | Topography | BedMachine (`ANT-32KM_TOPO-BedMachine.nc`) |
-| Reference climate (`snap_clim0`) | RACMO2.3--ERA-Interim hybrid 1981--2010; ocean ISMIP6 (Jourdain et al. 2020) |
-| Snapshots (`snap_clim1`, `snap_clim2`) | PMIP3 piControl and LGM means (atmosphere only; the ocean follows `fraction`) |
+| Reference climate (`snap_pd`) | RACMO2.3p2 1981--2010 (surface temperature, precipitation); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
+| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows `[ocn_fraction]`) |
 | Surface mass balance | chion ITM (`[comps] surface_method = "chion"`) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |

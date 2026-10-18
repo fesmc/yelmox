@@ -22,8 +22,10 @@ supplies the ocean of the rembo climate (an ocean-only reference snapshot).
 
 ## snapclim
 
-The default backend of every regional config (`yelmox/yelmox_<domain>.nml`).
-`[snap]` sets the forcing method for the atmosphere (`atm_type`) and the ocean
+Retired from the regional configs (`yelmox/yelmox_<domain>.nml` run on
+snapesm); still used by
+`yelmox_Greenland_snapclim.nml` (the reference of the snapesm port) and the
+bipolar driver until its removal. `[snap]` sets the forcing method for the atmosphere (`atm_type`) and the ocean
 (`ocn_type`), the index files (`fname_at`, `fname_ao`, ...), the lapse rates and
 the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 `[snap_clim3]`, plus `[snap_hybrid]` and `[snap_recon]` for those methods.
@@ -40,6 +42,16 @@ the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 
 The climate modifiers `[anom]` and `[ocn_fraction]` (see [yelmox](yelmox.md))
 apply after the backend, to any method.
+
+A snapclim config in snapesm form (as the regional configs were converted):
+
+| snapclim | snapesm |
+|---|---|
+| `const`, `anom` with zero series | `snapshots = "pd"` only |
+| `anom` with an index series × `dTa_const` | `pd` only + `[anom]` (index `[idx_<name>] method = "series"`, `f_ta`) |
+| `snap_1ind`, `snap_1ind_new` | `pd`, `picontrol`, `lgm` and an axis `picontrol` -> `lgm` for `tas` and `pr` (`blend = "ratio"`); its index the series (`snap_1ind`: as is; `_new`: `norm_t0 = 0`, `norm_t1 = -21e3`) |
+| `fraction` (ocean) | `[ocn_fraction] active = True`, `f_to` (on the sea-level air temperature anomaly, no lag) |
+| `f_hol`, the 80 km smoothing of the reference before 1 ka (`snap_1ind*`), `f_stdev` | none |
 
 A snapshot group reads the atmosphere (`clim_path`, `clim_names`, `clim_monthly`,
 `clim_stdev_path`/`clim_stdev_name`) and the ocean (`ocn_path`, `ocn_names`,

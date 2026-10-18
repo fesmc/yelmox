@@ -242,7 +242,7 @@ A minimal skeleton:
     with_climate    = True
     with_surface    = True
     with_shelf      = True
-    climate         = "snapclim"
+    climate         = "snapesm"
     surface_method  = "chion"
     dt_clim         = 10.0
     dt_isos         = 10.0

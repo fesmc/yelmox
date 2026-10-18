@@ -35,6 +35,23 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- The regional configs run on snapesm (`[comps] climate = "snapesm"`, snapclim groups
+  removed): `yelmox_pd_Greenland`, `yelmox_pd_Antarctica`, `yelmox_Antarctica` and
+  `yelmox_Antarctica_paleo_spinup` (`pd` snapshot only; spin-up with `[ocn_fraction]`
+  f_to 0.40), `yelmox_Antarctica_paleo_lgp`, `yelmox_North`, `yelmox_LIS` (`pd`,
+  `picontrol`, `lgm` on an axis `a`: LGP index `alpha_combined_125kyr_interp` as is,
+  North/LIS `const` 1; `[ocn_fraction]` f_to 0.25), `yelmox_Greenland` (as
+  `yelmox_Greenland_snapesm`), `yelmox_Pyrenees` (`pd` + `[anom]`, index
+  `alpha_orbital_t2018` x f_ta 10 K), `yelmox_SRG` (`pd`, the legacy MAR v3.14 file as
+  groups of the par file). Physical changes: Antarctic reference from FesmData RACMO2.3p2
+  1981-2010 t2m/pr (was the RACMO2.3/ERA-Interim hybrid: -1.0 K, +2.5% precipitation
+  over the ice) and the ISMIP7 ocean climatology (was ISMIP6 J20: +0.1 K); PMIP3 from
+  the global product (GRL +0.3 K over the ice); the ocean anomaly from the sea-level air
+  temperature anomaly without lag (North/LIS LGM ocean 0.8/1.8 K warmer: snapclim's rule
+  included the lapse-rate cooling of the ice sheets); dropped: `f_hol` (GRL), the 80 km
+  smoothing of the reference before 1 ka (`f_corr`: LGP, North, LIS; local +-4 K, means
+  unchanged), the unused snapshot oceans, the SRG and Pyrenees oceans (`with_shelf =
+  False`). `yelmox_Greenland_snapclim` stays until snapclim is removed.
 - `[snap] var_defs` is a list of files, searched in order (first that has the group; an
   error names the group and the files), then the par file itself (implicitly last, so a
   par file never names itself); also `[bias] var_defs` (default `""`: the par file only). The forcing groups need only the keys that
