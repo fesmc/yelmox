@@ -124,7 +124,6 @@ module esm_forcing
         logical :: with_sgd_proj = .false.        ! Qd from the sgd_proj group (Greenland; its filename /= "none")
         
         ! === Mean fields ===
-        real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:)     ! Annual surface temperature [K]
         real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/d]
         real(wp), allocatable :: smb_ann(:,:)     ! Annual SMB [mm/yr]
@@ -159,7 +158,6 @@ module esm_forcing
     public :: esm_forcing_update
     public :: esm_variability_update
     public :: esm_clim_update
-    public :: esm_summer_mean
     public :: esm_lapse_monthly
     
     public :: esm_write_init
@@ -492,8 +490,6 @@ contains
             esm%pr_ann  = sum(esm%pr,dim=3) / 12.0
         end if
 
-        esm%t2m_sum = esm_summer_mean(esm%t2m, south)
-
         return
 
     end subroutine esm_clim_update
@@ -514,24 +510,6 @@ contains
             end if
         end do
     end function esm_lapse_monthly
-
-    function esm_summer_mean(var, south) result(var_sum)
-        ! Mean of a monthly field over the summer months: DJF in the southern
-        ! hemisphere, JJA in the northern.
-
-        implicit none
-
-        real(wp), intent(IN) :: var(:,:,:)
-        logical,  intent(IN) :: south
-        real(wp) :: var_sum(size(var,1),size(var,2))
-
-        if (south) then
-            var_sum = (var(:,:,1)+var(:,:,2)+var(:,:,12)) / 3.0
-        else
-            var_sum = (var(:,:,6)+var(:,:,7)+var(:,:,8)) / 3.0
-        end if
-
-    end function esm_summer_mean
 
     subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var,use_ref_atm,use_ref_ocn)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
@@ -1048,7 +1026,6 @@ contains
         allocate(esm%dto_var(nx,ny))
         allocate(esm%dso_var(nx,ny))
         allocate(esm%t2m_ann(nx,ny))
-        allocate(esm%t2m_sum(nx,ny))
         allocate(esm%pr_ann(nx,ny)) 
         allocate(esm%smb_ann(nx,ny))       
 
@@ -1079,7 +1056,6 @@ contains
             if (allocated(esm%dso_var)) deallocate(esm%dso_var)
             if (allocated(esm%Qd_ann))  deallocate(esm%Qd_ann)
             if (allocated(esm%Qd_sum))  deallocate(esm%Qd_sum)
-            if (allocated(esm%t2m_sum)) deallocate(esm%t2m_sum)
             if (allocated(esm%t2m_ann)) deallocate(esm%t2m_ann)
             if (allocated(esm%pr_ann))  deallocate(esm%pr_ann)
             if (allocated(esm%smb_ann)) deallocate(esm%smb_ann)

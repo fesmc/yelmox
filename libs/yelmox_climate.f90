@@ -20,13 +20,13 @@ module yelmox_climate
     use ncio
     use coordinates,   only : grid_class
     use timestepping,  only : tstep_class
-    use climate_out,   only : climate_out_class
+    use climate_out,   only : climate_out_class, summer_mean
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom, &
                               snapclim_lapse_monthly
     use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
                               snapesm_write_init, snapesm_write_step, snapesm_lapse_monthly
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
-                              esm_forcing_update, esm_variability_update, esm_summer_mean, &
+                              esm_forcing_update, esm_variability_update, &
                               esm_lapse_monthly
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
     use kryos_forcing, only : indices_class, indices_value
@@ -336,7 +336,8 @@ contains
 
     subroutine climate_write_2D(cl, out, filename, ncid, n)
         ! Write one record of the climate (record n of an open 2D file on the
-        ! climate grid): the annual near-surface air temperature and
+        ! climate grid), as applied (after the modifiers): the annual and,
+        ! with monthly fields, summer near-surface air temperature, the annual
         ! precipitation, the annual ocean profiles (when the climate has them),
         ! plus the backend's own fields and the modifiers' diagnostics.
         type(yelmox_climate_class), intent(in) :: cl
@@ -345,6 +346,9 @@ contains
         integer,                    intent(in) :: ncid, n
 
         call write2D("t2m_ann", out%now%ta_ann, "K", "Near-surface air temperature (ann)")
+        if (allocated(out%now%tas)) &
+            call write2D("t2m_sum", summer_mean(out%now%tas, cl%south), "K", &
+                         "Near-surface air temperature (sum)")
         if (allocated(out%now%pr_ann)) &
             call write2D("pr_ann", out%now%pr_ann, "mm/a", "Precipitation (ann)")
         if (out%has_smb) then
@@ -360,8 +364,7 @@ contains
 
         select case(trim(cl%method))
             case("snapesm")
-                ! The monthly atmosphere as applied (after the modifiers), then
-                ! snapesm's own state (axes, sea-level and summer temperature).
+                ! The monthly atmosphere, then snapesm's own state (the axes).
                 call write3D("tas",     out%now%tas,     "month", "K",    "Near-surface air temperature")
                 call write3D("pr",      out%now%pr,      "month", "mm/d", "Precipitation")
                 call write2D("tsl_ann", out%now%tsl_ann, "K", "Sea-level air temperature (ann)")
@@ -369,6 +372,7 @@ contains
             case("esm")
                 call write_esm()
             case("rembo")
+                ! Annual fields only: REMBO's own summer temperature.
                 call write2D("t2m_sum", cl%rembo%ta_sum, "K", "Near-surface air temperature (sum)")
         end select
 
@@ -379,8 +383,6 @@ contains
         subroutine write_esm()
 
             associate(esm => cl%esm)
-            call write2D("t2m_sum", esm%t2m_sum + esm_summer_mean(esm%dts, cl%south), "K", &
-                         "Near-surface air temperature (sum)")
             call write2D("dts_ann", sum(esm%dts, dim=3)/12.0_wp, "K", "Surface air temperature anomaly")
             if (cl%esm_ctl%use_smb) then
                 call write2D("smb_ref_ann", 1e-3_wp*esm%smb_ann, "m/a water equiv.", "Reference SMB (ann)")

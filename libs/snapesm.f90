@@ -443,11 +443,9 @@ contains
 
     subroutine snapesm_write_step(sc, filename, ncid, n)
         ! Write record n of the snapesm state into an open 2D output file
-        ! (axes from snapesm_write_init): the axis positions, the surface
-        ! elevation, the monthly sea-level and the summer temperature -- the
-        ! fields the enabled registry fills. The backend's state, before the
-        ! climate modifiers; the applied atmosphere (tas, pr, tsl_ann) and ocean
-        ! are written by the caller (climate_write_2D).
+        ! (axes from snapesm_write_init): the axis positions and the surface
+        ! elevation. The climate as applied (after the climate modifiers) is
+        ! written by the caller (climate_write_2D).
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
@@ -464,8 +462,6 @@ contains
 
         associate(now => sc%now)
         if (allocated(now%z_srf))   call write2D("z_srf",   now%z_srf,   "m",    "Surface elevation")
-        if (allocated(now%tsl))     call write3D("tsl",     now%tsl,     "month", "K",    "Sea-level air temperature")
-        if (allocated(now%ta_sum))  call write2D("ta_sum",  now%ta_sum,  "K",    "Near-surface air temperature (sum)")
         end associate
 
         return
@@ -479,14 +475,6 @@ contains
                           start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
                           units=units, long_name=long_name)
         end subroutine write2D
-
-        subroutine write3D(vnm, var, dim3, units, long_name)
-            character(len=*), intent(IN) :: vnm, dim3, units, long_name
-            real(wp),         intent(IN) :: var(:,:,:)
-            call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3=dim3, dim4="time", &
-                          start=[1,1,1,n], count=[size(var,1),size(var,2),size(var,3),1], &
-                          ncid=ncid, units=units, long_name=long_name)
-        end subroutine write3D
 
     end subroutine snapesm_write_step
 
