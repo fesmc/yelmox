@@ -5,12 +5,20 @@ module climate_mods
     !                   registry: dTa = f*f_ta, dTo = f*f_to, dSo = f*f_so
     !   ocn_fraction -- ocean temperature anomaly = f_to * the mean sea-level
     !                   air temperature anomaly over a region
+    !   ocn_obm      -- ocean temperature from a box of the bipolar ocean box
+    !                   model (absolute, or the reference plus the box anomaly)
     !   bias         -- static bias correction of the atmosphere
-    ! (later ocn_obm and taper, between ocn_fraction and bias). Each is an
-    ! optional namelist group with `active` (default off), suffixed by the
-    ! domain (anom<sfx>, ocn_fraction<sfx>, bias<sfx>); unset keys (an absent
-    ! group: all) from the templates anom, ocn_fraction, bias of
+    ! (later taper, between ocn_obm and bias). Each is an optional namelist
+    ! group with `active` (default off), suffixed by the domain (anom<sfx>,
+    ! ocn_fraction<sfx>, ocn_obm<sfx>, bias<sfx>); unset keys (an absent
+    ! group: all) from the templates anom, ocn_fraction, ocn_obm, bias of
     ! input/yelmox_defaults.nml.
+    !
+    ! ocn_obm is the one modifier that climate_mods_apply does not call: the
+    ! box value belongs to the driver that owns the box model (yelmox_bipolar),
+    ! which applies it with climate_mod_ocn_obm after the climate update and
+    ! before the shelf step (obm_coupling). climate_mods_init reads its group
+    ! and checks its contract like the others.
     !
     ! Contract: each modifier states what it touches in `now` (`ref` is never
     ! touched) and which backends it refuses; climate_mods_init checks every
@@ -30,6 +38,12 @@ module climate_mods
     !         ocean profiles and tsl_ann: refused for an ocean at the shelf base
     !         (esm) and a backend without tsl_ann (esm, rembo); refused with an
     !         anom f_to /= 0, since it replaces the ocean temperature anomaly.
+    !   ocn_obm: to_ann = theta (absolute) or ref%to_ann + (theta - theta_init)
+    !         (anomaly), at every depth, theta the box temperature passed by the
+    !         driver; salinity untouched. Needs ocean profiles: refused for an
+    !         ocean at the shelf base (esm); a climate without ocean profiles
+    !         stops at the first application. Refused with ocn_fraction or an
+    !         anom f_to /= 0, since it replaces the ocean temperature.
     !   bias: tas, ta_ann, tsl_ann + dtas; pr * fpr, pr_ann by the ratio of the
     !         annual totals. Refused for a backend with annual fields only (rembo).
 
@@ -83,6 +97,16 @@ module climate_mods
         real(wp)           :: dTo    = 0.0_wp   ! [K] the anomaly of the last update
     end type ocn_fraction_class
 
+    ! [ocn_obm<sfx>]: the ocean temperature profiles from a box temperature of
+    ! the bipolar ocean box model, passed by the driver (climate_mod_ocn_obm).
+    type ocn_obm_class
+        logical           :: active = .false.
+        character(len=64) :: group  = ""
+        character(len=16) :: mode   = "absolute"   ! absolute | anomaly
+        real(wp)          :: theta  = 0.0_wp       ! [K] the box temperature of the last application
+        real(wp)          :: dTo    = 0.0_wp       ! [K] its anomaly, theta - theta_init
+    end type ocn_obm_class
+
     ! [bias<sfx>]: an additive temperature field and a precipitation factor
     ! field, monthly (12) or annual (1 field, all months), read from var_defs
     ! groups (a list of databases, default the par file) on the climate grid
@@ -100,14 +124,16 @@ module climate_mods
         type(climate_caps_class) :: caps
         type(anom_class)         :: anom
         type(ocn_fraction_class) :: ocn_fraction
+        type(ocn_obm_class)      :: ocn_obm
         type(bias_class)         :: bias
     end type climate_mods_class
 
     public :: climate_caps_class
-    public :: anom_class, ocn_fraction_class, bias_class
+    public :: anom_class, ocn_fraction_class, ocn_obm_class, bias_class
     public :: climate_mods_class
     public :: climate_mods_init
     public :: climate_mods_apply
+    public :: climate_mod_ocn_obm
     public :: climate_mods_write_init, climate_mods_write_step
 
 contains
@@ -128,13 +154,17 @@ contains
         call anom_init(mods%anom, filename, "anom"//trim(sfx), idx, caps)
         call ocn_fraction_init(mods%ocn_fraction, filename, "ocn_fraction"//trim(sfx), caps, &
                                mods%anom, reg)
+        call ocn_obm_init(mods%ocn_obm, filename, "ocn_obm"//trim(sfx), caps, &
+                          mods%anom, mods%ocn_fraction)
         call bias_init(mods%bias, filename, "bias"//trim(sfx), caps, domain, grid)
 
     end subroutine climate_mods_init
 
     subroutine climate_mods_apply(mods, out, idx)
         ! The active modifiers on `out`, in the fixed order. idx is the driver's
-        ! registry, advanced to the forcing time.
+        ! registry, advanced to the forcing time. ocn_obm, in the order between
+        ! ocn_fraction and bias, is applied by the driver that owns the box
+        ! model (climate_mod_ocn_obm); bias does not touch the ocean.
         type(climate_mods_class), intent(inout) :: mods
         type(climate_out_class),  intent(inout) :: out
         type(indices_class),      intent(in)    :: idx
@@ -170,7 +200,8 @@ contains
 
     subroutine climate_mods_write_step(mods, filename, ncid, n)
         ! Record n of the active modifiers' diagnostics, into an open 2D output
-        ! file: the ocean temperature anomaly of ocn_fraction.
+        ! file: the ocean temperature anomaly of ocn_fraction, the box
+        ! temperature of ocn_obm and its anomaly.
         type(climate_mods_class), intent(in) :: mods
         character(len=*),         intent(in) :: filename
         integer,                  intent(in) :: ncid, n
@@ -179,6 +210,15 @@ contains
             call nc_write(filename, "ocn_fraction_dto", mods%ocn_fraction%dTo, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="K", &
                           long_name="Ocean temperature anomaly of ocn_fraction")
+
+        if (mods%ocn_obm%active) then
+            call nc_write(filename, "ocn_obm_theta", mods%ocn_obm%theta, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="K", &
+                          long_name="Box temperature of ocn_obm")
+            call nc_write(filename, "ocn_obm_dto", mods%ocn_obm%dTo, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="K", &
+                          long_name="Box temperature anomaly of ocn_obm")
+        end if
 
     end subroutine climate_mods_write_step
 
@@ -325,6 +365,91 @@ contains
         out%now%to_ann = out%ref%to_ann + ocf%dTo
 
     end subroutine ocn_fraction_apply
+
+    ! ===== ocn_obm =========================================================
+
+    subroutine ocn_obm_init(ocm, filename, group, caps, anom, ocf)
+        ! Read [ocn_obm<sfx>] (optional group; inactive without it) and check its
+        ! contract: ocean profiles, and no other ocean temperature modifier
+        ! (ocn_fraction, anom f_to), which it would replace.
+        type(ocn_obm_class),      intent(inout) :: ocm
+        character(len=*),         intent(in)    :: filename, group
+        type(climate_caps_class), intent(in)    :: caps
+        type(anom_class),         intent(in)    :: anom
+        type(ocn_fraction_class), intent(in)    :: ocf
+
+        ocm%group = group
+        call nml_validate(filename, def_file, group, defaults_group="ocn_obm")
+        call nml_read(filename, group, "active", ocm%active, defaults_file=def_file, defaults_group="ocn_obm")
+        if (.not. ocm%active) return
+
+        call nml_read(filename, group, "mode",   ocm%mode,   defaults_file=def_file, defaults_group="ocn_obm")
+
+        select case(trim(ocm%mode))
+            case("absolute", "anomaly")
+                ! ok
+            case default
+                write(*,*) "climate_mods_init:: error: ["//trim(group)//"] mode must be &
+                           &absolute or anomaly; got '"//trim(ocm%mode)//"'."
+                error stop 1
+        end select
+        if (caps%has_ocn_shelf) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs ocean profiles; &
+                       &climate = "//trim(caps%name)//" has the ocean at the shelf base."
+            error stop 1
+        end if
+        if (ocf%active) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] sets the ocean &
+                       &temperature, ["//trim(ocf%group)//"] too; set "// &
+                       trim(ocf%group)//".active = False."
+            error stop 1
+        end if
+        if (anom%active .and. anom%f_to /= 0.0_wp) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] sets the ocean &
+                       &temperature, ["//trim(anom%group)//"] f_to /= 0 adds an anomaly; &
+                       &set "//trim(anom%group)//".f_to = 0."
+            error stop 1
+        end if
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, mode "//trim(ocm%mode)// &
+                   " (the box temperature from the ocean box model)"
+
+    end subroutine ocn_obm_init
+
+    subroutine climate_mod_ocn_obm(mods, out, theta, theta_init)
+        ! ocn_obm on `out`: the ocean temperature profiles, at every depth, from
+        ! the box temperature theta [K] of the ocean box model: theta itself
+        ! (absolute), or the reference plus the box anomaly theta - theta_init
+        ! (anomaly, keeping the pattern of the reference). Called by the driver
+        ! that owns the box model, after the climate update (see the header).
+        type(climate_mods_class), intent(inout) :: mods
+        type(climate_out_class),  intent(inout) :: out
+        real(wp),                 intent(in)    :: theta, theta_init
+
+        associate(ocm => mods%ocn_obm)
+
+        if (.not. ocm%active) then
+            write(*,*) "climate_mod_ocn_obm:: error: ["//trim(ocm%group)//"] is not active."
+            error stop 1
+        end if
+        if (.not. allocated(out%now%to_ann)) then
+            write(*,*) "climate_mod_ocn_obm:: error: ["//trim(ocm%group)//"] needs ocean &
+                       &profiles; the climate has no ocean temperature (to_ann)."
+            error stop 1
+        end if
+
+        ocm%theta = theta
+        ocm%dTo   = theta - theta_init
+        select case(trim(ocm%mode))
+            case("absolute")
+                out%now%to_ann = theta
+            case("anomaly")
+                out%now%to_ann = out%ref%to_ann + ocm%dTo
+        end select
+
+        end associate
+
+    end subroutine climate_mod_ocn_obm
 
     ! ===== bias ============================================================
 

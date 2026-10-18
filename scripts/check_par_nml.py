@@ -33,7 +33,8 @@ the defaults. Files without a control block are skipped.
 The yelmox forcing groups, with <sfx> the same domain suffixes, and their
 group in yelmox_defaults.nml:
   [indices] -> indices, [idx_<name>] -> idx,
-  [anom<sfx>], [ocn_fraction<sfx>], [bias<sfx>] -> anom, ocn_fraction, bias,
+  [anom<sfx>], [ocn_fraction<sfx>], [ocn_obm<sfx>], [bias<sfx>] -> anom,
+  ocn_fraction, ocn_obm, bias,
   with [comps<sfx>] climate = snapesm or rembo (the snapshot backend):
   [snap<sfx>] -> snap, [snap<sfx>_field_<f>] -> snap_field (f in fields),
   [snap<sfx>_<s>] -> snap_snapshot (s in snapshots),
@@ -175,7 +176,7 @@ def yelmox_groups(groups, ydefaults):
         if g.startswith("idx_"):
             out[g] = "idx"
     for sfx in domain_suffixes(groups):
-        for base in ("anom", "ocn_fraction", "bias"):
+        for base in ("anom", "ocn_fraction", "ocn_obm", "bias"):
             if base + sfx in groups:
                 out[base + sfx] = base
         climate = scalar(groups.get("comps" + sfx, {}).get("climate", ""))
