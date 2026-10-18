@@ -122,8 +122,9 @@ module nautilus
         ntls%lambdatd = ntls%par%lambdatd_init
         ntls%lambdas = ntls%par%lambdas_init    
 
-        ! Restart: the prognostic state and the forcing (fluxes, air
-        ! temperatures) of the last record of the restart file.
+        ! Restart: the prognostic state, the overturning (a diagnostic, for the
+        ! output at the restart time) and the forcing (fluxes, air temperatures)
+        ! of the last record of the restart file.
         if (use_restart) then
             n = nc_size(ocn_restart,"time")
             call nc_read(ocn_restart,"tn",ntls%tn,start=[n],count=[1]) 
@@ -134,6 +135,7 @@ module nautilus
             call nc_read(ocn_restart,"st",ntls%st,start=[n],count=[1]) 
             call nc_read(ocn_restart,"std",ntls%std,start=[n],count=[1]) 
             call nc_read(ocn_restart,"ss",ntls%ss,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"m",ntls%m,start=[n],count=[1]) 
             call nc_read(ocn_restart,"fn",ntls%fn,start=[n],count=[1]) 
             call nc_read(ocn_restart,"ft",ntls%ft,start=[n],count=[1]) 
             call nc_read(ocn_restart,"fs",ntls%fs,start=[n],count=[1]) 
