@@ -5,7 +5,7 @@
     run_step        = "ctrl"            ! group holding the timeline ("ctrl" = this group)
     calendar        = False             ! timeline in calendar years (tstep_const = calendar time)
     calendar_ref    = 1950.0            ! [yr CE] calendar reference
-    tstep_method    = "const"           ! "const" (time_elapsed) or "rel" (time_rel=time_bp)
+    tstep_method    = "rel"             ! "const" (time_elapsed) or "rel" (time_rel=time_bp); rel: the ramp advances on time_rel
     tstep_const     = 0.0               ! Assumed time for "const" method
     time_init       = 0.0               ! [yr] Starting time
     time_end        = 15e3               ! [yr] Ending time
@@ -112,15 +112,25 @@
 
 ! ===== Forcing =====
 
-&tsforcing
-    active = True     ! Functionality test: ramp+noise atmospheric anomaly via dTa
-    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
-    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
-    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
+&indices
+    ! Indices: named scalar series, read by name (snapesm axes, [tsforcing]).
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
+    ! units and restart_every_df), advanced on the forcing clock time_rel.
+    names  = "at" "ramp"
 /
 
-&tsgen
+&idx_at
+    ! Glacial index: the orbital series normalised to 0 at present (piControl)
+    ! and 1 at 21 ka (LGM); the position on the snapesm axis "at".
+    method      = "series"
+    sigma       = 0.0
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
+/
+
+&idx_ramp
+    ! Functionality test: ramp + noise, the [tsforcing] anomaly.
     method     = "ramp-slope"  ! constant-rate ramp (df_dt_max), clamped to [f_min,f_max]
     with_kill  = False      ! stop the run once the response equilibrates at a bound
     dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
@@ -134,6 +144,14 @@
     f_min      = 0.0        ! [f]   lower forcing bound
     f_max      = 5.0        ! [f]   upper forcing bound (dTa caps at 5 K)
     f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+/
+
+&tsforcing
+    active = True     ! Functionality test: ramp+noise atmospheric anomaly via dTa
+    index  = "ramp"   ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (atmospheric temperature)
+    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
 
 ! ===== Simulation options =====
@@ -559,7 +577,7 @@
     dSo_const  = 3.0
     snapshots  = "pd" "picontrol" "lgm"
     fields     = "tas" "pr" "to" "so" "zs"
-    indices    = "at" "ap"
+    axes       = "at"
 /
 
 ! ---- field registry (semantics + blend rule; no file bindings here) ---------
@@ -567,31 +585,31 @@
 &snap_field_tas
     kind  = "atm_temp"
     blend = "linear"
-    index = "at"
+    axes  = "at"
 /
 
 &snap_field_pr
     kind  = "atm_precip"
     blend = "ratio"
-    index = "ap"
+    axes  = "at"
 /
 
 &snap_field_to
     kind  = "ocn"
     blend = "fraction"
-    index = ""
+    axes  = ""
 /
 
 &snap_field_so
     kind  = "ocn_salt"
     blend = "const"
-    index = ""
+    axes  = ""
 /
 
 &snap_field_zs
     kind  = "elev"
     blend = "const"
-    index = ""
+    axes  = ""
 /
 
 ! ---- snapshots (state -> var_defs group refs per field) ---------------------
@@ -625,28 +643,13 @@
     so  = ""
 /
 
-! ---- driving indices (tsgen; groups named &snap_idx_<name>) ------------------
-! Each index is the position on the axis snap_lo -> snap_hi (0 -> 1). The
-! orbital series is normalised to 0 at present (piControl) and 1 at 21 ka (LGM).
+! ---- axes (two snapshots and the index giving the position on them) --------
+! The value of the index is the position on the axis lo -> hi (0 -> 1).
 
-&snap_idx_at
-    snap_lo     = "picontrol"
-    snap_hi     = "lgm"
-    method      = "series"
-    sigma       = 0.0
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
-/
-
-&snap_idx_ap
-    snap_lo     = "picontrol"
-    snap_hi     = "lgm"
-    method      = "series"
-    sigma       = 0.0
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
+&snap_axis_at
+    lo    = "picontrol"
+    hi    = "lgm"
+    index = "at"
 /
 
 ! ===== Surface =====

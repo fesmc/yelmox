@@ -85,6 +85,15 @@
     restart    = "None"
 /
 
+! ===== Forcing =====
+
+&indices
+    ! Indices: named scalar series shared by both domains, read by name
+    ! (snapesm axes). Each is a tsgen group [idx_<name>] (method, series_file,
+    ! ...; optional units and restart_every_df), advanced on the forcing clock time_rel.
+    names  = ""       ! e.g. "at"; "" = none
+/
+
 ! ===== Ocean box model =====
 
 &nautilus
