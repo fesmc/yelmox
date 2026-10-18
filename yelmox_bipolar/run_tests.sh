@@ -70,18 +70,20 @@ run_test() {
 run_test "Test 1: coupling OFF (baseline)" "tmp/mgbi_test1_baseline"
 
 # --- Test 2: ocean box model ON; atmosphere <-> ocean <-> ice ----------------
-# Exercises obm_update + atm2obm + obm2ism (box-model ocean temperature fed into
-# marine_shelf). Freshwater flux (ism2obm) is OFF here because it needs the
-# hydrographic mask files, which are not in every checkout (see Test 3).
+# Exercises obm_update + atm2obm (global index gmt) + obm2ism (box-model ocean
+# temperature fed into marine_shelf through ocn_obm_<sfx>, which replaces
+# ocn_fraction_north). Freshwater flux (ism2obm) is OFF here because it needs
+# the hydrographic mask files, which are not in every checkout (see Test 3).
+OBM_ON="ctrl.active_obm=True ctrl.atm2obm=True ocn_obm_north.active=True ocn_obm_south.active=True ocn_fraction_north.active=False"
 run_test "Test 2: OBM on (atm2obm + obm2ism, no fwf)" "tmp/mgbi_test2_obm" \
-    -p ctrl.active_obm=True ctrl.atm2obm=True ctrl.obm2ism=True
+    -p $OBM_ON
 
 # --- Test 3: FULL coupling incl. freshwater flux (ism2obm) --------------------
 # Needs the hydrographic masks referenced by [ctrl] hydro_mask_north/south.
 # Disabled by default; run with RUN_FWF=1 once those files exist.
 if [ "$RUN_FWF" = "1" ]; then
     run_test "Test 3: FULL coupling (+ ism2obm/fwf)" "tmp/mgbi_test3_fullcouple" \
-        -p ctrl.active_obm=True ctrl.atm2obm=True ctrl.obm2ism=True \
+        -p $OBM_ON \
            ctrl.ism2obm=True ctrl.couple_fwf_north=True ctrl.couple_fwf_south=True
 else
     echo
