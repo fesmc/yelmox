@@ -565,7 +565,6 @@
     lapse      = 0.0080 0.0065
     f_p        = 0.06
     f_p_ne     = 1.0
-    f_stdev    = 0.0
     snapshots  = "pd" "picontrol" "lgm"
     fields     = "tas" "pr" "to" "so" "zs"
     axes       = "at"
@@ -604,6 +603,7 @@
 /
 
 ! ---- snapshots (state -> var_defs group refs per field) ---------------------
+! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
 
 &snap_pd
     monthly   = True
@@ -620,8 +620,6 @@
     tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
     pr  = "clim_picontrol_pr_ann"
     zs  = "clim_picontrol_zs"
-    to  = ""
-    so  = ""
 /
 
 &snap_lgm
@@ -630,8 +628,6 @@
     tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
     pr  = "clim_lgm_pr_ann"
     zs  = "clim_lgm_zs"
-    to  = ""
-    so  = ""
 /
 
 ! ---- axes (two snapshots and the index giving the position on them) --------

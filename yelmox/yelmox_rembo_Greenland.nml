@@ -21,7 +21,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapclim ocean
+    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapesm ocean ([snap])
     surface_method  = "climate" ! the smb from the climate (REMBO)
     dt_clim         = 10.0     ! [yr] climate update interval (= dtt: REMBO has its own intervals)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -127,7 +127,7 @@
     active = False    ! Apply it? (was ctrl.use_hyster)
     index  = ""       ! the index driving the anomalies ([indices] names), e.g. "hyst"
     f_ta   = 1.0      ! [K] dT_sum = f * f_ta  (summer air; dT_ann = 1.3*dT_sum)
-    f_to   = 0.25     ! [K] dT_ocn = dT_ann * f_to (ocean, if snap ocn_type = "const")
+    f_to   = 0.25     ! [K] dT_ocn = dT_ann * f_to, added to the [snap] ocean
     f_so   = 0.0      ! [psu] unused by REMBO
 /
 
@@ -566,89 +566,37 @@
 ! ===== Climate =====
 
 &snap
-    atm_type           = "snap_1ind_new"
-    ocn_type           = "const"
-    fname_at           = "input/alpha_orbital_r2020.dat"
-    fname_ao           = "input/alpha_orbital_r2020.dat"
-    fname_ap           = "input/alpha_orbital_r2020.dat"
-    fname_as           = "input/salinity_index_deglaciation.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
-    dSo_const          = 3.0
-    f_to               = 0.25 
-    f_p                = 0.06
-    f_stdev            = 0.0 
+    ! The ocean of the rembo climate: an ocean-only reference snapshot (ORAS5,
+    ! var_defs database input/greenland_clim.nml), no axes; [anom] adds
+    ! dT_ocn = dT_ann*f_to to it. REMBO supplies the atmosphere, so no tas,
+    ! pr, zs (lapse, f_p, f_p_ne unused).
+    var_defs   = "input/greenland_clim.nml"
+    combine    = "anomaly"
+    ref_name   = "pd"
+    lapse      = 0.0080 0.0065
+    f_p        = 0.06
+    f_p_ne     = 1.0
+    snapshots  = "pd"
+    fields     = "to" "so"
+    axes       = ""
 /
 
-&snap_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 0.3 
-    f_glac             = 1.0 
-    f_hol              = 0.5 
-    f_seas             = 1.0 
-    f_to               = 0.2
+&snap_field_to
+    kind  = "ocn"
+    blend = "const"
+    axes  = ""
 /
 
-&snap_clim0
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
-    clim_names      = "z_srf" "t2m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "tas" "sf" "rf"
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    !ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
-    ocn_path        = "none"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = True
-    ocn_time        = 0
+&snap_field_so
+    kind  = "ocn_salt"
+    blend = "const"
+    axes  = ""
 /
 
-&snap_clim1
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = 0
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
-/
-
-&snap_clim2
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = -21000
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
-/
-
-&snap_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
+&snap_pd
+    monthly   = True              ! (atmosphere only; none here)
+    to  = "clim_pd_to"            ! ORAS5 1981-2010, monthly climatology
+    so  = "clim_pd_so"
 /
 
 ! ===== Surface =====
