@@ -6,6 +6,10 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- `scripts/climate-compare/`: climate-only comparison of two par files (`run.sh`: ice sheet
+  off, `tstep_method = "rel"`, climate every 1 kyr over -130 ka to 0 or PD; `compare.jl`:
+  domain means per time and maps of `t2m_ann`, `pr_ann`, `to_ann`), the regression check
+  for climate backend and modifier changes.
 - Static climate bias correction `[climate_bias]` (optional): additive temperature and
   multiplicative precipitation fields (monthly or annual, varslice groups, online remap
   allowed) with weights `f_tas`, `f_pr`, applied to the monthly atmosphere of snapclim,
