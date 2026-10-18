@@ -19,10 +19,10 @@ program yelmox
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
-    use kryos_forcing,  only : tsforcing_class, tsforcing_init, tsforcing_update, &
-                               tsforcing_kill, tsforcing_restart_due, &
-                               tsforcing_restart_fldr, tsforcing_restart_read, &
-                               tsforcing_write_step
+    use kryos_forcing,  only : indices_class, indices_init, indices_update, indices_kill, &
+                               indices_restart_due, indices_restart_fldr, &
+                               indices_restart_read, indices_write_step, &
+                               tsforcing_class, tsforcing_init, tsforcing_set_anom
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
@@ -50,11 +50,13 @@ program yelmox
     ! Restart bundle folder to start from ([ctrl]); "None" = cold start.
     character(len=512) :: restart
 
-    ! Transient time-series forcing (tsgen), owned by the driver. The single
-    ! forcing value f_now is mapped onto the climate anomalies via per-channel
-    ! gains ([tsforcing]): dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so.
-    ! The tsforcing_class also owns the forcing-increment restart bookkeeping and
-    ! the kill switch (see libs/kryos_forcing.f90).
+    ! Indices ([indices], one tsgen series [idx_<name>] each), owned by the
+    ! driver and advanced once per step on the forcing clock time_rel; read by
+    ! name by the climate (snapesm axes) and [tsforcing], which maps one index
+    ! onto the climate anomalies: dTa = f*f_ta, dTo = f*f_to, dSo = f*f_so. The
+    ! registry also owns the kill switch and the forcing-increment restarts
+    ! (see libs/kryos_forcing.f90).
+    type(indices_class)   :: idx
     type(tsforcing_class) :: tsf
     real(wp) :: fvar
 
@@ -83,28 +85,29 @@ program yelmox
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
 
+    ! Indices on the forcing clock, before the domain (its climate checks the
+    ! indices it names) and the startup (the initial climate carries the same
+    ! index values and anomalies as the time loop). On a restart run, resume
+    ! them from the bundle; then [tsforcing] takes its index.
+    call indices_init(idx, path_par, ts%time_rel)
+    if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
+    call tsforcing_init(tsf, path_par, idx)
+
     ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
     ! reads the timeline values it needs from the same [run_step] group.
-    call domain_init(dom, path_par, ts%time, timeline_group=trim(run_step))
+    call domain_init(dom, path_par, ts%time, idx, timeline_group=trim(run_step))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
-
-    ! Transient time-series forcing (tsgen -> climate anomalies). Initialize
-    ! before startup so the initial (cold-start) climate carries the same
-    ! anomalies as the time loop. tsforcing reads [tsforcing] + [tsgen]; on a
-    ! restart run, resume the series from the saved tsgen state in the bundle.
-    call tsforcing_init(tsf, path_par, ts%time)
-    if (trim(restart) /= "None") call tsforcing_restart_read(tsf, trim(restart))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
     ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
     ! then re-establish the climate/smb and marine-shelf forcing from the
     ! restored state (the bundle does not hold them), so the first step and the
     ! first output see a valid boundary state.
-    call domain_startup(dom, ts, bsl, trim(restart), tsf=tsf)
+    call domain_startup(dom, ts, bsl, trim(restart), idx, tsf=tsf)
     if (trim(restart) /= "None") then
-        call step_climate(dom, ts, tsf)
+        call step_climate(dom, ts, idx, tsf)
         call step_surface(dom, ts)
         call step_shelf(dom, ts)
     end if
@@ -153,7 +156,7 @@ program yelmox
 
         if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
             call domain_write_1D(dom, trim(outfldr), ts%time)
-            call tsforcing_write_step(tsf, dom%yelmo%reg%fnm, ts%time)
+            call indices_write_step(idx, dom%yelmo%reg%fnm, ts%time)
             call timer_write_totals(tmr, ts%time, "s", trim(outfldr)//"timing.txt", &
                                     init=timing_init)
             timing_init = .FALSE.
@@ -162,9 +165,9 @@ program yelmox
         ! CMIP-formatted output ([output] write_cmip, every dt_cmip).
         call domain_write_cmip(dom, trim(outfldr), ts)
 
-        ! Restart bundle (domain + shared bsl + tsforcing state).
+        ! Restart bundle (domain + shared bsl + indices).
         if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then
-            call run_restart_write(dom, bsl, ts%time, tsf=tsf)
+            call run_restart_write(dom, bsl, ts%time, idx)
         end if
 
         call timer_step(tmr, tt_output)
@@ -177,12 +180,12 @@ program yelmox
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        ! Transient forcing: advance the series every step (feedback methods need
-        ! the response-derivative window); response variable = ice volume [Gt].
-        if (tsf%active) then
-            fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
-            call tsforcing_update(tsf, ts%time, var=fvar)
-        end if
+        ! Indices: advance every series once per step on the forcing clock
+        ! (feedback methods need the response-derivative window); response
+        ! variable = ice volume [Gt]. Then the [tsforcing] anomalies.
+        fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
+        call indices_update(idx, ts%time_rel, var=fvar)
+        call tsforcing_set_anom(tsf, idx)
         call timer_step(tmr, tt_forcing)
 
         ! === coupling sequence ===
@@ -198,25 +201,26 @@ program yelmox
         call timer_step(tmr, tt_icesheet)
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call timer_step(tmr, tt_couple_htopo)
-        call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
+        call step_climate(dom, ts, idx, tsf)   ! climate (dt_clim cadence)
         call timer_step(tmr, tt_climate)
         call step_surface(dom, ts)        ! surface mass balance + temperature
         call timer_step(tmr, tt_surface)
         call step_shelf(dom, ts)          ! shelf-base melt + temperature
         call timer_step(tmr, tt_shelf)
 
-        ! Forcing-increment restart each |Δf| > restart_every_df (folders
-        ! restart-<n>), so a ramp can be branched at fixed forcing levels.
-        if (tsforcing_restart_due(tsf)) then
-            write(*,*) "yelmox: forcing-increment restart at f =", tsf%tsg%f_now
-            call run_restart_write(dom, bsl, ts%time, tsf=tsf, &
-                                   fldr=trim(tsforcing_restart_fldr(tsf)))
+        ! Forcing-increment restart each time an index moves by more than its
+        ! restart_every_df (folders restart-<n>), so a ramp can be branched at
+        ! fixed forcing levels.
+        if (indices_restart_due(idx)) then
+            write(*,*) "yelmox: forcing-increment restart "//trim(indices_restart_fldr(idx))// &
+                       " at time =", ts%time
+            call run_restart_write(dom, bsl, ts%time, idx, fldr=trim(indices_restart_fldr(idx)))
         end if
 
         ! Kill switch: stop once the response has equilibrated at a forcing
-        ! bound. The top of the loop then writes the final state and exits.
-        if (tsforcing_kill(tsf)) then
-            write(*,*) "yelmox: tsgen kill switch tripped at time =", ts%time
+        ! bound (any index). The top of the loop then writes the final state and exits.
+        if (indices_kill(idx)) then
+            write(*,*) "yelmox: index kill switch tripped at time =", ts%time
             ts%is_finished = .TRUE.
         end if
     end do

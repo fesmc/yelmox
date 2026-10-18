@@ -18,7 +18,7 @@ module kryos_coupling
                                  optimize_tf_corr_basin
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
-    use kryos_forcing, only : tsforcing_class
+    use kryos_forcing, only : indices_class, tsforcing_class
 
     implicit none
     private
@@ -360,16 +360,18 @@ contains
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, tsf, init)
+    subroutine step_climate(dom, ts, idx, tsf, init)
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend into dom%clim,
-        ! read by step_surface, step_shelf and couple_climate_to_yelmo. tsf
-        ! (optional) is the driver-owned transient forcing; the backend applies
-        ! it in its own way. init=.true. marks the cold start: the update runs
-        ! regardless of the cadence.
+        ! read by step_surface, step_shelf and couple_climate_to_yelmo. idx is
+        ! the driver-owned indices registry (advanced to this step); tsf
+        ! (optional) the driver-owned transient forcing, which the backend
+        ! applies in its own way. init=.true. marks the cold start: the update
+        ! runs regardless of the cadence.
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
+        type(indices_class),   intent(in)    :: idx
         type(tsforcing_class), intent(in), optional :: tsf
         logical,               intent(in), optional :: init
 
@@ -401,7 +403,7 @@ contains
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
                             z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
-                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, tsf=tsf, init=is_init)
+                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, idx=idx, tsf=tsf, init=is_init)
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)

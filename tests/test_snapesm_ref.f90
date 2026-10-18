@@ -11,6 +11,7 @@ program test_snapesm_ref
     use precision, only : wp, sp, dp
     use ncio
     use snapesm
+    use kryos_forcing, only : indices_class, indices_init, indices_update
     use coordinates, only : grid_class
     use fesmdata,    only : fesmdata_grid_read
 
@@ -19,6 +20,7 @@ program test_snapesm_ref
     integer, parameter :: nx = 106, ny = 181
 
     type(snapesm_class) :: sc
+    type(indices_class) :: idx
     type(grid_class)    :: cgrid
     real(sp) :: z_srf_sp(nx,ny)
     real(wp) :: z_srf(nx,ny)
@@ -49,13 +51,16 @@ program test_snapesm_ref
 
     call fesmdata_grid_read(cgrid, "fesmdata/Greenland/"//trim(grid)//"/"//trim(grid)// &
                             "_Atmosphere-ERA5-1981-2010.nc", trim(grid))
+    ! The indices ([indices], [idx_<name>]) of the axes, from the same file.
+    call indices_init(idx, trim(path_par), times(1))
     call snapesm_init(sc, trim(path_par), trim(domain), cgrid, &
-                      times(1), south=.FALSE., group="snp")   ! Greenland
+                      times(1), south=.FALSE., idx=idx, group="snp")   ! Greenland
 
     call dump_init(trim(outfile), sc, xc, yc, times(1))
 
     do it = 1, nt
-        call snapesm_update(sc, z_srf=z_srf, time=times(it))
+        call indices_update(idx, times(it), var=0.0_wp)
+        call snapesm_update(sc, z_srf=z_srf, time=times(it), idx=idx)
         call dump_step(trim(outfile), sc, times(it), it)
         write(*,"(a,f12.1,a,f10.4,a,f10.4)") " time=", times(it), &
             "  ta_ann(mid)=", sc%now%ta_ann(nx/2,ny/2), &

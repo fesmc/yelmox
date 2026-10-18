@@ -9,8 +9,9 @@ module yelmox_climate
     !
     ! Presents one interface (climate_init / climate_update) over the backends,
     ! filling a `climate_out_class`; the domain and its coupling read only that.
-    ! The driver's transient forcing (tsforcing: f_now and the gains f_ta, f_to,
-    ! f_so) is handed to the backend, which applies it in its own way.
+    ! The driver's indices registry is read by snapesm (its axes); the driver's
+    ! transient forcing (tsforcing: one index and the gains f_ta, f_to, f_so) is
+    ! handed to the backend, which applies it in its own way.
     ! An optional static bias correction ([climate_bias]) is applied to the
     ! monthly air temperature and precipitation of any backend but rembo.
 
@@ -24,13 +25,12 @@ module yelmox_climate
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom, &
                               snapclim_lapse_monthly
     use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
-                              snapesm_write_init, snapesm_write_step, &
-                              snapesm_restart_write, snapesm_restart_read, snapesm_lapse_monthly
+                              snapesm_write_init, snapesm_write_step, snapesm_lapse_monthly
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
                               esm_forcing_update, esm_variability_update, esm_summer_mean, &
                               esm_lapse_monthly
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
-    use kryos_forcing, only : tsforcing_class
+    use kryos_forcing, only : indices_class, tsforcing_class
     use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_restart_write
     use regions,       only : regions_class, regions_basin_ids
 
@@ -89,13 +89,14 @@ module yelmox_climate
     public :: climate_update
     public :: climate_air_anom
     public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
-    public :: climate_restart_write, climate_restart_read
+    public :: climate_restart_write
 
 contains
 
     subroutine climate_init(cl, method, filename, domain, grid, time, reg, &
-                            south, sfx, timeline_group, smb_direct)
+                            south, sfx, timeline_group, smb_direct, idx)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
+        ! idx: the driver's indices registry (snapesm checks its axes against it).
         ! smb_direct: the surface mass balance is taken from the climate
         ! ([comps] surface_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
@@ -109,6 +110,7 @@ contains
         character(len=*), intent(in) :: sfx              ! namelist group suffix of the domain
         character(len=*), intent(in) :: timeline_group   ! group of the run phase's timeline
         logical,          intent(in) :: smb_direct
+        type(indices_class), intent(in) :: idx
 
         character(len=256) :: grid_name
         integer :: nx, ny
@@ -140,7 +142,7 @@ contains
                                    south, group="snap"//trim(sfx))
             case("snapesm")
                 call snapesm_init(cl%snapesm, filename, domain, grid, time, &
-                                  south, group="snap"//trim(sfx))
+                                  south, idx, group="snap"//trim(sfx))
             case("esm")
                 call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &
                               smb_direct, reg)
@@ -257,11 +259,13 @@ contains
     end subroutine climate_bias_apply
 
     subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
-                              domain, dx, dtt, mshlf, tsf, init)
+                              domain, dx, dtt, mshlf, idx, tsf, init)
         ! Update the backend on the climate grid and fill `out`. The geometry is
         ! the domain's, on the climate grid, with its present-day surface
         ! (z_srf_ref); the marine shelf lends its parameters to the esm ocean,
-        ! which is interpolated to the shelf base here.
+        ! which is interpolated to the shelf base here. idx is the driver's
+        ! indices registry, advanced to the forcing time; snapesm reads its axes
+        ! from it.
         !
         ! With an active transient forcing, its spatially homogeneous anomalies
         ! (dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so) go to the backend:
@@ -281,6 +285,7 @@ contains
         real(wp),         intent(in) :: dx
         real(dp),         intent(in) :: dtt              ! [yr] time step of the run
         type(marshelf_class),  intent(in) :: mshlf
+        type(indices_class),   intent(in) :: idx
         type(tsforcing_class), intent(in), optional :: tsf
         logical,               intent(in), optional :: init
 
@@ -326,10 +331,10 @@ contains
 
             case("snapesm")
                 if (forced) then
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
+                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, &
                                         dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx)
                 else
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, &
+                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, &
                                         dx=dx)
                 end if
 
@@ -655,36 +660,21 @@ contains
 
     subroutine climate_restart_write(cl, fldr, time, z_srf, H_ice, z_sl)
         ! The backend's own restart in the bundle folder `fldr`, with the
-        ! geometry on the climate grid: snapesm's driving indices
-        ! (snapesm_idx_<name>_restart.nc) or REMBO's (rembo_restart.nc); snapclim
-        ! and esm hold no state.
+        ! geometry on the climate grid: REMBO's (rembo_restart.nc); snapclim,
+        ! snapesm and esm hold no state (snapesm's indices restart with the
+        ! driver's registry). REMBO reads its restart itself, as set in its own
+        ! parameter file.
         type(yelmox_climate_class), intent(in) :: cl
         character(len=*),           intent(in) :: fldr
         real(dp),                   intent(in) :: time
         real(wp),                   intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
 
         select case(trim(cl%method))
-            case("snapesm")
-                call snapesm_restart_write(cl%snapesm, trim(fldr), time)
             case("rembo")
                 call rembo_clim_restart_write(trim(fldr)//"/rembo_restart.nc", time, z_srf, H_ice, z_sl)
         end select
 
     end subroutine climate_restart_write
-
-    subroutine climate_restart_read(cl, fldr)
-        ! Restore the backend's own state from the bundle folder `fldr`:
-        ! snapesm's driving indices. REMBO reads its restart itself, as set in
-        ! its own parameter file.
-        type(yelmox_climate_class), intent(inout) :: cl
-        character(len=*),           intent(in)    :: fldr
-
-        select case(trim(cl%method))
-            case("snapesm")
-                call snapesm_restart_read(cl%snapesm, trim(fldr))
-        end select
-
-    end subroutine climate_restart_read
 
     ! ===== esm backend =====================================================
 

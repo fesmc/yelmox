@@ -36,7 +36,7 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/snapesm.o: $(libdir)/snapesm.f90
+$(objdir)/snapesm.o: $(libdir)/snapesm.f90 $(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
@@ -59,9 +59,9 @@ $(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o
 
 # Kryos: the domain (kryos_domain + config + init + remap) and the modules built
 # on it -- region-specific physics, per-step coupling, cold start + restarts,
-# output, and the driver-owned transient forcing.
+# output, and the driver-owned indices registry.
 $(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
-						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o \
+						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o $(objdir)/kryos_forcing.o \
 						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
 						$(objdir)/surface_chion.o \
 						$(objdir)/sediments.o $(objdir)/geothermal.o
@@ -75,7 +75,7 @@ $(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
 
 $(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o $(objdir)/kryos_coupling.o \

@@ -2,8 +2,8 @@ module snapesm
     ! snapesm — climate boundary forcing built on the fesm-utils primitives.
     !
     !   Loading   -> varslice  (one varslice_class per snapshot x field)
-    !   Indices   -> tsgen      (one tsgen_class per driving index)
-    !   Wrapper   -> this module (blend + transforms + derive + output state + restart)
+    !   Indices   -> the driver's registry (kryos_forcing), read by name
+    !   Wrapper   -> this module (blend + transforms + derive + output state)
     !
     ! Replacement for the monolithic `snapclim`. See docs/climate-snap.md for its
     ! configuration.
@@ -12,22 +12,22 @@ module snapesm
     ! per-file variable metadata); each climate-state group &<group>_<snapshot> names
     ! the group(s) supplying each field (1 = monthly, 2 = [ann, sum] -> synthesized).
     !
-    ! Indices: each driving index &<group>_idx_<name> (a tsgen group) spans one axis
-    ! between two snapshots (snap_lo -> snap_hi); its value f_now is the position on
-    ! that axis (0 at snap_lo, 1 at snap_hi). A field sums the axes of its indices
-    ! on top of the reference snapshot (Banderas et al., 2018, for two indices).
-    ! Turning a proxy into an index (normalisation) is tsgen's job (norm_t0/norm_t1).
+    ! Axes: each axis &<group>_axis_<name> spans two snapshots (lo -> hi) and
+    ! names an index of the driver's registry ([indices], kryos_forcing); the
+    ! value of the index is the position on the axis (0 at lo, 1 at hi). A field
+    ! sums the axes it lists on top of the reference snapshot (Banderas et al.,
+    ! 2018, for two axes). The indices restart with the registry, so snapesm
+    ! holds no state of its own.
     !
     ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
-    ! checked against snapclim (tests/test_snapesm_ref.f90); output and restart
-    ! (snapesm_write_*, snapesm_restart_*) are in place; snapesm_end is a stub.
+    ! checked against snapclim (tests/test_snapesm_ref.f90); output
+    ! (snapesm_write_*) is in place; snapesm_end is a stub.
 
     use precision, only : wp, sp, dp
     use ncio
     use nml
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
-    use tsgen,    only : tsgen_class, tsgen_init, tsgen_update, &
-                         tsgen_restart_write, tsgen_restart_read
+    use kryos_forcing, only : indices_class, indices_value, indices_has
     use gaussian_filter, only : filter_gaussian
     use coordinates, only : grid_class
 
@@ -37,8 +37,8 @@ module snapesm
 
     private
 
-    integer, parameter :: SNP_MAX = 32   ! max entries in a snapshots/fields/indices list
-    integer, parameter :: IDX_MAX = 8    ! max driving indices of one field
+    integer, parameter :: SNP_MAX = 32   ! max entries in a snapshots/fields/axes list
+    integer, parameter :: AXS_MAX = 8    ! max axes of one field
     integer, parameter :: NMONTH   = 12
 
     ! =====================================================================
@@ -58,9 +58,9 @@ module snapesm
         character(len=16) :: kind           ! "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
         character(len=16) :: blend          ! "linear" | "ratio" | "fraction" | "const"
-        character(len=64) :: index(IDX_MAX) ! names of the driving indices of this field ("" = none)
-        integer           :: n_index        ! number of driving indices
-        integer           :: idx_k(IDX_MAX) ! their positions in snapesm_class%idx
+        character(len=64) :: axes(AXS_MAX)  ! names of the axes of this field ("" = none)
+        integer           :: n_axis         ! number of axes
+        integer           :: axis_k(AXS_MAX) ! their positions in snapesm_class%axis
         logical           :: enabled        ! off by default for exotic fields
         logical           :: apply_lapse
         logical           :: precip_scaling
@@ -132,7 +132,15 @@ module snapesm
         real(wp)           :: f_to          ! ocean/atm anomaly ratio (fraction ocean rule)
         ! bipolar/obm compatibility (obm_coupling reads par%dTa_const today)
         real(wp)           :: dTa_const, dTo_const, dSo_const
-        integer            :: n_snap, n_field, n_idx
+        integer            :: n_snap, n_field, n_axis
+    end type
+
+    ! One axis: two snapshots and the registry index giving the position on it.
+    type axis_class
+        character(len=64) :: name
+        character(len=64) :: index          ! registry index (kryos_forcing)
+        integer           :: lo, hi         ! snapshots at index = 0 and 1 (positions in snap)
+        real(wp)          :: f              ! position at the last update (output)
     end type
 
     ! The object callers hold.
@@ -140,10 +148,7 @@ module snapesm
         type(snapesm_param_class)          :: par
         type(field_spec_class),  allocatable :: registry(:)  ! field definitions
         type(snapshot_class),    allocatable :: snap(:)      ! was clim0..clim3
-        type(tsgen_class),       allocatable :: idx(:)       ! was at..bs (each may be nc-channel)
-        character(len=64),       allocatable :: idx_name(:)  ! index names (for labels/accessors)
-        integer,                 allocatable :: idx_lo(:)    ! snapshot at index = 0 (snap_lo)
-        integer,                 allocatable :: idx_hi(:)    ! snapshot at index = 1 (snap_hi)
+        type(axis_class),        allocatable :: axis(:)      ! snapshot axes
         type(climate_state_class)            :: now          ! current output
         type(climate_state_class)            :: ref          ! distinguished reference (was clim0)
     end type
@@ -154,8 +159,6 @@ module snapesm
     public :: snapesm_end
     public :: snapesm_write_init
     public :: snapesm_write_step
-    public :: snapesm_restart_write
-    public :: snapesm_restart_read
     public :: snapesm_lapse_monthly
 
 contains
@@ -164,10 +167,11 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid, time, south, group)
+    subroutine snapesm_init(sc, filename, domain, grid, time, south, idx, group)
         ! `grid` is the climate grid: the snapshot fields are read on it, or
         ! remapped onto it online (var_defs groups with remap/grid_src). `time`
-        ! initializes the tsgen indices (ramp-type series anchor to their start time).
+        ! primes the time-varying snapshots. `idx` is the driver's registry: each
+        ! axis must name one of its indices.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
@@ -175,26 +179,20 @@ contains
         type(grid_class),      intent(IN)    :: grid
         real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
+        type(indices_class),   intent(IN)    :: idx
         character(len=*),      intent(IN), optional :: group
 
         character(len=64) :: base_group
-        integer           :: k
 
         base_group = "snp"
         if (present(group)) base_group = trim(group)
 
-        ! Read all configuration: top-level, field registry, snapshot specs, index names.
-        call snapesm_par_load(sc, filename, trim(base_group), domain, trim(grid%name))
+        ! Read all configuration: top-level, field registry, snapshot specs, axes.
+        call snapesm_par_load(sc, filename, trim(base_group), domain, trim(grid%name), idx)
         sc%par%nx = grid%G%nx
         sc%par%ny = grid%G%ny
         sc%par%dx_km = real(grid%G%dx*grid%cs%xy_conv*1e-3_dp, wp)   ! [km] (clim_sigma)
         sc%par%south = south
-
-        ! Initialize the driving indices (tsgen). Group is &<base_group>_idx_<idxname>.
-        do k = 1, sc%par%n_idx
-            call tsgen_init(sc%idx(k), filename, time, &
-                            group=trim(base_group)//"_idx_"//trim(sc%idx_name(k)))
-        end do
 
         ! Load the snapshot fields (varslice), reduce them, and set the reference state.
         call snapesm_load_snapshots(sc, filename, time, grid)
@@ -202,19 +200,24 @@ contains
         return
     end subroutine snapesm_init
 
-    subroutine snapesm_update(sc, z_srf, time, dTa, dTo, dSo, dx)
-        ! Mirrors snapclim_update. Pipeline: advance indices -> refresh loads ->
-        ! combine -> transform -> derive.
+    subroutine snapesm_update(sc, z_srf, time, idx, dTa, dTo, dSo, dx)
+        ! Mirrors snapclim_update. Pipeline: axis positions from the registry
+        ! (advanced by the driver to `time`) -> refresh loads -> combine ->
+        ! transform -> derive.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(dp),              intent(IN)    :: time
+        type(indices_class),   intent(IN)    :: idx
         real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
 
         real(wp), allocatable :: ta_ann_lag(:,:)
+        integer :: k
 
-        ! 1. Advance the driving indices (tsgen) to `time`.
-        call snapesm_advance_indices(sc, time)
+        ! 1. The position on each axis: the current value of its index.
+        do k = 1, sc%par%n_axis
+            sc%axis(k)%f = indices_value(idx, sc%axis(k)%index)
+        end do
 
         ! 2. Refresh time-varying loads and re-reduce those snapshots.
         call snapesm_refresh_loads(sc, time)
@@ -248,21 +251,6 @@ contains
     ! Update pipeline stages
     ! ---------------------------------------------------------------------
 
-    subroutine snapesm_advance_indices(sc, time)
-        ! Advance each tsgen index. Our indices are series/analytic (no feedback),
-        ! so the model-response argument is a dummy.
-        implicit none
-        type(snapesm_class), intent(INOUT) :: sc
-        real(dp),              intent(IN)    :: time
-        integer  :: k
-        real(wp) :: response
-        response = 0.0_wp
-        do k = 1, sc%par%n_idx
-            call tsgen_update(sc%idx(k), time, var=response)
-        end do
-        return
-    end subroutine snapesm_advance_indices
-
     subroutine snapesm_refresh_loads(sc, time)
         ! Re-slice only the time-varying fields (recon, transient orography, etc.);
         ! static fields were primed once at load. A re-reduce of touched snapshots
@@ -292,13 +280,12 @@ contains
 
     subroutine snapesm_combine(sc)
         ! Blend the reduced snapshot states into `now`, per field, from the reference
-        ! baseline (was clim0). Each driving index k of a field adds its axis
-        ! (lo_k -> hi_k, the snapshots snap_lo/snap_hi of the index) with weight
-        ! a_k = f_now of the index:
+        ! baseline (was clim0). Each axis k of a field (lo_k -> hi_k) adds with
+        ! weight a_k = the value of its index:
         !   linear (temp/salinity): now = ref + sum_k a_k*(hi_k - lo_k)
         !   ratio  (precip):        now = ref * prod_k (a_k*(hi_k/lo_k - 1) + 1)
         !   fraction / const:       now = ref  (fraction ocean is finished in derive)
-        ! One index reproduces snapclim calc_temp_1ind/calc_precip_1ind, two indices
+        ! One axis reproduces snapclim calc_temp_1ind/calc_precip_1ind, two axes
         ! calc_temp_2ind/calc_precip_2ind (Banderas et al., 2018).
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
@@ -323,17 +310,17 @@ contains
                     cycle   ! "elev" and other non-blended fields: nothing to combine.
             end select
 
-            ! linear/ratio fields add the axes of their indices; fraction/const
-            ! fields stay at the reference.
+            ! linear/ratio fields add their axes; fraction/const fields stay at
+            ! the reference.
             blended = trim(sc%registry(f)%blend) == "linear" .or. &
                       trim(sc%registry(f)%blend) == "ratio"
             if (.not. blended) cycle
 
-            do j = 1, sc%registry(f)%n_index
-                k  = sc%registry(f)%idx_k(j)
-                lo = sc%idx_lo(k)
-                hi = sc%idx_hi(k)
-                aa = sc%idx(k)%f_now
+            do j = 1, sc%registry(f)%n_axis
+                k  = sc%registry(f)%axis_k(j)
+                lo = sc%axis(k)%lo
+                hi = sc%axis(k)%hi
+                aa = sc%axis(k)%f
 
                 associate(blend => sc%registry(f)%blend, x0 => sc%snap(lo)%state, x1 => sc%snap(hi)%state)
                 select case(trim(sc%registry(f)%kind))
@@ -354,7 +341,7 @@ contains
     end subroutine snapesm_combine
 
     subroutine blend_axis(mode, dst, x0, x1, aa)
-        ! Add one index axis (x0 -> x1, weight aa) to dst, which holds the reference
+        ! Add one axis (x0 -> x1, weight aa) to dst, which holds the reference
         ! plus the axes added so far. No-op when the axis snapshots do not supply
         ! the field (x0 or x1 unallocated).
         implicit none
@@ -501,11 +488,11 @@ contains
     end subroutine snapesm_apply_atm_anom
 
     subroutine snapesm_end(sc)
-        ! Teardown (snapclim never had one). Free varslice/tsgen and state arrays.
+        ! Teardown (snapclim never had one). Free varslice and state arrays.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
 
-        ! TODO: varslice_end on each snap%bind%src, deallocate snap/idx/registry and states.
+        ! TODO: varslice_end on each snap%bind%src, deallocate snap/axis/registry and states.
 
         return
     end subroutine snapesm_end
@@ -530,7 +517,7 @@ contains
 
     subroutine snapesm_write_step(sc, filename, ncid, n)
         ! Write record n of the snapesm state into an open 2D output file
-        ! (axes from snapesm_write_init): the driving indices, the surface
+        ! (axes from snapesm_write_init): the axis positions, the surface
         ! elevation, the monthly atmosphere, the summer and sea-level
         ! temperatures and the ocean profiles -- the fields the enabled registry
         ! fills.
@@ -541,10 +528,11 @@ contains
 
         integer :: k
 
-        do k = 1, sc%par%n_idx
-            call nc_write(filename, "idx_"//trim(sc%idx_name(k)), sc%idx(k)%f_now, dim1="time", &
+        do k = 1, sc%par%n_axis
+            call nc_write(filename, "axis_"//trim(sc%axis(k)%name), sc%axis(k)%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Driving index "//trim(sc%idx_name(k)))
+                          long_name="Position on axis "//trim(sc%axis(k)%name)//" (index "// &
+                                    trim(sc%axis(k)%index)//")")
         end do
 
         associate(now => sc%now)
@@ -581,100 +569,25 @@ contains
     end subroutine snapesm_write_step
 
     ! =====================================================================
-    ! Restart (+ provenance record)
-    ! =====================================================================
-
-    subroutine snapesm_restart_write(sc, fldr, time)
-        ! The prognostic state of snapesm: its driving indices, one tsgen restart
-        ! file per index in the bundle folder fldr (snapesm_idx_<name>_restart.nc).
-        ! Each file also carries a provenance record of the configuration as
-        ! global attributes (documentation only: the fields are recomputed from
-        ! time on the next update).
-        implicit none
-        type(snapesm_class), intent(IN) :: sc
-        character(len=*),      intent(IN) :: fldr
-        real(dp),              intent(IN) :: time
-
-        character(len=512)  :: fnm
-        character(len=1024) :: snaps, fields
-        integer :: k
-
-        snaps = ""
-        do k = 1, sc%par%n_snap
-            snaps = trim(snaps)//" "//trim(sc%snap(k)%spec%name)
-        end do
-        fields = ""
-        do k = 1, sc%par%n_field
-            fields = trim(fields)//" "//trim(sc%registry(k)%name)
-        end do
-
-        do k = 1, sc%par%n_idx
-            fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
-            call tsgen_restart_write(trim(fnm), sc%idx(k), time)
-            call nc_write_attr(trim(fnm), "snapesm_index",     trim(sc%idx_name(k)))
-            call nc_write_attr(trim(fnm), "snapesm_axis",      trim(sc%snap(sc%idx_lo(k))%spec%name)// &
-                                                               " -> "//trim(sc%snap(sc%idx_hi(k))%spec%name))
-            call nc_write_attr(trim(fnm), "snapesm_var_defs",  trim(sc%par%var_defs))
-            call nc_write_attr(trim(fnm), "snapesm_ref_name",  trim(sc%par%ref_name))
-            call nc_write_attr(trim(fnm), "snapesm_snapshots", trim(adjustl(snaps)))
-            call nc_write_attr(trim(fnm), "snapesm_fields",    trim(adjustl(fields)))
-        end do
-
-        return
-    end subroutine snapesm_restart_write
-
-    subroutine snapesm_restart_read(sc, fldr)
-        ! Restore the driving indices written by snapesm_restart_write (after
-        ! snapesm_init). An index without a restart file (a bundle written
-        ! before snapesm had one) keeps its cold-start state.
-        implicit none
-        type(snapesm_class), intent(INOUT) :: sc
-        character(len=*),      intent(IN)    :: fldr
-
-        character(len=512) :: fnm
-        logical :: found
-        integer :: k
-
-        do k = 1, sc%par%n_idx
-            fnm = snapesm_idx_restart_file(fldr, sc%idx_name(k))
-            inquire(file=trim(fnm), exist=found)
-            if (found) then
-                call tsgen_restart_read(sc%idx(k), trim(fnm))
-            else
-                write(*,*) "snapesm_restart_read:: WARNING: no restart file "//trim(fnm)// &
-                           "; keeping the cold-start state of index "//trim(sc%idx_name(k))//"."
-            end if
-        end do
-
-        return
-    end subroutine snapesm_restart_read
-
-    function snapesm_idx_restart_file(fldr, name) result(fnm)
-        ! Restart file of one driving index in the bundle folder fldr.
-        character(len=*), intent(IN) :: fldr, name
-        character(len=512) :: fnm
-        fnm = trim(fldr)//"/snapesm_idx_"//trim(name)//"_restart.nc"
-    end function snapesm_idx_restart_file
-
-    ! =====================================================================
     ! Parameter loading & setup
     ! =====================================================================
 
-    subroutine snapesm_par_load(sc, filename, group, domain, grid_name)
+    subroutine snapesm_par_load(sc, filename, group, domain, grid_name, idx)
         ! Read the full configuration: top-level knobs, the field registry
         ! (&<group>_field_<name>), the snapshot specs (&<group>_<name>), and the
-        ! indices (&<group>_idx_<name>: the tsgen parameters, read by tsgen_init,
-        ! plus the axis snap_lo/snap_hi read here).
+        ! axes (&<group>_axis_<name>: lo, hi, index), whose indices must be in
+        ! the registry idx.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         character(len=*),      intent(IN)    :: group      ! base group (already domain-suffixed)
         character(len=*),      intent(IN)    :: domain
         character(len=*),      intent(IN)    :: grid_name
+        type(indices_class),   intent(IN)    :: idx
 
         character(len=64) :: names(SNP_MAX)
-        character(len=64) :: snap_lo, snap_hi
-        character(len=256):: igroup
+        character(len=64) :: lo, hi
+        character(len=256):: agroup
         integer           :: i, j
 
         sc%par%group     = group
@@ -729,31 +642,32 @@ contains
                                     trim(names(i)), sc%par%ref_name)
         end do
 
-        ! --- indices: names and axes (tsgen_init reads the rest of the group) ---
+        ! --- axes: two snapshots and a registry index -------------------------
         names = ""
-        call nml_read(filename, group, "indices", names, init=.TRUE.)
-        sc%par%n_idx = count(len_trim(names) > 0)
-        if (allocated(sc%idx))      deallocate(sc%idx)
-        if (allocated(sc%idx_name)) deallocate(sc%idx_name)
-        if (allocated(sc%idx_lo))   deallocate(sc%idx_lo)
-        if (allocated(sc%idx_hi))   deallocate(sc%idx_hi)
-        allocate(sc%idx(sc%par%n_idx))
-        allocate(sc%idx_name(sc%par%n_idx))
-        allocate(sc%idx_lo(sc%par%n_idx))
-        allocate(sc%idx_hi(sc%par%n_idx))
-        do i = 1, sc%par%n_idx
-            sc%idx_name(i) = trim(names(i))
-            igroup = trim(group)//"_idx_"//trim(names(i))
-            call nml_read(filename, trim(igroup), "snap_lo", snap_lo, init=.TRUE.)
-            call nml_read(filename, trim(igroup), "snap_hi", snap_hi, init=.TRUE.)
-            sc%idx_lo(i) = snapshot_position(sc, snap_lo, "snap_lo of &"//trim(igroup))
-            sc%idx_hi(i) = snapshot_position(sc, snap_hi, "snap_hi of &"//trim(igroup))
+        call nml_read(filename, group, "axes", names, init=.TRUE.)
+        sc%par%n_axis = count(len_trim(names) > 0)
+        if (allocated(sc%axis)) deallocate(sc%axis)
+        allocate(sc%axis(sc%par%n_axis))
+        do i = 1, sc%par%n_axis
+            agroup = trim(group)//"_axis_"//trim(names(i))
+            sc%axis(i)%name = trim(names(i))
+            call nml_read(filename, trim(agroup), "lo",    lo,                 init=.TRUE.)
+            call nml_read(filename, trim(agroup), "hi",    hi,                 init=.TRUE.)
+            call nml_read(filename, trim(agroup), "index", sc%axis(i)%index,   init=.TRUE.)
+            sc%axis(i)%lo = snapshot_position(sc, lo, "lo of &"//trim(agroup))
+            sc%axis(i)%hi = snapshot_position(sc, hi, "hi of &"//trim(agroup))
+            if (.not. indices_has(idx, sc%axis(i)%index)) then
+                write(*,*) "snapesm:: Error: index '"//trim(sc%axis(i)%index)//"' (index of &"// &
+                           trim(agroup)//") is not in [indices] names."
+                stop
+            end if
+            sc%axis(i)%f = 0.0_wp
         end do
 
-        ! --- field indices -> positions in sc%idx -------------------------------
+        ! --- field axes -> positions in sc%axis -------------------------------
         do i = 1, sc%par%n_field
-            do j = 1, sc%registry(i)%n_index
-                sc%registry(i)%idx_k(j) = index_position(sc, sc%registry(i)%index(j), &
+            do j = 1, sc%registry(i)%n_axis
+                sc%registry(i)%axis_k(j) = axis_position(sc, sc%registry(i)%axes(j), &
                                 "field "//trim(sc%registry(i)%name))
             end do
         end do
@@ -773,17 +687,17 @@ contains
         stop
     end function snapshot_position
 
-    integer function index_position(sc, name, what) result(k)
-        ! Position of the index `name` in sc%idx; stops if it is not listed.
+    integer function axis_position(sc, name, what) result(k)
+        ! Position of the axis `name` in sc%axis; stops if it is not listed.
         type(snapesm_class), intent(IN) :: sc
         character(len=*),    intent(IN) :: name, what
-        do k = 1, sc%par%n_idx
-            if (trim(sc%idx_name(k)) == trim(name)) return
+        do k = 1, sc%par%n_axis
+            if (trim(sc%axis(k)%name) == trim(name)) return
         end do
-        write(*,*) "snapesm:: Error: index '"//trim(name)//"' ("//trim(what)// &
-                   ") is not in the indices list."
+        write(*,*) "snapesm:: Error: axis '"//trim(name)//"' ("//trim(what)// &
+                   ") is not in the axes list."
         stop
-    end function index_position
+    end function axis_position
 
     subroutine read_field_spec(fs, filename, group, name, combine_default)
         implicit none
@@ -794,21 +708,21 @@ contains
         fs%kind           = "atm_temp"
         fs%combine        = combine_default
         fs%blend          = "linear"
-        fs%index          = ""
-        fs%n_index        = 0
-        fs%idx_k          = 0
+        fs%axes           = ""
+        fs%n_axis         = 0
+        fs%axis_k         = 0
         fs%enabled        = .TRUE.
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
         fs%seasonal_synth = .FALSE.
-        ! Only the keys the current model uses are read (kind/blend/index). The
+        ! Only the keys the current model uses are read (kind/blend/axes). The
         ! remaining knobs (combine/enabled/*_flags) keep their struct defaults; they
         ! cannot be made optional in the namelist until nml gains an ignore-missing
         ! mode (it errors on any absent key), so they are not read here yet.
         call nml_read(filename, group, "kind",  fs%kind,  init=.TRUE.)
         call nml_read(filename, group, "blend", fs%blend, init=.TRUE.)
-        call nml_read(filename, group, "index", fs%index, init=.TRUE.)
-        fs%n_index = count(len_trim(fs%index) > 0)
+        call nml_read(filename, group, "axes",  fs%axes,  init=.TRUE.)
+        fs%n_axis = count(len_trim(fs%axes) > 0)
 
         return
     end subroutine read_field_spec
