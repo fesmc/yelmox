@@ -152,7 +152,7 @@ All insolation users (chion, smbpal) take an **orbit** instead of a time:
 ```
 
 - Replaces `const_insol`/`const_kabp` in `[surface_chion]` and smbpal.
-- **Library: fesmc/insol.** yelmox still vendors an older copy under
+- **Library: fesmc/insol, branch `main`.** yelmox still vendors an older copy under
   `libs/insol/` (module state, the same Laskar tables);
   fesmc/insol is its successor: a standalone library (no netCDF, no
   fesm-utils), state object `insol_class` / `orbit_class`, Laskar et al.
@@ -358,7 +358,7 @@ Proposal, with a global anomaly as the single input:
 - The ice-sheet domains take the same index with their own regional gain
   (`anom` with `f_ta = ampl_north`, or a snapshot axis): explicit in the par
   file.
-- `obm2ism` becomes the modifier `ocn_obm` (mode `absolute`, as now, or
+- `obm2ism` becomes the modifier `ocn_obm` (mode `absolute` by default, as now, or
   `anomaly`: reference ocean + box anomaly, keeping the pattern); the box
   temperatures enter as model-set indices (`obm_tn`, `obm_ts`, section 4).
 - Switches stay; the order of the exchange is unchanged.
@@ -425,7 +425,7 @@ the paper repo). The esm backend keeps its own par_file for now.
 original files (`fesmc/Montoya2008-CLIMBER3a`, `TS_ANN`, `TS_JJA`, `PRC_ANN`).
 PMIP3 has ann, JJA, DJF; PMIP4 and CLIMBER-X are monthly. Today the
 two-field synthesis (`[ann, sum]` → 12 months) takes the second field as the
-hemisphere's summer. Proposal: a snapshot names the season of its second
+hemisphere's summer. Decided (tentatively): a snapshot names the season of its second
 field (`tas_season = "jja"` or `"djf"`, default: the summer of the
 hemisphere), and the synthesis builds the cycle from the annual mean and that
 season. CLIMBER-3α then works in the south too (JJA as the winter),
@@ -443,7 +443,7 @@ PMIP3 takes DJF in the south as now.
 | Pyrenees | snapshots `pd` | orb | `anom` f_ta 10 | |
 | SRG (`const`) | snapshots `pd` | none | none | |
 | GRL paleo A | snapshots, axis a (+ b) | glacial (+ millennial) | `ocn_fraction` or ocean axis | `[ice_bnd]` |
-| GRL paleo B | snapshots, Buizert `hi` over baseline `lo`; Badgeley `lo=""` | const 1 | ocean: question 4 | `[ice_bnd]`, LGM steady = `tstep_method const` at -21 ka |
+| GRL paleo B | snapshots, Buizert `hi` over baseline `lo`; Badgeley `lo=""` | const 1 | ocean: any of `ocn_fraction`, CLIMBER ocean snapshots, TraCE-21ka (selectable) | `[ice_bnd]`, LGM steady = `tstep_method const` at -21 ka |
 | rembo GRL | rembo + snapshots ocean-only | ramp index | rembo reads the `anom` gains itself | |
 | Bipolar | snapshots per domain | gmt (+ glacial) | `anom` per domain, `ocn_obm` | `[obm_forcing]` |
 | Ramps / hysteresis | snapshots | feedback index | `anom` | kill, restart every Δf |
@@ -508,21 +508,20 @@ All on dev; 2.4-beta stays frozen.
 | 7 | yelmox | remove snapclim; rename snapesm → snapshots; docs, CHANGELOG | |
 | 8 | fesm-utils | tsgen windowed modifiers (replaces `f_hol`), RNG state in restart | |
 | 9 | yelmo + yelmox | `H_ice_fix`, `[ice_bnd]`, GRL-PAL base config, GRL paleo A then B | |
+| 9b | FesmData | TraCE-21ka ocean product (time-varying `to`, `so`; not in v2, v1 had `OCN-RECON-TRACE21ka`), global, for the GRL paleo B ocean | |
 
 LIS moves to the new keys after phases 1-5 (paper repo par files, on dev).
 
 ## 15. Decisions needed
 
-Answered 2026-10-18: questions on the name (`snapshots`), model-set indices
-(same registry), insolation (fesmc/insol as a dependency), `ocn_fraction`
-(sea-level anomaly), OBM (global anomaly), global grid (GLOBAL-1DEG, path
-keywords). Open:
+All answered (2026-10-18): name `snapshots`; model-set indices in the same
+registry; insolation from fesmc/insol `main` as a dependency; `ocn_fraction`
+on the sea-level anomaly; OBM from one global anomaly; GLOBAL-1DEG with path
+keywords; `tas_season` for two-field snapshots (tentative); `ocn_obm`
+absolute by default, `anomaly` as an option; GRL paleo B ocean: all three
+options (`ocn_fraction`, CLIMBER ocean snapshots, a TraCE-21ka product)
+selectable, for comparison.
 
-1. Seasons of a two-field snapshot: `tas_season` (section 9), so
-   CLIMBER-3α (ann + JJA only) can be used in the south?
-2. `ocn_obm`: absolute (as now) by default, `anomaly` as an option?
-3. insol: which branch for the dependency (main, or a dev branch for the
-   fixed-orbit work)? Reproduce the vendored copy exactly (S0,
-   `coszm_kind`), or accept small differences?
-4. GRL paleo B ocean: `ocn_fraction`, CLIMBER snapshots, or a TraCE product
-   (GRL plan Q9; its other questions stay open).
+Left for later: whether insol reproduces the vendored copy exactly (decide
+after the comparison of section 5); the other open questions of
+`_grl-paleo-plan.md`.
