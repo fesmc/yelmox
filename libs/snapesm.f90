@@ -44,7 +44,7 @@ module snapesm
     use nml
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use kryos_forcing, only : indices_class, indices_value, indices_has
-    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
     use gaussian_filter, only : filter_gaussian
     use coordinates, only : grid_class
 
@@ -556,7 +556,9 @@ contains
         ! Read the full configuration: top-level knobs, the field registry
         ! (&<group>_field_<name>), the snapshot specs and their field bindings
         ! (&<group>_<name>), and the axes (&<group>_axis_<name>: lo, hi, index),
-        ! whose indices must be in the registry idx.
+        ! whose indices must be in the registry idx. Keys not set take the
+        ! defaults of input/yelmox_defaults.nml, the named groups those of the
+        ! templates snap_field, snap_snapshot and snap_axis.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
@@ -575,25 +577,25 @@ contains
         sc%par%grid_name = grid_name
 
         ! --- top-level --------------------------------------------------------
-        sc%par%var_defs  = ""
-        sc%par%grid_global = "GLOBAL-1DEG"
-        sc%par%combine   = "anomaly"
-        sc%par%ref_name  = ""
-        sc%par%lapse     = 0.0_wp
-        sc%par%f_p       = 0.0_wp
-        sc%par%f_p_ne    = 1.0_wp
-        call nml_read(filename, group, "var_defs",  sc%par%var_defs,  init=.TRUE.)
-        if (nml_has_param(filename, group, "grid_global")) &
-            call nml_read(filename, group, "grid_global", sc%par%grid_global, init=.TRUE.)
-        call nml_read(filename, group, "combine",   sc%par%combine,   init=.TRUE.)
-        call nml_read(filename, group, "ref_name",  sc%par%ref_name,  init=.TRUE.)
-        call nml_read(filename, group, "lapse",     sc%par%lapse,     init=.TRUE.)
-        call nml_read(filename, group, "f_p",       sc%par%f_p,       init=.TRUE.)
-        call nml_read(filename, group, "f_p_ne",    sc%par%f_p_ne,    init=.TRUE.)
+        call nml_validate(filename, def_file, group, defaults_group="snap")
+        call nml_read(filename, group, "var_defs",    sc%par%var_defs,    init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
+        call nml_read(filename, group, "grid_global", sc%par%grid_global, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
+        call nml_read(filename, group, "combine",     sc%par%combine,     init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
+        call nml_read(filename, group, "ref_name",    sc%par%ref_name,    init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
+        call nml_read(filename, group, "lapse",       sc%par%lapse,       init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
+        call nml_read(filename, group, "f_p",         sc%par%f_p,         init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
+        call nml_read(filename, group, "f_p_ne",      sc%par%f_p_ne,      init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
 
         ! --- field registry ---------------------------------------------------
-        names = ""
-        call nml_read(filename, group, "fields", names, init=.TRUE.)
+        call nml_read(filename, group, "fields", names, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
         sc%par%n_field = count(len_trim(names) > 0)
         if (allocated(sc%registry)) deallocate(sc%registry)
         allocate(sc%registry(sc%par%n_field))
@@ -604,8 +606,8 @@ contains
         end do
 
         ! --- snapshots and their bindings ------------------------------------
-        names = ""
-        call nml_read(filename, group, "snapshots", names, init=.TRUE.)
+        call nml_read(filename, group, "snapshots", names, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
         sc%par%n_snap = count(len_trim(names) > 0)
         if (allocated(sc%snap)) deallocate(sc%snap)
         allocate(sc%snap(sc%par%n_snap))
@@ -617,17 +619,21 @@ contains
         sc%par%iref = snapshot_position(sc, sc%par%ref_name, "ref_name of &"//trim(group))
 
         ! --- axes: two snapshots (lo may be "") and a registry index ----------
-        names = ""
-        call nml_read(filename, group, "axes", names, init=.TRUE.)
+        call nml_read(filename, group, "axes", names, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap")
         sc%par%n_axis = count(len_trim(names) > 0)
         if (allocated(sc%axis)) deallocate(sc%axis)
         allocate(sc%axis(sc%par%n_axis))
         do i = 1, sc%par%n_axis
             agroup = trim(group)//"_axis_"//trim(names(i))
             sc%axis(i)%name = trim(names(i))
-            call nml_read(filename, trim(agroup), "lo",    lo,                 init=.TRUE.)
-            call nml_read(filename, trim(agroup), "hi",    hi,                 init=.TRUE.)
-            call nml_read(filename, trim(agroup), "index", sc%axis(i)%index,   init=.TRUE.)
+            call nml_validate(filename, def_file, trim(agroup), defaults_group="snap_axis")
+            call nml_read(filename, trim(agroup), "lo",    lo,               init=.TRUE., &
+                          defaults_file=def_file, defaults_group="snap_axis")
+            call nml_read(filename, trim(agroup), "hi",    hi,               init=.TRUE., &
+                          defaults_file=def_file, defaults_group="snap_axis")
+            call nml_read(filename, trim(agroup), "index", sc%axis(i)%index, init=.TRUE., &
+                          defaults_file=def_file, defaults_group="snap_axis")
             sc%axis(i)%lo = 0
             if (len_trim(lo) > 0) sc%axis(i)%lo = snapshot_position(sc, lo, "lo of &"//trim(agroup))
             sc%axis(i)%hi = snapshot_position(sc, hi, "hi of &"//trim(agroup))
@@ -793,24 +799,43 @@ contains
         character(len=*),       intent(IN)  :: filename, group, name, combine_default
 
         fs%name           = name
-        fs%kind           = "atm_temp"
         fs%combine        = combine_default
-        fs%blend          = "linear"
-        fs%axes           = ""
         fs%n_axis         = 0
         fs%axis_k         = 0
         fs%enabled        = .TRUE.
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
         fs%seasonal_synth = .FALSE.
-        ! Only the keys the current model uses are read (kind/blend/axes). The
-        ! remaining knobs (combine/enabled/*_flags) keep their struct defaults; they
-        ! cannot be made optional in the namelist until nml gains an ignore-missing
-        ! mode (it errors on any absent key), so they are not read here yet.
-        call nml_read(filename, group, "kind",  fs%kind,  init=.TRUE.)
-        call nml_read(filename, group, "blend", fs%blend, init=.TRUE.)
-        call nml_read(filename, group, "axes",  fs%axes,  init=.TRUE.)
+        ! Only the keys the current model uses are read (kind/blend/axes, template
+        ! snap_field); the remaining knobs (combine/enabled/*_flags) keep their
+        ! struct defaults. kind "" (default) is the kind of the field name.
+        call nml_validate(filename, def_file, group, defaults_group="snap_field")
+        call nml_read(filename, group, "kind",  fs%kind,  init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_field")
+        call nml_read(filename, group, "blend", fs%blend, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_field")
+        call nml_read(filename, group, "axes",  fs%axes,  init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_field")
         fs%n_axis = count(len_trim(fs%axes) > 0)
+
+        if (len_trim(fs%kind) == 0) then
+            select case(trim(name))
+                case("tas")
+                    fs%kind = "atm_temp"
+                case("pr")
+                    fs%kind = "atm_precip"
+                case("to")
+                    fs%kind = "ocn"
+                case("so")
+                    fs%kind = "ocn_salt"
+                case("zs")
+                    fs%kind = "elev"
+                case default
+                    write(*,*) "snapesm:: Error: &"//trim(group)//": unknown field '"// &
+                               trim(name)//"' (tas, pr, to, so, zs)."
+                    stop 1
+            end select
+        end if
 
         select case(trim(fs%blend))
             case("linear", "ratio", "const")
@@ -832,8 +857,9 @@ contains
     subroutine read_snapshot_spec(ss, filename, group, name, ref_name, registry, south)
         ! The spec of one snapshot and its bindings: per registry field, the
         ! var_defs group(s) under the field's name (key absent or "" = not bound).
-        ! tas_season (optional): the season of the second tas field of an annual
-        ! snapshot, "jja" or "djf" (default: the summer of the hemisphere).
+        ! tas_season: the season of the second tas field of an annual snapshot,
+        ! "jja" or "djf" ("", the default: the summer of the hemisphere). Unset
+        ! keys from the template snap_snapshot of the defaults file.
         implicit none
         type(snapshot_spec_class), intent(OUT) :: ss
         character(len=*),          intent(IN)  :: filename, group, name, ref_name
@@ -845,21 +871,21 @@ contains
 
         ss%name      = name
         ss%is_ref    = .FALSE.
-        ss%exp       = ""
-        if (nml_has_param(filename, group, "exp")) &
-            call nml_read(filename, group, "exp", ss%exp, init=.TRUE.)
-        ss%monthly   = .FALSE.
-        call nml_read(filename, group, "monthly",   ss%monthly,   init=.TRUE.)
-        ss%clim_sigma = 0.0_wp
-        if (nml_has_param(filename, group, "clim_sigma")) &
-            call nml_read(filename, group, "clim_sigma", ss%clim_sigma, init=.TRUE.)
-        ss%ocn_sigma = 0.0_wp
-        if (nml_has_param(filename, group, "ocn_sigma")) &
-            call nml_read(filename, group, "ocn_sigma", ss%ocn_sigma, init=.TRUE.)
-        ss%tas_season = "jja"
-        if (south) ss%tas_season = "djf"
-        if (nml_has_param(filename, group, "tas_season")) &
-            call nml_read(filename, group, "tas_season", ss%tas_season, init=.TRUE.)
+        call nml_validate(filename, def_file, group, defaults_group="snap_snapshot")
+        call nml_read(filename, group, "exp",        ss%exp,        init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_snapshot")
+        call nml_read(filename, group, "monthly",    ss%monthly,    init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_snapshot")
+        call nml_read(filename, group, "clim_sigma", ss%clim_sigma, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_snapshot")
+        call nml_read(filename, group, "ocn_sigma",  ss%ocn_sigma,  init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_snapshot")
+        call nml_read(filename, group, "tas_season", ss%tas_season, init=.TRUE., &
+                      defaults_file=def_file, defaults_group="snap_snapshot")
+        if (len_trim(ss%tas_season) == 0) then
+            ss%tas_season = "jja"
+            if (south) ss%tas_season = "djf"
+        end if
         select case(trim(ss%tas_season))
             case("jja", "djf")
                 ! ok
@@ -868,18 +894,15 @@ contains
                            trim(ss%tas_season)//"'; must be jja or djf."
                 stop 1
         end select
-        ! The reference snapshot is designated solely by the top-level ref_name
-        ! (an is_ref namelist key would have to be present in every snapshot group,
-        ! given nml's error-on-missing behavior).
+        ! The reference snapshot is designated solely by the top-level ref_name.
         if (trim(name) == trim(ref_name)) ss%is_ref = .TRUE.
 
         ! Bindings: 1 group (monthly) or 2 ([ann, season]; pr monthly: summed).
         allocate(ss%refs(size(registry),2), ss%nsrc(size(registry)))
         ss%refs = ""
         do f = 1, size(registry)
-            refs = ""
-            if (nml_has_param(filename, group, trim(registry(f)%name))) &
-                call nml_read(filename, group, trim(registry(f)%name), refs, init=.TRUE.)
+            call nml_read(filename, group, trim(registry(f)%name), refs, init=.TRUE., &
+                          defaults_file=def_file, defaults_group="snap_snapshot")
             ss%refs(f,:) = refs
             ss%nsrc(f)   = count(len_trim(refs) > 0)
             if (len_trim(refs(1)) == 0 .and. ss%nsrc(f) > 0) then

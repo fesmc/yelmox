@@ -83,7 +83,7 @@ $(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o $(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
 
-$(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90
+$(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90 $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \

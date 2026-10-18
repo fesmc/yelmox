@@ -11,7 +11,8 @@ module kryos_forcing
     ! bundle each time an index moves by more than its restart_every_df,
     ! folders restart-<n>); each index restarts from idx_<name>_restart.nc.
 
-    use nml,          only : nml_read, nml_has_param
+    use nml,          only : nml_read, nml_validate
+    use yelmox_nml,   only : def_file => yelmox_defaults_file
     use ncio,         only : nc_open, nc_close, nc_write, nc_time_index
     use precision,    only : wp, dp
     use tsgen,        only : tsgen_class, tsgen_init, tsgen_update, &
@@ -47,10 +48,11 @@ contains
 
     subroutine indices_init(idx, path_par, time)
         ! Read [indices] names and initialise each index from its tsgen group
-        ! [idx_<name>] at `time` (the forcing clock). Optional per index, besides
-        ! the tsgen keys: restart_every_df (default 0) and units (default "1").
-        ! An absent [indices] group or empty names give an empty registry. On a
-        ! restart run the caller then calls indices_restart_read.
+        ! [idx_<name>] at `time` (the forcing clock). Per index, besides the
+        ! tsgen keys: restart_every_df and units. Unset keys from the defaults
+        ! file (the template idx for [idx_<name>]). An absent [indices] group or
+        ! empty names give an empty registry. On a restart run the caller then
+        ! calls indices_restart_read.
         type(indices_class), intent(inout) :: idx
         character(len=*),    intent(in)    :: path_par
         real(dp),            intent(in)    :: time
@@ -59,9 +61,8 @@ contains
         character(len=128) :: group
         integer :: k, n
 
-        names = ""
-        if (nml_has_param(path_par, "indices", "names")) &
-            call nml_read(path_par, "indices", "names", names)
+        call nml_validate(path_par, def_file, "indices")
+        call nml_read(path_par, "indices", "names", names, init=.true., defaults_file=def_file)
         n = count(len_trim(names) > 0)
 
         if (allocated(idx%idx)) deallocate(idx%idx)
@@ -77,14 +78,14 @@ contains
             end if
             group = "idx_"//trim(ix%name)
 
-            ix%units = "1"
-            if (nml_has_param(path_par, trim(group), "units")) &
-                call nml_read(path_par, trim(group), "units", ix%units)
-            ix%restart_every_df = 0.0_wp
-            if (nml_has_param(path_par, trim(group), "restart_every_df")) &
-                call nml_read(path_par, trim(group), "restart_every_df", ix%restart_every_df)
+            call nml_validate(path_par, def_file, trim(group), defaults_group="idx")
+            call nml_read(path_par, trim(group), "units", ix%units, init=.true., &
+                          defaults_file=def_file, defaults_group="idx")
+            call nml_read(path_par, trim(group), "restart_every_df", ix%restart_every_df, &
+                          defaults_file=def_file, defaults_group="idx")
 
-            call tsgen_init(ix%tsg, path_par, time, group=trim(group))
+            call tsgen_init(ix%tsg, path_par, time, group=trim(group), &
+                            defaults_file=def_file, defaults_group="idx")
             ix%f_last_restart = ix%tsg%f_now
 
             write(*,*) "indices_init:: "//trim(ix%name)//" ("//trim(ix%tsg%par%method)// &

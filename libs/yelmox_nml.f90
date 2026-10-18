@@ -1,13 +1,18 @@
 module yelmox_nml
-    ! Namelist helpers shared by the yelmox forcing modules (snapesm, the
-    ! climate modifiers): the lookup of a varslice group in a list of
-    ! database files (var_defs).
+    ! Namelist helpers shared by the yelmox forcing modules (indices, snapesm,
+    ! the climate modifiers): the defaults file of their groups, and the
+    ! lookup of a varslice group in a list of database files (var_defs).
 
     use nml, only : nml_has_group
 
     implicit none
 
     private
+
+    ! Defaults (schema) of the forcing groups: every key is read with
+    ! nml_read(..., defaults_file = yelmox_defaults_file, defaults_group =
+    ! its template group), see the file's header.
+    character(len=*), parameter, public :: yelmox_defaults_file = "input/yelmox_defaults.nml"
 
     integer, parameter, public :: VAR_DEFS_MAX = 8   ! max files of a var_defs list
 

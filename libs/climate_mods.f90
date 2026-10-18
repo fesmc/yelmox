@@ -8,7 +8,9 @@ module climate_mods
     !   bias         -- static bias correction of the atmosphere
     ! (later ocn_obm and taper, between ocn_fraction and bias). Each is an
     ! optional namelist group with `active` (default off), suffixed by the
-    ! domain (anom<sfx>, ocn_fraction<sfx>, bias<sfx>).
+    ! domain (anom<sfx>, ocn_fraction<sfx>, bias<sfx>); unset keys (an absent
+    ! group: all) from the templates anom, ocn_fraction, bias of
+    ! input/yelmox_defaults.nml.
     !
     ! Contract: each modifier states what it touches in `now` (`ref` is never
     ! touched) and which backends it refuses; climate_mods_init checks every
@@ -32,14 +34,14 @@ module climate_mods
     !         annual totals. Refused for a backend with annual fields only (rembo).
 
     use precision,     only : wp
-    use nml,           only : nml_read, nml_has_param
+    use nml,           only : nml_read, nml_validate
     use ncio,          only : nc_write
     use coordinates,   only : grid_class
     use varslice,      only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use regions,       only : regions_class, regions_select
     use climate_out,   only : climate_out_class
     use kryos_forcing, only : indices_class, indices_value, indices_has
-    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
 
     implicit none
 
@@ -191,16 +193,15 @@ contains
         type(indices_class),      intent(in)    :: idx
         type(climate_caps_class), intent(in)    :: caps
 
-        anom%group  = group
-        anom%active = .false.
-        if (nml_has_param(filename, group, "active")) &
-            call nml_read(filename, group, "active", anom%active)
+        anom%group = group
+        call nml_validate(filename, def_file, group, defaults_group="anom")
+        call nml_read(filename, group, "active", anom%active, defaults_file=def_file, defaults_group="anom")
         if (.not. anom%active) return
 
-        call nml_read(filename, group, "index", anom%index)
-        call nml_read(filename, group, "f_ta",  anom%f_ta)
-        call nml_read(filename, group, "f_to",  anom%f_to)
-        call nml_read(filename, group, "f_so",  anom%f_so)
+        call nml_read(filename, group, "index",  anom%index,  defaults_file=def_file, defaults_group="anom")
+        call nml_read(filename, group, "f_ta",   anom%f_ta,   defaults_file=def_file, defaults_group="anom")
+        call nml_read(filename, group, "f_to",   anom%f_to,   defaults_file=def_file, defaults_group="anom")
+        call nml_read(filename, group, "f_so",   anom%f_so,   defaults_file=def_file, defaults_group="anom")
 
         if (.not. indices_has(idx, anom%index)) then
             write(*,*) "climate_mods_init:: error: ["//trim(group)//"] index = '"// &
@@ -279,14 +280,13 @@ contains
         type(anom_class),         intent(in)    :: anom
         type(regions_class),      intent(in)    :: reg
 
-        ocf%group  = group
-        ocf%active = .false.
-        if (nml_has_param(filename, group, "active")) &
-            call nml_read(filename, group, "active", ocf%active)
+        ocf%group = group
+        call nml_validate(filename, def_file, group, defaults_group="ocn_fraction")
+        call nml_read(filename, group, "active", ocf%active, defaults_file=def_file, defaults_group="ocn_fraction")
         if (.not. ocf%active) return
 
-        call nml_read(filename, group, "f_to",   ocf%f_to)
-        call nml_read(filename, group, "region", ocf%region)
+        call nml_read(filename, group, "f_to",   ocf%f_to,   defaults_file=def_file, defaults_group="ocn_fraction")
+        call nml_read(filename, group, "region", ocf%region, defaults_file=def_file, defaults_group="ocn_fraction")
 
         if (caps%has_ocn_shelf .or. .not. caps%has_tsl_ann) then
             write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs ocean profiles &
@@ -341,10 +341,9 @@ contains
         character(len=256) :: grp_dtas, grp_fpr
         integer :: nx, ny
 
-        bias%group  = group
-        bias%active = .false.
-        if (nml_has_param(filename, group, "active")) &
-            call nml_read(filename, group, "active", bias%active)
+        bias%group = group
+        call nml_validate(filename, def_file, group, defaults_group="bias")
+        call nml_read(filename, group, "active", bias%active, defaults_file=def_file, defaults_group="bias")
         if (.not. bias%active) return
 
         if (.not. caps%monthly) then
@@ -354,14 +353,14 @@ contains
             error stop 1
         end if
 
-        var_defs = ""
-        grp_dtas = ""
-        grp_fpr  = ""
-        call nml_read(filename, group, "var_defs", var_defs, init=.true.)
-        call nml_read(filename, group, "dtas",     grp_dtas)
-        call nml_read(filename, group, "fpr",      grp_fpr)
-        call nml_read(filename, group, "f_tas",    bias%f_tas)
-        call nml_read(filename, group, "f_pr",     bias%f_pr)
+        call nml_read(filename, group, "var_defs", var_defs,   init=.true., &
+                      defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "dtas",     grp_dtas,   init=.true., &
+                      defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "fpr",      grp_fpr,    init=.true., &
+                      defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "f_tas",    bias%f_tas, defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "f_pr",     bias%f_pr,  defaults_file=def_file, defaults_group="bias")
         if (all(len_trim(var_defs) == 0)) var_defs(1) = filename
 
         nx = grid%G%nx
