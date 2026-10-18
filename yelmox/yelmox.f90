@@ -21,8 +21,7 @@ program yelmox
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : indices_class, indices_init, indices_update, indices_kill, &
                                indices_restart_due, indices_restart_fldr, &
-                               indices_restart_read, indices_write_step, &
-                               tsforcing_class, tsforcing_init, tsforcing_set_anom
+                               indices_restart_read, indices_write_step
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
@@ -52,12 +51,10 @@ program yelmox
 
     ! Indices ([indices], one tsgen series [idx_<name>] each), owned by the
     ! driver and advanced once per step on the forcing clock time_rel; read by
-    ! name by the climate (snapesm axes) and [tsforcing], which maps one index
-    ! onto the climate anomalies: dTa = f*f_ta, dTo = f*f_to, dSo = f*f_so. The
+    ! name by the climate (snapesm axes, the modifiers such as [anom]). The
     ! registry also owns the kill switch and the forcing-increment restarts
     ! (see libs/kryos_forcing.f90).
     type(indices_class)   :: idx
-    type(tsforcing_class) :: tsf
     real(wp) :: fvar
 
     ! Wall time of each part of the time loop (fesm-utils timer), accumulated
@@ -87,11 +84,10 @@ program yelmox
 
     ! Indices on the forcing clock, before the domain (its climate checks the
     ! indices it names) and the startup (the initial climate carries the same
-    ! index values and anomalies as the time loop). On a restart run, resume
-    ! them from the bundle; then [tsforcing] takes its index.
+    ! index values as the time loop). On a restart run, resume them from the
+    ! bundle.
     call indices_init(idx, path_par, ts%time_rel)
     if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
-    call tsforcing_init(tsf, path_par, idx)
 
     ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
     ! reads the timeline values it needs from the same [run_step] group.
@@ -105,9 +101,9 @@ program yelmox
     ! then re-establish the climate/smb and marine-shelf forcing from the
     ! restored state (the bundle does not hold them), so the first step and the
     ! first output see a valid boundary state.
-    call domain_startup(dom, ts, bsl, trim(restart), idx, tsf=tsf)
+    call domain_startup(dom, ts, bsl, trim(restart), idx)
     if (trim(restart) /= "None") then
-        call step_climate(dom, ts, idx, tsf)
+        call step_climate(dom, ts, idx)
         call step_surface(dom, ts)
         call step_shelf(dom, ts)
     end if
@@ -182,10 +178,9 @@ program yelmox
 
         ! Indices: advance every series once per step on the forcing clock
         ! (feedback methods need the response-derivative window); response
-        ! variable = ice volume [Gt]. Then the [tsforcing] anomalies.
+        ! variable = ice volume [Gt].
         fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
         call indices_update(idx, ts%time_rel, var=fvar)
-        call tsforcing_set_anom(tsf, idx)
         call timer_step(tmr, tt_forcing)
 
         ! === coupling sequence ===
@@ -201,7 +196,7 @@ program yelmox
         call timer_step(tmr, tt_icesheet)
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call timer_step(tmr, tt_couple_htopo)
-        call step_climate(dom, ts, idx, tsf)   ! climate (dt_clim cadence)
+        call step_climate(dom, ts, idx)        ! climate (dt_clim cadence)
         call timer_step(tmr, tt_climate)
         call step_surface(dom, ts)        ! surface mass balance + temperature
         call timer_step(tmr, tt_surface)

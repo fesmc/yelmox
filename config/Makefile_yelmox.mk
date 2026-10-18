@@ -42,6 +42,11 @@ $(objdir)/snapesm.o: $(libdir)/snapesm.f90 $(objdir)/kryos_forcing.o
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
+# Climate modifiers on climate_out after the backend (anom, ...), fixed order.
+$(objdir)/climate_mods.o: $(libdir)/climate_mods.f90 $(objdir)/climate_out.o \
+						$(objdir)/kryos_forcing.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
 # REMBO for the rembo climate backend: the adapter over rembo1 with rembo=1,
 # else a stub with the same interface that stops if climate = "rembo".
 $(objdir)/climate_rembo.o: $(libdir)/climate_rembo.f90
@@ -52,7 +57,7 @@ $(objdir)/climate_rembo_stub.o: $(libdir)/climate_rembo_stub.f90
 
 # The climate backend of a domain ([comps] climate = snapclim | snapesm | esm
 # | rembo), chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
-$(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o \
+$(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o $(objdir)/climate_mods.o \
 						$(objdir)/snapclim.o $(objdir)/snapesm.o $(objdir)/esm_forcing.o \
 						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o $(climate_rembo_obj)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
@@ -199,6 +204,7 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/smb_simple.o \
 					    $(objdir)/surface_chion.o \
 					    $(objdir)/climate_out.o \
+					    $(objdir)/climate_mods.o \
 					    $(climate_rembo_obj) \
 					    $(objdir)/yelmox_climate.o \
 					    $(objdir)/snapclim.o \

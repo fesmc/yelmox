@@ -9,10 +9,10 @@ module yelmox_climate
     !
     ! Presents one interface (climate_init / climate_update) over the backends,
     ! filling a `climate_out_class`; the domain and its coupling read only that.
-    ! The driver's indices registry is read by snapesm (its axes); the driver's
-    ! transient forcing (tsforcing: one index and the gains f_ta, f_to, f_so) is
-    ! handed to the backend, which applies it in its own way.
-    ! An optional static bias correction ([climate_bias]) is applied to the
+    ! The driver's indices registry is read by snapesm (its axes) and by the
+    ! climate modifiers (climate_mods), applied to `climate_out` after the
+    ! backend in a fixed order; rembo reads [anom] itself (rembo_update).
+    ! An optional static bias correction ([climate_bias]) is applied last, to the
     ! monthly air temperature and precipitation of any backend but rembo.
 
     use precision,     only : wp, dp
@@ -30,7 +30,8 @@ module yelmox_climate
                               esm_forcing_update, esm_variability_update, esm_summer_mean, &
                               esm_lapse_monthly
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
-    use kryos_forcing, only : indices_class, tsforcing_class
+    use kryos_forcing, only : indices_class, indices_value
+    use climate_mods,  only : climate_mods_class, climate_mods_init, climate_mods_apply
     use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_restart_write
     use regions,       only : regions_class, regions_basin_ids
 
@@ -51,7 +52,7 @@ module yelmox_climate
     end type esm_ctl_class
 
     ! State of the rembo backend beyond the climate products: REMBO's summer
-    ! air temperature and the anomalies applied from the transient forcing.
+    ! air temperature and the anomalies applied from [anom].
     type rembo_state_class
         real(wp), allocatable :: ta_sum(:,:)     ! [K] near-surface air temperature (summer)
         real(wp) :: dT_sum = 0.0_wp              ! [K] summer air temperature anomaly
@@ -80,6 +81,7 @@ module yelmox_climate
         type(esm_forcing_class) :: esm
         type(esm_ctl_class)     :: esm_ctl
         type(rembo_state_class) :: rembo
+        type(climate_mods_class):: mods          ! modifiers after the backend
         type(climate_bias_class):: bias
         real(wp), allocatable   :: basins(:,:)   ! basin ids on the climate grid (esm: [esm] basins)
     end type yelmox_climate_class
@@ -96,7 +98,8 @@ contains
     subroutine climate_init(cl, method, filename, domain, grid, time, reg, &
                             south, sfx, timeline_group, smb_direct, idx)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
-        ! idx: the driver's indices registry (snapesm checks its axes against it).
+        ! idx: the driver's indices registry (snapesm and the modifiers check the
+        ! indices they name against it).
         ! smb_direct: the surface mass balance is taken from the climate
         ! ([comps] surface_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
@@ -158,6 +161,11 @@ contains
                            trim(cl%method)
                 error stop 1
         end select
+
+        ! The modifiers, checked against the backend. The backend supplies the
+        ! surface mass balance exactly when it is taken from it (smb_direct:
+        ! esm with use_smb, rembo; checked above).
+        call climate_mods_init(cl%mods, filename, sfx, idx, cl%method, has_smb=smb_direct)
 
         call climate_bias_init(cl%bias, filename, domain, grid, "climate_bias"//trim(sfx))
         if (cl%bias%active .and. trim(cl%method) == "rembo") then
@@ -259,19 +267,14 @@ contains
     end subroutine climate_bias_apply
 
     subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
-                              domain, dx, dtt, mshlf, idx, tsf, init)
-        ! Update the backend on the climate grid and fill `out`. The geometry is
-        ! the domain's, on the climate grid, with its present-day surface
-        ! (z_srf_ref); the marine shelf lends its parameters to the esm ocean,
-        ! which is interpolated to the shelf base here. idx is the driver's
-        ! indices registry, advanced to the forcing time; snapesm reads its axes
-        ! from it.
-        !
-        ! With an active transient forcing, its spatially homogeneous anomalies
-        ! (dTa = f_now*f_ta, dTo = f_now*f_to, dSo = f_now*f_so) go to the backend:
-        ! snapclim uses them in place of its own index in its "anom" modes;
-        ! snapesm adds them on top in every mode; esm has its own forcing; rembo
-        ! maps them its own way (see rembo_update).
+                              domain, dx, dtt, mshlf, idx, init)
+        ! Update the backend on the climate grid and fill `out`, then its
+        ! elevation dependence, the modifiers (climate_mods) and the bias
+        ! correction. The geometry is the domain's, on the climate grid, with its
+        ! present-day surface (z_srf_ref); the marine shelf lends its parameters
+        ! to the esm ocean, which is interpolated to the shelf base here. idx is
+        ! the driver's indices registry, advanced to the forcing time; snapesm
+        ! (its axes), the modifiers and rembo ([anom]) read it.
         !
         ! snapclim, snapesm and rembo are evaluated at the forcing time time_rel
         ! (with tstep_method = "const", time is the elapsed time and time_rel the
@@ -286,14 +289,10 @@ contains
         real(dp),         intent(in) :: dtt              ! [yr] time step of the run
         type(marshelf_class),  intent(in) :: mshlf
         type(indices_class),   intent(in) :: idx
-        type(tsforcing_class), intent(in), optional :: tsf
         logical,               intent(in), optional :: init
 
-        logical  :: forced, is_init
+        logical  :: is_init
         real(dp) :: time
-
-        forced = .false.
-        if (present(tsf)) forced = tsf%active
 
         is_init = .false.
         if (present(init)) is_init = init
@@ -302,13 +301,7 @@ contains
 
         select case(trim(cl%method))
             case("snapclim")
-                if (forced) then
-                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
-                                         dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx)
-                else
-                    call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
-                                         dx=dx)
-                end if
+                call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, dx=dx)
 
                 ! snapclim's reference climate is clim0.
                 out%now%tas     = cl%snapclim%now%tas
@@ -330,13 +323,7 @@ contains
                 out%ref%depth   = cl%snapclim%clim0%depth
 
             case("snapesm")
-                if (forced) then
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, &
-                                        dTa=tsf%dTa, dTo=tsf%dTo, dSo=tsf%dSo, dx=dx)
-                else
-                    call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, &
-                                        dx=dx)
-                end if
+                call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, dx=dx)
 
                 out%now%tas     = cl%snapesm%now%tas
                 out%now%pr      = cl%snapesm%now%pr
@@ -362,14 +349,13 @@ contains
 
             case("rembo")
                 call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
-                                  forced, is_init, tsf)
+                                  idx, is_init)
         end select
-
-        if (cl%bias%active) call climate_bias_apply(cl%bias, out)
 
         ! The elevation dependence of the atmosphere, to move it to another surface
         ! (kryos_coupling): its surface z_srf, the monthly lapse rate and the
-        ! precipitation sensitivity, as the backend applies them. rembo: none.
+        ! precipitation sensitivity, as the backend applies them (anom reads
+        ! beta_p). rembo: none.
         out%now%z_srf = z_srf
         if (.not. allocated(out%now%beta_p)) allocate(out%now%beta_p(size(z_srf,1),size(z_srf,2)))
         select case(trim(cl%method))
@@ -386,6 +372,10 @@ contains
                 out%lapse       = 0.0_wp
                 out%now%beta_p  = 0.0_wp
         end select
+
+        call climate_mods_apply(cl%mods, out, idx, cl%method)
+
+        if (cl%bias%active) call climate_bias_apply(cl%bias, out)
 
     end subroutine climate_update
 
@@ -482,6 +472,11 @@ contains
 
         select case(trim(cl%method))
             case("snapesm")
+                ! The monthly atmosphere as applied (after the modifiers), then
+                ! snapesm's own state (axes, sea-level and summer temperature).
+                call write3D("tas",     out%now%tas,     "month", "K",    "Near-surface air temperature")
+                call write3D("pr",      out%now%pr,      "month", "mm/d", "Precipitation")
+                call write2D("tsl_ann", out%now%tsl_ann, "K", "Sea-level air temperature (ann)")
                 call snapesm_write_step(cl%snapesm, filename, ncid, n)
             case("esm")
                 call write_esm()
@@ -838,13 +833,15 @@ contains
     ! ===== rembo backend ===================================================
 
     subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
-                            forced, init, tsf)
+                            idx, init)
         ! REMBO's atmosphere and surface mass balance, and the ocean from snapclim
-        ! (at `time`, as for the snapclim backend). The transient forcing maps
-        ! onto REMBO's anomalies: the summer air temperature dT_sum = f_now*f_ta,
-        ! the annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6), and the
-        ! ocean dT_ocn = dT_ann*f_to, added to a snapclim ocean held at its
-        ! reference (ocn_type = "const").
+        ! (at `time`, as for the snapclim backend). The exception to the
+        ! modifiers: REMBO needs the anomaly before it runs, so it reads [anom]
+        ! itself (climate_mods skips anom for rembo). The index f maps onto
+        ! REMBO's anomalies: the summer air temperature dT_sum = f*f_ta, the
+        ! annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6), and the ocean
+        ! dT_ocn = dT_ann*f_to, added to a snapclim ocean held at its reference
+        ! (ocn_type = "const"); f_so is unused.
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
         type(tstep_class),          intent(in)    :: ts
@@ -852,18 +849,18 @@ contains
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
-        logical,          intent(in) :: forced, init
-        type(tsforcing_class), intent(in), optional :: tsf
+        type(indices_class), intent(in) :: idx
+        logical,          intent(in) :: init
 
         integer :: nx, ny
 
         nx = size(z_srf,1)
         ny = size(z_srf,2)
 
-        if (forced) then
-            cl%rembo%dT_sum = tsf%dTa
+        if (cl%mods%anom%active) then
+            cl%rembo%dT_sum = indices_value(idx, cl%mods%anom%index) * cl%mods%anom%f_ta
             cl%rembo%dT_ann = 1.3_wp * cl%rembo%dT_sum
-            cl%rembo%dT_ocn = cl%rembo%dT_ann * tsf%f_to
+            cl%rembo%dT_ocn = cl%rembo%dT_ann * cl%mods%anom%f_to
         else
             cl%rembo%dT_sum = 0.0_wp
             cl%rembo%dT_ann = 0.0_wp

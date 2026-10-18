@@ -1,20 +1,15 @@
 module kryos_forcing
-    ! Driver-owned forcing: the indices registry and the homogeneous anomaly of
-    ! [tsforcing].
+    ! Driver-owned forcing: the indices registry.
     !
     ! Indices: named scalar series ([indices] names = "a" "b"), each a tsgen
     ! group [idx_<name>], advanced once per step on the forcing clock with the
     ! response variable (ice volume) and read by name by their consumers (the
-    ! snapesm axes, [tsforcing]). One registry per run, held by the driver like
-    ! bsl -- deliberately NOT part of kryos_domain, so every domain of a
-    ! multi-domain driver reads the same indices. The registry also holds the
+    ! snapesm axes, the climate modifiers). One registry per run, held by the
+    ! driver like bsl -- deliberately NOT part of kryos_domain, so every domain
+    ! of a multi-domain driver reads the same indices. The registry also holds the
     ! kill switch (any index tripped) and the forcing-increment restarts (a
     ! bundle each time an index moves by more than its restart_every_df,
     ! folders restart-<n>); each index restarts from idx_<name>_restart.nc.
-    !
-    ! [tsforcing]: one index mapped onto homogeneous climate anomalies by the
-    ! gains (dTa = f*f_ta, dTo = f*f_to, dSo = f*f_so), applied by the climate
-    ! backend in its own way (yelmox_climate).
 
     use nml,          only : nml_read, nml_has_param
     use ncio,         only : nc_open, nc_close, nc_write, nc_time_index
@@ -42,22 +37,9 @@ module kryos_forcing
         integer :: counter_restart = 0                  ! forcing-increment restarts written
     end type indices_class
 
-    ! Homogeneous anomaly from one index; phase 1b replaces it by the anom modifier.
-    type tsforcing_class
-        logical           :: active = .false.
-        character(len=64) :: index  = ""        ! the index driving the anomalies
-        real(wp) :: f_ta = 1.0_wp               ! [K]   dTa = f * f_ta
-        real(wp) :: f_to = 0.0_wp               ! [K]   dTo = f * f_to
-        real(wp) :: f_so = 0.0_wp               ! [psu] dSo = f * f_so
-        real(wp) :: dTa  = 0.0_wp               ! derived anomalies
-        real(wp) :: dTo  = 0.0_wp
-        real(wp) :: dSo  = 0.0_wp
-    end type tsforcing_class
-
     public :: indices_class, indices_init, indices_update, indices_value, indices_has
     public :: indices_kill, indices_restart_due, indices_restart_fldr
     public :: indices_restart_write, indices_restart_read, indices_write_step
-    public :: tsforcing_class, tsforcing_init, tsforcing_set_anom
 
 contains
 
@@ -278,48 +260,5 @@ contains
 
         call nc_close(ncid)
     end subroutine indices_write_step
-
-    ! ===== [tsforcing]: homogeneous anomaly from one index ====================
-
-    subroutine tsforcing_init(tsf, path_par, idx)
-        ! Read [tsforcing] (active, index, gains) and set the anomalies from the
-        ! registry, which must hold the index when active. Call after
-        ! indices_init (and indices_restart_read on a restart run).
-        type(tsforcing_class), intent(inout) :: tsf
-        character(len=*),      intent(in)    :: path_par
-        type(indices_class),   intent(in)    :: idx
-
-        call nml_read(path_par, "tsforcing", "active", tsf%active)
-        call nml_read(path_par, "tsforcing", "index",  tsf%index)
-        call nml_read(path_par, "tsforcing", "f_ta",   tsf%f_ta)
-        call nml_read(path_par, "tsforcing", "f_to",   tsf%f_to)
-        call nml_read(path_par, "tsforcing", "f_so",   tsf%f_so)
-
-        if (tsf%active .and. .not. indices_has(idx, tsf%index)) then
-            write(*,*) "tsforcing_init:: error: [tsforcing] index = '"//trim(tsf%index)// &
-                       "' is not in [indices] names."
-            error stop 1
-        end if
-
-        call tsforcing_set_anom(tsf, idx)
-
-        if (tsf%active) &
-            write(*,*) "tsforcing:: active, index "//trim(tsf%index)//"; f_ta/f_to/f_so =", &
-                        tsf%f_ta, tsf%f_to, tsf%f_so
-    end subroutine tsforcing_init
-
-    subroutine tsforcing_set_anom(tsf, idx)
-        ! Map the current value of the index onto the three anomalies (zero when
-        ! inactive). Call after each indices_update.
-        type(tsforcing_class), intent(inout) :: tsf
-        type(indices_class),   intent(in)    :: idx
-        real(wp) :: f
-
-        f = 0.0_wp
-        if (tsf%active) f = indices_value(idx, tsf%index)
-        tsf%dTa = f * tsf%f_ta
-        tsf%dTo = f * tsf%f_to
-        tsf%dSo = f * tsf%f_so
-    end subroutine tsforcing_set_anom
 
 end module kryos_forcing

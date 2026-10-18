@@ -25,7 +25,7 @@ module kryos_startup
                                step_surface, step_shelf, couple_to_yelmo, &
                                couple_isostasy_to_yelmo, couple_surface_to_yelmo, &
                                check_isostasy_reference
-    use kryos_forcing,  only : indices_class, tsforcing_class, indices_restart_write
+    use kryos_forcing,  only : indices_class, indices_restart_write
     use yelmox_climate, only : climate_restart_write
 
     implicit none
@@ -54,7 +54,7 @@ contains
         call bsl_restart_read(bsl, trim(fldr)//"/bsl_restart.nc")
     end subroutine bsl_startup
 
-    subroutine domain_startup(dom, ts, bsl, restart, idx, restore_bsl, tsf)
+    subroutine domain_startup(dom, ts, bsl, restart, idx, restore_bsl)
         ! Establish the domain state after domain_init: cold start (restart
         ! == "None") builds the initial boundary state; otherwise the domain's
         ! restart bundle (folder `restart`) is restored and the hi-res hub rebuilt
@@ -73,7 +73,6 @@ contains
         character(len=*),  intent(in)    :: restart
         type(indices_class), intent(in)  :: idx
         logical, intent(in), optional    :: restore_bsl
-        type(tsforcing_class), intent(in), optional :: tsf   ! transient forcing (cold start)
 
         logical :: do_bsl
 
@@ -81,7 +80,7 @@ contains
         if (present(restore_bsl)) do_bsl = restore_bsl
 
         if (trim(restart) == "None") then
-            call domain_init_state(dom, ts, bsl, idx, tsf=tsf)
+            call domain_init_state(dom, ts, bsl, idx)
         else
             if (do_bsl) call bsl_startup(bsl, trim(restart))
             call domain_restart_read(dom, trim(restart), ts, bsl)
@@ -114,19 +113,18 @@ contains
         call indices_restart_write(idx, trim(bundle), time)
     end subroutine run_restart_write
 
-    subroutine domain_init_state(dom, ts, bsl, idx, tsf)
+    subroutine domain_init_state(dom, ts, bsl, idx)
         ! Build the initial boundary state and initialize the Yelmo state
         ! variables, then run the domain-specific cold-start setup.
         ! bsl is the shared, driver-owned sea level; the driver has already called
         ! bsl_update for the initial time, so this routine only consumes it. The
         ! indices registry (idx) gives the startup climate its initial index
-        ! values, and the optional transient forcing (tsf) its initial anomalies,
-        ! keeping the cold-start state consistent with the loop.
+        ! values (axes, modifiers), keeping the cold-start state consistent with
+        ! the loop.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         type(indices_class), intent(in)  :: idx
-        type(tsforcing_class), intent(in), optional :: tsf
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call domain_init_isostasy(dom, ts, bsl)
@@ -137,7 +135,7 @@ contains
         ! Climate on grid_clim (init: snapclim/snapesm at time_rel), then the
         ! surface mass balance on grid_surface (init=.true. runs the smbpal ITM
         ! equilibration before the first update).
-        call step_climate(dom, ts, idx, tsf=tsf, init=.true.)
+        call step_climate(dom, ts, idx, init=.true.)
         call step_surface(dom, ts, init=.true.)
 
         ! Marine shelf through the (already refreshed) hub.

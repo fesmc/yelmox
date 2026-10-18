@@ -18,7 +18,7 @@ module kryos
     !   kryos_coupling  the per-step coupling primitives (step_*, couple_*)
     !   kryos_startup   initial state (cold start) and restart bundles
     !   kryos_output    per-module 2D/1D output
-    !   kryos_forcing   driver-owned indices registry and [tsforcing]
+    !   kryos_forcing   driver-owned indices registry
 
     use precision,    only : dp
     use nml,          only : nml_read, nml_replace

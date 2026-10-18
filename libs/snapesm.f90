@@ -130,8 +130,6 @@ module snapesm
         real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (snapclim hardcodes 1.0)
         real(wp)           :: f_stdev       ! precip-variability multiplier
         real(wp)           :: f_to          ! ocean/atm anomaly ratio (fraction ocean rule)
-        ! bipolar/obm compatibility (obm_coupling reads par%dTa_const today)
-        real(wp)           :: dTa_const, dTo_const, dSo_const
         integer            :: n_snap, n_field, n_axis
     end type
 
@@ -200,16 +198,17 @@ contains
         return
     end subroutine snapesm_init
 
-    subroutine snapesm_update(sc, z_srf, time, idx, dTa, dTo, dSo, dx)
+    subroutine snapesm_update(sc, z_srf, time, idx, dx)
         ! Mirrors snapclim_update. Pipeline: axis positions from the registry
         ! (advanced by the driver to `time`) -> refresh loads -> combine ->
-        ! transform -> derive.
+        ! transform -> derive. Homogeneous anomalies are climate modifiers
+        ! (climate_mods), applied by the caller afterwards.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(dp),              intent(IN)    :: time
         type(indices_class),   intent(IN)    :: idx
-        real(wp),              intent(IN), optional :: dTa, dTo, dSo, dx
+        real(wp),              intent(IN), optional :: dx
 
         real(wp), allocatable :: ta_ann_lag(:,:)
         integer :: k
@@ -225,14 +224,6 @@ contains
         ! 3. Combine the reduced snapshot states into `now`, per field.
         call snapesm_combine(sc)
 
-        ! 3b. Driver transient forcing: a spatially-homogeneous atmospheric anomaly
-        !     (dTa = [tsforcing] f_now*f_ta) added on top of the blended base
-        !     climate. Absent (or 0) when [tsforcing] is inactive -> base climate
-        !     unchanged. Unlike snapclim (which honors dTa in atm_type='anom' only),
-        !     applied for any atm_type, so scenario forcing composes with e.g.
-        !     snap_1ind_new. tsl feeds the transform, so tas/ta_ann/ta_sum inherit it.
-        if (present(dTa)) call snapesm_apply_atm_anom(sc, dTa)
-
         ! Capture ta_ann as it stands BEFORE the transform overwrites it: the
         ! fraction ocean rule (derive) reads the previous step's value (see there).
         if (allocated(sc%now%ta_ann)) ta_ann_lag = sc%now%ta_ann
@@ -242,7 +233,7 @@ contains
         call snapesm_transform(sc, z_srf)
 
         ! 5. Derive: coupled rules (e.g. fraction ocean = f_to * atm anomaly).
-        call snapesm_derive(sc, ta_ann_lag, dTa, dTo, dSo)
+        call snapesm_derive(sc, ta_ann_lag)
 
         return
     end subroutine snapesm_update
@@ -429,7 +420,7 @@ contains
         end do
     end function snapesm_lapse_monthly
 
-    subroutine snapesm_derive(sc, ta_ann_lag, dTa, dTo, dSo)
+    subroutine snapesm_derive(sc, ta_ann_lag)
         ! Coupled/derived rules applied after the blend. The `fraction` ocean rule
         ! (snapclim 663-675) sets the ocean anomaly to f_to times the domain-mean
         ! atmospheric annual anomaly. snapclim evaluates this BEFORE now%ta_ann is
@@ -438,7 +429,6 @@ contains
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: ta_ann_lag(:,:)
-        real(wp),              intent(IN), optional :: dTa, dTo, dSo
         integer  :: f
         real(wp) :: dTo_now
 
@@ -453,39 +443,8 @@ contains
             end if
         end do
 
-        ! Driver transient forcing: homogeneous ocean anomalies (dTo/dSo =
-        ! [tsforcing] f_now*{f_to,f_so}) on top of the blended/derived ocean state.
-        ! Absent (or 0) when [tsforcing] is inactive. As with dTa, applied for any
-        ! ocn_type (snapclim honors these in ocn_type='anom' only).
-        if (present(dTo)) then
-            if (allocated(sc%now%to_ann)) sc%now%to_ann = sc%now%to_ann + dTo
-        end if
-        if (present(dSo)) then
-            if (allocated(sc%now%so_ann)) sc%now%so_ann = sc%now%so_ann + dSo
-        end if
-
         return
     end subroutine snapesm_derive
-
-    subroutine snapesm_apply_atm_anom(sc, dTa)
-        ! Apply a spatially-homogeneous atmospheric temperature anomaly on top of
-        ! the blended base climate: warm the sea-level temperature uniformly and
-        ! scale precip by exp(beta_p*dTa). Mirrors snapclim's anom-mode kernels
-        ! (calc_temp_anom + calc_precip_anom, snapclim 504-505) but composes with
-        ! any atm_type. tsl feeds snapesm_transform, so tas/ta_ann/ta_sum inherit
-        ! the shift; prcor feeds the precip re-sensitization there.
-        implicit none
-        type(snapesm_class), intent(INOUT) :: sc
-        real(wp),              intent(IN)    :: dTa
-        integer :: m
-        if (allocated(sc%now%tsl)) sc%now%tsl = sc%now%tsl + dTa
-        if (allocated(sc%now%prcor)) then
-            do m = 1, NMONTH
-                sc%now%prcor(:,:,m) = sc%now%prcor(:,:,m) * exp(sc%now%beta_p*dTa)
-            end do
-        end if
-        return
-    end subroutine snapesm_apply_atm_anom
 
     subroutine snapesm_end(sc)
         ! Teardown (snapclim never had one). Free varslice and state arrays.
@@ -516,9 +475,10 @@ contains
     subroutine snapesm_write_step(sc, filename, ncid, n)
         ! Write record n of the snapesm state into an open 2D output file
         ! (axes from snapesm_write_init): the axis positions, the surface
-        ! elevation, the monthly atmosphere, the summer and sea-level
-        ! temperatures -- the fields the enabled registry fills. The ocean
-        ! profiles are written by the caller (climate_write_2D).
+        ! elevation, the monthly sea-level and the summer temperature -- the
+        ! fields the enabled registry fills. The backend's state, before the
+        ! climate modifiers; the applied atmosphere (tas, pr, tsl_ann) and ocean
+        ! are written by the caller (climate_write_2D).
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
@@ -535,11 +495,8 @@ contains
 
         associate(now => sc%now)
         if (allocated(now%z_srf))   call write2D("z_srf",   now%z_srf,   "m",    "Surface elevation")
-        if (allocated(now%tas))     call write3D("tas",     now%tas,     "month", "K",    "Near-surface air temperature")
         if (allocated(now%tsl))     call write3D("tsl",     now%tsl,     "month", "K",    "Sea-level air temperature")
-        if (allocated(now%pr))      call write3D("pr",      now%pr,      "month", "mm/d", "Precipitation")
         if (allocated(now%ta_sum))  call write2D("ta_sum",  now%ta_sum,  "K",    "Near-surface air temperature (sum)")
-        if (allocated(now%tsl_ann)) call write2D("tsl_ann", now%tsl_ann, "K",    "Sea-level air temperature (ann)")
         end associate
 
         return
@@ -599,9 +556,6 @@ contains
         sc%par%f_p_ne    = 1.0_wp
         sc%par%f_stdev   = 0.0_wp
         sc%par%f_to      = 0.0_wp
-        sc%par%dTa_const = 0.0_wp
-        sc%par%dTo_const = 0.0_wp
-        sc%par%dSo_const = 0.0_wp
         call nml_read(filename, group, "var_defs",  sc%par%var_defs,  init=.TRUE.)
         call nml_read(filename, group, "combine",   sc%par%combine,   init=.TRUE.)
         call nml_read(filename, group, "ref_name",  sc%par%ref_name,  init=.TRUE.)
@@ -610,9 +564,6 @@ contains
         call nml_read(filename, group, "f_p_ne",    sc%par%f_p_ne,    init=.TRUE.)
         call nml_read(filename, group, "f_stdev",   sc%par%f_stdev,   init=.TRUE.)
         call nml_read(filename, group, "f_to",      sc%par%f_to,      init=.TRUE.)
-        call nml_read(filename, group, "dTa_const", sc%par%dTa_const, init=.TRUE.)
-        call nml_read(filename, group, "dTo_const", sc%par%dTo_const, init=.TRUE.)
-        call nml_read(filename, group, "dSo_const", sc%par%dSo_const, init=.TRUE.)
 
         ! --- field registry ---------------------------------------------------
         names = ""
