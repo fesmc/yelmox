@@ -99,7 +99,8 @@ Five nouns a user needs:
      (existing `[climate_bias]`); later e.g. `pr_var` (f_stdev), regional
      tapers.
 5. **Prescribed ice**: `[ice_bnd]`, a data group (ice history) + a region,
-   optionally scaled by an index; sets yelmo `bnd%H_ice_fix` (GRL plan).
+   optionally scaled by an index; writes yelmo `bnd%H_ice_ref` in the
+   fixed/relaxation strip (`border_width`, GRL plan).
 
 Per step (unchanged order, one new line):
 
@@ -170,8 +171,8 @@ All insolation users (chion, smbpal) take an **orbit** instead of a time:
   take `time_bp` today). CLIMBER-X can use the same library later.
 - Check: insol has changed since the copy was vendored (precision and solar
   constant unified, selectable mean-cosine convention): compare the daily
-  insolation of both at 0, 21, 40 and 125 ka before switching (S0 and
-  `coszm_kind` set to reproduce the vendored copy, if possible).
+  insolation of both at 0, 21, 40 and 125 ka before switching. A good
+  match is enough: small differences (interpolation etc.) are accepted.
 
 ## 6. Climate backends
 
@@ -473,7 +474,7 @@ Region-specific behaviour stays opt-in by key, never `select case(domain)`.
 | `libs/yelmox_climate.f90` | backends snapshots/esm/rembo; `climate_update(..., idx)` then `climate_mods_apply`; snapclim cases removed; rembo ocean via snapshots |
 | `yelmox_bipolar/obm_coupling.f90` | `[obm_forcing]` global anomaly → boxes; `obm2ism` → `ocn_obm`; `climate_air_anom` removed |
 | `libs/insol/` → fesmc/insol (configme dependency) | fixed `orbit_class` and orbit-based calls added in insol; chion/smbpal take `[orbit]`, `const_insol/const_kabp` removed; `libs/insol/` and its Makefile rules removed |
-| `libs/ice_bnd.f90` (new) + yelmo `bnd%H_ice_fix` | GRL paleo border ice |
+| `libs/ice_bnd.f90` (new) + yelmo masks `border_width` | GRL paleo border ice into `H_ice_ref`; `smb_simple` mask set once at init |
 | `input/clim_db.nml`, `input/yelmox_defaults.nml` (new) | shared database (section 9); defaults for yelmox groups, read with `defaults_file` |
 | `scripts/check_par_nml.py` | also check yelmox groups against `yelmox_defaults.nml` |
 | removed | `libs/snapclim.f90`, its tests, `libs/obm/atm2ocean.f90`, `input/greenland_snp.nml` |
@@ -507,7 +508,7 @@ All on dev; 2.4-beta stays frozen.
 | 6 | yelmox | config conversions per family (retirement plan order); bipolar with `[obm_forcing]`, `ocn_obm` | section 13 steps 1-3 |
 | 7 | yelmox | remove snapclim; rename snapesm → snapshots; docs, CHANGELOG | |
 | 8 | fesm-utils | tsgen windowed modifiers (replaces `f_hol`), RNG state in restart | |
-| 9 | yelmo + yelmox | `H_ice_fix`, `[ice_bnd]`, GRL-PAL base config, GRL paleo A then B | |
+| 9 | yelmo + yelmox | `border_width`, `[ice_bnd]`, regional taper modifier, GRL-PAL base config, GRL paleo A then B | |
 | 9b | FesmData | TraCE-21ka ocean product (time-varying `to`, `so`; not in v2, v1 had `OCN-RECON-TRACE21ka`), global, for the GRL paleo B ocean | |
 
 LIS moves to the new keys after phases 1-5 (paper repo par files, on dev).
@@ -522,6 +523,5 @@ absolute by default, `anomaly` as an option; GRL paleo B ocean: all three
 options (`ocn_fraction`, CLIMBER ocean snapshots, a TraCE-21ka product)
 selectable, for comparison.
 
-Left for later: whether insol reproduces the vendored copy exactly (decide
-after the comparison of section 5); the other open questions of
-`_grl-paleo-plan.md`.
+insol need not reproduce the vendored copy exactly (a good match is
+enough). GRL paleo decisions: `_grl-paleo-plan.md`.

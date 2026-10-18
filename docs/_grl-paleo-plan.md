@@ -110,25 +110,45 @@ To check:
 - Relaxation zones: `relax`, `relax_tau` -> `bnd%tau_relax` (`topo_rel = -1`),
   towards `H_ice_ref`.
 
-### Missing
+### Decided (2026-10-18)
 
-A prescribed thickness that changes in time. Overwriting `H_ice_ref` is not
-an option: it is also the PD reference of isostasy
-(`libs/kryos_startup.f90:210`), the optimisation and relaxation target, and
-the reference ice extent in the surface coupling
-(`libs/kryos_coupling.f90:445`).
+No separate field: `H_ice_ref` is the prescribed/reference thickness and may
+vary in time. Nothing in yelmo assumes it constant; its uses:
 
-### Proposal
+| Where | Use | Time-varying value |
+|---|---|---|
+| yelmo `mass_conservation.f90:529` | `MASK_ICE_FIXED`: `H_ice = H_ice_ref` | the purpose |
+| yelmo `yelmo_topography.f90:320/332` | relaxation target (`topo_rel_field = "H_ref"`); `topo_rel` 1/2 masks | fine (PD spin-ups only) |
+| yelmox `kryos_startup.f90:210` | isostasy reference, copied once at cold start | fine |
+| yelmox `kryos_startup.f90:274-294` | `recon` cold start overwrites it with the reconstruction | already not PD |
+| yelmox `kryos_coupling.f90:448` | `smb_simple` target mask, refreshed each step | set the mask once at init instead |
+| yelmo restart | saved and read | fine |
 
-1. yelmo: a separate field, e.g. `bnd%H_ice_fix`, imposed in `MASK_ICE_FIXED`
-   cells (and optionally the target of a relaxation buffer). `H_ice_ref` stays
-   the PD reference.
-2. yelmox: a border-ice forcing group, e.g. `[ice_bnd]`: a varslice group of an
-   IceHistory product on `grid_ice` (time-interpolated, `extrap`), the region
-   of fixed cells (border strip and/or region expression), an optional
-   relaxation buffer inside it; updates `H_ice_fix` every step.
-3. Before the start of the reconstructions (A before 120 ka): hold the oldest
-   slice, or scale an LGM slice by the glacial index (tsgen index x slice).
+The optimisation targets `dta%pd%H_ice`, not `H_ice_ref` (the earlier
+version of this plan was wrong there).
+
+Proposal:
+
+1. yelmo masks group: `border_width = N M`, a strip of N fixed cells
+   (`MASK_ICE_FIXED`) and M relaxation cells inside it (`tau_relax` =
+   `relax_tau`, `topo_rel = -1`), measured inward from the edge of the
+   `mask_ice_dynamic` region; outside the region `MASK_ICE_NONE`. Applied
+   after the expressions (`mask_ice_dynamic`, `mask_ice_fixed`, `relax`),
+   which stay for hand-made zones. Covers `mask_border = "fixed"` (`1 0` on
+   the domain border).
+   - GRL-PAL: `mask_ice_dynamic = "all"`, the strip is the domain border.
+   - NH with only the GRL-PAL area active: `mask_ice_dynamic` = an
+     expression for that area, from a layer of the regions: a FesmData layer
+     (e.g. the footprint of GRL-PAL on the NH grids) or an own mask file
+     (`path_<layer>` in the regions group, remapped by nearest neighbour onto
+     the grid if needed).
+2. yelmox `[ice_bnd]`: a varslice group of an IceHistory product
+   (time-interpolated on the forcing clock, `extrap`), PaleoMIST by default,
+   any file; writes `H_ice_ref` in the fixed and relaxation cells only (the
+   interior keeps its value).
+3. Outside the time range of the file (PaleoMIST: 80-0 ka; GLAC-1D nn9927:
+   120-0 ka): a scaled thickness, `H = f(index) × H_slice` (e.g. the LGM slice
+   times the glacial index), with a `method` key to iterate on the scaling.
 
 Consequences:
 
@@ -176,29 +196,35 @@ and isochrones, Vinther 2009 elevations, Schumacher 2018 GPS uplift).
 1. FesmData: reference climate (or bias) on GRL-PAL; Buizert2018/Badgeley2020
    on GRL-PAL or decision for online remap; western fill; layout fix for
    varslice if needed.
-2. yelmo: `H_ice_fix`; `mask_border` for GRL-PAL.
+2. yelmo: `border_width` in the masks group.
 3. yelmox: `[ice_bnd]`; base `yelmox_GreenlandPaleo.nml` (domain, regions,
    isostasy, masks).
-4. yelmox: snapesm anomaly-type snapshot (if chosen for Badgeley); depends on
-   the snapesm ocean work of the retirement plan.
+4. yelmox: snapshot axes with `lo = ""` (Badgeley), regional taper modifier;
+   see `_forcing-design.md`.
 5. A: par files, scripts, docs.
 6. B: par files, scripts, docs.
 
-## Open questions
+## Decisions (2026-10-18)
 
-1. Border-ice source: GLAC-1D, ICE-6G_C or PaleoMIST? For A before 120 ka:
-   hold the oldest slice or scale by the index?
-2. `H_ice_fix` separate from `H_ice_ref`: agreed? Relaxation buffer towards it?
-3. Border zone: strip of N cells + buffer, or region-based (everything outside
-   Greenland and Ellesmere fixed)? Ellesmere fully dynamic?
-4. Reference climate: ERA5 + MAR bias, or a merged MAR/ERA5 product?
-5. Reconstructions outside their coverage: how to fill?
-6. Badgeley in snapesm: zero/one `lo` snapshot or an anomaly-type option?
-7. Resolution: GRL-PAL-16KM or 32KM?
-8. Tabone et al. (2024) setup: which reconstruction for temperature and
-   precipitation (or as ensemble members), ocean forcing, LGM spin-up length
-   and climate, `cb_ref` (PD-optimised and fixed?). Are their par files
-   anywhere (old palma-ice branch, albedo)? None in `GrIS_deglaciation_yelmox`
-   or the yelmox history.
-9. Ocean for B: `fraction`, CLIMBER snapshots, or a TraCE product?
-10. One script directory or two?
+1. Border ice: any IceHistory file, PaleoMIST by default; before the file
+   starts, a scaled thickness from an index (`[ice_bnd] method`).
+2. No `H_ice_fix`: `[ice_bnd]` writes `H_ice_ref` (section "Prescribed ice").
+3. Strip of cells, `border_width = N M` (fixed, relaxation), from the edge of
+   the dynamic region; own masks via expressions or a regions layer from a
+   file; works on GRL-PAL and on NH with only the GRL-PAL area active.
+4. Reference climate: ERA5 + MAR - ERA5 bias via `[climate_bias]`. FesmData:
+   a bias product on GRL-PAL (`dtas`, `fpr`), tapered at the MAR edge.
+5. Reconstructions outside their coverage: regional taper, a climate modifier
+   `now = ref + w (now - ref)` (atmosphere), `w` from the `f_valid` of the
+   Buizert/Badgeley products (smoothed), no mixing of datasets.
+6. Badgeley: snapshot axis with `lo = ""`.
+7. GRL-PAL-16KM first, resolution configurable (8 km later).
+8. Tabone et al. (2024): temperature and precipitation reconstructions chosen
+   separately (one snapshot per field); `cb_ref` optimisation optional.
+9. Ocean for B: all three, selectable (`ocn_fraction`, CLIMBER ocean
+   snapshots, TraCE-21ka product); see `_forcing-design.md`.
+10. One script directory, `scripts/grl-paleo/`.
+
+Still to check (data/code, section "Reconstruction forcing"): the Buizert
+month/time layout vs varslice, I/O per update, Buizert/Badgeley on GRL-PAL
+(new products or online remap from the GRL grids).
