@@ -139,6 +139,15 @@
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
 
+&ocn_fraction
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = True     ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
 ! ===== Simulation options =====
 
 &relax
@@ -546,8 +555,9 @@
 ! ===== Climate =====
 
 &snap
-    ! snapesm assembly config — reproduces snapclim atm_type=snap_1ind_new (except f_hol),
-    ! ocn_type=fraction (see yelmox_Greenland_snapclim.nml &snap). Params copied
+    ! snapesm assembly config — reproduces snapclim atm_type=snap_1ind_new (except f_hol)
+    ! (see yelmox_Greenland_snapclim.nml &snap); the ocean held at the reference
+    ! (to: blend = "const"), its anomaly from [ocn_fraction]. Params copied
     ! verbatim from that block. var_defs database: input/greenland_clim.nml.
     var_defs   = "input/greenland_clim.nml"
     combine    = "anomaly"
@@ -556,7 +566,6 @@
     f_p        = 0.06
     f_p_ne     = 1.0
     f_stdev    = 0.0
-    f_to       = 0.25
     snapshots  = "pd" "picontrol" "lgm"
     fields     = "tas" "pr" "to" "so" "zs"
     axes       = "at"
@@ -578,7 +587,7 @@
 
 &snap_field_to
     kind  = "ocn"
-    blend = "fraction"
+    blend = "const"
     axes  = ""
 /
 

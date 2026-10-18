@@ -656,6 +656,15 @@
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
 
+&ocn_fraction_south
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom_south]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = False    ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
 &snap_south
     atm_type           = "anom"
     ocn_type           = "anom"
@@ -1212,6 +1221,15 @@
     f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
     f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+/
+
+&ocn_fraction_north
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom_north]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = False    ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
 /
 
 &snap_north

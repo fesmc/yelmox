@@ -178,6 +178,15 @@
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
 
+&ocn_fraction
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = False    ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
 ! ===== Simulation options =====
 
 &relax
