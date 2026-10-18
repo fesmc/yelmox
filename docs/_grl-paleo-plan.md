@@ -1,7 +1,8 @@
 # Greenland paleo: glacial cycles and a Tabone et al. (2024) deglaciation
 
 Status: design summary (2026-10-17), not started. The leading `_` keeps
-quarto from rendering it. Input for a unified design.
+quarto from rendering it. Input for the unified design, `_forcing-design.md`
+(2026-10-18).
 
 States checked: yelmox dev d60e752, yelmo dev bd9ef661, FesmData (local
 checkout: `shared/domains.toml`, dataset READMEs).

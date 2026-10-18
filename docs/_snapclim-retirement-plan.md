@@ -1,7 +1,8 @@
 # Retiring snapclim: snapesm + tsgen for all snapshot climates
 
 Status: design draft (2026-10-17), not started. The leading `_` keeps quarto
-from rendering it.
+from rendering it. Superseded where they differ by `_forcing-design.md`
+(2026-10-18).
 
 States checked: yelmox dev ed2a6b5, fesm-utils dev b8a9a3d, FesmData
 products on Levante (`/work/ba1442/fesmdata/products`, paleoclimate-v2.6.0).
@@ -58,6 +59,8 @@ when inactive, so the series file must exist.
 ## Work needed
 
 ### 1. tsgen normalisation (fesm-utils)
+
+Done: on fesm-utils origin/dev 021f403 (the local clone checked was behind).
 
 `norm_t0`/`norm_t1` are set in `yelmox_Greenland_snapesm*.nml` and the
 CHANGELOG (Unreleased) says snapesm needs them, but they are not in tsgen
