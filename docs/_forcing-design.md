@@ -1,9 +1,21 @@
 # Forcing and climate in yelmox: a unified design
 
-Status: proposal (2026-10-18), nothing implemented. The leading `_` keeps
-quarto from rendering it. Merges and supersedes the open parts of
-`_snapclim-retirement-plan.md` and `_grl-paleo-plan.md`, and takes in the LIS
-work (`paper-lis-dynamics`, on 2.4-beta).
+Status: proposal (2026-10-18, revised after a code review the same day),
+nothing implemented. The leading `_` keeps quarto from rendering it. Merges
+and supersedes the open parts of `_snapclim-retirement-plan.md` and
+`_grl-paleo-plan.md`, and takes in the LIS work (`paper-lis-dynamics`, on
+2.4-beta).
+
+Review outcome (2026-10-18): the architecture stands; the core decisions match
+seams already in the code (`climate_out_class` as the only consumer, the
+`[climate_bias]` apply step as the modifier pattern, varslice `subs` for path
+keywords, `nml` `defaults_file`/`defaults_group`). Revisions: modifiers in a
+fixed order with `active` keys, not an ordered list (section 7); a written
+contract per modifier (section 7); the OBM box temperatures passed directly,
+not registry indices (sections 4, 8); a tsgen defaults passthrough in
+fesm-utils (section 14); phase 1 split into a behaviour-preserving and a
+behaviour-changing commit; the climate-only comparison as a permanent script
+(section 13); esm on calendar time named as the clock exception (section 3).
 
 States checked: yelmox dev 0ebbd14, fesm-utils origin/dev 021f403 (the local
 clone was at b8a9a3d), FesmData b420a94 (`Paleoclimate/remap.toml`,
@@ -13,11 +25,12 @@ clone was at b8a9a3d), FesmData b420a94 (`Paleoclimate/remap.toml`,
 Decided (2026-10-18): dev only, 2.4-beta frozen; backend renamed
 `snapshots`; indices named `idx_<name>`, any scalar series; insolation from
 the fesmc/insol library (a configme dependency), on the forcing clock with an
-optional fixed time or orbit; climate modifiers after the backend;
-`ocn_fraction` on the sea-level anomaly; OBM driven by one global anomaly,
-its box temperatures as model-set indices in the same registry; a
-shared database with path keywords, the paleoclimate snapshots read from
-global products (GLOBAL-1DEG).
+optional fixed time or orbit; climate modifiers after the backend, in a
+fixed order, each an optional group with `active`; `ocn_fraction` on the
+sea-level anomaly; OBM driven by one global anomaly, its box temperatures
+passed to `ocn_obm` by the bipolar bridge (no model-set indices until a
+second user exists); a shared database with path keywords, the paleoclimate
+snapshots read from global products (GLOBAL-1DEG).
 
 ## 1. Use cases to cover
 
@@ -51,7 +64,11 @@ global products (GLOBAL-1DEG).
    - barystatic sea level from file (FastIsostasy `bsl`, on `time_rel`: fine).
 
    Consequence in the LIS config: `at`/`ap` and `bt`/`bp` are identical
-   16-line groups, because a series is bound to one axis.
+   16-line groups, because a series is bound to one axis. (This is a
+   snapclim limitation; in snapesm two fields can already share one index.
+   The axis layer of section 6 is justified by driver ownership of the index,
+   needed by modifiers, `[ice_bnd]` and multi-domain drivers, not by the
+   duplication.)
 2. **The homogeneous anomaly is applied three ways**: snapclim in `anom`
    modes only, snapesm always and before the elevation transform, rembo with
    its own mapping (dT_sum, 1.3 × for annual, f_to for the ocean).
@@ -64,7 +81,12 @@ global products (GLOBAL-1DEG).
 4. **Configuration volume**: every par file carries its own database groups
    (LIS: ~350 lines of `clim_*`), every tsgen key is required, and yelmox
    groups have no defaults file (yelmo groups do: `input/yelmo_defaults.nml`
-   via `nml_read(..., defaults_file=)`, already in fesm-utils `nml`).
+   via `nml_read(..., defaults_file=)`, already in fesm-utils `nml`, with a
+   `defaults_group` argument that maps a named group such as
+   `snap_field_tas` onto a template group `snap_field`). `tsgen_init` reads
+   its keys with plain `nml_read`, so `[idx_<name>]` groups stay fully
+   required until tsgen passes `defaults_file`/`defaults_group` through
+   (phase 8).
 5. **Retirement plan, step 1 is done**: tsgen `norm_t0`/`norm_t1` (point or
    window) is on fesm-utils origin/dev and `snapesm-axes` (021f403). The plan
    found it missing because the local clone was not fetched.
@@ -81,8 +103,11 @@ Five nouns a user needs:
 1. **Forcing clock**: `ts%time_rel`. `ctrl.tstep_method = "const"` holds it
    at `tstep_const`, `"rel"` follows the model time. Everything time-dependent
    (indices, time-varying snapshots, insolation, sea level, recon slices,
-   border ice) is evaluated on it. No second clock; the only exception is an
-   explicit fixed orbit (section 5).
+   border ice) is evaluated on it. No second clock. Two explicit exceptions:
+   a fixed orbit (section 5), and the esm backend, which follows calendar
+   time (`ts%time` against `calendar_ref`) because its periods are calendar
+   years; esm configs run with `tstep_method = "rel"` and `calendar = True`,
+   so the two clocks coincide.
 2. **Indices**: named scalar series, `[idx_<name>]`, listed in
    `[indices] names = ...`. Owned by the driver (like `bsl`), updated once per
    step on the forcing clock with the response variable (ice volume), shared
@@ -93,11 +118,14 @@ Five nouns a user needs:
 4. **Climate** = backend → modifiers → `climate_out`:
    - backend: snapshots (today snapesm; name open, section 6), `esm`,
      `rembo`;
-   - modifiers, applied in listed order to `climate_out`, any backend:
-     `anom` (homogeneous dTa/dTo/dSo = gain × index), `ocn_fraction`
-     (ocean anomaly = f_to × mean air anomaly), `ocn_obm` (bipolar), `bias`
-     (existing `[climate_bias]`); later e.g. `pr_var` (f_stdev), regional
-     tapers.
+   - modifiers, applied to `climate_out` in a fixed order, each an optional
+     group with `active` (as `[climate_bias]` today): `anom` (homogeneous
+     dTa/dTo/dSo = gain × index), `ocn_fraction` (ocean anomaly = f_to ×
+     mean sea-level air anomaly), `ocn_obm` (bipolar), `taper` (regional
+     weight towards the reference), `bias` (existing `[climate_bias]`);
+     later e.g. `pr_var` (f_stdev). Each modifier states which backends it
+     accepts (section 7); modifier groups take the domain suffix
+     (`anom<sfx>`), as `climate_bias<sfx>` does.
 5. **Prescribed ice**: `[ice_bnd]`, a data group (ice history) + a region,
    optionally scaled by an index; writes yelmo `bnd%H_ice_ref` in the
    fixed/relaxation strip (`border_width`, GRL plan).
@@ -124,7 +152,13 @@ An index is a tsgen group with a name. What it holds depends on the method:
 | physical series, as is | `series` without normalisation | in the file's units | a temperature anomaly [K], e.g. NGRIP or a global mean |
 | generated | `const`, `ramp-*`, `sin` | any | sensitivity ramp |
 | feedback | `PI42`, `H312PID`, ... | controlled by the response (ice volume) | hysteresis |
-| from a coupled model (later) | not tsgen: set by the driver each step | the model's output | OBM box temperature |
+
+Every index is a tsgen series. A scalar set by another model each step (OBM
+box temperature, later a coupled climate model's global mean) is coupler
+state, not an index: it is passed to its consumer by the driver that owns
+the model (section 8). Model-set entries in the registry would need a second
+kind, their own restart path and output for one consumer today; they are
+added when a second user exists.
 
 A consumer applies its own gain, so a raw series in K drives `anom` with
 `f_ta = 1`. An optional `units` key labels the index in the output
@@ -257,15 +291,17 @@ Config sketch, LIS B18 (today ~140 lines of `[snap*]` groups):
     pr  = "pmip3_lgm_mean_pr_ann"
     zs  = "pmip3_lgm_mean_zs"
 /
-&climate_mods
-    names = "ocn_fraction"
-/
 &ocn_fraction
-    f_to = 0.25
+    active = True
+    f_to   = 0.25
 /
 ```
 
-Unset keys come from `input/yelmox_defaults.nml`.
+Unset keys come from `input/yelmox_defaults.nml`; named groups
+(`snap_field_<name>`, `snap_<name>`, `snap_axis_<name>`, `idx_<name>`) fall
+back to template groups there (`snap_field`, `snap_snapshot`, `snap_axis`,
+`idx`) via `defaults_group`, so `blend = "linear"` and `axes = ""` need not
+be written for a field that only follows the reference.
 
 Pyrenees (snapclim `anom`, orbital × 10 K):
 
@@ -277,22 +313,52 @@ Pyrenees (snapclim `anom`, orbital × 10 K):
     method      = "series"
     series_file = "input/alpha_orbital_t2018.dat"
 /
-&climate_mods
-    names = "anom"
-/
 &anom
-    index = "orb"
-    f_ta  = 10.0
+    active = True
+    index  = "orb"
+    f_ta   = 10.0
 /
 ```
 
 Hysteresis ramp (today `[tsforcing]`): the same with a `ramp-*` or feedback
 tsgen.
 
-## 7. Modifiers: what changes, by example
+## 7. Modifiers: order, contract, and what changes
 
-Modifiers act on `climate_out` after the backend, in the order of
-`[climate_mods] names`.
+Modifiers act on `climate_out` after the backend, in a **fixed order**:
+`anom`, `ocn_fraction`, `ocn_obm`, `taper`, `bias`. Each is an optional
+namelist group with `active` (default off), read like `[climate_bias]`
+today. An ordered `names` list was considered and dropped: only one order is
+physically meaningful, a fixed order removes a mis-ordering failure mode and
+one group, and the par checker can validate each group against the defaults
+file. `climate_mods_apply` is one subroutine that calls each active modifier
+in that order; a new modifier is one subroutine and one line there.
+
+### Contract per modifier
+
+What each one touches in `climate_out%now`, what it needs, and when it
+refuses (an error at init, never a silent partial application):
+
+| Modifier | Touches | Needs | Refuses |
+|---|---|---|---|
+| `anom` | `tas`, `ta_ann`, `tsl_ann` (+dTa); `pr`, `pr_ann` (× e^(β dTa)); ocean: `to_ann`/`so_ann` (+dTo/+dSo) when profiles, else `T_shlf`/`S_shlf` and `dT_shlf`/`dS_shlf` | an index; `beta_p` | a backend that supplies the smb (`has_smb`: esm with `use_smb`, rembo), since a post-hoc air anomaly cannot reach that smb; rembo reads `[anom]` itself instead (below) |
+| `ocn_fraction` | `to_ann` = `ref%to_ann` + f_to × mean(`tsl_ann` − `ref%tsl_ann`) over `region` | profile ocean and `tsl_ann` (snapshot backend) | `has_ocn_shelf` (esm); a backend without `tsl_ann` |
+| `ocn_obm` | `to_ann` (all depths): `absolute` = box value, `anomaly` = `ref%to_ann` + (box − box_init) | profile ocean; the box value, passed by the bipolar bridge (section 8) | `has_ocn_shelf` |
+| `taper` | atmosphere: `now = ref + w (now − ref)` for `tas`, `pr` and their annual means | a weight field `w` from a var_defs group (static) | nothing |
+| `bias` | as today: `tas`, `ta_ann`, `tsl_ann` (+dtas), `pr`, `pr_ann` (× fpr) | var_defs groups | rembo (annual fields only) |
+
+Everything downstream is unchanged: the elevation dependence (`lapse`,
+`beta_p`, `z_srf`) that moves the atmosphere to the surface grid is additive
+and multiplicative in the same way, and `smb_simple` reads the modified
+`tsl_ann`.
+
+**rembo is the one backend where the homogeneous anomaly is an input, not a
+modifier**: REMBO needs `dT_sum` before it runs. The rembo backend reads the
+same `[anom]` group (index and `f_ta` → `dT_sum`, `1.3 ×` annual, `f_to` →
+ocean) and `climate_mods_apply` skips `anom` for it. Documented as the
+exception; keeping the anomaly a backend input everywhere (today's design)
+was rejected because it keeps dTa arguments in every backend and blocks the
+esm case.
 
 **`anom` on the snapshot backend: same result.** Today dTa is added at sea
 level before the elevation transform (Γ lapse rate, β precipitation
@@ -314,7 +380,7 @@ restart* sees no anomaly. LIS LGM steady state (a = 0.87, b = 0.48,
 reference for the first 10 yr after the cold start and after each restart,
 then follows the air anomaly one update late; after the change it follows
 from the first update. In a transient the lag is one `dt_clim` (10 yr): no
-visible difference. Order: with `names = "anom" "ocn_fraction"` the ocean
+visible difference. Order: `anom` runs before `ocn_fraction`, so the ocean
 also sees the homogeneous anomaly (as today, one update late).
 
 **What the fraction rule averages.** Today: the mean of
@@ -360,8 +426,14 @@ Proposal, with a global anomaly as the single input:
   (`anom` with `f_ta = ampl_north`, or a snapshot axis): explicit in the par
   file.
 - `obm2ism` becomes the modifier `ocn_obm` (mode `absolute` by default, as now, or
-  `anomaly`: reference ocean + box anomaly, keeping the pattern); the box
-  temperatures enter as model-set indices (`obm_tn`, `obm_ts`, section 4).
+  `anomaly`: reference ocean + box anomaly, keeping the pattern). The box
+  temperature is **passed directly** by the bipolar bridge:
+  `coupling_obm2ism` calls `climate_mod_ocn_obm(dom%clim, theta, mode)` in
+  `obm_exchange`, after both domains' climate steps and before their shelf
+  steps, exactly where `obm2ism` runs today. So `ocn_obm` is the one
+  modifier applied outside `climate_mods_apply`, by the driver that owns the
+  box model; it keeps the same contract (section 7). No registry entry, no
+  extra restart path: the box state is in `obm_restart.nc` already.
 - Switches stay; the order of the exchange is unchanged.
 
 ## 9. Shared database
@@ -445,8 +517,8 @@ PMIP3 takes DJF in the south as now.
 | SRG (`const`) | snapshots `pd` | none | none | |
 | GRL paleo A | snapshots, axis a (+ b) | glacial (+ millennial) | `ocn_fraction` or ocean axis | `[ice_bnd]` |
 | GRL paleo B | snapshots, Buizert `hi` over baseline `lo`; Badgeley `lo=""` | const 1 | ocean: any of `ocn_fraction`, CLIMBER ocean snapshots, TraCE-21ka (selectable) | `[ice_bnd]`, LGM steady = `tstep_method const` at -21 ka |
-| rembo GRL | rembo + snapshots ocean-only | ramp index | rembo reads the `anom` gains itself | |
-| Bipolar | snapshots per domain | gmt (+ glacial) | `anom` per domain, `ocn_obm` | `[obm_forcing]` |
+| rembo GRL | rembo + snapshots ocean-only | ramp index | rembo reads `[anom]` itself (section 7) | |
+| Bipolar | snapshots per domain | gmt (+ glacial) | `anom<sfx>` per domain, `ocn_obm` via the bridge | `[obm_forcing]` |
 | Ramps / hysteresis | snapshots | feedback index | `anom` | kill, restart every Δf |
 
 ## 11. Extension points
@@ -457,7 +529,7 @@ To test a new idea, one of:
 |---|---|---|
 | time series shape (window, taper, sum of series) | tsgen (fesm-utils) | nothing in yelmox |
 | spatial pattern / snapshot | `input/clim_db.nml` group + snapshot or axis | nothing in code |
-| operation on the climate (variability, regional taper, ...) | one subroutine + one `case` in `libs/climate_mods.f90` | nothing else |
+| operation on the climate (variability, ...) | one subroutine + one call in `climate_mods_apply` (`libs/climate_mods.f90`), its group in `yelmox_defaults.nml`, a contract row in section 7 | nothing else |
 | orbit | `[orbit]` | nothing in code |
 | climate model | backend in `yelmox_climate.f90` | fills `climate_out` |
 | prescribed ice / boundary | `[ice_bnd]` data + region | |
@@ -468,11 +540,12 @@ Region-specific behaviour stays opt-in by key, never `select case(domain)`.
 
 | File | Change |
 |---|---|
-| `libs/kryos_forcing.f90` | `tsforcing_class` → `indices_class`: named tsgen array (+ model-set entries), `indices_init/update/value(name)/restart_*`, kill and Δf restarts per index; `idx_<name>_restart.nc` |
+| `libs/kryos_forcing.f90` | `tsforcing_class` → `indices_class`: named tsgen array, `indices_init/update/value(name)/restart_*`, kill and Δf restarts per index; `idx_<name>_restart.nc` |
 | `libs/snapesm.f90` (→ `snapshots.f90`) | axes reference indices by name; `lo=""`; optional fields; annual/no-salinity ocean; drop dTa args, `*_const`, `f_to`, fraction lag; `snapesm_end` |
-| `libs/climate_mods.f90` (new) | `anom`, `ocn_fraction`, `ocn_obm`, `bias` (moved from `yelmox_climate.f90`) |
-| `libs/yelmox_climate.f90` | backends snapshots/esm/rembo; `climate_update(..., idx)` then `climate_mods_apply`; snapclim cases removed; rembo ocean via snapshots |
-| `yelmox_bipolar/obm_coupling.f90` | `[obm_forcing]` global anomaly → boxes; `obm2ism` → `ocn_obm`; `climate_air_anom` removed |
+| `libs/climate_mods.f90` (new) | `anom`, `ocn_fraction`, `ocn_obm`, `taper`, `bias` (moved from `yelmox_climate.f90`); `climate_mods_init` (reads the groups, checks each contract against the backend), `climate_mods_apply` (fixed order), `climate_mod_ocn_obm` (public, for the bridge) |
+| `libs/yelmox_climate.f90` | backends snapshots/esm/rembo; `climate_update(..., idx)` then `climate_mods_apply`; snapclim cases removed; rembo ocean via snapshots; rembo reads `[anom]` |
+| `yelmox_bipolar/obm_coupling.f90` | `[obm_forcing]` global anomaly → boxes; `coupling_obm2ism` → `climate_mod_ocn_obm`; `climate_air_anom` removed |
+| `fesm-utils` `tsgen.f90` | `tsgen_init(..., defaults_file, defaults_group)` passthrough, so `[idx_<name>]` keys can default |
 | `libs/insol/` → fesmc/insol (configme dependency) | fixed `orbit_class` and orbit-based calls added in insol; chion/smbpal take `[orbit]`, `const_insol/const_kabp` removed; `libs/insol/` and its Makefile rules removed |
 | `libs/ice_bnd.f90` (new) + yelmo masks `border_width` | GRL paleo border ice into `H_ice_ref` |
 | `input/clim_db.nml`, `input/yelmox_defaults.nml` (new) | shared database (section 9); defaults for yelmox groups, read with `defaults_file` |
@@ -489,7 +562,14 @@ Region-specific behaviour stays opt-in by key, never `select case(domain)`.
    for paleo, 0 for PD): `snap.nc` of both, maps and domain means of
    `t2m_ann`, `pr_ann`, `to_ann` per time. Minutes per config; shows where
    and why they differ (dropped `f_corr`, fraction rule, global vs regional
-   remap of the snapshots).
+   remap of the snapshots). **Permanent**, not a one-off:
+   `scripts/climate-compare/` (a runner that sets the overrides and runs two
+   par files, a Julia script that plots the maps and means and prints the
+   per-time differences). It becomes the regression check for every later
+   modifier and backend change, and it is where the open data questions are
+   answered: whether `clim_sigma` is still needed after the global remap
+   (section 9), and the I/O cost per update of the time-varying GRL
+   snapshots (two bracketing slices of a 1.5 GB file; from the GRL plan).
 3. 10-yr coupled runs on Levante per family (as planned).
 4. Delete snapclim in its own commit, after 2-3 pass.
 
@@ -499,29 +579,33 @@ All on dev; 2.4-beta stays frozen.
 
 | # | Repo | Content | Check |
 |---|---|---|---|
-| 0 | yelmox | this doc; retirement plan step 1 marked done | |
-| 1 | yelmox | indices registry; snapesm axes on indices; `[tsforcing]` → `anom` modifier; per-index restarts | GRL snapesm, LIS steady: identical up to rounding; ramp restart continuity |
-| 2 | yelmox | `climate_mods`: `ocn_fraction` (no lag, sea-level anomaly), `bias` moved | expected diffs only |
+| 0 | yelmox | this doc; retirement plan step 1 marked done; `scripts/climate-compare/` | the script runs on today's snapclim vs snapesm GRL pair |
+| 1a | yelmox | indices registry; snapesm axes on registry indices; per-index restarts; `[tsforcing]` still feeds the backends' dTa args | behaviour-preserving: GRL snapesm, LIS steady, ramp restart continuity bit-for-bit (or up to rounding) |
+| 1b | yelmox | `climate_mods` with `anom` (fixed order, `active`); `[tsforcing]` and the dTa args removed; rembo reads `[anom]`; contract checks at init | the anomaly crosses the elevation transform: equal up to rounding (section 7); esm + `anom` + `use_smb` refused |
+| 2 | yelmox | `ocn_fraction` (no lag, sea-level anomaly, `region`), `bias` moved | expected diffs only |
 | 3 | yelmox | snapshot backend: optional fields, annual/no-salt ocean, `lo=""`; rembo ocean on it | |
 | 4 | insol + configme + yelmox | insol: fixed orbit; configme: insol a yelmox dependency; yelmox: link libinsol, `[orbit]` in chion/smbpal, `libs/insol/` removed | insolation tables vs the vendored copy (section 5); `clock` = transient insolation today, `time` = `const_insol` |
-| 5 | yelmox | `clim_db.nml` (global paleoclimate), `yelmox_defaults.nml`, checker | configs shorter |
-| 6 | yelmox | config conversions per family (retirement plan order); bipolar with `[obm_forcing]`, `ocn_obm` | section 13 steps 1-3 |
+| 5 | fesm-utils + yelmox | fesm-utils: `tsgen_init` defaults passthrough; yelmox: `clim_db.nml` (global paleoclimate), `yelmox_defaults.nml` with template groups, checker | configs shorter; every `idx_<name>` group can omit unused keys |
+| 6 | yelmox | config conversions per family (retirement plan order); bipolar with `[obm_forcing]`, `ocn_obm` via the bridge | section 13 steps 1-3 |
 | 7 | yelmox | remove snapclim; rename snapesm → snapshots; docs, CHANGELOG | |
 | 8 | fesm-utils | tsgen windowed modifiers (replaces `f_hol`), RNG state in restart | |
-| 9 | yelmo + yelmox | `border_width`, `[ice_bnd]`, regional taper modifier, GRL-PAL base config, GRL paleo A then B | |
+| 9 | yelmo + yelmox | `border_width`, `[ice_bnd]`, `taper` modifier, GRL-PAL base config, GRL paleo A then B | |
 | 9b | FesmData | TraCE-21ka ocean product (time-varying `to`, `so`; not in v2, v1 had `OCN-RECON-TRACE21ka`), global, for the GRL paleo B ocean | |
 
 LIS moves to the new keys after phases 1-5 (paper repo par files, on dev).
 
 ## 15. Decisions needed
 
-All answered (2026-10-18): name `snapshots`; model-set indices in the same
-registry; insolation from fesmc/insol `main` as a dependency; `ocn_fraction`
-on the sea-level anomaly; OBM from one global anomaly; GLOBAL-1DEG with path
-keywords; `tas_season` for two-field snapshots (tentative); `ocn_obm`
-absolute by default, `anomaly` as an option; GRL paleo B ocean: all three
-options (`ocn_fraction`, CLIMBER ocean snapshots, a TraCE-21ka product)
-selectable, for comparison.
+All answered (2026-10-18): name `snapshots`; indices are tsgen series only,
+the OBM box temperature is passed by the bridge (revised from "model-set
+indices in the same registry" after review); modifiers in a fixed order with
+`active` keys (revised from an ordered `names` list); insolation from
+fesmc/insol `main` as a dependency; `ocn_fraction` on the sea-level anomaly;
+OBM from one global anomaly; GLOBAL-1DEG with path keywords; `tas_season`
+for two-field snapshots (tentative); `ocn_obm` absolute by default,
+`anomaly` as an option; GRL paleo B ocean: all three options
+(`ocn_fraction`, CLIMBER ocean snapshots, a TraCE-21ka product) selectable,
+for comparison.
 
 insol need not reproduce the vendored copy exactly (a good match is
 enough). GRL paleo decisions: `_grl-paleo-plan.md`.
