@@ -42,7 +42,7 @@ $(objdir)/snapesm.o: $(libdir)/snapesm.f90 $(objdir)/kryos_forcing.o
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# Climate modifiers on climate_out after the backend (anom, ...), fixed order.
+# Climate modifiers on climate_out after the backend (anom, ocn_fraction, bias), fixed order.
 $(objdir)/climate_mods.o: $(libdir)/climate_mods.f90 $(objdir)/climate_out.o \
 						$(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<

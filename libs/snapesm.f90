@@ -3,7 +3,7 @@ module snapesm
     !
     !   Loading   -> varslice  (one varslice_class per snapshot x field)
     !   Indices   -> the driver's registry (kryos_forcing), read by name
-    !   Wrapper   -> this module (blend + transforms + derive + output state)
+    !   Wrapper   -> this module (blend + transforms + output state)
     !
     ! Replacement for the monolithic `snapclim`. See docs/climate-snap.md for its
     ! configuration.
@@ -19,7 +19,11 @@ module snapesm
     ! 2018, for two axes). The indices restart with the registry, so snapesm
     ! holds no state of its own.
     !
-    ! STATUS: the pipeline (reduce / combine / transform / derive) is ported and
+    ! The ocean temperature as a fraction of the air temperature anomaly is the
+    ! climate modifier ocn_fraction (climate_mods), on the field `to` held at
+    ! the reference (blend = "const").
+    !
+    ! STATUS: the pipeline (reduce / combine / transform) is ported and
     ! checked against snapclim (tests/test_snapesm_ref.f90); output
     ! (snapesm_write_*) is in place; snapesm_end is a stub.
 
@@ -57,7 +61,7 @@ module snapesm
         character(len=32) :: name           ! "tas","pr","to","so","zs","smb","bmb_shlf",...
         character(len=16) :: kind           ! "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
-        character(len=16) :: blend          ! "linear" | "ratio" | "fraction" | "const"
+        character(len=16) :: blend          ! "linear" | "ratio" | "const"
         character(len=64) :: axes(AXS_MAX)  ! names of the axes of this field ("" = none)
         integer           :: n_axis         ! number of axes
         integer           :: axis_k(AXS_MAX) ! their positions in snapesm_class%axis
@@ -125,11 +129,10 @@ module snapesm
         character(len=16)  :: combine       ! default combine mode
         character(len=64)  :: ref_name      ! which snapshot is the reference
         real(wp)           :: lapse(2)      ! [annual, summer] lapse rate [K/m]
-        ! precip / ocean sensitivity parameters (snapclim &snap)
+        ! precip sensitivity parameters (snapclim &snap)
         real(wp)           :: f_p           ! precip-temperature Clausius factor -> beta_p [1/K]
         real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (snapclim hardcodes 1.0)
         real(wp)           :: f_stdev       ! precip-variability multiplier
-        real(wp)           :: f_to          ! ocean/atm anomaly ratio (fraction ocean rule)
         integer            :: n_snap, n_field, n_axis
     end type
 
@@ -201,8 +204,8 @@ contains
     subroutine snapesm_update(sc, z_srf, time, idx, dx)
         ! Mirrors snapclim_update. Pipeline: axis positions from the registry
         ! (advanced by the driver to `time`) -> refresh loads -> combine ->
-        ! transform -> derive. Homogeneous anomalies are climate modifiers
-        ! (climate_mods), applied by the caller afterwards.
+        ! transform. Homogeneous anomalies and the ocean fraction rule are
+        ! climate modifiers (climate_mods), applied by the caller afterwards.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
@@ -210,7 +213,6 @@ contains
         type(indices_class),   intent(IN)    :: idx
         real(wp),              intent(IN), optional :: dx
 
-        real(wp), allocatable :: ta_ann_lag(:,:)
         integer :: k
 
         ! 1. The position on each axis: the current value of its index.
@@ -224,16 +226,9 @@ contains
         ! 3. Combine the reduced snapshot states into `now`, per field.
         call snapesm_combine(sc)
 
-        ! Capture ta_ann as it stands BEFORE the transform overwrites it: the
-        ! fraction ocean rule (derive) reads the previous step's value (see there).
-        if (allocated(sc%now%ta_ann)) ta_ann_lag = sc%now%ta_ann
-
         ! 4. Transform: inflate sea-level fields to the current model elevation
         !    (tsl -> tas), precip, annual/summer aggregates.
         call snapesm_transform(sc, z_srf)
-
-        ! 5. Derive: coupled rules (e.g. fraction ocean = f_to * atm anomaly).
-        call snapesm_derive(sc, ta_ann_lag)
 
         return
     end subroutine snapesm_update
@@ -275,7 +270,7 @@ contains
         ! weight a_k = the value of its index:
         !   linear (temp/salinity): now = ref + sum_k a_k*(hi_k - lo_k)
         !   ratio  (precip):        now = ref * prod_k (a_k*(hi_k/lo_k - 1) + 1)
-        !   fraction / const:       now = ref  (fraction ocean is finished in derive)
+        !   const:                  now = ref
         ! One axis reproduces snapclim calc_temp_1ind/calc_precip_1ind, two axes
         ! calc_temp_2ind/calc_precip_2ind (Banderas et al., 2018).
         implicit none
@@ -301,8 +296,8 @@ contains
                     cycle   ! "elev" and other non-blended fields: nothing to combine.
             end select
 
-            ! linear/ratio fields add their axes; fraction/const fields stay at
-            ! the reference.
+            ! linear/ratio fields add their axes; const fields stay at the
+            ! reference.
             blended = trim(sc%registry(f)%blend) == "linear" .or. &
                       trim(sc%registry(f)%blend) == "ratio"
             if (.not. blended) cycle
@@ -420,32 +415,6 @@ contains
         end do
     end function snapesm_lapse_monthly
 
-    subroutine snapesm_derive(sc, ta_ann_lag)
-        ! Coupled/derived rules applied after the blend. The `fraction` ocean rule
-        ! (snapclim 663-675) sets the ocean anomaly to f_to times the domain-mean
-        ! atmospheric annual anomaly. snapclim evaluates this BEFORE now%ta_ann is
-        ! recomputed, so it reads the previous step's ta_ann -> we pass ta_ann_lag
-        ! (now%ta_ann as of the start of this update) to reproduce that lag exactly.
-        implicit none
-        type(snapesm_class), intent(INOUT) :: sc
-        real(wp),              intent(IN)    :: ta_ann_lag(:,:)
-        integer  :: f
-        real(wp) :: dTo_now
-
-        do f = 1, sc%par%n_field
-            if (.not. sc%registry(f)%enabled) cycle
-            if (trim(sc%registry(f)%blend) == "fraction" .and. &
-                trim(sc%registry(f)%kind)  == "ocn") then
-                dTo_now = sc%par%f_to * sum(ta_ann_lag - sc%ref%ta_ann) &
-                          / real(sc%par%nx*sc%par%ny, wp)
-                if (allocated(sc%now%to_ann) .and. allocated(sc%ref%to_ann)) &
-                    sc%now%to_ann = sc%ref%to_ann + dTo_now
-            end if
-        end do
-
-        return
-    end subroutine snapesm_derive
-
     subroutine snapesm_end(sc)
         ! Teardown (snapclim never had one). Free varslice and state arrays.
         implicit none
@@ -555,7 +524,6 @@ contains
         sc%par%f_p       = 0.0_wp
         sc%par%f_p_ne    = 1.0_wp
         sc%par%f_stdev   = 0.0_wp
-        sc%par%f_to      = 0.0_wp
         call nml_read(filename, group, "var_defs",  sc%par%var_defs,  init=.TRUE.)
         call nml_read(filename, group, "combine",   sc%par%combine,   init=.TRUE.)
         call nml_read(filename, group, "ref_name",  sc%par%ref_name,  init=.TRUE.)
@@ -563,7 +531,6 @@ contains
         call nml_read(filename, group, "f_p",       sc%par%f_p,       init=.TRUE.)
         call nml_read(filename, group, "f_p_ne",    sc%par%f_p_ne,    init=.TRUE.)
         call nml_read(filename, group, "f_stdev",   sc%par%f_stdev,   init=.TRUE.)
-        call nml_read(filename, group, "f_to",      sc%par%f_to,      init=.TRUE.)
 
         ! --- field registry ---------------------------------------------------
         names = ""
@@ -671,6 +638,20 @@ contains
         call nml_read(filename, group, "axes",  fs%axes,  init=.TRUE.)
         fs%n_axis = count(len_trim(fs%axes) > 0)
 
+        select case(trim(fs%blend))
+            case("linear", "ratio", "const")
+                ! ok
+            case("fraction")
+                write(*,*) "snapesm:: Error: &"//trim(group)//" blend = 'fraction' was removed: &
+                           &set blend = 'const' and use the climate modifier [ocn_fraction] &
+                           &(f_to, region; see docs/climate-snap.md)."
+                stop 1
+            case default
+                write(*,*) "snapesm:: Error: &"//trim(group)//" blend = '"//trim(fs%blend)// &
+                           "'; must be linear, ratio or const."
+                stop 1
+        end select
+
         return
     end subroutine read_field_spec
 
@@ -753,7 +734,7 @@ contains
         call snapesm_set_ref(sc)
 
         ! Seed the output state from the reference (allocates now; mirrors snapclim's
-        ! `now = clim0`). This also primes now%ta_ann for the first fraction-ocean lag.
+        ! `now = clim0`).
         sc%now = sc%ref
 
         return
