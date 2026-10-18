@@ -704,8 +704,8 @@
 /
 
 &snap_south
-    ! Snapshot backend (snapesm): present day only (RACMO2.3p2 1981-2010, the
-    ! surface temperature as the snapclim config read it; ISMIP7 ocean).
+    ! Snapshot backend (snapesm): present day only (RACMO2.3p2 1981-2010, 2 m
+    ! air temperature; ISMIP7 ocean).
     ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
     var_defs   = "input/clim_db.nml"
     ref_name   = "pd"
@@ -715,7 +715,7 @@
 /
 
 &snap_south_pd
-    tas = "racmo23p2_1981_2010_tsrf"
+    tas = "racmo23p2_1981_2010_tas"
     pr  = "racmo23p2_1981_2010_pr"
     zs  = "racmo23p2_1981_2010_zs"
     to  = "ismip7_to"
