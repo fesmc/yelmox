@@ -39,6 +39,7 @@ module climate_mods
     use regions,       only : regions_class, regions_select
     use climate_out,   only : climate_out_class
     use kryos_forcing, only : indices_class, indices_value, indices_has
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find
 
     implicit none
 
@@ -82,7 +83,8 @@ module climate_mods
 
     ! [bias<sfx>]: an additive temperature field and a precipitation factor
     ! field, monthly (12) or annual (1 field, all months), read from var_defs
-    ! groups on the climate grid (online remap allowed), each with a weight:
+    ! groups (a list of databases, default the par file) on the climate grid
+    ! (online remap allowed), each with a weight:
     !   tas = tas + f_tas*dtas,   pr = pr*(1 + f_pr*(fpr - 1))
     type bias_class
         logical               :: active = .false.
@@ -335,7 +337,7 @@ contains
         type(climate_caps_class), intent(in)    :: caps
         type(grid_class),         intent(in)    :: grid
 
-        character(len=512) :: var_defs
+        character(len=256) :: var_defs(VAR_DEFS_MAX)
         character(len=256) :: grp_dtas, grp_fpr
         integer :: nx, ny
 
@@ -355,12 +357,12 @@ contains
         var_defs = ""
         grp_dtas = ""
         grp_fpr  = ""
-        call nml_read(filename, group, "var_defs", var_defs)
+        call nml_read(filename, group, "var_defs", var_defs, init=.true.)
         call nml_read(filename, group, "dtas",     grp_dtas)
         call nml_read(filename, group, "fpr",      grp_fpr)
         call nml_read(filename, group, "f_tas",    bias%f_tas)
         call nml_read(filename, group, "f_pr",     bias%f_pr)
-        if (len_trim(var_defs) == 0) var_defs = filename
+        if (all(len_trim(var_defs) == 0)) var_defs(1) = filename
 
         nx = grid%G%nx
         ny = grid%G%ny
@@ -384,7 +386,8 @@ contains
             type(varslice_class) :: vs
             integer :: m, nm
 
-            call varslice_init_nml(vs, trim(var_defs), vgroup, domain=domain, &
+            call varslice_init_nml(vs, trim(var_defs_find(var_defs, vgroup, "["//trim(group)//"]")), &
+                                   vgroup, domain=domain, &
                                    grid_name=trim(grid%name), grid=grid)
             call varslice_update(vs)
             nm = size(vs%var, 3)

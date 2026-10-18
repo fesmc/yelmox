@@ -8,9 +8,14 @@ module snapesm
     ! Replacement for the monolithic `snapclim`. See docs/climate-snap.md for its
     ! configuration.
     !
-    ! Config model: a `var_defs` database nml defines varslice groups (permanent
-    ! per-file variable metadata); each climate-state group &<group>_<snapshot> names
-    ! the group(s) supplying each field (1 = monthly, 2 = [ann, season] -> synthesized).
+    ! Config model: the `var_defs` databases (a list of nml files, first file
+    ! that has a group wins; the shared input/clim_db.nml, the par file for
+    ! run-specific groups) define varslice groups (permanent per-file variable
+    ! metadata); each climate-state group &<group>_<snapshot> names the group(s)
+    ! supplying each field (1 = monthly, 2 = [ann, season] -> synthesized). Their
+    ! paths take the keywords {grid_global} ([snap] grid_global, the global grid
+    ! of the paleoclimate products) and {exp} (the snapshot's exp), besides
+    ! {domain} and {grid_name}.
     ! Fields are optional per snapshot (key absent or "" = not bound): the backend
     ! builds the fields the reference snapshot binds, the atmosphere (tas and pr,
     ! with zs) and/or the ocean (to, optionally so); an ocean-only reference serves
@@ -39,6 +44,7 @@ module snapesm
     use nml
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use kryos_forcing, only : indices_class, indices_value, indices_has
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find
     use gaussian_filter, only : filter_gaussian
     use coordinates, only : grid_class
 
@@ -86,6 +92,7 @@ module snapesm
         character(len=3)  :: tas_season     ! season of the second tas field: "jja" | "djf"
         real(wp)          :: clim_sigma     ! [km] Gaussian smoothing of the atmosphere at loading (0: none)
         real(wp)          :: ocn_sigma      ! [km] Gaussian smoothing of the ocean at loading (0: none)
+        character(len=64) :: exp            ! experiment, the {exp} of its var_defs paths
         character(len=64), allocatable :: refs(:,:)  ! (n_field,2) var_defs groups per field ("" = none)
         integer,           allocatable :: nsrc(:)    ! (n_field) number of groups per field (0 = not bound)
     end type
@@ -113,7 +120,7 @@ module snapesm
 
     ! A field's source binding for one snapshot: one varslice group (already monthly)
     ! or two (annual mean + season) that `reduce` synthesizes into 12 months. The group
-    ! names are references into the var_defs database file.
+    ! names are references into the var_defs databases.
     type field_binding_class
         type(varslice_class), allocatable :: src(:)   ! size 1 (monthly) or 2 ([ann, season])
     end type
@@ -130,7 +137,8 @@ module snapesm
     type snapesm_param_class
         character(len=256) :: domain
         character(len=256) :: grid_name
-        character(len=256) :: var_defs      ! path to the varslice variable-database nml
+        character(len=256) :: var_defs(VAR_DEFS_MAX) ! varslice databases, searched in order
+        character(len=64)  :: grid_global   ! global grid of the paleoclimate products ({grid_global})
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
         real(wp)           :: dx_km         ! [km] grid spacing (snapshot smoothing)
@@ -568,12 +576,15 @@ contains
 
         ! --- top-level --------------------------------------------------------
         sc%par%var_defs  = ""
+        sc%par%grid_global = "GLOBAL-1DEG"
         sc%par%combine   = "anomaly"
         sc%par%ref_name  = ""
         sc%par%lapse     = 0.0_wp
         sc%par%f_p       = 0.0_wp
         sc%par%f_p_ne    = 1.0_wp
         call nml_read(filename, group, "var_defs",  sc%par%var_defs,  init=.TRUE.)
+        if (nml_has_param(filename, group, "grid_global")) &
+            call nml_read(filename, group, "grid_global", sc%par%grid_global, init=.TRUE.)
         call nml_read(filename, group, "combine",   sc%par%combine,   init=.TRUE.)
         call nml_read(filename, group, "ref_name",  sc%par%ref_name,  init=.TRUE.)
         call nml_read(filename, group, "lapse",     sc%par%lapse,     init=.TRUE.)
@@ -834,6 +845,9 @@ contains
 
         ss%name      = name
         ss%is_ref    = .FALSE.
+        ss%exp       = ""
+        if (nml_has_param(filename, group, "exp")) &
+            call nml_read(filename, group, "exp", ss%exp, init=.TRUE.)
         ss%monthly   = .FALSE.
         call nml_read(filename, group, "monthly",   ss%monthly,   init=.TRUE.)
         ss%clim_sigma = 0.0_wp
@@ -880,8 +894,10 @@ contains
 
     subroutine snapesm_load_snapshots(sc, time, grid)
         ! For each snapshot, load the var_defs groups of every field it binds
-        ! (from the database var_defs), prime them to `time`, reduce the snapshot
-        ! to its sea-level state, and set the reference.
+        ! (each from the first database of var_defs that has it, with the path
+        ! keywords {grid_global} and the snapshot's {exp}), prime them to
+        ! `time`, reduce the snapshot to its sea-level state, and set the
+        ! reference.
         implicit none
         type(snapesm_class), intent(INOUT) :: sc
         real(dp),              intent(IN)    :: time
@@ -889,10 +905,12 @@ contains
 
         integer            :: s, f, k, nsrc
         character(len=256) :: vdb
-
-        vdb = trim(sc%par%var_defs)
+        character(len=256) :: subs(2,2)   ! {key} -> value path substitutions
 
         do s = 1, sc%par%n_snap
+
+            subs(1,:) = [character(len=256) :: "grid_global", sc%par%grid_global]
+            subs(2,:) = [character(len=256) :: "exp",         sc%snap(s)%spec%exp]
 
             if (allocated(sc%snap(s)%bind)) deallocate(sc%snap(s)%bind)
             allocate(sc%snap(s)%bind(sc%par%n_field))
@@ -905,10 +923,13 @@ contains
 
                 allocate(sc%snap(s)%bind(f)%src(nsrc))
                 do k = 1, nsrc
+                    vdb = var_defs_find(sc%par%var_defs, trim(sc%snap(s)%spec%refs(f,k)), &
+                                        "&"//trim(sc%par%group)//"_"//trim(sc%snap(s)%spec%name)// &
+                                        " "//trim(sc%registry(f)%name))
                     call varslice_init_nml(sc%snap(s)%bind(f)%src(k), trim(vdb), &
                                            trim(sc%snap(s)%spec%refs(f,k)), &
                                            domain=trim(sc%par%domain), grid_name=trim(sc%par%grid_name), &
-                                           grid=grid)
+                                           subs=subs, grid=grid)
                     ! Prime: static read once here, time-varying sliced at `time`.
                     if (sc%snap(s)%bind(f)%src(k)%par%with_time) then
                         call varslice_update(sc%snap(s)%bind(f)%src(k), [time], method="extrap")

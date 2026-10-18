@@ -36,7 +36,11 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/snapclim.o: $(libdir)/snapclim.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/snapesm.o: $(libdir)/snapesm.f90 $(objdir)/kryos_forcing.o
+# Namelist helpers of the forcing modules (var_defs lookup, defaults file).
+$(objdir)/yelmox_nml.o: $(libdir)/yelmox_nml.f90
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+$(objdir)/snapesm.o: $(libdir)/snapesm.f90 $(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
@@ -44,7 +48,7 @@ $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 
 # Climate modifiers on climate_out after the backend (anom, ocn_fraction, bias), fixed order.
 $(objdir)/climate_mods.o: $(libdir)/climate_mods.f90 $(objdir)/climate_out.o \
-						$(objdir)/kryos_forcing.o
+						$(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # REMBO for the rembo climate backend: the adapter over rembo1 with rembo=1,
@@ -204,6 +208,7 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/smb_simple.o \
 					    $(objdir)/surface_chion.o \
 					    $(objdir)/climate_out.o \
+					    $(objdir)/yelmox_nml.o \
 					    $(objdir)/climate_mods.o \
 					    $(climate_rembo_obj) \
 					    $(objdir)/yelmox_climate.o \
