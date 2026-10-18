@@ -8,12 +8,16 @@ work (`paper-lis-dynamics`, on 2.4-beta).
 States checked: yelmox dev 0ebbd14, fesm-utils origin/dev 021f403 (the local
 clone was at b8a9a3d), FesmData b420a94 (`Paleoclimate/remap.toml`,
 `shared/domains.toml`), LIS `par/yelmox_LIS.nml` and `sims-log.md`
-(2026-10-17).
+(2026-10-17), fesmc/insol main 27e767e, configme `packages/insol.toml`.
 
-Decided (2026-10-18): dev only, 2.4-beta frozen; indices named `idx_<name>`;
-insolation on the forcing clock with an optional fixed time or orbit;
-climate modifiers after the backend; a shared database with the paleoclimate
-snapshots read from global products.
+Decided (2026-10-18): dev only, 2.4-beta frozen; backend renamed
+`snapshots`; indices named `idx_<name>`, any scalar series; insolation from
+the fesmc/insol library (a configme dependency), on the forcing clock with an
+optional fixed time or orbit; climate modifiers after the backend;
+`ocn_fraction` on the sea-level anomaly; OBM driven by one global anomaly,
+its box temperatures as model-set indices in the same registry; a
+shared database with path keywords, the paleoclimate snapshots read from
+global products (GLOBAL-1DEG).
 
 ## 1. Use cases to cover
 
@@ -148,12 +152,26 @@ All insolation users (chion, smbpal) take an **orbit** instead of a time:
 ```
 
 - Replaces `const_insol`/`const_kabp` in `[surface_chion]` and smbpal.
-- `libs/insol/insolation.f90` already separates the two steps
-  (`calc_orbital_par(time) -> ecc, obl, per`, then the daily insolation); the
-  change adds an entry point taking `(ecc, obl, per)` directly.
-- To share it with CLIMBER-X later, the module moves to fesm-utils
-  (`insolation`, with an `orbit_class`), the orbital tables as its data
-  (question 3).
+- **Library: fesmc/insol.** yelmox still vendors an older copy under
+  `libs/insol/` (module state, the same Laskar tables);
+  fesmc/insol is its successor: a standalone library (no netCDF, no
+  fesm-utils), state object `insol_class` / `orbit_class`, Laskar et al.
+  (2004) elements, daily, diurnal and daylength routines, already a configme
+  package (`configme install insol`, `libinsol.a`), but listed as
+  "standalone" because yelmox vendors the source.
+- Change: insol becomes a yelmox dependency (`.configme/manifest.toml`
+  `deps += "insol:<branch>"`, the configme package entry no longer
+  "standalone"; `config/Makefile_yelmox.mk` links `libinsol.a`, includes its
+  modules and drops the `interp1D`/`insolation` rules); `libs/insol/` is
+  removed; chion's host insolation (`surface_chion.f90`) and smbpal call
+  insol with an `insol_class` initialised once.
+- New functionality goes into insol: `orbit_class` from fixed `(ecc, obl,
+  per)` and an insolation call taking an orbit instead of a time (all calls
+  take `time_bp` today). CLIMBER-X can use the same library later.
+- Check: insol has changed since the copy was vendored (precision and solar
+  constant unified, selectable mean-cosine convention): compare the daily
+  insolation of both at 0, 21, 40 and 125 ka before switching (S0 and
+  `coszm_kind` set to reproduce the vendored copy, if possible).
 
 ## 6. Climate backends
 
@@ -174,9 +192,9 @@ discharge are protocol-specific, and the esm configs are verified against
 ISMIP7.
 
 Name: "snapesm" reads as a relative of "esm" (it was snapclim rebuilt on the
-fesm-utils primitives); "snap" alone is too broad. Proposal: `snapshots`
+fesm-utils primitives); "snap" alone is too broad. Decided: `snapshots`
 (`[comps] climate = "snapshots"`, `libs/snapshots.f90`; groups keep the
-`snap_` prefix). Question 1.
+`snap_` prefix).
 
 ### The snapshot backend after the change
 
@@ -298,7 +316,7 @@ from the first update. In a transient the lag is one `dt_clim` (10 yr): no
 visible difference. Order: with `names = "anom" "ocn_fraction"` the ocean
 also sees the homogeneous anomaly (as today, one update late).
 
-**What the fraction rule averages (question 4).** Today: the mean of
+**What the fraction rule averages.** Today: the mean of
 `ta_ann - ta_ann_ref` over *all* cells of the climate grid, with `ta_ann` at
 the current model surface and `ta_ann_ref` at the reference snapshot's
 surface. So it includes:
@@ -310,7 +328,7 @@ surface. So it includes:
   reference orography (e.g. ERA5 at its own resolution): a non-zero ocean
   anomaly with no forcing.
 
-Proposal: average the sea-level anomaly `tsl_ann - tsl_ann_ref` (the
+Decided: average the sea-level anomaly `tsl_ann - tsl_ann_ref` (the
 forcing only), optionally over a region (`ocn_fraction.region`, e.g. ocean
 cells). This changes the results of every `fraction` config.
 
@@ -347,34 +365,71 @@ Proposal, with a global anomaly as the single input:
 
 ## 9. Shared database
 
-`input/clim_db.nml` (one file, in yelmox): one group per product field,
-named after the product. Configs list databases: `var_defs =
-"input/clim_db.nml" "<par file>"`, the par file holding only run-specific
-groups (e.g. the LIS NGRIP experiments in the paper repo). The esm backend
-keeps its own par_file for now.
+`input/clim_db.nml` (one file, in yelmox): one group per product field.
+Configs list databases: `var_defs = "input/clim_db.nml" "<par file>"`, the
+par file holding only run-specific groups (e.g. the LIS NGRIP experiments in
+the paper repo). The esm backend keeps its own par_file for now.
+
+**No group per grid or domain.** Paths use varslice keywords (built in:
+`{domain}`, `{grid_name}`; extra `{key}` substitutions are already supported,
+`varslice_init_nml(..., subs=)`, also in `grid_src`). Two extra keys:
+
+- `{grid_global}`: the global grid of the paleoclimate products, set once in
+  `[snap] grid_global` (default `GLOBAL-1DEG`);
+- `{exp}`: the experiment/state of a snapshot, set in its group
+  (`&snap_lgm exp = "lgm"`), so one group serves every experiment of a
+  product family.
+
+```fortran
+&era5_1981_2010_tas                  ! regional reference, any domain and grid
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
+    name     = "t2m"
+    time     = 0 0 0 0 12
+/
+&pmip3_mean_tas_ann                  ! any PMIP3 experiment, any domain
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP3-{exp}-mean.nc"
+    name     = "t2m_ann"
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+&snap_lgm
+    exp = "lgm"
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
+/
+```
 
 - **Present-day references stay regional** (high resolution), with
-  `{domain}/{grid_name}` substitution: MAR v3.14, ERA5, RACMO, ORAS5, ISMIP6
-  ocean.
+  `{domain}/{grid_name}`: MAR v3.14, ERA5, RACMO, ORAS5, ISMIP6 ocean.
 - **Paleoclimate snapshots from the global products**, remapped online
-  (bilinear, map cached in `maps/`), one group set for every domain:
+  (bilinear, map cached in `maps/`):
 
-| Product (FesmData) | Global grids | Groups |
-|---|---|---|
-| `Paleoclimate-PMIP3-<exp>-mean` (lgm, midHolocene, piControl) | GLOBAL-0.5/1/2/5DEG | `pmip3_<exp>_mean_{tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
-| `Paleoclimate-PMIP4-<exp>-mean` | GLOBAL-0.5/1/2/5DEG | `pmip4_<exp>_mean_{tas_mon,pr_mon,zs}` (or ann/jja/djf) |
-| `Paleoclimate-CLIMBER3a-<sim>` (present, lgm_1p7weak, lgm_1p7strong), `-ocean` | atmosphere 0.5/1/2/5DEG, ocean 1/2/5DEG | `c3a_<sim>_{tas_ann,tas_jja,pr_ann,zs}`, `c3a_<sim>_to` |
-| `Paleoclimate-CLIMBERX-Willeit2025-<state>` (piControl, interstadial, stadial, heinrich), `-ocean` | GLOBAL-1/2/5DEG (source 5°) | `cx_<state>_{tas_mon,pr_mon,zs}`, `cx_<state>_{to,so}` |
+| Product (FesmData) | Global grids | `{exp}` | Groups |
+|---|---|---|---|
+| `Paleoclimate-PMIP3-{exp}-mean` | GLOBAL-0.5/1/2/5DEG | lgm, midHolocene, piControl | `pmip3_mean_{tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
+| `Paleoclimate-PMIP4-{exp}-mean` | GLOBAL-0.5/1/2/5DEG | lgm, midHolocene, piControl | `pmip4_mean_{tas_mon,pr_mon,zs}` (and ann/jja/djf) |
+| `Paleoclimate-CLIMBER3a-{exp}`, `-{exp}-ocean` | atmosphere 0.5/1/2/5DEG, ocean 1/2/5DEG | present, lgm_1p7weak, lgm_1p7strong | `c3a_{tas_ann,tas_jja,pr_ann,zs}`, `c3a_to` |
+| `Paleoclimate-CLIMBERX-Willeit2025-{exp}`, `-{exp}-ocean` | GLOBAL-1/2/5DEG (source 5°) | piControl, interstadial, stadial, heinrich | `cx_{tas_mon,pr_mon,zs}`, `cx_{to,so}` |
 
-- Global grid: GLOBAL-1DEG for all (the finest common to the four
-  families; the sources are about 1° or coarser, CLIMBER-X 5°), so every
+- GLOBAL-1DEG for all (the finest common to the four families; the sources
+  are about 1° or coarser, CLIMBER-3α 22.5° × 7.5°, CLIMBER-X 5°), so every
   snapshot of a run is remapped with the same kernel. Whether the regional
   `clim_sigma` smoothing of PMIP3 (50 km) is still needed is checked in the
   climate-only comparison (section 13); `clim_sigma` stays an option.
-- Southern summer: the Antarctic snapshots need DJF (`t2m_djf`, PMIP3/4) or
-  monthly fields (PMIP4, CLIMBER-X); CLIMBER-3α has JJA only.
-- The single PMIP models (`-<model>-<exp>`) and `-stdev` are added in the
-  same form when needed.
+- The single PMIP models (`-<model>-<exp>`, with `{model}`) and `-stdev`
+  are added in the same form when needed.
+
+**Seasons.** CLIMBER-3α has annual means (`t2m_ann`, `pr_ann`) and JJA
+(`t2m_jja`) only: no DJF, no monthly fields, neither in FesmData nor in the
+original files (`fesmc/Montoya2008-CLIMBER3a`, `TS_ANN`, `TS_JJA`, `PRC_ANN`).
+PMIP3 has ann, JJA, DJF; PMIP4 and CLIMBER-X are monthly. Today the
+two-field synthesis (`[ann, sum]` → 12 months) takes the second field as the
+hemisphere's summer. Proposal: a snapshot names the season of its second
+field (`tas_season = "jja"` or `"djf"`, default: the summer of the
+hemisphere), and the synthesis builds the cycle from the annual mean and that
+season. CLIMBER-3α then works in the south too (JJA as the winter),
+PMIP3 takes DJF in the south as now.
 
 ## 10. Use cases in the new form
 
@@ -388,7 +443,7 @@ keeps its own par_file for now.
 | Pyrenees | snapshots `pd` | orb | `anom` f_ta 10 | |
 | SRG (`const`) | snapshots `pd` | none | none | |
 | GRL paleo A | snapshots, axis a (+ b) | glacial (+ millennial) | `ocn_fraction` or ocean axis | `[ice_bnd]` |
-| GRL paleo B | snapshots, Buizert `hi` over baseline `lo`; Badgeley `lo=""` | const 1 | ocean: question 7 | `[ice_bnd]`, LGM steady = `tstep_method const` at -21 ka |
+| GRL paleo B | snapshots, Buizert `hi` over baseline `lo`; Badgeley `lo=""` | const 1 | ocean: question 4 | `[ice_bnd]`, LGM steady = `tstep_method const` at -21 ka |
 | rembo GRL | rembo + snapshots ocean-only | ramp index | rembo reads the `anom` gains itself | |
 | Bipolar | snapshots per domain | gmt (+ glacial) | `anom` per domain, `ocn_obm` | `[obm_forcing]` |
 | Ramps / hysteresis | snapshots | feedback index | `anom` | kill, restart every Δf |
@@ -417,7 +472,7 @@ Region-specific behaviour stays opt-in by key, never `select case(domain)`.
 | `libs/climate_mods.f90` (new) | `anom`, `ocn_fraction`, `ocn_obm`, `bias` (moved from `yelmox_climate.f90`) |
 | `libs/yelmox_climate.f90` | backends snapshots/esm/rembo; `climate_update(..., idx)` then `climate_mods_apply`; snapclim cases removed; rembo ocean via snapshots |
 | `yelmox_bipolar/obm_coupling.f90` | `[obm_forcing]` global anomaly → boxes; `obm2ism` → `ocn_obm`; `climate_air_anom` removed |
-| `libs/insol/` → fesm-utils `insolation` | `orbit_class`, insolation from `(ecc, obl, per)`; chion/smbpal take `[orbit]`, `const_insol/const_kabp` removed |
+| `libs/insol/` → fesmc/insol (configme dependency) | fixed `orbit_class` and orbit-based calls added in insol; chion/smbpal take `[orbit]`, `const_insol/const_kabp` removed; `libs/insol/` and its Makefile rules removed |
 | `libs/ice_bnd.f90` (new) + yelmo `bnd%H_ice_fix` | GRL paleo border ice |
 | `input/clim_db.nml`, `input/yelmox_defaults.nml` (new) | shared database (section 9); defaults for yelmox groups, read with `defaults_file` |
 | `scripts/check_par_nml.py` | also check yelmox groups against `yelmox_defaults.nml` |
@@ -445,12 +500,12 @@ All on dev; 2.4-beta stays frozen.
 |---|---|---|---|
 | 0 | yelmox | this doc; retirement plan step 1 marked done | |
 | 1 | yelmox | indices registry; snapesm axes on indices; `[tsforcing]` → `anom` modifier; per-index restarts | GRL snapesm, LIS steady: identical up to rounding; ramp restart continuity |
-| 2 | yelmox | `climate_mods`: `ocn_fraction` (no lag, question 4), `bias` moved | expected diffs only |
+| 2 | yelmox | `climate_mods`: `ocn_fraction` (no lag, sea-level anomaly), `bias` moved | expected diffs only |
 | 3 | yelmox | snapshot backend: optional fields, annual/no-salt ocean, `lo=""`; rembo ocean on it | |
-| 4 | fesm-utils + yelmox | insolation with `orbit_class` in fesm-utils; `[orbit]` in chion/smbpal | `clock` identical to transient insolation today, `time` to `const_insol` |
+| 4 | insol + configme + yelmox | insol: fixed orbit; configme: insol a yelmox dependency; yelmox: link libinsol, `[orbit]` in chion/smbpal, `libs/insol/` removed | insolation tables vs the vendored copy (section 5); `clock` = transient insolation today, `time` = `const_insol` |
 | 5 | yelmox | `clim_db.nml` (global paleoclimate), `yelmox_defaults.nml`, checker | configs shorter |
 | 6 | yelmox | config conversions per family (retirement plan order); bipolar with `[obm_forcing]`, `ocn_obm` | section 13 steps 1-3 |
-| 7 | yelmox | remove snapclim; rename snapesm (question 1); docs, CHANGELOG | |
+| 7 | yelmox | remove snapclim; rename snapesm → snapshots; docs, CHANGELOG | |
 | 8 | fesm-utils | tsgen windowed modifiers (replaces `f_hol`), RNG state in restart | |
 | 9 | yelmo + yelmox | `H_ice_fix`, `[ice_bnd]`, GRL-PAL base config, GRL paleo A then B | |
 
@@ -458,18 +513,16 @@ LIS moves to the new keys after phases 1-5 (paper repo par files, on dev).
 
 ## 15. Decisions needed
 
-1. Backend name: keep `snapesm`, or `snapshots` (proposed)?
-2. Indices set by a coupled model (OBM box temperatures) in the same
-   registry, or kept separate?
-3. Insolation module to fesm-utils (shared with CLIMBER-X later), or stays in
-   yelmox for now?
-4. `ocn_fraction`: average the sea-level anomaly (forcing only, proposed) or
-   keep today's surface-temperature mean over the whole grid (includes the
-   ice sheet's own elevation cooling)? Optional region?
-5. OBM: one global anomaly into all boxes via the amplification factors
-   (proposed), or keep the per-hemisphere input? `ocn_obm` absolute (as now)
-   or anomaly?
-6. Global grid of the paleoclimate snapshots: GLOBAL-1DEG for all
-   (proposed)? Antarctic summer from DJF/monthly fields where available?
-7. GRL paleo B ocean: `ocn_fraction`, CLIMBER snapshots, or a TraCE product
+Answered 2026-10-18: questions on the name (`snapshots`), model-set indices
+(same registry), insolation (fesmc/insol as a dependency), `ocn_fraction`
+(sea-level anomaly), OBM (global anomaly), global grid (GLOBAL-1DEG, path
+keywords). Open:
+
+1. Seasons of a two-field snapshot: `tas_season` (section 9), so
+   CLIMBER-3α (ann + JJA only) can be used in the south?
+2. `ocn_obm`: absolute (as now) by default, `anomaly` as an option?
+3. insol: which branch for the dependency (main, or a dev branch for the
+   fixed-orbit work)? Reproduce the vendored copy exactly (S0,
+   `coszm_kind`), or accept small differences?
+4. GRL paleo B ocean: `ocn_fraction`, CLIMBER snapshots, or a TraCE product
    (GRL plan Q9; its other questions stay open).
