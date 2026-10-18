@@ -35,6 +35,14 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- yelmox_bipolar: the OBM box air temperatures from one global anomaly index,
+  `[obm_forcing]` (`index`, `gain`): `theta_i = theta_i_init + ampl_i × gain × index` for
+  every box (the tropical box set once), vapour fluxes likewise; `climate_air_anom` and
+  `libs/obm/atm2ocean.f90` removed. `obm2ism` is the climate modifier `[ocn_obm_<sfx>]`
+  (`absolute`, as before, or `anomaly`: reference + box anomaly), applied by the driver;
+  `[ctrl] obm2ism` removed. The OBM restart keeps the `*_init` values of the par file and
+  now holds the box air temperatures. The Bipolar par file on snapesm (north as GRL, south
+  present day), indices `at` and `gmt`.
 - `[snap] var_defs` is a list of files, searched in order (first that has the group; an
   error names the group and the files), e.g. `"input/clim_db.nml" "<par file>"`; also
   `[bias] var_defs` (default the par file). The forcing groups need only the keys that

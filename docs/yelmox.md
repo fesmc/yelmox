@@ -117,8 +117,8 @@ moves by more than its `restart_every_df`. Each index restarts from
 `idx_<name>` (plus `idx_<name>_df_dt`).
 
 `[anom]` is a climate modifier (libs/climate_mods.f90): applied to the
-backend's output after the backend, before `[ocn_fraction]` and `[bias]`, on
-the climate grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
+backend's output after the backend, before `[ocn_fraction]`, `[ocn_obm]` and
+`[bias]`, on the climate grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
 precipitation sensitivity), ocean profiles + `dTo`/`dSo` (esm: at the shelf
 base). The group is optional (inactive without it) and takes the domain suffix
 (`anom<sfx>`). Checked at init: the index must be in the registry, and a
@@ -155,6 +155,32 @@ and with `[anom] f_to /= 0` (both would set the ocean temperature anomaly).
 The anomaly is written to the climate's 2D file (`ocn_fraction_dto`). It
 replaces snapclim's `fraction` ocean for snapesm (see
 [snapclim and snapesm](climate-snap.md)).
+
+## Ocean from the ocean box model (`[ocn_obm]`)
+
+The climate modifier after `[ocn_fraction]`, for
+[`yelmox_bipolar`](yelmox-bipolar.md): the ocean temperature profiles, at every
+depth, from the box of the domain's hemisphere of the ocean box model
+(northern box `tn`, southern box `ts`); salinity unchanged:
+
+    absolute:  to_ann = box
+    anomaly:   to_ann = to_ann_ref + (box - box_init)
+
+```
+&ocn_obm_north
+    active = True
+    mode   = "absolute"   ! absolute | anomaly
+/
+```
+
+The one modifier not applied in the climate step: the driver that owns the box
+model applies it (`climate_mod_ocn_obm`) after both domains' climate steps and
+before their shelf steps; `active` is the switch of that exchange
+(`yelmox_bipolar` needs `[ctrl] active_obm`). `box_init` is the box's initial
+value of the par file (`tn_init`, `ts_init`), also after a restart. Refused for
+an ocean at the shelf base (esm), and with `[ocn_fraction]` or `[anom] f_to /= 0`
+(it replaces the ocean temperature). The box temperature and its anomaly are
+written to the climate's 2D file (`ocn_obm_theta`, `ocn_obm_dto`).
 
 ## Climate bias correction (`[bias]`)
 
@@ -194,8 +220,9 @@ the run), except the keys of an unselected `init_method` and the `[relax]` and
 The forcing groups have defaults: `input/yelmox_defaults.nml` declares every
 key of `[indices]`, `[idx_<name>]` (template `[idx]`: the tsgen keys, `units`,
 `restart_every_df`), the snapshot backend (`[snap]`, templates `[snap_field]`,
-`[snap_snapshot]`, `[snap_axis]`) and the climate modifiers (`[anom]`,
-`[ocn_fraction]`, `[bias]`), with the domain suffix of a multi-domain driver
+`[snap_snapshot]`, `[snap_axis]`), the climate modifiers (`[anom]`,
+`[ocn_fraction]`, `[ocn_obm]`, `[bias]`) and `[obm_forcing]` (yelmox_bipolar),
+with the domain suffix of a multi-domain driver
 (`[anom_north]` to `[anom]`). A par file lists only what differs; an absent
 group takes every default (a modifier is then inactive). Each read goes through
 `nml_read(..., defaults_file, defaults_group)` (the path in `libs/yelmox_nml.f90`),
