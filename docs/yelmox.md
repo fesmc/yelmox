@@ -172,7 +172,7 @@ group is optional; without it, or with `active = False`, nothing changes.
 ```
 &bias
     active   = True
-    var_defs = ""             ! files with the groups below, searched in order ("" = this file)
+    var_defs = ""             ! files with the groups below, searched in order, then this file
     dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
     fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
     f_tas    = 1.0            ! weight of dtas

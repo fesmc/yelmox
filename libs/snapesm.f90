@@ -9,8 +9,8 @@ module snapesm
     ! configuration.
     !
     ! Config model: the `var_defs` databases (a list of nml files, first file
-    ! that has a group wins; the shared input/clim_db.nml, the par file for
-    ! run-specific groups) define varslice groups (permanent per-file variable
+    ! that has a group wins, then the par file itself for run-specific groups;
+    ! the shared input/clim_db.nml by default) define varslice groups (permanent per-file variable
     ! metadata); each climate-state group &<group>_<snapshot> names the group(s)
     ! supplying each field (1 = monthly, 2 = [ann, season] -> synthesized). Their
     ! paths take the keywords {grid_global} ([snap] grid_global, the global grid
@@ -138,6 +138,7 @@ module snapesm
         character(len=256) :: domain
         character(len=256) :: grid_name
         character(len=256) :: var_defs(VAR_DEFS_MAX) ! varslice databases, searched in order
+        character(len=512) :: par_file      ! the par file, searched after var_defs
         character(len=64)  :: grid_global   ! global grid of the paleoclimate products ({grid_global})
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
@@ -573,6 +574,7 @@ contains
         integer           :: i, j
 
         sc%par%group     = group
+        sc%par%par_file  = filename
         sc%par%domain    = domain
         sc%par%grid_name = grid_name
 
@@ -917,7 +919,8 @@ contains
 
     subroutine snapesm_load_snapshots(sc, time, grid)
         ! For each snapshot, load the var_defs groups of every field it binds
-        ! (each from the first database of var_defs that has it, with the path
+        ! (each from the first database of var_defs that has it, else the par
+        ! file, with the path
         ! keywords {grid_global} and the snapshot's {exp}), prime them to
         ! `time`, reduce the snapshot to its sea-level state, and set the
         ! reference.
@@ -927,7 +930,7 @@ contains
         type(grid_class),      intent(IN)    :: grid     ! target grid (online remap)
 
         integer            :: s, f, k, nsrc
-        character(len=256) :: vdb
+        character(len=512) :: vdb
         character(len=256) :: subs(2,2)   ! {key} -> value path substitutions
 
         do s = 1, sc%par%n_snap
@@ -946,7 +949,8 @@ contains
 
                 allocate(sc%snap(s)%bind(f)%src(nsrc))
                 do k = 1, nsrc
-                    vdb = var_defs_find(sc%par%var_defs, trim(sc%snap(s)%spec%refs(f,k)), &
+                    vdb = var_defs_find(sc%par%var_defs, trim(sc%par%par_file), &
+                                        trim(sc%snap(s)%spec%refs(f,k)), &
                                         "&"//trim(sc%par%group)//"_"//trim(sc%snap(s)%spec%name)// &
                                         " "//trim(sc%registry(f)%name))
                     call varslice_init_nml(sc%snap(s)%bind(f)%src(k), trim(vdb), &

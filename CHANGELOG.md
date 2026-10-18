@@ -36,8 +36,8 @@ annotated git tag. Dates are release (tag) dates.
 
 ### Changed
 - `[snap] var_defs` is a list of files, searched in order (first that has the group; an
-  error names the group and the files), e.g. `"input/clim_db.nml" "<par file>"`; also
-  `[bias] var_defs` (default the par file). The forcing groups need only the keys that
+  error names the group and the files), then the par file itself (implicitly last, so a
+  par file never names itself); also `[bias] var_defs` (default `""`: the par file only). The forcing groups need only the keys that
   differ from `input/yelmox_defaults.nml`: `[snap_field_<name>] kind` defaults to the
   kind of the field name, a field without axes needs no group, `[anom]`/`[ocn_fraction]`/
   `[bias]` absent = inactive. GRL snapesm configs take PMIP3 piControl/lgm from the global

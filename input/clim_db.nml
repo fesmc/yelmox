@@ -3,11 +3,12 @@
 ! backend (snapesm) and the climate modifiers.
 !
 ! One group per product field. A par file lists the databases to search,
-! first file that has a group wins:
+! first file that has a group wins, then the par file itself (searched
+! implicitly last: it can hold run-specific groups without naming itself):
 !     &snap
-!         var_defs = "input/clim_db.nml" "yelmox/<par>.nml"
-! (the par file itself can hold run-specific groups). A snapshot binds groups
-! by name: &snap_lgm  exp = "lgm"  tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja".
+!         var_defs = "input/clim_db.nml"
+! A snapshot binds groups by name: &snap_lgm  exp = "lgm"
+! tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja".
 !
 ! Path keywords:
 !   {domain}, {grid_name}  the domain ([domain] name) and the climate grid

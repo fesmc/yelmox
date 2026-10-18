@@ -439,8 +439,8 @@ Proposal, with a global anomaly as the single input:
 ## 9. Shared database
 
 `input/clim_db.nml` (one file, in yelmox): one group per product field.
-Configs list databases: `var_defs = "input/clim_db.nml" "<par file>"`, the
-par file holding only run-specific groups (e.g. the LIS NGRIP experiments in
+Configs list databases: `var_defs = "input/clim_db.nml"`; the par file itself
+is searched implicitly last (phase 6), holding only run-specific groups (e.g. the LIS NGRIP experiments in
 the paper repo). The esm backend keeps its own par_file for now.
 
 **No group per grid or domain.** Paths use varslice keywords (built in:

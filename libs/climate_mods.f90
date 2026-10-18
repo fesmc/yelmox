@@ -85,7 +85,7 @@ module climate_mods
 
     ! [bias<sfx>]: an additive temperature field and a precipitation factor
     ! field, monthly (12) or annual (1 field, all months), read from var_defs
-    ! groups (a list of databases, default the par file) on the climate grid
+    ! groups (a list of databases, then the par file) on the climate grid
     ! (online remap allowed), each with a weight:
     !   tas = tas + f_tas*dtas,   pr = pr*(1 + f_pr*(fpr - 1))
     type bias_class
@@ -361,7 +361,6 @@ contains
                       defaults_file=def_file, defaults_group="bias")
         call nml_read(filename, group, "f_tas",    bias%f_tas, defaults_file=def_file, defaults_group="bias")
         call nml_read(filename, group, "f_pr",     bias%f_pr,  defaults_file=def_file, defaults_group="bias")
-        if (all(len_trim(var_defs) == 0)) var_defs(1) = filename
 
         nx = grid%G%nx
         ny = grid%G%ny
@@ -385,7 +384,8 @@ contains
             type(varslice_class) :: vs
             integer :: m, nm
 
-            call varslice_init_nml(vs, trim(var_defs_find(var_defs, vgroup, "["//trim(group)//"]")), &
+            call varslice_init_nml(vs, trim(var_defs_find(var_defs, filename, vgroup, &
+                                                          "["//trim(group)//"]")), &
                                    vgroup, domain=domain, &
                                    grid_name=trim(grid%name), grid=grid)
             call varslice_update(vs)

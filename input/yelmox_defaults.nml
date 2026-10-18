@@ -59,7 +59,7 @@
 ! ===== Snapshot backend (snapesm) =====
 
 &snap
-    var_defs    = "input/clim_db.nml"  ! varslice databases, searched in order (e.g. + the par file)
+    var_defs    = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
     grid_global = "GLOBAL-1DEG"     ! global grid of the paleoclimate products ({grid_global})
     combine     = "anomaly"         ! anomaly | absolute
     ref_name    = "pd"              ! the reference snapshot
@@ -115,7 +115,7 @@
 
 &bias
     active   = False    ! apply it?
-    var_defs = ""       ! varslice databases of dtas/fpr, searched in order; "" = the par file
+    var_defs = ""       ! varslice databases of dtas/fpr, searched in order, then the par file itself
     dtas     = ""       ! group of the temperature correction [K] (1 or 12 slices); "" = none
     fpr      = ""       ! group of the precipitation factor [1] (1 or 12 slices); "" = none
     f_tas    = 1.0      ! weight of dtas

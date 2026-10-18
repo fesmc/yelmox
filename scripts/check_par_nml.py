@@ -14,8 +14,10 @@ script reproduces that check offline, with more:
      group of the defaults file (`nml_validate` would stop the run).
   2. duplicate: a group or key defined twice in one file. `nml_read` takes the
      first occurrence, so later copies are silently ignored.
-  3. var_defs: a snapshot binds a varslice group that none of the [snap]
-     var_defs files holds (or a var_defs file is missing).
+  3. var_defs: a snapshot (or an active [bias]) binds a varslice group that
+     neither its var_defs files nor the par file itself (searched implicitly
+     last) holds, or a var_defs file is missing. Bound groups in the par file
+     are not reported by --dead.
   4. dead (only with --dead): keys in the other groups (ctrl, snapclim,
      smbpal, isos, ...) whose name appears nowhere in the Fortran sources as a
      string literal, so no `nml_read` can read them. The match is by key name
@@ -196,35 +198,59 @@ def yelmox_groups(groups, ydefaults):
     return out, stale
 
 
+def var_defs_files(path, listed, label, errors):
+    """The var_defs files of a group, then the par file itself (searched
+    implicitly last); a listed file that is missing is an error."""
+    files = []
+    for f in listed:
+        # Relative to the run folder: the repo links (input, ...).
+        cand = [os.path.join(REPO, f), os.path.join(os.path.dirname(path), f)]
+        found = next((c for c in cand if os.path.isfile(c)), None)
+        if found is None:
+            errors.append("&%s: var_defs file not found: %s" % (label, f))
+        else:
+            files.append(found)
+    return files + [path]
+
+
 def var_defs_errors(path, groups, ygroups, ydefaults):
-    """Bindings of the snapshots to varslice groups that no var_defs file holds."""
-    errors = []
-    for snap, tmpl in ygroups.items():
-        if tmpl != "snap":
-            continue
-        files = []
-        for f in listval(groups[snap].get("var_defs", ydefaults["snap"]["var_defs"])):
-            # Relative to the run folder: the repo links (input, ...) or the par
-            # file itself (runme copies it there under its name).
-            cand = [os.path.join(REPO, f), os.path.join(os.path.dirname(path), f)]
-            found = next((c for c in cand if os.path.isfile(c)), None)
-            if found is None:
-                errors.append("&%s: var_defs file not found: %s" % (snap, f))
-            else:
-                files.append(found)
+    """Bindings of the snapshots (and [bias] dtas/fpr) to varslice groups that
+    neither the var_defs files nor the par file hold. Also returns the bound
+    groups found in the par file itself (read by varslice, not dead)."""
+    errors, local = [], set()
+
+    def check(label, files, refs):
         db = set()
-        for f in files:
-            g, _ = parse_par(f)
-            db |= {name for name, _ in g}
-        for name, t in ygroups.items():
-            if t != "snap_snapshot" or not name.startswith(snap + "_") or name not in groups:
+        for f in files[:-1]:
+            db |= {name for name, _ in parse_par(f)[0]}
+        for key, ref in refs:
+            if ref in db:
                 continue
-            for key in ("tas", "pr", "zs", "to", "so"):
-                for ref in listval(groups[name].get(key, "")):
-                    if ref not in db:
-                        errors.append("&%s %s: group %s in none of the var_defs files"
-                                      % (name, key, ref))
-    return errors
+            if ref in groups:
+                local.add(ref)
+            else:
+                errors.append("&%s %s: group %s in none of the var_defs files nor the par file"
+                              % (label, key, ref))
+
+    for snap, tmpl in ygroups.items():
+        if tmpl == "snap":
+            files = var_defs_files(path, listval(groups[snap].get(
+                "var_defs", ydefaults["snap"]["var_defs"])), snap, errors)
+            for name, t in ygroups.items():
+                if t != "snap_snapshot" or not name.startswith(snap + "_") or name not in groups:
+                    continue
+                check(name, files, [(key, ref) for key in ("tas", "pr", "zs", "to", "so")
+                                    for ref in listval(groups[name].get(key, ""))])
+        elif tmpl == "bias":
+            g = groups[snap]
+            if scalar(g.get("active", ydefaults["bias"]["active"])).lower() not in (
+                    "true", ".true.", "t"):
+                continue
+            files = var_defs_files(path, listval(g.get(
+                "var_defs", ydefaults["bias"]["var_defs"])), snap, errors)
+            check(snap, files, [(key, scalar(g[key])) for key in ("dtas", "fpr")
+                                if scalar(g.get(key, ""))])
+    return errors, local
 
 
 def source_literals():
@@ -265,13 +291,14 @@ def check_file(path, defaults, ydefaults, lits):
         if unknown:
             errors.append("&%s: unknown key(s) (not in &%s of yelmox defaults): %s"
                           % (name, def_group, ", ".join(unknown)))
-    errors += var_defs_errors(path, groups, xgroups, ydefaults)
+    vd_errors, local = var_defs_errors(path, groups, xgroups, ydefaults)
+    errors += vd_errors
 
     dead = []
     if lits is not None:
         dead += ["&%s: group not read by the snapshot backend" % g for g in stale]
         for name, params in groups.items():
-            if name in ygroups or name in xgroups or name in stale:
+            if name in ygroups or name in xgroups or name in stale or name in local:
                 continue
             keys = [k for k in params if k not in lits]
             if keys:

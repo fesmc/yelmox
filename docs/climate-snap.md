@@ -128,17 +128,22 @@ the reference), `fields = "tas" "pr" "to" "so" "zs"`, `grid_global =
 
 The snapshots bind varslice groups (see [Database namelists](database-namelists.md))
 by name, from the files listed in `[snap] var_defs`, searched in order (first
-file that has the group). The shared database `input/clim_db.nml` holds one
-group per product field; a par file can add run-specific groups and list itself
-(its name in the run folder, where runme copies it):
+file that has the group), then from the par file itself (searched implicitly
+last, so it never has to name itself). The shared database `input/clim_db.nml`
+holds one group per product field; a par file can add run-specific groups:
 
 ```fortran
 &snap
-    var_defs = "input/clim_db.nml" "yelmox_Greenland_snapesm.nml"
+    var_defs = "input/clim_db.nml"   ! the default
+/
+&my_tas                              ! in the par file: found after clim_db.nml
+    filename = "ice_data/..."
+    ...
 /
 ```
 
-A group missing from every file stops the run, naming the group and the files.
+A group missing from every file (and the par file) stops the run, naming the
+group and the files.
 The paths of the database take, besides `{domain}` and `{grid_name}`, two
 keywords:
 
