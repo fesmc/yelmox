@@ -20,7 +20,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -114,9 +114,19 @@
 
 &indices
     ! Indices: named scalar series, read by name (snapesm axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
-    ! units and restart_every_df), advanced on the forcing clock time_rel.
-    names  = ""       ! e.g. "at" "ramp"; "" = none
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
+    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
+    ! from the template [idx] of input/yelmox_defaults.nml.
+    names  = "at"
+/
+
+&idx_at
+    ! Glacial index: the orbital series normalised to 0 at present (piControl)
+    ! and 1 at 21 ka (LGM); the position on the snapesm axis "at".
+    method      = "series"
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
 /
 
 &anom
@@ -133,7 +143,7 @@
     ! Ocean temperature anomaly as a fraction of the mean sea-level air
     ! temperature anomaly over a region, applied after [anom]: to_ann =
     ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = False    ! Apply it?
+    active = True     ! Apply it?
     f_to   = 0.25     ! [1] fraction of the air temperature anomaly
     region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
 /
@@ -557,97 +567,63 @@
 ! ===== Climate =====
 
 &snap
-    atm_type           = "snap_1ind_new"
-    ocn_type           = "fraction"
-    fname_at           = "input/alpha_orbital_r2020.dat"
-    fname_ao           = "input/alpha_orbital_r2020.dat"
-    fname_ap           = "input/alpha_orbital_r2020.dat"
-    fname_as           = "input/salinity_index_deglaciation.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
-    dSo_const          = 3.0
-    f_to               = 0.25 
-    f_p                = 0.06
-    f_stdev            = 0.0 
+    ! Snapshot backend (snapesm): present day (MAR v3.14 1961-1990, ORAS5) and
+    ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
+    ! "at" (snapclim atm_type = snap_1ind_new, without f_hol). The ocean
+    ! follows the reference, its anomaly from [ocn_fraction]. Databases:
+    ! input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    snapshots  = "pd" "picontrol" "lgm"
+    axes       = "at"
+    f_p        = 0.06
 /
 
-&snap_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 0.3 
-    f_glac             = 1.0 
-    f_hol              = 0.5 
-    f_seas             = 1.0 
-    f_to               = 0.2
+! ---- fields (blend rule and axes; the others follow the reference) ---------
+
+&snap_field_tas
+    axes  = "at"
 /
 
-&snap_recon
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-RECON-B20.nc"
-    clim_names      = "time" "tas" "pr" "zs"
-    clim_monthly    = False
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCN-RECON-TRACE21ka.nc"
-    ocn_names       = "time" "depth" "mask_ocn" "to"
-    ocn_monthly     = False
+&snap_field_pr
+    blend = "ratio"
+    axes  = "at"
 /
 
-&snap_clim0
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
-    clim_names      = "z_srf" "t2m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = True
-    ocn_time        = 0
+! ---- snapshots (var_defs groups per field; {exp} of the paths) -------------
+! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
+
+&snap_pd
+    tas = "mar314_1961_1990_tas"
+    pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
+    zs  = "mar314_1961_1990_zs"
+    to  = "oras5_1981_2010_to"
+    so  = "oras5_1981_2010_so"
 /
 
-&snap_clim1
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = 0
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
+&snap_picontrol
+    exp        = "piControl"
+    monthly    = False
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
 /
 
-&snap_clim2
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = -21000
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
+&snap_lgm
+    exp        = "lgm"
+    monthly    = False
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
 /
 
-&snap_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
+! ---- axes (two snapshots and the index giving the position on them) --------
+! The value of the index is the position on the axis lo -> hi (0 -> 1).
+
+&snap_axis_at
+    lo    = "picontrol"
+    hi    = "lgm"
+    index = "at"
 /
 
 ! ===== Surface =====
