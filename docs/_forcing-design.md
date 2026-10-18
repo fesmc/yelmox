@@ -474,7 +474,7 @@ Region-specific behaviour stays opt-in by key, never `select case(domain)`.
 | `libs/yelmox_climate.f90` | backends snapshots/esm/rembo; `climate_update(..., idx)` then `climate_mods_apply`; snapclim cases removed; rembo ocean via snapshots |
 | `yelmox_bipolar/obm_coupling.f90` | `[obm_forcing]` global anomaly → boxes; `obm2ism` → `ocn_obm`; `climate_air_anom` removed |
 | `libs/insol/` → fesmc/insol (configme dependency) | fixed `orbit_class` and orbit-based calls added in insol; chion/smbpal take `[orbit]`, `const_insol/const_kabp` removed; `libs/insol/` and its Makefile rules removed |
-| `libs/ice_bnd.f90` (new) + yelmo masks `border_width` | GRL paleo border ice into `H_ice_ref`; `smb_simple` mask set once at init |
+| `libs/ice_bnd.f90` (new) + yelmo masks `border_width` | GRL paleo border ice into `H_ice_ref` |
 | `input/clim_db.nml`, `input/yelmox_defaults.nml` (new) | shared database (section 9); defaults for yelmox groups, read with `defaults_file` |
 | `scripts/check_par_nml.py` | also check yelmox groups against `yelmox_defaults.nml` |
 | removed | `libs/snapclim.f90`, its tests, `libs/obm/atm2ocean.f90`, `input/greenland_snp.nml` |

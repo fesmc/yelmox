@@ -121,7 +121,7 @@ vary in time. Nothing in yelmo assumes it constant; its uses:
 | yelmo `yelmo_topography.f90:320/332` | relaxation target (`topo_rel_field = "H_ref"`); `topo_rel` 1/2 masks | fine (PD spin-ups only) |
 | yelmox `kryos_startup.f90:210` | isostasy reference, copied once at cold start | fine |
 | yelmox `kryos_startup.f90:274-294` | `recon` cold start overwrites it with the reconstruction | already not PD |
-| yelmox `kryos_coupling.f90:448` | `smb_simple` target mask, refreshed each step | set the mask once at init instead |
+| yelmox `kryos_coupling.f90:448` | `smb_simple` target mask, refreshed each step | intended: the mask follows `H_ice_ref` |
 | yelmo restart | saved and read | fine |
 
 The optimisation targets `dta%pd%H_ice`, not `H_ice_ref` (the earlier
