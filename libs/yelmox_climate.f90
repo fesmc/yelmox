@@ -427,11 +427,16 @@ contains
 
     end function climate_file_base
 
-    subroutine climate_write_init(cl, filename)
-        ! The backend's own axes in its 2D output file (created with xc, yc and
-        ! time by the caller).
+    subroutine climate_write_init(cl, out, filename)
+        ! The axes of the climate's 2D output file beyond xc, yc and time (created
+        ! by the caller): the ocean depth axis, when the climate has ocean
+        ! profiles, and the backend's own axes.
         type(yelmox_climate_class), intent(in) :: cl
+        type(climate_out_class),    intent(in) :: out
         character(len=*),           intent(in) :: filename
+
+        if (allocated(out%now%depth)) &
+            call nc_write_dim(filename, "depth", x=out%now%depth, units="m")
 
         select case(trim(cl%method))
             case("snapesm")
@@ -454,7 +459,8 @@ contains
     subroutine climate_write_2D(cl, out, filename, ncid, n)
         ! Write one record of the climate (record n of an open 2D file on the
         ! climate grid): the annual near-surface air temperature and
-        ! precipitation, plus the backend's own fields.
+        ! precipitation, the annual ocean profiles (when the climate has them),
+        ! plus the backend's own fields.
         type(yelmox_climate_class), intent(in) :: cl
         type(climate_out_class),    intent(in) :: out
         character(len=*),           intent(in) :: filename
@@ -469,6 +475,10 @@ contains
             call write2D("smb_ann",  1e-3_wp*out%now%smb, "m/a water equiv.", "Surface mass balance (ann)")
             call write2D("tsrf_ann", out%now%tsrf, "K", "Surface temperature (ann)")
         end if
+        if (allocated(out%now%to_ann)) &
+            call write3D("to_ann", out%now%to_ann, "depth", "K", "Ocean temperature (ann)")
+        if (allocated(out%now%so_ann)) &
+            call write3D("so_ann", out%now%so_ann, "depth", "PSU", "Ocean salinity (ann)")
 
         select case(trim(cl%method))
             case("snapesm")
@@ -510,6 +520,14 @@ contains
                           start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
                           units=units, long_name=long_name)
         end subroutine write2D
+
+        subroutine write3D(vnm, var, dim3, units, long_name)
+            character(len=*), intent(in) :: vnm, dim3, units, long_name
+            real(wp),         intent(in) :: var(:,:,:)
+            call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3=dim3, dim4="time", &
+                          start=[1,1,1,n], count=[size(var,1),size(var,2),size(var,3),1], &
+                          ncid=ncid, units=units, long_name=long_name)
+        end subroutine write3D
 
     end subroutine climate_write_2D
 

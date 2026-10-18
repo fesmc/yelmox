@@ -24,6 +24,9 @@ annotated git tag. Dates are release (tag) dates.
   (`index`). Removed `[tsgen]`, `[snap_idx_*]`, `[tsforcing] restart_every_df`,
   `tsgen_restart.nc` and `snapesm_idx_<name>_restart.nc`. The ramp config runs with
   `tstep_method = "rel"` (the ramp now advances on `time_rel`).
+- The climate 2D file has the annual ocean profiles `to_ann`, `so_ann` (over `depth`) for
+  every backend that has them (snapclim, snapesm, rembo); written by `climate_write_2D`
+  (were snapesm only).
 - Climate on a coarser grid than the surface: `tas`/`pr` are moved from the climate grid's
   surface elevation to the surface grid's with the backend's monthly lapse rate and
   precipitation sensitivity (`climate_out`: `now%z_srf`, `lapse(12)`, `now%beta_p`;

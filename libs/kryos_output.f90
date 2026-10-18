@@ -72,7 +72,7 @@ contains
             call io_dims_init(trim(io_fname(outfldr,trim(dom%ctl%surface_method))), dom%ctl%grid_surface, time)
         if (dom%ctl%write_clim) then
             call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
-            call climate_write_init(dom%cl, trim(io_fname(outfldr,climate_file_base(dom%cl))))
+            call climate_write_init(dom%cl, dom%clim, trim(io_fname(outfldr,climate_file_base(dom%cl))))
         end if
     end subroutine domain_write_init
 

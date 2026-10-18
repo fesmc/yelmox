@@ -502,15 +502,13 @@ contains
     ! =====================================================================
 
     subroutine snapesm_write_init(sc, filename)
-        ! Add the month and depth axes of the snapesm fields to an existing 2D
-        ! output file (xc, yc and time defined by the caller).
+        ! Add the month axis of the snapesm fields to an existing 2D output file
+        ! (xc, yc, time and depth defined by the caller).
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
 
         call nc_write_dim(filename, "month", x=1, dx=1, nx=NMONTH, units="month")
-        if (allocated(sc%now%depth)) &
-            call nc_write_dim(filename, "depth", x=sc%now%depth, units="m")
 
         return
     end subroutine snapesm_write_init
@@ -519,8 +517,8 @@ contains
         ! Write record n of the snapesm state into an open 2D output file
         ! (axes from snapesm_write_init): the axis positions, the surface
         ! elevation, the monthly atmosphere, the summer and sea-level
-        ! temperatures and the ocean profiles -- the fields the enabled registry
-        ! fills.
+        ! temperatures -- the fields the enabled registry fills. The ocean
+        ! profiles are written by the caller (climate_write_2D).
         implicit none
         type(snapesm_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
@@ -542,8 +540,6 @@ contains
         if (allocated(now%pr))      call write3D("pr",      now%pr,      "month", "mm/d", "Precipitation")
         if (allocated(now%ta_sum))  call write2D("ta_sum",  now%ta_sum,  "K",    "Near-surface air temperature (sum)")
         if (allocated(now%tsl_ann)) call write2D("tsl_ann", now%tsl_ann, "K",    "Sea-level air temperature (ann)")
-        if (allocated(now%to_ann))  call write3D("to_ann",  now%to_ann,  "depth", "K",    "Ocean temperature (ann)")
-        if (allocated(now%so_ann))  call write3D("so_ann",  now%so_ann,  "depth", "PSU",  "Ocean salinity (ann)")
         end associate
 
         return
