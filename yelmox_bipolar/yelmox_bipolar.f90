@@ -17,11 +17,13 @@ program yelmox_bipolar
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
     ! Per-step coupling order: shared sea level and indices ([indices], read
-    ! by the climate of both domains), then per domain relaxation,
-    ! optimization + isostasy, then one OBM step, then per domain ice sheet + climate + smb,
-    ! then the ocean exchanges (atm->obm, ism->obm freshwater flux, hysteresis
-    ! forcing, obm->ism ocean temperature), then per domain marine shelf (which
-    ! reads the obm-updated ocean temperature). Per-domain physics live in the
+    ! by the climate of both domains and the OBM forcing), then per domain
+    ! relaxation, optimization + isostasy, then one OBM step, then per domain
+    ! ice sheet + climate + smb, then the ocean exchanges (atm->obm from the
+    ! global index of [obm_forcing], ism->obm freshwater flux, hysteresis
+    ! forcing, obm->ism ocean temperature through each domain's ocn_obm<sfx>),
+    ! then per domain marine shelf (which reads the obm-updated ocean
+    ! temperature). Per-domain physics live in the
     ! kryos modules (libs/kryos*.f90); the ocean coupling lives in
     ! yelmox_bipolar/obm_coupling.f90. See docs/multigrid.md.
 
@@ -48,7 +50,7 @@ program yelmox_bipolar
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
-    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
+    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
     use timer,        only : timer_class, timer_init, timer_step, &
                              timer_print_totals, timer_write_totals
 
@@ -96,17 +98,14 @@ program yelmox_bipolar
     call nml_read(path_par, "ctrl", "active_north", active_north)
     call nml_read(path_par, "ctrl", "active_south", active_south)
 
-    ! Ocean coupling control ([ctrl] switches + nautilus hysteresis parameters).
+    ! Ocean coupling control ([ctrl] switches, [obm_forcing], nautilus
+    ! hysteresis parameters); checked by obm_coupling_init below.
     call obm_ctl_load(oc, path_par)
 
     ! At least one component runs: an ice-sheet domain or the ocean box model
-    ! alone. The atmosphere/ice <-> ocean couplings need an ice-sheet domain.
+    ! alone.
     if (.not. (active_north .or. active_south .or. oc%active_obm)) then
         write(*,*) "yelmox_bipolar: error -- none of active_north, active_south, active_obm is set."
-        stop 1
-    end if
-    if (.not. (active_north .or. active_south) .and. (oc%atm2obm .or. oc%ism2obm .or. oc%obm2ism)) then
-        write(*,*) "yelmox_bipolar: error -- atm2obm, ism2obm and obm2ism need active_north or active_south."
         stop 1
     end if
 
@@ -128,8 +127,10 @@ program yelmox_bipolar
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
     if (active_south) call setup_domain(dom_south, "_south", outfldr_south)
 
-    ! Hydrographic masks (Yelmo grid) restricting the freshwater flux per domain.
-    call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
+    ! The ocean couplings checked against the indices and the domains
+    ! (ocn_obm<sfx>), and the hydrographic masks (Yelmo grid) restricting the
+    ! freshwater flux per domain.
+    call obm_coupling_init(oc, idx, dom_north, dom_south, active_north, active_south)
 
     ! === Ocean box model init (from the run-level bundle when restarting) +
     !     output file ===
@@ -244,13 +245,14 @@ program yelmox_bipolar
             call timer_step(tmr, tt_surface)
         end if
 
-        ! Inter-domain ocean coupling (shared obm): atm->obm, ism->obm freshwater
-        ! flux, hysteresis forcing, obm->ism ocean temperature.
-        call obm_exchange(oc, obox, dom_north, dom_south, active_north, active_south, &
-                          ts%time, ts%time_rel, ts%time_init, dtt)
+        ! Inter-domain ocean coupling (shared obm): atm->obm (global index),
+        ! ism->obm freshwater flux, hysteresis forcing, obm->ism ocean
+        ! temperature (ocn_obm<sfx>).
+        call obm_exchange(oc, obox, idx, dom_north, dom_south, active_north, active_south, &
+                          ts%time, ts%time_init, dtt)
         call timer_step(tmr, tt_obm_exchange)
 
-        ! Marine shelf (both domains) -- reads the obm-updated snapclim to_ann.
+        ! Marine shelf (both domains) -- reads the obm-updated to_ann (ocn_obm<sfx>).
         if (active_north) call step_shelf(dom_north, ts)
         if (active_south) call step_shelf(dom_south, ts)
         call timer_step(tmr, tt_shelf)

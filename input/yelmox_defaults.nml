@@ -3,9 +3,10 @@
 ! ============================================================
 !
 ! The schema of the forcing groups: the indices ([indices], [idx_<name>]),
-! the snapshot backend ([snap*]) and the climate modifiers ([anom],
-! [ocn_fraction], [ocn_obm], [bias]). Every key yelmox reads in these groups
-! is declared here and read with nml_read(..., defaults_file = this file): a par file
+! the snapshot backend ([snap*]), the climate modifiers ([anom],
+! [ocn_fraction], [ocn_obm], [bias]) and the forcing of the bipolar ocean box
+! model ([obm_forcing]). Every key yelmox reads in these groups is declared
+! here and read with nml_read(..., defaults_file = this file): a par file
 ! lists only what differs, and nml_validate stops a run on a key that is not
 ! declared (a typo, a removed key); scripts/check_par_nml.py checks the same
 ! offline.
@@ -127,4 +128,13 @@
     fpr      = ""       ! group of the precipitation factor [1] (1 or 12 slices); "" = none
     f_tas    = 1.0      ! weight of dtas
     f_pr     = 1.0      ! weight of fpr
+/
+
+! ===== Ocean box model forcing (yelmox_bipolar) =====
+
+&obm_forcing
+    ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init +
+    ! ampl_i * gain * index (north, tropics, south) and the vapour fluxes.
+    index = ""          ! the global mean air temperature anomaly [K] ([indices] names)
+    gain  = 1.0         ! [1] dT_glob = gain * index
 /

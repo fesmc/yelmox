@@ -32,7 +32,7 @@ the defaults. Files without a control block are skipped.
 
 The yelmox forcing groups, with <sfx> the same domain suffixes, and their
 group in yelmox_defaults.nml:
-  [indices] -> indices, [idx_<name>] -> idx,
+  [indices] -> indices, [idx_<name>] -> idx, [obm_forcing] -> obm_forcing,
   [anom<sfx>], [ocn_fraction<sfx>], [ocn_obm<sfx>], [bias<sfx>] -> anom,
   ocn_fraction, ocn_obm, bias,
   with [comps<sfx>] climate = snapesm or rembo (the snapshot backend):
@@ -170,8 +170,9 @@ def yelmox_groups(groups, ydefaults):
     """User group -> template group of yelmox_defaults.nml for the forcing
     groups of a file, and the snapshot-backend groups that are not read."""
     out, stale = {}, []
-    if "indices" in groups:
-        out["indices"] = "indices"
+    for g in ("indices", "obm_forcing"):
+        if g in groups:
+            out[g] = g
     for g in groups:
         if g.startswith("idx_"):
             out[g] = "idx"

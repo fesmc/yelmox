@@ -1,43 +1,55 @@
 module obm_coupling
-    ! Bipolar ocean coupling: exchanges scalars between a kryos_domain (Yelmo +
-    ! snapclim) and the shared Ocean Box Model (OBM). This is a bridge module -- it sits above both
-    ! the Kryos modules (kryos_domain) and the libs/obm ocean box model. It is only
-    ! pertinent to yelmox_bipolar, so it lives here next to its driver.
+    ! Bipolar ocean coupling: exchanges scalars between the kryos_domains (Yelmo
+    ! + climate) and the shared Ocean Box Model (OBM). This is a bridge module --
+    ! it sits above both the Kryos modules (kryos_domain) and the libs/obm ocean
+    ! box model. It is only pertinent to yelmox_bipolar, so it lives here next
+    ! to its driver.
     !
     ! The whole obm stack is single precision (obm_defs preci = kind(1.0)), which
-    ! matches Yelmo's wp (= sp), so obm and Yelmo/snapclim fields are exchanged
+    ! matches Yelmo's wp (= sp), so obm and Yelmo/climate fields are exchanged
     ! without kind conversion.
     !
-    ! The three exchanges (per hemisphere):
-    !   atm2obm  : snapclim air-temperature anomaly -> obm box temperatures/vapor
+    ! The three exchanges:
+    !   atm2obm  : global mean air temperature anomaly ([obm_forcing], an index
+    !              of the driver's registry) -> obm box air temperatures/vapor
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
-    !   obm2ism  : obm box ocean temperature -> snapclim%now%to_ann (mshlf forcing)
+    !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
+    !              to_ann (marine-shelf forcing), through the climate modifier
+    !              ocn_obm<sfx> of each domain (climate_mods), applied here
     !
     ! The module owns its whole configuration (obm_coupling_ctl: exchange
-    ! switches, freshwater-flux masks, nautilus hysteresis forcing), loaded by
-    ! obm_ctl_load from [ctrl]. The driver calls obm_ctl_load + obm_masks_init
-    ! once, then obm_exchange once per step after the domains have advanced.
+    ! switches, the atmospheric forcing, freshwater-flux masks, nautilus
+    ! hysteresis forcing), loaded by obm_ctl_load from [ctrl] and
+    ! [obm_forcing]. The switch of obm2ism is per domain, ocn_obm<sfx>.active.
+    ! The driver calls obm_ctl_load, then obm_coupling_init once the indices
+    ! and the domains are initialized, then obm_exchange once per step after
+    ! the domains' climate steps.
 
-    use nml,           only : nml_read
+    use nml,           only : nml_read, nml_validate
     use ncio,          only : nc_read
     use precision,     only : dp
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
-    use yelmox_climate, only : climate_air_anom
+    use kryos_forcing, only : indices_class, indices_has, indices_value
+    use climate_mods,  only : climate_mod_ocn_obm
+    use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
-    use ocean2ice,     only : calc_ocean_temperature_field
+    use ocean2ice,     only : obm_temperature_kelvin
 
     implicit none
     private
 
     type obm_coupling_ctl
-        ! Which exchanges are active ([ctrl]).
+        ! Which exchanges are active ([ctrl]; obm2ism: ocn_obm<sfx> of each domain).
         logical :: active_obm = .false.
         logical :: ism2obm    = .false.
-        logical :: obm2ism    = .false.
         logical :: atm2obm    = .false.
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus"/"stommel")
+        ! atm2obm: the global mean air temperature anomaly dT_glob = gain * index
+        ! ([obm_forcing]).
+        character(len=64)  :: forcing_index = ""
+        real(wp)           :: forcing_gain  = 1.0_wp
         ! ism2obm: freshwater-flux definition + per-hemisphere hydrographic masks.
         logical            :: couple_fwf_north = .false.
         logical            :: couple_fwf_south = .false.
@@ -52,7 +64,7 @@ module obm_coupling
         real(dp)           :: hyster_positive_branch_time = 0.0_dp
     end type obm_coupling_ctl
 
-    public :: obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
+    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
     public :: coupling_atm2obm, coupling_ism2obm, coupling_obm2ism
     public :: update_bipolar_hyster_forcing
 
@@ -60,17 +72,24 @@ contains
 
     subroutine obm_ctl_load(oc, path_par)
         ! Load the ocean-coupling switches ([ctrl]) and, when needed, the
-        ! freshwater-flux mask paths and nautilus hysteresis-forcing parameters.
-        ! The masks themselves are read by obm_masks_init (they need the
-        ! initialized domains for their grid shape).
+        ! atmospheric forcing ([obm_forcing]; unset keys from
+        ! input/yelmox_defaults.nml), the freshwater-flux mask paths and the
+        ! nautilus hysteresis-forcing parameters. The masks themselves are read
+        ! by obm_coupling_init (they need the initialized domains for their
+        ! grid shape).
         type(obm_coupling_ctl), intent(inout) :: oc
         character(len=*),       intent(in)    :: path_par
 
         call nml_read(path_par, "ctrl", "active_obm", oc%active_obm)
         call nml_read(path_par, "ctrl", "ism2obm",    oc%ism2obm)
-        call nml_read(path_par, "ctrl", "obm2ism",    oc%obm2ism)
         call nml_read(path_par, "ctrl", "atm2obm",    oc%atm2obm)
         call nml_read(path_par, "ctrl", "obm_name",   oc%obm_name)
+
+        if (oc%atm2obm) then
+            call nml_validate(path_par, def_file, "obm_forcing")
+            call nml_read(path_par, "obm_forcing", "index", oc%forcing_index, defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "gain",  oc%forcing_gain,  defaults_file=def_file)
+        end if
 
         if (oc%ism2obm) then
             call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
@@ -91,13 +110,42 @@ contains
         end if
     end subroutine obm_ctl_load
 
-    subroutine obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
-        ! Load the hydrographic masks (Yelmo grid) restricting the freshwater
-        ! flux per hemisphere. Only touches a domain when it is active and its
-        ! fwf coupling is on, so an inactive domain may be uninitialized.
+    subroutine obm_coupling_init(oc, idx, dom_north, dom_south, active_north, active_south)
+        ! Check the exchanges against what the run holds, then load the
+        ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
+        ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
+        ! the index of [obm_forcing] in the registry; ism2obm an ice-sheet
+        ! domain. Only touches a domain when it is active, so an inactive domain
+        ! may be uninitialized. Call after the indices and the domains.
         type(obm_coupling_ctl), intent(inout) :: oc
-        type(kryos_domain),       intent(in)    :: dom_north, dom_south
+        type(indices_class),    intent(in)    :: idx
+        type(kryos_domain),     intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
+
+        logical :: obm2ism
+
+        obm2ism = .false.
+        if (active_north) obm2ism = dom_north%cl%mods%ocn_obm%active
+        if (active_south) obm2ism = obm2ism .or. dom_south%cl%mods%ocn_obm%active
+
+        if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%ism2obm .or. obm2ism)) then
+            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and ocn_obm<sfx> need &
+                       &the ocean box model ([ctrl] active_obm = True)."
+            error stop 1
+        end if
+        if (oc%atm2obm .and. .not. indices_has(idx, oc%forcing_index)) then
+            write(*,*) "obm_coupling_init:: error: [obm_forcing] index = '"// &
+                       trim(oc%forcing_index)//"' is not in [indices] names (needed by atm2obm)."
+            error stop 1
+        end if
+        if (oc%ism2obm .and. .not. (active_north .or. active_south)) then
+            write(*,*) "obm_coupling_init:: error: ism2obm needs active_north or active_south."
+            error stop 1
+        end if
+
+        if (oc%atm2obm) &
+            write(*,*) "obm_coupling_init:: atm2obm from index "//trim(oc%forcing_index)// &
+                       ", gain =", oc%forcing_gain
 
         if (.not. oc%ism2obm) return
 
@@ -109,26 +157,25 @@ contains
             allocate(oc%hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
         end if
-    end subroutine obm_masks_init
+    end subroutine obm_coupling_init
 
-    subroutine obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
-                            time, time_rel, time_init, dtt)
+    subroutine obm_exchange(oc, obm, idx, dom_north, dom_south, active_north, active_south, &
+                            time, time_init, dtt)
         ! One coupling pass, in the yelmox_bipolar order: atmosphere -> obm,
         ! ice-sheet freshwater flux -> obm, hysteresis forcing (nautilus), then
         ! obm ocean temperature -> ice sheets (read by the marine-shelf step).
         ! Call after the domains' dynamics/climate have advanced and before
-        ! their marine-shelf steps.
+        ! their marine-shelf steps. idx: the driver's registry, advanced to
+        ! this step.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(obm_class),        intent(inout) :: obm
-        type(kryos_domain),       intent(inout) :: dom_north, dom_south
+        type(indices_class),    intent(in)    :: idx
+        type(kryos_domain),     intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         real(dp),               intent(in)    :: time, time_init, dtt
-        real(dp),               intent(in)    :: time_rel   ! forcing time of the climate index
 
-        if (oc%atm2obm) then
-            if (active_north) call coupling_atm2obm(dom_north, obm, "north", time_rel)
-            if (active_south) call coupling_atm2obm(dom_south, obm, "south", time_rel)
-        end if
+        if (oc%atm2obm) &
+            call coupling_atm2obm(obm, oc%forcing_gain*indices_value(idx, oc%forcing_index))
 
         if (oc%ism2obm) then
             if (oc%couple_fwf_north .and. active_north) &
@@ -142,43 +189,32 @@ contains
                     oc%hyster_positive_branch_time, oc%hyster_rate, &
                     oc%hyster_forcing, oc%hyster_forcing_method)
 
-        if (oc%obm2ism) then
-            if (active_north) call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
-            if (active_south) call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
+        ! obm2ism: per domain, its ocn_obm<sfx> switch.
+        if (active_north) then
+            if (dom_north%cl%mods%ocn_obm%active) &
+                call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
+        end if
+        if (active_south) then
+            if (dom_south%cl%mods%ocn_obm%active) &
+                call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
         end if
     end subroutine obm_exchange
 
-    subroutine coupling_atm2obm(dom, obm, hemisphere, time)
-        ! Atmosphere -> OBM: drive the box-model atmospheric temperatures + vapor
-        ! fluxes from this domain's air-temperature anomaly index (climate_air_anom).
-        ! Hemisphere-specific: north sets thetan/phin, south sets thetas/phit.
-        ! Both hemispheres also set the shared tropical box temperature thetat; if
-        ! both are active the south value overwrites the north one, exactly as in
-        ! yelmox_bipolar (the original flagged this as redundant).
-        type(kryos_domain), intent(in)    :: dom
-        type(obm_class),  intent(inout) :: obm
-        character(len=*), intent(in)    :: hemisphere
-        real(dp),         intent(in)    :: time
+    subroutine coupling_atm2obm(obm, dT_glob)
+        ! Atmosphere -> OBM: the box-model air temperatures of every box from the
+        ! global mean air temperature anomaly dT_glob [K] with the regional
+        ! amplification factors (Zickfeld et al., 2004), theta_i = theta_i_init
+        ! + ampl_i * dT_glob (north, tropics, south), and the vapor fluxes,
+        ! phin (tropics -> north) and phit (south -> tropics), linear in dT_glob
+        ! by the hydrological sensitivities.
+        type(obm_class), intent(inout) :: obm
+        real(wp),        intent(in)    :: dT_glob
 
-        real(wp) :: dTa
-
-        ! Air-temperature anomaly index of the domain's climate backend.
-        dTa = climate_air_anom(dom%cl, time)
-
-        select case(trim(hemisphere))
-            case("north")
-                obm%thetan = obm%par%thetan_init + dTa
-                obm%thetat = obm%par%thetat_init + &
-                             dTa*obm%par%thermal_ampl_tropics/obm%par%thermal_ampl_north
-                obm%phin   = obm%par%phin_init + &
-                             obm%par%hn*obm%par%pnh*dTa/obm%par%thermal_ampl_north
-            case("south")
-                obm%thetas = obm%par%thetas_init + dTa
-                obm%thetat = obm%par%thetat_init + &
-                             dTa*obm%par%thermal_ampl_tropics/obm%par%thermal_ampl_south
-                obm%phit   = obm%par%phit_init + &
-                             obm%par%hs*obm%par%psh*dTa/obm%par%thermal_ampl_south
-        end select
+        obm%thetan = obm%par%thetan_init + obm%par%thermal_ampl_north  *dT_glob
+        obm%thetat = obm%par%thetat_init + obm%par%thermal_ampl_tropics*dT_glob
+        obm%thetas = obm%par%thetas_init + obm%par%thermal_ampl_south  *dT_glob
+        obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob
+        obm%phit   = obm%par%phit_init   + obm%par%hs*obm%par%psh*dT_glob
     end subroutine coupling_atm2obm
 
     subroutine coupling_ism2obm(dom, obm, mask, hemisphere, fwf_def)
@@ -214,23 +250,29 @@ contains
     end subroutine coupling_ism2obm
 
     subroutine coupling_obm2ism(dom, obm, obm_name, hemisphere)
-        ! OBM -> ice sheet: broadcast the box-model ocean temperature (northern box
-        ! tn / southern box ts) into the domain's snapclim ocean-temperature field
-        ! to_ann, which marine_shelf then reads as its ocean forcing.
+        ! OBM -> ice sheet: the box-model ocean temperature of the hemisphere
+        ! (northern box tn / southern box ts) and its initial value, in K, to
+        ! the domain's climate modifier ocn_obm, which sets the ocean
+        ! temperature to_ann that marine_shelf then reads as its ocean forcing.
         type(kryos_domain), intent(inout) :: dom
-        type(obm_class),  intent(in)    :: obm
-        character(len=*), intent(in)    :: obm_name
-        character(len=*), intent(in)    :: hemisphere
+        type(obm_class),    intent(in)    :: obm
+        character(len=*),   intent(in)    :: obm_name
+        character(len=*),   intent(in)    :: hemisphere
 
-        character(len=512) :: name_loc
+        real(wp) :: t_box, t_box_init
 
-        name_loc = obm_name
         select case(trim(hemisphere))
             case("north")
-                call calc_ocean_temperature_field(dom%clim%now%to_ann, obm%tn, name_loc)
+                t_box      = obm%tn
+                t_box_init = obm%par%tn_init
             case("south")
-                call calc_ocean_temperature_field(dom%clim%now%to_ann, obm%ts, name_loc)
+                t_box      = obm%ts
+                t_box_init = obm%par%ts_init
         end select
+
+        call climate_mod_ocn_obm(dom%cl%mods, dom%clim, &
+                                 obm_temperature_kelvin(t_box, obm_name), &
+                                 obm_temperature_kelvin(t_box_init, obm_name))
     end subroutine coupling_obm2ism
 
     subroutine update_bipolar_hyster_forcing(t, t0, obm, dt, branch_time_thr, &
