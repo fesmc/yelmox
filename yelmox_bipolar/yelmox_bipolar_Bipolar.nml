@@ -89,8 +89,9 @@
 
 &indices
     ! Indices: named scalar series shared by both domains, read by name
-    ! (snapesm axes). Each is a tsgen group [idx_<name>] (method, series_file,
-    ! ...; optional units and restart_every_df), advanced on the forcing clock time_rel.
+    ! (snapesm axes, [anom_<sfx>]). Each is a tsgen group [idx_<name>]
+    ! (method, series_file, ...; optional units and restart_every_df), advanced
+    ! on the forcing clock time_rel.
     names  = ""       ! e.g. "at"; "" = none
 /
 
@@ -645,6 +646,16 @@
 
 ! ===== Climate =====
 
+&anom_south
+    ! Homogeneous anomaly from one index, applied after the climate backend:
+    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
+    active = False    ! Apply it?
+    index  = ""       ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+/
+
 &snap_south
     atm_type           = "anom"
     ocn_type           = "anom"
@@ -1192,6 +1203,16 @@
 /
 
 ! ===== Climate =====
+
+&anom_north
+    ! Homogeneous anomaly from one index, applied after the climate backend:
+    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
+    active = False    ! Apply it?
+    index  = ""       ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+/
 
 &snap_north
     atm_type           = "snap_1ind_new"

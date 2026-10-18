@@ -115,14 +115,16 @@
 ! ===== Forcing =====
 
 &indices
-    ! Indices: named scalar series, read by name (snapesm axes, [tsforcing]).
+    ! Indices: named scalar series, read by name (snapesm axes, [anom]).
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
     ! units and restart_every_df), advanced on the forcing clock time_rel.
     names  = ""       ! e.g. "at" "ramp"; "" = none
 /
 
-&tsforcing
-    active = False    ! Apply a homogeneous anomaly from one index? (was ctrl.use_hyster)
+&anom
+    ! Homogeneous anomaly from one index. rembo reads it itself, as an input of
+    ! REMBO (dT_sum), not as a modifier after the backend.
+    active = False    ! Apply it? (was ctrl.use_hyster)
     index  = ""       ! the index driving the anomalies ([indices] names), e.g. "hyst"
     f_ta   = 1.0      ! [K] dT_sum = f * f_ta  (summer air; dT_ann = 1.3*dT_sum)
     f_to   = 0.25     ! [K] dT_ocn = dT_ann * f_to (ocean, if snap ocn_type = "const")
@@ -131,7 +133,7 @@
 
 &idx_hyst
     ! Hysteresis template (not listed in [indices] names): add "hyst" to names
-    ! and set [tsforcing] active = True, index = "hyst".
+    ! and set [anom] active = True, index = "hyst".
     method     = "PI42"     ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
     with_kill  = True       ! stop the run once the response equilibrates at a bound
     dt_init    = 200.0      ! [yr]  hold forcing flat during this initial interval
