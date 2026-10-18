@@ -4,7 +4,7 @@ module kryos_forcing
     ! Indices: named scalar series ([indices] names = "a" "b"), each a tsgen
     ! group [idx_<name>], advanced once per step on the forcing clock with the
     ! response variable (ice volume) and read by name by their consumers (the
-    ! snapesm axes, the climate modifiers). One registry per run, held by the
+    ! snapshots axes, the climate modifiers). One registry per run, held by the
     ! driver like bsl -- deliberately NOT part of kryos_domain, so every domain
     ! of a multi-domain driver reads the same indices. The registry also holds the
     ! kill switch (any index tripped) and the forcing-increment restarts (a

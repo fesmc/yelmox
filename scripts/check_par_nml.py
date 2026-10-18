@@ -37,7 +37,7 @@ group in yelmox_defaults.nml:
   [indices] -> indices, [idx_<name>] -> idx, [obm_forcing] -> obm_forcing,
   [anom<sfx>], [ocn_fraction<sfx>], [ocn_obm<sfx>], [bias<sfx>] -> anom,
   ocn_fraction, ocn_obm, bias,
-  with [comps<sfx>] climate = snapesm or rembo (the snapshot backend):
+  with [comps<sfx>] climate = snapshots or rembo (the snapshot backend):
   [snap<sfx>] -> snap, [snap<sfx>_field_<f>] -> snap_field (f in fields),
   [snap<sfx>_<s>] -> snap_snapshot (s in snapshots),
   [snap<sfx>_axis_<a>] -> snap_axis (a in axes); unset lists from the defaults.
@@ -184,7 +184,7 @@ def yelmox_groups(groups, ydefaults):
                 out[base + sfx] = base
         climate = scalar(groups.get("comps" + sfx, {}).get("climate", ""))
         snap = "snap" + sfx
-        if climate not in ("snapesm", "rembo") or snap not in groups:
+        if climate not in ("snapshots", "rembo") or snap not in groups:
             continue
         out[snap] = "snap"
 

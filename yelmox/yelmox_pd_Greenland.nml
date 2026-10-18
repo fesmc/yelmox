@@ -20,7 +20,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -113,7 +113,7 @@
 ! ===== Forcing =====
 
 &indices
-    ! Indices: named scalar series, read by name (snapesm axes, [anom]).
+    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
     ! units and restart_every_df), advanced on the forcing clock time_rel.
     names  = ""       ! e.g. "at" "ramp"; "" = none
@@ -545,7 +545,7 @@
 ! ===== Climate =====
 
 &snap
-    ! Snapshot backend (snapesm): the present-day reference only, MAR v3.14
+    ! Snapshot backend (snapshots): the present-day reference only, MAR v3.14
     ! 1961-1990 and ORAS5 1981-2010. Databases: input/clim_db.nml; unset keys:
     ! input/yelmox_defaults.nml.
     snapshots  = "pd"

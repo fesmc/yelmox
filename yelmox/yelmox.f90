@@ -52,7 +52,7 @@ program yelmox
 
     ! Indices ([indices], one tsgen series [idx_<name>] each), owned by the
     ! driver and advanced once per step on the forcing clock time_rel; read by
-    ! name by the climate (snapesm axes, the modifiers such as [anom]). The
+    ! name by the climate (snapshots axes, the modifiers such as [anom]). The
     ! registry also owns the kill switch and the forcing-increment restarts
     ! (see libs/kryos_forcing.f90).
     type(indices_class)   :: idx

@@ -1,5 +1,5 @@
-module snapesm
-    ! snapesm — climate boundary forcing built on the fesm-utils primitives.
+module snapshots
+    ! snapshots — climate boundary forcing built on the fesm-utils primitives.
     !
     !   Loading   -> varslice  (one varslice_class per snapshot x field)
     !   Indices   -> the driver's registry (kryos_forcing), read by name
@@ -28,7 +28,7 @@ module snapesm
     ! 2018, for two axes). With lo = "", hi is itself the anomaly (linear) or the
     ! ratio (ratio): an anomaly snapshot binds no zs, its fields are taken as
     ! given, at sea level (no elevation correction of their own). The indices
-    ! restart with the registry, so snapesm holds no state of its own.
+    ! restart with the registry, so snapshots holds no state of its own.
     !
     ! The ocean temperature as a fraction of the air temperature anomaly is the
     ! climate modifier ocn_fraction (climate_mods), on the field `to` held at
@@ -72,7 +72,7 @@ module snapesm
         character(len=16) :: blend          ! "linear" | "ratio" | "const"
         character(len=64) :: axes(AXS_MAX)  ! names of the axes of this field ("" = none)
         integer           :: n_axis         ! number of axes
-        integer           :: axis_k(AXS_MAX) ! their positions in snapesm_class%axis
+        integer           :: axis_k(AXS_MAX) ! their positions in snapshots_class%axis
         logical           :: enabled        ! off by default for exotic fields
         logical           :: apply_lapse
         logical           :: precip_scaling
@@ -129,7 +129,7 @@ module snapesm
     end type
 
     ! Top-level parameters.
-    type snapesm_param_class
+    type snapshots_param_class
         character(len=256) :: domain
         character(len=256) :: grid_name
         character(len=256) :: var_defs(VAR_DEFS_MAX) ! varslice databases, searched in order
@@ -161,8 +161,8 @@ module snapesm
     end type
 
     ! The object callers hold.
-    type snapesm_class
-        type(snapesm_param_class)          :: par
+    type snapshots_class
+        type(snapshots_param_class)        :: par
         type(field_spec_class),  allocatable :: registry(:)  ! field definitions
         type(snapshot_class),    allocatable :: snap(:)      ! was clim0..clim3
         type(axis_class),        allocatable :: axis(:)      ! snapshot axes
@@ -170,14 +170,14 @@ module snapesm
         type(climate_state_class)            :: ref          ! distinguished reference (was clim0)
     end type
 
-    public :: snapesm_class
+    public :: snapshots_class
     public :: climate_state_class
-    public :: snapesm_init
-    public :: snapesm_update
-    public :: snapesm_end
-    public :: snapesm_write_init
-    public :: snapesm_write_step
-    public :: snapesm_lapse_monthly
+    public :: snapshots_init
+    public :: snapshots_update
+    public :: snapshots_end
+    public :: snapshots_write_init
+    public :: snapshots_write_step
+    public :: snapshots_lapse_monthly
 
 contains
 
@@ -185,13 +185,13 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapesm_init(sc, filename, domain, grid, time, south, idx, group)
+    subroutine snapshots_init(sc, filename, domain, grid, time, south, idx, group)
         ! `grid` is the climate grid: the snapshot fields are read on it, or
         ! remapped onto it online (var_defs groups with remap/grid_src). `time`
         ! primes the time-varying snapshots. `idx` is the driver's registry: each
         ! axis must name one of its indices.
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         character(len=*),      intent(IN)    :: domain
         type(grid_class),      intent(IN)    :: grid
@@ -212,23 +212,23 @@ contains
 
         ! Read all configuration: top-level, field registry, snapshot specs and
         ! their bindings, axes; then check the bindings against each other.
-        call snapesm_par_load(sc, filename, trim(base_group), domain, trim(grid%name), idx)
-        call snapesm_check_bindings(sc)
+        call snapshots_par_load(sc, filename, trim(base_group), domain, trim(grid%name), idx)
+        call snapshots_check_bindings(sc)
 
         ! Load the snapshot fields (varslice), reduce them, and set the reference state.
-        call snapesm_load_snapshots(sc, time, grid)
+        call snapshots_load_snapshots(sc, time, grid)
 
         return
-    end subroutine snapesm_init
+    end subroutine snapshots_init
 
-    subroutine snapesm_update(sc, z_srf, time, idx, dx)
+    subroutine snapshots_update(sc, z_srf, time, idx, dx)
         ! Pipeline: axis positions from the registry
         ! (advanced by the driver to `time`) -> refresh loads -> combine ->
         ! transform (the atmosphere, if bound). Homogeneous anomalies and the
         ! ocean fraction rule are climate modifiers (climate_mods), applied by
         ! the caller afterwards.
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(dp),              intent(IN)    :: time
         type(indices_class),   intent(IN)    :: idx
@@ -242,29 +242,29 @@ contains
         end do
 
         ! 2. Refresh time-varying loads and re-reduce those snapshots.
-        call snapesm_refresh_loads(sc, time)
+        call snapshots_refresh_loads(sc, time)
 
         ! 3. Combine the reduced snapshot states into `now`, per field.
-        call snapesm_combine(sc)
+        call snapshots_combine(sc)
 
         ! 4. Transform: inflate sea-level fields to the current model elevation
         !    (tsl -> tas), precip, annual/summer aggregates.
-        if (sc%par%with_atm) call snapesm_transform(sc, z_srf)
+        if (sc%par%with_atm) call snapshots_transform(sc, z_srf)
 
         return
-    end subroutine snapesm_update
+    end subroutine snapshots_update
 
     ! ---------------------------------------------------------------------
     ! Update pipeline stages
     ! ---------------------------------------------------------------------
 
-    subroutine snapesm_refresh_loads(sc, time)
+    subroutine snapshots_refresh_loads(sc, time)
         ! Re-slice only the time-varying fields (recon, transient orography, etc.);
         ! static fields were primed once at load. A snapshot with a refreshed
         ! source is reduced again (and the reference state reset, if it is the
         ! reference).
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         real(dp),              intent(IN)    :: time
         integer :: s, f, k
         logical :: touched
@@ -281,14 +281,14 @@ contains
             end do
             ! Re-reduce only if a time-varying source was refreshed.
             if (touched) then
-                call snapesm_reduce_snapshot(sc, s)
+                call snapshots_reduce_snapshot(sc, s)
                 if (s == sc%par%iref) sc%ref = sc%snap(s)%state
             end if
         end do
         return
-    end subroutine snapesm_refresh_loads
+    end subroutine snapshots_refresh_loads
 
-    subroutine snapesm_combine(sc)
+    subroutine snapshots_combine(sc)
         ! Blend the reduced snapshot states into `now`, per field bound in the
         ! reference, from the reference baseline (was clim0). Each axis k of a
         ! field (lo_k -> hi_k) adds with weight a_k = the value of its index:
@@ -298,9 +298,9 @@ contains
         ! An axis with lo = "" adds hi itself: a_k*hi_k (linear) or the factor
         ! a_k*(hi_k - 1) + 1 (ratio). Two axes as in Banderas et al. (2018).
         ! The snapshots of the axes bind the field
-        ! (snapesm_check_bindings).
+        ! (snapshots_check_bindings).
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         integer  :: f, j, k, lo, hi
         logical  :: blended
         type(climate_state_class) :: none   ! the lo of a lo = "" axis
@@ -344,7 +344,7 @@ contains
         end do
 
         return
-    end subroutine snapesm_combine
+    end subroutine snapshots_combine
 
     subroutine add_axis(fs, now, x0, x1, aa, anomaly)
         ! Add one axis (x0 -> x1, weight aa; anomaly: x1 alone) to the field fs
@@ -400,19 +400,19 @@ contains
         return
     end subroutine blend_axis
 
-    subroutine snapesm_transform(sc, z_srf)
+    subroutine snapshots_transform(sc, z_srf)
         ! Inflate the blended sea-level fields to the current model elevation and
         ! compute the annual/summer aggregates. Note the cosine
         ! phase here is m*30-15 (vs m*30-30 in the sea-level reduction).
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         integer  :: m
         logical  :: south
         real(wp) :: lapse(NMONTH)
 
         south = sc%par%south
-        lapse = snapesm_lapse_monthly(sc)
+        lapse = snapshots_lapse_monthly(sc)
 
         sc%now%z_srf = z_srf
         sc%now%mask  = 0.0_wp
@@ -443,14 +443,14 @@ contains
         sc%now%pr_ann    = sum(sc%now%pr,    dim=3) / 12.0_wp * 365.0_wp
 
         return
-    end subroutine snapesm_transform
+    end subroutine snapshots_transform
 
-    function snapesm_lapse_monthly(sc) result(lapse)
+    function snapshots_lapse_monthly(sc) result(lapse)
         ! Monthly lapse rate [K/m] that lifts tsl to the surface:
         ! annual lapse(1) with a seasonal cosine of amplitude lapse(1)-lapse(2),
         ! phase m*30-15, summer at lapse(2).
         implicit none
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         real(wp) :: lapse(NMONTH)
         integer  :: m
         real(wp) :: l1, l2
@@ -463,13 +463,13 @@ contains
                 lapse(m) = l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp)
             end if
         end do
-    end function snapesm_lapse_monthly
+    end function snapshots_lapse_monthly
 
-    subroutine snapesm_end(sc)
+    subroutine snapshots_end(sc)
         ! Teardown: the varslice sources of every snapshot, the snapshots, axes
         ! and registry, and the output and reference states.
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
 
         type(climate_state_class) :: empty
         integer :: s, f, k
@@ -488,31 +488,31 @@ contains
         sc%ref = empty
 
         return
-    end subroutine snapesm_end
+    end subroutine snapshots_end
 
     ! =====================================================================
     ! Diagnostic output
     ! =====================================================================
 
-    subroutine snapesm_write_init(sc, filename)
-        ! Add the month axis of the snapesm fields to an existing 2D output file
+    subroutine snapshots_write_init(sc, filename)
+        ! Add the month axis of the snapshots fields to an existing 2D output file
         ! (xc, yc, time and depth defined by the caller).
         implicit none
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
 
         call nc_write_dim(filename, "month", x=1, dx=1, nx=NMONTH, units="month")
 
         return
-    end subroutine snapesm_write_init
+    end subroutine snapshots_write_init
 
-    subroutine snapesm_write_step(sc, filename, ncid, n)
-        ! Write record n of the snapesm state into an open 2D output file
-        ! (axes from snapesm_write_init): the axis positions and the surface
+    subroutine snapshots_write_step(sc, filename, ncid, n)
+        ! Write record n of the snapshots state into an open 2D output file
+        ! (axes from snapshots_write_init): the axis positions and the surface
         ! elevation. The climate as applied (after the climate modifiers) is
         ! written by the caller (climate_write_2D).
         implicit none
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
         integer,               intent(IN) :: ncid, n
 
@@ -541,13 +541,13 @@ contains
                           units=units, long_name=long_name)
         end subroutine write2D
 
-    end subroutine snapesm_write_step
+    end subroutine snapshots_write_step
 
     ! =====================================================================
     ! Parameter loading & setup
     ! =====================================================================
 
-    subroutine snapesm_par_load(sc, filename, group, domain, grid_name, idx)
+    subroutine snapshots_par_load(sc, filename, group, domain, grid_name, idx)
         ! Read the full configuration: top-level knobs, the field registry
         ! (&<group>_field_<name>), the snapshot specs and their field bindings
         ! (&<group>_<name>), and the axes (&<group>_axis_<name>: lo, hi, index),
@@ -555,7 +555,7 @@ contains
         ! defaults of input/yelmox_defaults.nml, the named groups those of the
         ! templates snap_field, snap_snapshot and snap_axis.
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
         character(len=*),      intent(IN)    :: group      ! base group (already domain-suffixed)
         character(len=*),      intent(IN)    :: domain
@@ -634,7 +634,7 @@ contains
             if (len_trim(lo) > 0) sc%axis(i)%lo = snapshot_position(sc, lo, "lo of &"//trim(agroup))
             sc%axis(i)%hi = snapshot_position(sc, hi, "hi of &"//trim(agroup))
             if (.not. indices_has(idx, sc%axis(i)%index)) then
-                write(*,*) "snapesm:: Error: index '"//trim(sc%axis(i)%index)//"' (index of &"// &
+                write(*,*) "snapshots:: Error: index '"//trim(sc%axis(i)%index)//"' (index of &"// &
                            trim(agroup)//") is not in [indices] names."
                 stop
             end if
@@ -654,9 +654,9 @@ contains
         sc%par%with_ocn = binds(sc, sc%par%iref, "to")
 
         return
-    end subroutine snapesm_par_load
+    end subroutine snapshots_par_load
 
-    subroutine snapesm_check_bindings(sc)
+    subroutine snapshots_check_bindings(sc)
         ! Check the field bindings of the snapshots against each other (stop
         ! with an error on the first mismatch):
         !  - number of var_defs groups: tas 1 (monthly) or 2 ([ann, season]),
@@ -673,7 +673,7 @@ contains
         !    built);
         !  - every snapshot of an axis of a blended (linear, ratio) field binds it.
         implicit none
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
 
         integer :: s, f, j, k, n, iref
         logical :: state
@@ -759,32 +759,32 @@ contains
 
         subroutine binding_error(msg)
             character(len=*), intent(IN) :: msg
-            write(*,*) "snapesm:: Error: "//trim(msg)
+            write(*,*) "snapshots:: Error: "//trim(msg)
             stop 1
         end subroutine binding_error
 
-    end subroutine snapesm_check_bindings
+    end subroutine snapshots_check_bindings
 
     integer function snapshot_position(sc, name, what) result(s)
         ! Position of the snapshot `name` in sc%snap; stops if it is not listed.
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         character(len=*),    intent(IN) :: name, what
         do s = 1, sc%par%n_snap
             if (trim(sc%snap(s)%spec%name) == trim(name)) return
         end do
-        write(*,*) "snapesm:: Error: snapshot '"//trim(name)//"' ("//trim(what)// &
+        write(*,*) "snapshots:: Error: snapshot '"//trim(name)//"' ("//trim(what)// &
                    ") is not in the snapshots list."
         stop
     end function snapshot_position
 
     integer function axis_position(sc, name, what) result(k)
         ! Position of the axis `name` in sc%axis; stops if it is not listed.
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         character(len=*),    intent(IN) :: name, what
         do k = 1, sc%par%n_axis
             if (trim(sc%axis(k)%name) == trim(name)) return
         end do
-        write(*,*) "snapesm:: Error: axis '"//trim(name)//"' ("//trim(what)// &
+        write(*,*) "snapshots:: Error: axis '"//trim(name)//"' ("//trim(what)// &
                    ") is not in the axes list."
         stop
     end function axis_position
@@ -827,7 +827,7 @@ contains
                 case("zs")
                     fs%kind = "elev"
                 case default
-                    write(*,*) "snapesm:: Error: &"//trim(group)//": unknown field '"// &
+                    write(*,*) "snapshots:: Error: &"//trim(group)//": unknown field '"// &
                                trim(name)//"' (tas, pr, to, so, zs)."
                     stop 1
             end select
@@ -837,12 +837,12 @@ contains
             case("linear", "ratio", "const")
                 ! ok
             case("fraction")
-                write(*,*) "snapesm:: Error: &"//trim(group)//" blend = 'fraction' was removed: &
+                write(*,*) "snapshots:: Error: &"//trim(group)//" blend = 'fraction' was removed: &
                            &set blend = 'const' and use the climate modifier [ocn_fraction] &
                            &(f_to, region; see docs/climate-snap.md)."
                 stop 1
             case default
-                write(*,*) "snapesm:: Error: &"//trim(group)//" blend = '"//trim(fs%blend)// &
+                write(*,*) "snapshots:: Error: &"//trim(group)//" blend = '"//trim(fs%blend)// &
                            "'; must be linear, ratio or const."
                 stop 1
         end select
@@ -886,7 +886,7 @@ contains
             case("jja", "djf")
                 ! ok
             case default
-                write(*,*) "snapesm:: Error: &"//trim(group)//" tas_season = '"// &
+                write(*,*) "snapshots:: Error: &"//trim(group)//" tas_season = '"// &
                            trim(ss%tas_season)//"'; must be jja or djf."
                 stop 1
         end select
@@ -902,7 +902,7 @@ contains
             ss%refs(f,:) = refs
             ss%nsrc(f)   = count(len_trim(refs) > 0)
             if (len_trim(refs(1)) == 0 .and. ss%nsrc(f) > 0) then
-                write(*,*) "snapesm:: Error: &"//trim(group)//" "//trim(registry(f)%name)// &
+                write(*,*) "snapshots:: Error: &"//trim(group)//" "//trim(registry(f)%name)// &
                            ": the first group is empty."
                 stop 1
             end if
@@ -911,7 +911,7 @@ contains
         return
     end subroutine read_snapshot_spec
 
-    subroutine snapesm_load_snapshots(sc, time, grid)
+    subroutine snapshots_load_snapshots(sc, time, grid)
         ! For each snapshot, load the var_defs groups of every field it binds
         ! (each from the first database of var_defs that has it, else the par
         ! file, with the path
@@ -919,7 +919,7 @@ contains
         ! `time`, reduce the snapshot to its sea-level state, and set the
         ! reference.
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         real(dp),              intent(IN)    :: time
         type(grid_class),      intent(IN)    :: grid     ! target grid (online remap)
 
@@ -961,7 +961,7 @@ contains
             end do
 
             ! Reduce raw loads -> sea-level state for this snapshot.
-            call snapesm_reduce_snapshot(sc, s)
+            call snapshots_reduce_snapshot(sc, s)
 
         end do
 
@@ -971,20 +971,20 @@ contains
         sc%now = sc%ref
 
         return
-    end subroutine snapesm_load_snapshots
+    end subroutine snapshots_load_snapshots
 
-    subroutine snapesm_reduce_snapshot(sc, s)
+    subroutine snapshots_reduce_snapshot(sc, s)
         ! Extract snapshot s's varslice fields into its reduced (sea-level) state:
         ! the atmosphere if it binds tas or pr, the ocean if it binds to.
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         integer,               intent(IN)    :: s
 
         if (binds(sc, s, "tas") .or. binds(sc, s, "pr")) call reduce_atmosphere(sc, s)
         if (binds(sc, s, "to")) call reduce_ocean(sc, s)
 
         return
-    end subroutine snapesm_reduce_snapshot
+    end subroutine snapshots_reduce_snapshot
 
     subroutine reduce_atmosphere(sc, s)
         ! The atmosphere of snapshot s, reduced to sea level.
@@ -995,7 +995,7 @@ contains
         ! rates, beta_p); one without (the anomaly snapshot of a lo = "" axis) is
         ! taken as given, a sea-level anomaly (tas) or ratio (pr).
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         integer,               intent(IN)    :: s
 
         integer  :: nx, ny, m, k, nsrc
@@ -1140,7 +1140,7 @@ contains
                     end if
                 end do
             end if
-            if (has_pr) then   ! with tas and zs (snapesm_check_bindings)
+            if (has_pr) then   ! with tas and zs (snapshots_check_bindings)
                 call realloc3(st%prcor, nx, ny, NMONTH)
                 call realloc2(st%prcor_ann, nx, ny)
                 st%prcor_ann = st%pr_ann / exp(st%beta_p*(st%ta_ann - st%tsl_ann))
@@ -1160,7 +1160,7 @@ contains
         ! salinity 0), vertically interpolated from the input depth profiles to
         ! the model depth axis (e.g. 75 -> 23 levels, depth0 = abs(file depth)).
         implicit none
-        type(snapesm_class), intent(INOUT) :: sc
+        type(snapshots_class), intent(INOUT) :: sc
         integer,               intent(IN)    :: s
 
         integer  :: nx, ny, nz0, nzo, i, j, k, f_to, f_so
@@ -1183,7 +1183,7 @@ contains
         if (has_so) then
             so0 = ocean_annual(sc%snap(s)%bind(f_so)%src(1), trim(what)//" so")
             if (size(so0,3) /= nz0) then
-                write(*,*) "snapesm:: Error: "//trim(what)//": so and to have different depth axes."
+                write(*,*) "snapshots:: Error: "//trim(what)//": so and to have different depth axes."
                 stop 1
             end if
         end if
@@ -1239,7 +1239,7 @@ contains
 
         nt = size(vs%var,4)
         if (nt /= 1 .and. nt /= NMONTH) then
-            write(*,*) "snapesm:: Error: "//trim(what)//": an ocean field is a monthly &
+            write(*,*) "snapshots:: Error: "//trim(what)//": an ocean field is a monthly &
                        &climatology (12 slices) or annual (1 slice); got", nt, "slices."
             stop 1
         end if
@@ -1280,7 +1280,7 @@ contains
     function field_bind_index(sc, name) result(f)
         ! Registry index of the field named `name` (case-sensitive), or 0 if absent.
         implicit none
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: name
         integer :: f, i
         f = 0
@@ -1296,7 +1296,7 @@ contains
     logical function binds(sc, s, name)
         ! Snapshot s binds the field `name` (a registry field with a var_defs group).
         implicit none
-        type(snapesm_class), intent(IN) :: sc
+        type(snapshots_class), intent(IN) :: sc
         integer,             intent(IN) :: s
         character(len=*),    intent(IN) :: name
         integer :: f
@@ -1337,4 +1337,4 @@ contains
         return
     end function interp_linear
 
-end module snapesm
+end module snapshots

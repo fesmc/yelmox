@@ -23,7 +23,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = False  ! Ocean forcing off (mountain glacier: no ocean)
-    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 50.0     ! [yr] Frequency of climate updates (and of the surface: 250 m grid)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -115,7 +115,7 @@
 ! ===== Forcing =====
 
 &indices
-    ! Indices: named scalar series, read by name (snapesm axes, [anom]).
+    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
     ! restart_every_df), advanced on the forcing clock time_rel; unset keys
     ! from the template [idx] of input/yelmox_defaults.nml.
@@ -517,7 +517,7 @@
 ! ===== Climate =====
 
 &snap
-    ! Snapshot backend (snapesm): the present-day reference only, ERA5
+    ! Snapshot backend (snapshots): the present-day reference only, ERA5
     ! 1981-2010 (no ocean: with_shelf = False); the anomaly from [anom]
     ! (alpha_orbital_t2018 x 10 K).
     ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.

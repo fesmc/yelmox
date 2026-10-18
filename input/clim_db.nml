@@ -1,6 +1,6 @@
 ! =====================================================================
 ! clim_db.nml — shared climate database (varslice groups) for the snapshot
-! backend (snapesm) and the climate modifiers.
+! backend (snapshots) and the climate modifiers.
 !
 ! One group per product field. A par file lists the databases to search,
 ! first file that has a group wins, then the par file itself (searched

@@ -89,7 +89,7 @@
 
 &indices
     ! Indices: named scalar series shared by both domains and the OBM, read by
-    ! name (snapesm axes, [anom_<sfx>], [obm_forcing]). Each is a tsgen group
+    ! name (snapshots axes, [anom_<sfx>], [obm_forcing]). Each is a tsgen group
     ! [idx_<name>] (method, series_file, ...; units, restart_every_df),
     ! advanced on the forcing clock time_rel; unset keys from the template
     ! [idx] of input/yelmox_defaults.nml.
@@ -98,7 +98,7 @@
 
 &idx_at
     ! Glacial index (north): the orbital series normalised to 0 at present
-    ! (piControl) and 1 at 21 ka (LGM); the position on the snapesm axis "at".
+    ! (piControl) and 1 at 21 ka (LGM); the position on the snapshots axis "at".
     method      = "series"
     series_file = "input/alpha_orbital_r2020.dat"
     norm_t0     = 0.0
@@ -408,7 +408,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -704,7 +704,7 @@
 /
 
 &snap_south
-    ! Snapshot backend (snapesm): present day only (RACMO2.3p2 1981-2010, 2 m
+    ! Snapshot backend (snapshots): present day only (RACMO2.3p2 1981-2010, 2 m
     ! air temperature; ISMIP7 ocean).
     ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
     var_defs   = "input/clim_db.nml"
@@ -935,7 +935,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True
-    climate         = "snapesm"  ! climate backend: "snapesm", "esm" or "rembo"
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0
     dt_isos         = 10.0
@@ -1216,7 +1216,7 @@
 /
 
 &snap_north
-    ! Snapshot backend (snapesm): present day (MAR v3.14 1961-1990, ORAS5) and
+    ! Snapshot backend (snapshots): present day (MAR v3.14 1961-1990, ORAS5) and
     ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
     ! "at". The ocean follows the reference, its anomaly from [ocn_fraction_north].
     ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.

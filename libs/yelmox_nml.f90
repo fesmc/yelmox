@@ -1,5 +1,5 @@
 module yelmox_nml
-    ! Namelist helpers shared by the yelmox forcing modules (indices, snapesm,
+    ! Namelist helpers shared by the yelmox forcing modules (indices, snapshots,
     ! the climate modifiers): the defaults file of their groups, and the
     ! lookup of a varslice group in a list of database files (var_defs), then
     ! in the par file.

@@ -21,7 +21,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapesm ocean ([snap])
+    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapshots ocean ([snap])
     surface_method  = "climate" ! the smb from the climate (REMBO)
     dt_clim         = 10.0     ! [yr] climate update interval (= dtt: REMBO has its own intervals)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -115,7 +115,7 @@
 ! ===== Forcing =====
 
 &indices
-    ! Indices: named scalar series, read by name (snapesm axes, [anom]).
+    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
     ! restart_every_df), advanced on the forcing clock time_rel; unset keys
     ! from the template [idx] of input/yelmox_defaults.nml.

@@ -58,7 +58,7 @@
     restart_every_df = 0.0           ! [f] write a restart each time f moves by this much; 0 = off
 /
 
-! ===== Snapshot backend (snapesm) =====
+! ===== Snapshot backend (snapshots) =====
 
 &snap
     var_defs    = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
