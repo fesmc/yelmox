@@ -6,6 +6,23 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- `input/clim_db.nml`: shared climate database of the snapshot backend, one varslice group per
+  product field. Present-day references regional (`{domain}/{grid_name}`): MAR v3.14
+  1961-1990, RACMO2.3p2 1981-2010, ERA5 1981-2010, ORAS5 1981-2010, ISMIP7 ocean.
+  Paleoclimate from the global FesmData products, remapped online (`bilin`): PMIP3 and
+  PMIP4 ensemble means, CLIMBER-3α, CLIMBER-X (with the anomalies to piControl), atmosphere
+  and ocean. Path keywords `{grid_global}` (`[snap] grid_global`, default `GLOBAL-1DEG`)
+  and `{exp}` (the snapshot's `exp`).
+- `input/yelmox_defaults.nml`: defaults of the forcing groups, `[indices]`, `[idx_<name>]`
+  (template `[idx]`, passed to `tsgen_init`), `[snap]`, `[snap_field_<name>]`,
+  `[snap_<snapshot>]`, `[snap_axis_<name>]` (templates `[snap_field]`, `[snap_snapshot]`,
+  `[snap_axis]`), `[anom]`, `[ocn_fraction]`, `[bias]` (domain suffixes on the template);
+  read with `nml_read(..., defaults_file, defaults_group)`, unknown keys stop the run
+  (`nml_validate`). Needs fesm-utils `tsgen_init(..., defaults_file, defaults_group)` and
+  `nml_has_group` (fesm-utils `forcing`, to be merged into dev).
+- `scripts/check_par_nml.py` also checks the forcing groups against
+  `input/yelmox_defaults.nml` (named groups against their templates) and the snapshot
+  bindings against the `var_defs` files; `--dead` reports unread snapshot groups.
 - `scripts/climate-compare/`: climate-only comparison of two par files (`run.sh`: ice sheet
   off, `tstep_method = "rel"`, climate every 1 kyr over -130 ka to 0 or PD; `compare.jl`:
   domain means per time and maps of `t2m_ann`, `pr_ann`, `to_ann`), the regression check
@@ -18,6 +35,14 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- `[snap] var_defs` is a list of files, searched in order (first that has the group; an
+  error names the group and the files), e.g. `"input/clim_db.nml" "<par file>"`; also
+  `[bias] var_defs` (default the par file). The forcing groups need only the keys that
+  differ from `input/yelmox_defaults.nml`: `[snap_field_<name>] kind` defaults to the
+  kind of the field name, a field without axes needs no group, `[anom]`/`[ocn_fraction]`/
+  `[bias]` absent = inactive. GRL snapesm configs take PMIP3 piControl/lgm from the global
+  product (`exp`, remapped; regional MAR/ORAS5 unchanged); `input/greenland_clim.nml`
+  removed.
 - snapesm, phase 3: fields optional per snapshot (key absent or `""`); the backend builds
   what the reference binds (atmosphere `tas`+`pr`+`zs` and/or ocean `to`, `so` optional),
   bindings checked at init (axis snapshots bind the fields they blend, `zs` with `tas`/`pr`,

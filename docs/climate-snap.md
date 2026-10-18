@@ -96,29 +96,104 @@ which reproduces the atmosphere of snapclim `snap_1ind_new`
 
 ```fortran
 &snap
-    var_defs  = "input/greenland_clim.nml"   ! database of the input files
-    combine   = "anomaly"                    ! snapshots as anomalies from the reference
-    ref_name  = "pd"                         ! the reference snapshot
+    var_defs  = "input/clim_db.nml"   ! databases of the input files (default)
+    ref_name  = "pd"                  ! the reference snapshot (default)
     snapshots = "pd" "picontrol" "lgm"
-    fields    = "tas" "pr" "to" "so" "zs"
     axes      = "at"
-    ! lapse, f_p, f_p_ne
-    ! as in snapclim
+    lapse     = 0.0080 0.0065         ! [K m-1] annual, summer (default)
+    f_p       = 0.06                  ! [K-1] precipitation scaling (default 0.05)
 /
 ```
 
-Three kinds of group follow:
+Every key of the `[snap*]` groups has a default in `input/yelmox_defaults.nml`
+(see [Defaults](#defaults)): `combine = "anomaly"` (snapshots as anomalies from
+the reference), `fields = "tas" "pr" "to" "so" "zs"`, `grid_global =
+"GLOBAL-1DEG"`, ... Three kinds of group follow:
 
-- **Fields**, `[snap_field_<name>]`: `kind` (`atm_temp`, `atm_precip`, `ocn`,
-  `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `const`) and the
-  `axes`, one or more names (`""` = none).
-- **Snapshots**, `[snap_<name>]`: `monthly`, optionally `clim_sigma`/`ocn_sigma`
-  (as in snapclim) and, per field, the `var_defs` group(s) holding it. See
-  [Database namelists](database-namelists.md).
+- **Fields**, `[snap_field_<name>]`: `blend` (`linear`, `ratio`, `const`;
+  default `linear`) and the `axes`, one or more names (default `""` = none),
+  and `kind` (`atm_temp`, `atm_precip`, `ocn`, `ocn_salt`, `elev`; default `""`,
+  the kind of the field name). A field without axes follows the reference: its
+  group can be left out.
+- **Snapshots**, `[snap_<name>]`: `exp` (the experiment, `{exp}` in the
+  database paths), `monthly` (default `True`), `clim_sigma`/`ocn_sigma` (as in
+  snapclim, default 0), `tas_season` and, per field, the database group(s)
+  holding it (see [Database](#database)).
 - **Axes**, `[snap_axis_<name>]`: two snapshots `lo` -> `hi` and the `index`
   giving the position on the axis: 0 at `lo`, 1 at `hi`. The index is a
   driver-owned `[idx_<name>]` (a `tsgen` generator of any method: `const`,
   ramps, `series`, ...; see [yelmox](yelmox.md)), listed in `[indices]`.
+
+### Database
+
+The snapshots bind varslice groups (see [Database namelists](database-namelists.md))
+by name, from the files listed in `[snap] var_defs`, searched in order (first
+file that has the group). The shared database `input/clim_db.nml` holds one
+group per product field; a par file can add run-specific groups and list itself
+(its name in the run folder, where runme copies it):
+
+```fortran
+&snap
+    var_defs = "input/clim_db.nml" "yelmox_Greenland_snapesm.nml"
+/
+```
+
+A group missing from every file stops the run, naming the group and the files.
+The paths of the database take, besides `{domain}` and `{grid_name}`, two
+keywords:
+
+- `{grid_global}`: the global grid of the paleoclimate products, `[snap]
+  grid_global` (default `GLOBAL-1DEG`);
+- `{exp}`: the experiment of the snapshot, its `exp`, so one group serves every
+  experiment of a product family.
+
+Present-day references are regional (`{domain}/{grid_name}`, the resolution of
+the climate grid): MAR v3.14 1961-1990 (`mar314_1961_1990_{tas,sf,rf,pr,zs}`),
+RACMO2.3p2 1981-2010 (`racmo23p2_1981_2010_{tas,tsrf,pr,sf,zs}`), ERA5
+1981-2010 (`era5_1981_2010_{tas,pr,sf,zs}`), ORAS5 1981-2010
+(`oras5_1981_2010_{to,so}`, monthly climatology) and the ISMIP7 ocean
+(`ismip7_{to,so}`). The paleoclimate snapshots are the global products,
+remapped online onto the climate grid (`remap = "bilin"`, the map cached in
+`maps/`):
+
+| Product (FesmData) | `{exp}` | Groups |
+|---|---|---|
+| `Paleoclimate-PMIP3-{exp}-mean` | lgm, midHolocene, piControl | `pmip3_mean_{tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
+| `Paleoclimate-PMIP4-{exp}-mean` | lgm, midHolocene, piControl | `pmip4_mean_{tas_mon,pr_mon,tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
+| `Paleoclimate-CLIMBER3a-{exp}`, `-ocean` | present, lgm_1p7weak, lgm_1p7strong | `c3a_{tas_ann,tas_jja,pr_ann,zs}`, `c3a_to` |
+| `Paleoclimate-CLIMBERX-Willeit2025-{exp}`, `-ocean` | piControl, interstadial, stadial, heinrich | `cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}`, `cx_{tas_mon_anom,pr_mon_anom}` (anomalies to piControl, for `lo = ""` axes), `cx_{to,so}` |
+
+```fortran
+&snap_pd
+    tas = "mar314_1961_1990_tas"
+    pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
+    zs  = "mar314_1961_1990_zs"
+    to  = "oras5_1981_2010_to"
+    so  = "oras5_1981_2010_so"
+/
+
+&snap_lgm
+    exp        = "lgm"
+    monthly    = False
+    clim_sigma = 50.0
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
+/
+```
+
+### Defaults
+
+`input/yelmox_defaults.nml` declares every key of the `[snap*]` groups, the
+indices and the climate modifiers, with its default. The named groups fall
+back to a template group: `[snap_field_<name>]` to `[snap_field]`,
+`[snap_<name>]` (a snapshot) to `[snap_snapshot]`, `[snap_axis_<name>]` to
+`[snap_axis]`, `[snap]` to `[snap]`, with the domain suffix of a multi-domain
+driver (`[snap_north_field_tas]` to `[snap_field]`). A par file lists only what
+differs; a key the defaults file does not declare stops the run
+(`nml_validate`), and `scripts/check_par_nml.py` reports it offline.
+
+### Fields and blending
 
 **Fields are optional per snapshot.** A snapshot binds the fields it names
 (a key absent or `""` binds nothing). The backend builds what the reference
@@ -188,7 +263,6 @@ fields may share one index:
 
 &idx_at
     method      = "series"
-    sigma       = 0.0
     series_file = "input/alpha_orbital_r2020.dat"
     norm_t0     = 0.0             ! [yr] index 0 here
     norm_t1     = -21e3           ! [yr] index 1 here (or a window, e.g. -23e3, -19e3)
@@ -196,7 +270,6 @@ fields may share one index:
 
 &idx_bt
     method      = "series"
-    sigma       = 0.0
     series_file = "input/beta_ngrip_millennial.dat"
 /
 
@@ -213,9 +286,7 @@ fields may share one index:
 /
 
 &snap_field_tas
-    kind  = "atm_temp"
-    blend = "linear"
-    axes  = "at" "bt"
+    axes  = "at" "bt"             ! blend = "linear" (default)
 /
 ```
 
@@ -224,8 +295,8 @@ the fesm-utils tsgen docs); a steady state is a `const` index (`df_dt_max = 0`,
 value `f_min`), independent of the model time.
 
 **The ocean anomaly from the atmosphere** (snapclim `fraction`) is the climate
-modifier `[ocn_fraction]` (see [yelmox](yelmox.md)): the field `to` with
-`blend = "const"` stays at the reference, and the modifier adds `f_to` times
+modifier `[ocn_fraction]` (see [yelmox](yelmox.md)): the field `to` without
+axes (or `blend = "const"`) stays at the reference, and the modifier adds `f_to` times
 the mean sea-level air temperature anomaly of the same update. Unlike
 snapclim's `fraction` (and snapesm's before), it has no lag of one update and
 leaves out the lapse-rate cooling of the ice sheet. `blend = "fraction"` stops

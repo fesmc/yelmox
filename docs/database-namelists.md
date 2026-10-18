@@ -157,7 +157,10 @@ dimension, or the reader stops with an error — a useful check that `x0`, `x1`,
   ```
 
   and the same namelist serves every GCM/experiment combination — you select the
-  concrete values in the driver's `[esm]` configuration, not here.
+  concrete values in the driver's `[esm]` configuration, not here. snapesm
+  supplies `{grid_global}` (`[snap] grid_global`) and `{exp}` (the snapshot's
+  `exp`) for its database `input/clim_db.nml` (see
+  [snapclim and snapesm](climate-snap.md)).
 
 **Wildcards** (shell globs, `*` and `?`) are also allowed. The reader expands the
 pattern with `ls -1 … | sort`, so a dataset split across many files is matched

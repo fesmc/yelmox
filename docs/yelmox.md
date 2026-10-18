@@ -88,14 +88,14 @@ it to `step_climate` (and the cold start); consumers read an index by name
     names = "ramp"            ! "" = no indices
 /
 
-&idx_ramp                     ! a tsgen group
+&idx_ramp                     ! a tsgen group (unset keys: template [idx])
     method    = "ramp-time"   ! const | ramp-slope | ramp-time | ramp-time-step | sin | series | exp | PI42 | ...
     f_min     = 0.0
     f_max     = 5.0
     dt_ramp   = 200.0
-    ! ... (see tsgen.f90 for the full parameter set)
-    ! optional: units = "K" (label of idx_<name> in the 1D output),
-    !           restart_every_df = 0.5 (a restart bundle each |Δf|)
+    ! ... (see the [idx] template of input/yelmox_defaults.nml)
+    ! units = "K" (label of idx_<name> in the 1D output, default "1"),
+    ! restart_every_df = 0.5 (a restart bundle each |Δf|, default 0 = off)
 /
 
 &anom
@@ -172,7 +172,7 @@ group is optional; without it, or with `active = False`, nothing changes.
 ```
 &bias
     active   = True
-    var_defs = ""             ! file with the groups below ("" = this file)
+    var_defs = ""             ! files with the groups below, searched in order ("" = this file)
     dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
     fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
     f_tas    = 1.0            ! weight of dtas
@@ -190,6 +190,20 @@ fields are written to the climate's 2D file (`bias_dtas_ann`, `bias_fpr_ann`).
 A run is set by these namelist groups. Every key is required (a missing key stops
 the run), except the keys of an unselected `init_method` and the `[relax]` and
 `[opt]` groups when their switch in `[sim]` is off.
+
+The forcing groups have defaults: `input/yelmox_defaults.nml` declares every
+key of `[indices]`, `[idx_<name>]` (template `[idx]`: the tsgen keys, `units`,
+`restart_every_df`), the snapshot backend (`[snap]`, templates `[snap_field]`,
+`[snap_snapshot]`, `[snap_axis]`) and the climate modifiers (`[anom]`,
+`[ocn_fraction]`, `[bias]`), with the domain suffix of a multi-domain driver
+(`[anom_north]` to `[anom]`). A par file lists only what differs; an absent
+group takes every default (a modifier is then inactive). Each read goes through
+`nml_read(..., defaults_file, defaults_group)` (the path in `libs/yelmox_nml.f90`),
+and a key not declared there stops the run (`nml_validate`).
+`scripts/check_par_nml.py` checks the yelmo groups against
+`input/yelmo_defaults.nml` and these groups against `input/yelmox_defaults.nml`
+offline (`--dead`: keys of the other groups that no source reads). The other
+yelmox groups below are read without defaults.
 
 | Group | Sets |
 |---|---|

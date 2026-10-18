@@ -28,9 +28,9 @@ the surface mass balance; the ocean comes from snapesm.
 - **Update cadence.** `[comps] dt_clim = dtt`: REMBO updates its energy balance
   and its smb on its own intervals (`dtime_emb`, `dtime_smb`).
 - **Ocean.** The snapesm `[snap]` groups (see [snapclim and snapesm](climate-snap.md))
-  with an ocean-only reference snapshot: `fields = "to" "so"`, `snapshots = "pd"`,
-  `ref_name = "pd"`, no axes, the `pd` snapshot binding the ORAS5 1981-2010
-  climatology (`clim_pd_to`, `clim_pd_so` of `input/greenland_clim.nml`). The
+  with an ocean-only reference snapshot: `snapshots = "pd"`, `ref_name = "pd"`,
+  no axes, the `pd` snapshot binding the ORAS5 1981-2010 climatology
+  (`oras5_1981_2010_to`, `oras5_1981_2010_so` of `input/clim_db.nml`). The
   reference must bind `to` and no atmosphere (checked at start-up); `so` is
   optional (salinity 0 without it).
 - **Transient forcing.** `[anom]`, read by the rembo backend itself (an input of
