@@ -7,7 +7,8 @@ The two snapshot backends build the climate from a reference state plus climate
 **indices** (e.g. a glacial index). Both supply the atmosphere (monthly `tas`,
 `pr`, lapse-rate corrected to the current surface) and the ocean as depth
 profiles (`to_ann`, `so_ann`), which the marine shelf interpolates to the shelf
-base. Both run on `grid_clim` and read the `[snap]` group.
+base. Both run on `grid_clim` and read the `[snap]` group. snapesm also
+supplies the ocean of the rembo climate (an ocean-only reference snapshot).
 
 - **Program:** `yelmox` (`make yelmox`), backends in `libs/snapclim.f90` and
   `libs/snapesm.f90`, behind `libs/yelmox_climate.f90`.
@@ -101,7 +102,7 @@ which reproduces the atmosphere of snapclim `snap_1ind_new`
     snapshots = "pd" "picontrol" "lgm"
     fields    = "tas" "pr" "to" "so" "zs"
     axes      = "at"
-    ! lapse, f_p, f_p_ne, f_stdev
+    ! lapse, f_p, f_p_ne
     ! as in snapclim
 /
 ```
@@ -112,13 +113,43 @@ Three kinds of group follow:
   `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `const`) and the
   `axes`, one or more names (`""` = none).
 - **Snapshots**, `[snap_<name>]`: `monthly`, optionally `clim_sigma`/`ocn_sigma`
-  (as in snapclim) and, per field, the `var_defs` group(s) holding it (one =
-  monthly; two = annual + summer, from which the seasonal cycle is built). See
+  (as in snapclim) and, per field, the `var_defs` group(s) holding it. See
   [Database namelists](database-namelists.md).
 - **Axes**, `[snap_axis_<name>]`: two snapshots `lo` -> `hi` and the `index`
   giving the position on the axis: 0 at `lo`, 1 at `hi`. The index is a
   driver-owned `[idx_<name>]` (a `tsgen` generator of any method: `const`,
   ramps, `series`, ...; see [yelmox](yelmox.md)), listed in `[indices]`.
+
+**Fields are optional per snapshot.** A snapshot binds the fields it names
+(a key absent or `""` binds nothing). The backend builds what the reference
+snapshot (`ref_name`) binds: the atmosphere (`tas` and `pr`, with the
+elevation `zs`) and/or the ocean (`to`, optionally `so`). An ocean-only
+reference serves the ocean of the rembo climate; `climate = "snapesm"` needs
+the atmosphere. Checked at start-up, with an error naming the group:
+
+- every snapshot of an axis of a `linear`/`ratio` field binds that field, and
+  no snapshot binds a field the reference does not;
+- a snapshot with `tas` or `pr` binds `zs` (the sea-level reduction), except
+  the `hi` of a `lo = ""` axis (below); `pr` with `zs` needs `tas`; `so` needs
+  `to`; the reference binds `tas` and `pr` together;
+- the number of groups: `tas` one (`monthly = True`) or two (annual mean and one
+  season); `pr` one or two summed (monthly, e.g. snowfall + rainfall) or one
+  (annual); every other field one.
+
+**Seasons.** A snapshot with two `tas` groups (annual mean `ta_ann` and one
+season `ta_seas`) builds the monthly cycle as a cosine with its extremes in
+January and July, `c(m) = cos(2π(m-1)/12)`: with `tas_season = "djf"`,
+`tas(m) = ta_ann + (ta_seas - ta_ann) c(m)` (the season in January); with
+`"jja"`, `tas(m) = ta_ann - (ta_seas - ta_ann) c(m)` (in July). The default is
+the summer of the hemisphere (`jja` north, `djf` south), so the second field of
+CLIMBER-3α (JJA only) serves the south as its winter, and PMIP3 offers both
+(`t2m_jja`, `t2m_djf`).
+
+**Ocean.** `to` and `so` are depth profiles, interpolated to the model depth
+axis (23 levels, 0-3000 m). A monthly climatology (12 slices, e.g. ORAS5) is
+averaged to the annual mean; an annual field (one slice: no time axis, e.g.
+the CLIMBER ocean products, or one record) is taken as is. Without `so`, the
+salinity is 0 (as in snapclim).
 
 Each axis of a field adds to the reference snapshot, with weight `a_k` (the
 index value):
@@ -128,6 +159,22 @@ index value):
 | `linear` | `ref + sum_k a_k (hi_k - lo_k)` |
 | `ratio` | `ref * prod_k (1 + a_k (hi_k/lo_k - 1))` |
 | `const` | `ref` |
+
+An axis with `lo = ""` adds its `hi` snapshot as the anomaly itself:
+`ref + a_k hi_k` (`linear`) or `ref (1 + a_k (hi_k - 1))` (`ratio`), e.g. a
+reconstructed temperature anomaly or precipitation ratio (Badgeley et al.,
+2020) without a zero snapshot. Such a snapshot binds no `zs`: its fields are
+taken as given, so they must be **sea-level** anomalies or ratios (there is
+no elevation correction of their own). If it binds `zs`, it is reduced to sea
+level like any other snapshot.
+
+```fortran
+&snap_axis_recon
+    lo    = ""
+    hi    = "badgeley"      ! snapshot binding tas (anomaly) and pr (ratio), no zs
+    index = "one"
+/
+```
 
 One axis gives snapclim `snap_1ind`; two axes give `snap_2ind`, the
 orbital + millennial decomposition of Banderas et al. (2018), e.g. `at` on

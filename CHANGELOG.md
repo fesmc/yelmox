@@ -18,6 +18,17 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- snapesm, phase 3: fields optional per snapshot (key absent or `""`); the backend builds
+  what the reference binds (atmosphere `tas`+`pr`+`zs` and/or ocean `to`, `so` optional),
+  bindings checked at init (axis snapshots bind the fields they blend, `zs` with `tas`/`pr`,
+  group counts); ocean annual (one slice, e.g. CLIMBER ocean products) or a monthly
+  climatology, salinity 0 without `so`; axes with `lo = ""` (`hi` is the anomaly or ratio,
+  without `zs` taken at sea level); `tas_season = "jja" | "djf"` for two-field `tas`
+  (default the hemisphere's summer; PMIP3 `clim_*_tas_djf` groups added); `ref_name` must
+  name a snapshot; `[snap] f_stdev` removed; `snapesm_end` and `climate_end` (drivers).
+  rembo takes its ocean from snapesm, an ocean-only `pd` snapshot (ORAS5; the shipped
+  config had no ocean, `ocn_path = "none"`), plus `dT_ocn`; `climate = "snapesm"` needs an
+  atmosphere.
 - Climate modifiers, phase 2: `[ocn_fraction<sfx>]` (`active`, `f_to`, `region`) after
   `[anom]`: `to_ann = to_ann_ref + f_to × mean(tsl_ann − tsl_ann_ref)` over `region`
   (`"all"` or a `[regions]` selection, resolved at init), without the lag of one climate

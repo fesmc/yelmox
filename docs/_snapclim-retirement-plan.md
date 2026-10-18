@@ -73,6 +73,8 @@ CHANGELOG (Unreleased) says snapesm needs them, but they are not in tsgen
 
 ### 2. snapesm ocean
 
+Done (forcing design phase 3): annual or monthly ocean, `so` optional.
+
 `reduce_ocean` builds an ocean only when both `to` and `so` are bound, and
 assumes a monthly source (`range`, `rep = 12`).
 
@@ -97,6 +99,9 @@ Proposed: (a). The rest of the OBM coupling (`obm2ism` writes
 `dom%clim%now%to_ann`) is already backend-generic.
 
 ### 4. rembo ocean
+
+Done (forcing design phase 3), with optional fields: the `pd` snapshot binds
+only `to`/`so`, and the rembo backend adds `dT_ocn` itself.
 
 rembo uses snapclim for its ocean (`const` + `dT_ocn`). Replace with
 snapesm, `pd` snapshot only, `dTo = dT_ocn` passed to `snapesm_update`.

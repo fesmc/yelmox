@@ -48,7 +48,7 @@ The forcing of a run is set at runtime by its climate backend, `[comps] climate`
 | `snapclim` | atmosphere + ocean profiles, from climate snapshots blended by indices | [snapclim and snapesm](climate-snap.md) |
 | `snapesm` | as snapclim, configured as one blend model over any number of snapshots | [snapclim and snapesm](climate-snap.md) |
 | `esm` | reference climatology + Earth-system-model anomalies; atmosphere or smb, ocean at the shelf base, subglacial discharge | [ESM forcing](climate-esm.md) |
-| `rembo` | REMBOv1 atmosphere + smb; ocean from snapclim | [REMBO climate](climate-rembo.md) |
+| `rembo` | REMBOv1 atmosphere + smb; ocean from snapesm (ocean-only snapshot) | [REMBO climate](climate-rembo.md) |
 
 ## Stepping order
 
