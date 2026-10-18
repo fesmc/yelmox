@@ -32,6 +32,7 @@ program yelmox_bipolar
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
     use kryos,          only : kryos_domain, domain_init
+    use yelmox_climate, only : climate_end
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
@@ -282,6 +283,8 @@ program yelmox_bipolar
 
     if (active_north) call yelmo_end(dom_north%yelmo, time=ts%time)
     if (active_south) call yelmo_end(dom_south%yelmo, time=ts%time)
+    if (active_north) call climate_end(dom_north%cl)
+    if (active_south) call climate_end(dom_south%cl)
 
 contains
 

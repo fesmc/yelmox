@@ -14,6 +14,7 @@ program yelmox
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
     use kryos,          only : kryos_domain, domain_init
+    use yelmox_climate, only : climate_end
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
                                step_icesheet, couple_yelmo_to_htopo, step_climate, &
@@ -230,5 +231,6 @@ program yelmox
     ! Finalize Yelmo (deallocates model state) -- must come after the last
     ! access to dom%yelmo (it deallocates tpo%now%H_ice etc).
     call yelmo_end(dom%yelmo, time=ts%time)
+    call climate_end(dom%cl)
 
 end program yelmox

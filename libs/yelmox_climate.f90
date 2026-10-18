@@ -5,7 +5,8 @@ module yelmox_climate
     !   "esm"      -- reference climatology plus Earth-system-model anomalies over
     !                 historical/projection periods (esm_forcing)
     !   "rembo"    -- REMBO atmosphere and surface mass balance (climate_rembo,
-    !                 built with rembo=1), with the ocean from snapclim
+    !                 built with rembo=1), with the ocean from snapesm (an
+    !                 ocean-only reference snapshot)
     !
     ! Presents one interface (climate_init / climate_update) over the backends,
     ! filling a `climate_out_class`; the domain and its coupling read only that.
@@ -20,11 +21,12 @@ module yelmox_climate
     use ncio
     use coordinates,   only : grid_class
     use timestepping,  only : tstep_class
-    use climate_out,   only : climate_out_class, summer_mean
+    use climate_out,   only : climate_out_class, clim_state_class, summer_mean
     use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom, &
                               snapclim_lapse_monthly
-    use snapesm,       only : snapesm_class, snapesm_init, snapesm_update, &
-                              snapesm_write_init, snapesm_write_step, snapesm_lapse_monthly
+    use snapesm,       only : snapesm_class, climate_state_class, snapesm_init, snapesm_update, &
+                              snapesm_end, snapesm_write_init, snapesm_write_step, &
+                              snapesm_lapse_monthly
     use esm_forcing,   only : esm_forcing_class, esm_forcing_init, esm_clim_update, &
                               esm_forcing_update, esm_variability_update, &
                               esm_lapse_monthly
@@ -76,9 +78,15 @@ module yelmox_climate
     public :: yelmox_climate_class
     public :: climate_init
     public :: climate_update
+    public :: climate_end
     public :: climate_air_anom
     public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     public :: climate_restart_write
+
+    ! Copy of the fields a state supplies (allocated) into climate_out.
+    interface copy_allocated
+        module procedure copy_allocated_1D, copy_allocated_2D, copy_allocated_3D
+    end interface
 
 contains
 
@@ -140,15 +148,31 @@ contains
             case("snapesm")
                 call snapesm_init(cl%snapesm, filename, domain, grid, time, &
                                   south, idx, group="snap"//trim(sfx))
-                caps%has_tsl_ann = .true.
+                ! The surface reads the atmosphere; an ocean-only reference
+                ! serves the rembo ocean only.
+                if (.not. cl%snapesm%par%with_atm) then
+                    write(*,*) "climate_init:: error: climate = snapesm needs an atmosphere: &
+                               &the reference snapshot ([snap"//trim(sfx)//"] ref_name) binds &
+                               &no tas/pr."
+                    error stop 1
+                end if
+                caps%has_tsl_ann = cl%snapesm%par%with_atm
+                caps%monthly     = cl%snapesm%par%with_atm
             case("esm")
                 call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &
                               smb_direct, reg)
                 caps%has_ocn_shelf = .true.
             case("rembo")
-                ! REMBO for the atmosphere and smb, snapclim for the ocean.
-                call snapclim_init(cl%snapclim, filename, domain, grid_name, nx, ny, dx_km, &
-                                   south, group="snap"//trim(sfx))
+                ! REMBO for the atmosphere and smb, snapesm for the ocean: an
+                ! ocean-only reference snapshot (to, optionally so).
+                call snapesm_init(cl%snapesm, filename, domain, grid, time, &
+                                  south, idx, group="snap"//trim(sfx))
+                if (cl%snapesm%par%with_atm .or. .not. cl%snapesm%par%with_ocn) then
+                    write(*,*) "climate_init:: error: climate = rembo takes the ocean only from &
+                               &[snap"//trim(sfx)//"]: the reference snapshot must bind to &
+                               &(and optionally so), not tas/pr (REMBO supplies the atmosphere)."
+                    error stop 1
+                end if
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))
                 cl%rembo%ta_sum = 0.0_wp
@@ -223,24 +247,8 @@ contains
 
             case("snapesm")
                 call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, dx=dx)
-
-                out%now%tas     = cl%snapesm%now%tas
-                out%now%pr      = cl%snapesm%now%pr
-                out%now%tsl_ann = cl%snapesm%now%tsl_ann
-                out%now%ta_ann  = cl%snapesm%now%ta_ann
-                out%now%pr_ann  = cl%snapesm%now%pr_ann
-                out%now%to_ann  = cl%snapesm%now%to_ann
-                out%now%so_ann  = cl%snapesm%now%so_ann
-                out%now%depth   = cl%snapesm%now%depth
-
-                out%ref%tas     = cl%snapesm%ref%tas
-                out%ref%pr      = cl%snapesm%ref%pr
-                out%ref%tsl_ann = cl%snapesm%ref%tsl_ann
-                out%ref%ta_ann  = cl%snapesm%ref%ta_ann
-                out%ref%pr_ann  = cl%snapesm%ref%pr_ann
-                out%ref%to_ann  = cl%snapesm%ref%to_ann
-                out%ref%so_ann  = cl%snapesm%ref%so_ann
-                out%ref%depth   = cl%snapesm%ref%depth
+                call snapesm_state_copy(out%now, cl%snapesm%now)
+                call snapesm_state_copy(out%ref, cl%snapesm%ref)
 
             case("esm")
                 call esm_update(cl, out, ts%time, dtt, z_srf, H_ice, z_bed, f_grnd, z_sl, &
@@ -275,6 +283,53 @@ contains
         call climate_mods_apply(cl%mods, out, idx)
 
     end subroutine climate_update
+
+    subroutine snapesm_state_copy(dst, src)
+        ! The fields of a snapesm state that climate_out carries, those it built:
+        ! the atmosphere and/or the ocean of the reference snapshot.
+        type(clim_state_class),    intent(inout) :: dst
+        type(climate_state_class), intent(in)    :: src
+
+        call copy_allocated(dst%tas,     src%tas)
+        call copy_allocated(dst%pr,      src%pr)
+        call copy_allocated(dst%tsl_ann, src%tsl_ann)
+        call copy_allocated(dst%ta_ann,  src%ta_ann)
+        call copy_allocated(dst%pr_ann,  src%pr_ann)
+        call copy_allocated(dst%to_ann,  src%to_ann)
+        call copy_allocated(dst%so_ann,  src%so_ann)
+        call copy_allocated(dst%depth,   src%depth)
+
+    end subroutine snapesm_state_copy
+
+    subroutine copy_allocated_1D(dst, src)
+        real(wp), allocatable, intent(inout) :: dst(:)
+        real(wp), allocatable, intent(in)    :: src(:)
+        if (allocated(src)) dst = src
+    end subroutine copy_allocated_1D
+
+    subroutine copy_allocated_2D(dst, src)
+        real(wp), allocatable, intent(inout) :: dst(:,:)
+        real(wp), allocatable, intent(in)    :: src(:,:)
+        if (allocated(src)) dst = src
+    end subroutine copy_allocated_2D
+
+    subroutine copy_allocated_3D(dst, src)
+        real(wp), allocatable, intent(inout) :: dst(:,:,:)
+        real(wp), allocatable, intent(in)    :: src(:,:,:)
+        if (allocated(src)) dst = src
+    end subroutine copy_allocated_3D
+
+    subroutine climate_end(cl)
+        ! Teardown of the backend (snapesm, also the ocean of rembo); snapclim
+        ! and esm have none.
+        type(yelmox_climate_class), intent(inout) :: cl
+
+        select case(trim(cl%method))
+            case("snapesm", "rembo")
+                call snapesm_end(cl%snapesm)
+        end select
+
+    end subroutine climate_end
 
     function climate_air_anom(cl, time) result(dT)
         ! [K] The backend's air-temperature anomaly index at `time`, the forcing of
@@ -726,14 +781,13 @@ contains
 
     subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
                             idx, init)
-        ! REMBO's atmosphere and surface mass balance, and the ocean from snapclim
-        ! (at `time`, as for the snapclim backend). The exception to the
+        ! REMBO's atmosphere and surface mass balance, and the ocean from snapesm
+        ! (at `time`, as for the snapesm backend). The exception to the
         ! modifiers: REMBO needs the anomaly before it runs, so it reads [anom]
         ! itself (climate_mods skips anom for rembo). The index f maps onto
         ! REMBO's anomalies: the summer air temperature dT_sum = f*f_ta, the
         ! annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6), and the ocean
-        ! dT_ocn = dT_ann*f_to, added to a snapclim ocean held at its reference
-        ! (ocn_type = "const"); f_so is unused.
+        ! dT_ocn = dT_ann*f_to, added to the snapesm ocean; f_so is unused.
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
         type(tstep_class),          intent(in)    :: ts
@@ -769,17 +823,11 @@ contains
                                out%now%smb, out%now%tsrf)
         out%has_smb = .true.
 
-        ! Ocean (depth profiles) from snapclim; its reference is clim0.
-        call snapclim_update(cl%snapclim, z_srf=z_srf, time=time, &
-                             dx=dx)
-        out%now%to_ann = cl%snapclim%now%to_ann
-        out%now%so_ann = cl%snapclim%now%so_ann
-        out%now%depth  = cl%snapclim%now%depth
-        out%ref%to_ann = cl%snapclim%clim0%to_ann
-        out%ref%so_ann = cl%snapclim%clim0%so_ann
-        out%ref%depth  = cl%snapclim%clim0%depth
-        if (trim(cl%snapclim%par%ocn_type) == "const") &
-            out%now%to_ann = out%now%to_ann + cl%rembo%dT_ocn
+        ! Ocean (depth profiles) from snapesm (ocean only), plus dT_ocn.
+        call snapesm_update(cl%snapesm, z_srf=z_srf, time=time, idx=idx, dx=dx)
+        call snapesm_state_copy(out%now, cl%snapesm%now)
+        call snapesm_state_copy(out%ref, cl%snapesm%ref)
+        out%now%to_ann = out%now%to_ann + cl%rembo%dT_ocn
 
     end subroutine rembo_update
 
