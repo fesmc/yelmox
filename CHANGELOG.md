@@ -52,6 +52,14 @@ annotated git tag. Dates are release (tag) dates.
   smoothing of the reference before 1 ka (`f_corr`: LGP, North, LIS; local +-4 K, means
   unchanged), the unused snapshot oceans, the SRG and Pyrenees oceans (`with_shelf =
   False`). `yelmox_Greenland_snapclim` stays until snapclim is removed.
+- yelmox_bipolar: the OBM box air temperatures from one global anomaly index,
+  `[obm_forcing]` (`index`, `gain`): `theta_i = theta_i_init + ampl_i × gain × index` for
+  every box (the tropical box set once), vapour fluxes likewise; `climate_air_anom` and
+  `libs/obm/atm2ocean.f90` removed. `obm2ism` is the climate modifier `[ocn_obm_<sfx>]`
+  (`absolute`, as before, or `anomaly`: reference + box anomaly), applied by the driver;
+  `[ctrl] obm2ism` removed. The OBM restart keeps the `*_init` values of the par file and
+  now holds the box air temperatures. The Bipolar par file on snapesm (north as GRL, south
+  present day), indices `at` and `gmt`.
 - `[snap] var_defs` is a list of files, searched in order (first that has the group; an
   error names the group and the files), then the par file itself (implicitly last, so a
   par file never names itself); also `[bias] var_defs` (default `""`: the par file only). The forcing groups need only the keys that

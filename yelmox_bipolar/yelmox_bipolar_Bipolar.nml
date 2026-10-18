@@ -36,8 +36,8 @@
     hydro_mask_north = "ice_data/Greenland/GRL-16KM/GRL-16KM_HYDRO-BASINS_zickfeld2004.nc"
     hydro_mask_south = "ice_data/Antarctica/ANT-32KM/ANT-32KM_HYDRO-BASINS_zickfeld2004.nc"
 
-    obm2ism          = False            ! OBM ocean temperature -> ice sheet (mshlf)?
-    atm2obm          = False            ! Atmosphere (snapclim) -> OBM forcing?
+    atm2obm          = False            ! Global air temperature anomaly ([obm_forcing]) -> OBM box air temperatures?
+                                        ! OBM ocean temperature -> ice sheet: per domain, [ocn_obm_<sfx>] active
 /
 
 ! ===== Output timing =====
@@ -88,11 +88,40 @@
 ! ===== Forcing =====
 
 &indices
-    ! Indices: named scalar series shared by both domains, read by name
-    ! (snapesm axes, [anom_<sfx>]). Each is a tsgen group [idx_<name>]
-    ! (method, series_file, ...; optional units and restart_every_df), advanced
-    ! on the forcing clock time_rel.
-    names  = ""       ! e.g. "at"; "" = none
+    ! Indices: named scalar series shared by both domains and the OBM, read by
+    ! name (snapesm axes, [anom_<sfx>], [obm_forcing]). Each is a tsgen group
+    ! [idx_<name>] (method, series_file, ...; units, restart_every_df),
+    ! advanced on the forcing clock time_rel; unset keys from the template
+    ! [idx] of input/yelmox_defaults.nml.
+    names  = "at" "gmt"
+/
+
+&idx_at
+    ! Glacial index (north): the orbital series normalised to 0 at present
+    ! (piControl) and 1 at 21 ka (LGM); the position on the snapesm axis "at".
+    method      = "series"
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
+/
+
+&idx_gmt
+    ! Global mean air temperature anomaly [K]: the OBM forcing ([obm_forcing])
+    ! and, with the regional gains, the homogeneous anomaly of each domain
+    ! ([anom_north], [anom_south]). Zero here (present day), as the snapclim
+    ! anomaly the OBM read before. A series instead, e.g.:
+    !   method = "series", series_file = "input/<gmt series>.dat"
+    method      = "const"
+    f_min       = 0.0
+    units       = "K"
+/
+
+&obm_forcing
+    ! [ctrl] atm2obm: the OBM box air temperatures theta_i = theta_i_init +
+    ! ampl_i * gain * index (ampl_i: [nautilus] thermal_ampl_north/tropics/
+    ! south, Zickfeld et al., 2004) and the vapour fluxes.
+    index = "gmt"     ! global mean air temperature anomaly [K] ([indices] names)
+    gain  = 1.0       ! [1] dT_glob = gain * index
 /
 
 ! ===== Ocean box model =====
@@ -379,9 +408,9 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -648,10 +677,12 @@
 
 &anom_south
     ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = False    ! Apply it?
-    index  = ""       ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)). Here the
+    ! regional air temperature anomaly from the global one, f_ta = the OBM's
+    ! [nautilus] thermal_ampl_south (zero while gmt = 0).
+    active = True     ! Apply it?
+    index  = "gmt"    ! the index driving the anomalies ([indices] names)
+    f_ta   = 0.86     ! [K]   dTa = f * f_ta  (air temperature)
     f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
@@ -665,87 +696,30 @@
     region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
 /
 
+&ocn_obm_south
+    ! Ocean temperature from the OBM southern box (ts), at every depth, set by
+    ! the driver after the climate step (exclusive with [ocn_fraction_south]).
+    active = False      ! Apply it? (needs [ctrl] active_obm)
+    mode   = "absolute" ! absolute: to = box; anomaly: to = to_ref + (box - box_init)
+/
+
 &snap_south
-    atm_type           = "anom"
-    ocn_type           = "anom"
-    fname_at           = "input/zeros.dat"
-    fname_ao           = "input/zeros.dat"
-    fname_ap           = "input/zeros.dat"
-    fname_as           = "input/zeros.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 0.0  
-    dTo_const          = 0.0
-    dSo_const          = 0.0 
-    f_to               = 0.25 
-    f_p                = 0.05
-    f_stdev            = 0.0  
+    ! Snapshot backend (snapesm): present day only (RACMO2.3p2 1981-2010, 2 m
+    ! air temperature; ISMIP7 ocean).
+    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml"
+    ref_name   = "pd"
+    snapshots  = "pd"
+    lapse      = 0.0080 0.0065
+    f_p        = 0.05
 /
 
-&snap_south_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 1.0 
-    f_glac             = 1.0 
-    f_hol              = 1.0 
-    f_seas             = 1.0 
-    f_to               = 0.2
-/
-
-&snap_south_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
-    clim_names      = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
-    ocn_names       = "z" "mask_ocn" "to" "so"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
-
-&snap_south_clim1
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
-
-&snap_south_clim2
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
-/
-
-&snap_south_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
+&snap_south_pd
+    tas = "racmo23p2_1981_2010_tas"
+    pr  = "racmo23p2_1981_2010_pr"
+    zs  = "racmo23p2_1981_2010_zs"
+    to  = "ismip7_to"
+    so  = "ismip7_so"
 /
 
 ! ===== Surface =====
@@ -898,7 +872,7 @@
     corr_pine = "Zwally2012:14"
     corr_abbott = "Zwally2012:15"
     
-    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped snapclim forcing
+    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped climate forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  
@@ -961,7 +935,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True
-    climate         = "snapclim" ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 10.0
     dt_isos         = 10.0
@@ -1215,10 +1189,12 @@
 
 &anom_north
     ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = False    ! Apply it?
-    index  = ""       ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)). Here the
+    ! regional air temperature anomaly from the global one, f_ta = the OBM's
+    ! [nautilus] thermal_ampl_north (zero while gmt = 0).
+    active = True     ! Apply it?
+    index  = "gmt"    ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.07     ! [K]   dTa = f * f_ta  (air temperature)
     f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /
@@ -1227,103 +1203,71 @@
     ! Ocean temperature anomaly as a fraction of the mean sea-level air
     ! temperature anomaly over a region, applied after [anom_north]: to_ann =
     ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = False    ! Apply it?
+    active = True     ! Apply it?
     f_to   = 0.25     ! [1] fraction of the air temperature anomaly
     region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
 /
 
+&ocn_obm_north
+    ! Ocean temperature from the OBM northern box (tn), at every depth, set by
+    ! the driver after the climate step (exclusive with [ocn_fraction_north]).
+    active = False      ! Apply it? (needs [ctrl] active_obm)
+    mode   = "absolute" ! absolute: to = box; anomaly: to = to_ref + (box - box_init)
+/
+
 &snap_north
-    atm_type           = "snap_1ind_new"
-    ocn_type           = "fraction"
-    fname_at           = "input/alpha_orbital_r2020.dat"
-    fname_ao           = "input/alpha_orbital_r2020.dat"
-    fname_ap           = "input/alpha_orbital_r2020.dat"
-    fname_as           = "input/salinity_index_deglaciation.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
-    dSo_const          = 3.0
-    f_to               = 0.25 
-    f_p                = 0.06
-    f_stdev            = 0.0 
+    ! Snapshot backend (snapesm): present day (MAR v3.14 1961-1990, ORAS5) and
+    ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
+    ! "at" (snapclim atm_type = snap_1ind_new, without f_hol). The ocean
+    ! follows the reference, its anomaly from [ocn_fraction_north]. Databases:
+    ! input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml"
+    ref_name   = "pd"
+    snapshots  = "pd" "picontrol" "lgm"
+    axes       = "at"
+    lapse      = 0.0080 0.0065
+    f_p        = 0.06
 /
 
-&snap_north_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 0.3 
-    f_glac             = 1.0 
-    f_hol              = 0.5 
-    f_seas             = 1.0 
-    f_to               = 0.2
+&snap_north_field_tas
+    axes  = "at"
 /
 
-&snap_north_recon
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-RECON-B20.nc"
-    clim_names      = "time" "tas" "pr" "zs"
-    clim_monthly    = False
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCN-RECON-TRACE21ka.nc"
-    ocn_names       = "time" "depth" "mask_ocn" "to"
-    ocn_monthly     = False
+&snap_north_field_pr
+    blend = "ratio"
+    axes  = "at"
 /
 
-&snap_north_clim0
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
-    clim_names      = "z_srf" "t2m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = True
-    ocn_time        = 0
+&snap_north_pd
+    tas = "mar314_1961_1990_tas"
+    pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
+    zs  = "mar314_1961_1990_zs"
+    to  = "oras5_1981_2010_to"
+    so  = "oras5_1981_2010_so"
 /
 
-&snap_north_clim1
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = 0
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
+&snap_north_picontrol
+    exp        = "piControl"
+    monthly    = False
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
 /
 
-&snap_north_clim2
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = -21000
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
+&snap_north_lgm
+    exp        = "lgm"
+    monthly    = False
+    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
+    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
+    pr  = "pmip3_mean_pr_ann"
+    zs  = "pmip3_mean_zs"
 /
 
-&snap_north_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
+&snap_north_axis_at
+    lo    = "picontrol"
+    hi    = "lgm"
+    index = "at"
 /
 
 ! ===== Surface =====

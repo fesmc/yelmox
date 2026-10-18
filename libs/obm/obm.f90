@@ -239,6 +239,12 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"phit",obm_object%phit,units="Sv",long_name="Freshwater transport from southern to tropical box", &
                 dim1="time",start=[n],ncid=ncid) 
+        call nc_write(filename,"thetan",obm_object%thetan,units="K",long_name="North Atlantic box air temperature", &
+                dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"thetat",obm_object%thetat,units="K",long_name="Tropical Atlantic box air temperature", &
+                dim1="time",start=[n],ncid=ncid)
+        call nc_write(filename,"thetas",obm_object%thetas,units="K",long_name="South Atlantic box air temperature", &
+                dim1="time",start=[n],ncid=ncid)
                 
         ! Close the netcdf file
         call nc_close(ncid)

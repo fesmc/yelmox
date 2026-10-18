@@ -22,7 +22,7 @@ module yelmox_climate
     use coordinates,   only : grid_class
     use timestepping,  only : tstep_class
     use climate_out,   only : climate_out_class, clim_state_class, summer_mean
-    use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, snapclim_air_anom, &
+    use snapclim,      only : snapclim_class, snapclim_init, snapclim_update, &
                               snapclim_lapse_monthly
     use snapesm,       only : snapesm_class, climate_state_class, snapesm_init, snapesm_update, &
                               snapesm_end, snapesm_write_init, snapesm_write_step, &
@@ -79,7 +79,6 @@ module yelmox_climate
     public :: climate_init
     public :: climate_update
     public :: climate_end
-    public :: climate_air_anom
     public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     public :: climate_restart_write
 
@@ -330,25 +329,6 @@ contains
         end select
 
     end subroutine climate_end
-
-    function climate_air_anom(cl, time) result(dT)
-        ! [K] The backend's air-temperature anomaly index at `time`, the forcing of
-        ! the bipolar ocean box model: snapclim's index series `at` scaled by
-        ! dTa_const. snapesm and esm have no such index.
-        type(yelmox_climate_class), intent(in) :: cl
-        real(dp),                   intent(in) :: time
-        real(wp) :: dT
-
-        select case(trim(cl%method))
-            case("snapclim")
-                dT = snapclim_air_anom(cl%snapclim, time)
-            case default
-                write(*,*) "climate_air_anom:: error: climate = ", trim(cl%method), &
-                           " has no air-temperature anomaly index (needed by the ocean box model)."
-                error stop 1
-        end select
-
-    end function climate_air_anom
 
     ! ===== output ==========================================================
 
