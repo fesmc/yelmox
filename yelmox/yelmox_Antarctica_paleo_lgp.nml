@@ -617,7 +617,7 @@
 ! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
 
 &snap_pd
-    tas = "racmo23p2_1981_2010_tsrf"   ! surface temperature T_srf (as the snapclim reference)
+    tas = "racmo23p2_1981_2010_tas"
     pr  = "racmo23p2_1981_2010_pr"
     zs  = "racmo23p2_1981_2010_zs"
     to  = "ismip7_to"
