@@ -117,8 +117,8 @@ moves by more than its `restart_every_df`. Each index restarts from
 `idx_<name>` (plus `idx_<name>_df_dt`).
 
 `[anom]` is a climate modifier (libs/climate_mods.f90): applied to the
-backend's output after the backend, before `[climate_bias]`, on the climate
-grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
+backend's output after the backend, before `[ocn_fraction]` and `[bias]`, on
+the climate grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
 precipitation sensitivity), ocean profiles + `dTo`/`dSo` (esm: at the shelf
 base). The group is optional (inactive without it) and takes the domain suffix
 (`anom<sfx>`). Checked at init: the index must be in the registry, and a
@@ -126,12 +126,42 @@ backend that supplies the smb (esm with `surface_method = "climate"`) refuses
 it. rembo reads `[anom]` itself, as an input of REMBO (see
 [REMBO](climate-rembo.md)).
 
-## Climate bias correction (`[climate_bias]`)
+## Ocean anomaly from the atmosphere (`[ocn_fraction]`)
 
-A static spatial correction of the atmosphere, applied on the climate grid to
-the monthly air temperature and precipitation of any backend except rembo
-(annual fields only), after the backend and before the move to the surface
-grid's elevation:
+The climate modifier after `[anom]`: the ocean temperature profiles, at every
+depth, are the reference plus `f_to` times the mean sea-level air temperature
+anomaly of the current update over a region (salinity unchanged):
+
+    to_ann = to_ann_ref + f_to * mean_region(tsl_ann - tsl_ann_ref)
+
+The anomaly is that of the same update (no lag) and includes `[anom]`'s
+`dTa`; at sea level, it excludes the lapse-rate cooling of the ice sheet.
+
+```
+&ocn_fraction
+    active = True
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean
+/
+```
+
+`region` is `"all"` or a selection expression of the domain's regions on the
+climate grid (`[regions]`, resolved once at init), e.g. `"zone:open_ocean"`,
+`"zone:open_ocean,continental_shelf"`, `"region:Greenland"`, `"~zone:land"`
+(terms `layer:values` joined by `&` and `|`; see the fesm-utils regions docs).
+Its cell count is printed at init; an empty region stops the run. Refused for
+a backend without ocean profiles or sea-level air temperature (esm, rembo),
+and with `[anom] f_to /= 0` (both would set the ocean temperature anomaly).
+The anomaly is written to the climate's 2D file (`ocn_fraction_dto`). It
+replaces snapclim's `fraction` ocean for snapesm (see
+[snapclim and snapesm](climate-snap.md)).
+
+## Climate bias correction (`[bias]`)
+
+A static spatial correction of the atmosphere, the last climate modifier,
+applied on the climate grid to the monthly air temperature and precipitation
+of any backend except rembo (annual fields only), before the move to the
+surface grid's elevation:
 
     tas = tas + f_tas*dtas,    pr = pr*(1 + f_pr*(fpr - 1))
 
@@ -140,7 +170,7 @@ of the annual totals); the reference climate and the ocean are unchanged. The
 group is optional; without it, or with `active = False`, nothing changes.
 
 ```
-&climate_bias
+&bias
     active   = True
     var_defs = ""             ! file with the groups below ("" = this file)
     dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none

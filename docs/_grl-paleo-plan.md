@@ -53,7 +53,7 @@ which drops its `recon` mode).
 | snapesm index axes, any tsgen method, `const` index (afd4fe3) | A on snapesm, one or two indices (orbital + millennial, Banderas et al., 2018) |
 | time-varying `var_defs` groups (varslice `with_time`, refreshed in `snapesm_refresh_loads`, `extrap` = interpolate and clamp) | B: a reconstruction is a time-varying snapshot; `dx = 0` reads one slice (LGM steady state) |
 | varslice online remap (`remap`, `grid_src`, `fill`; 1dcb3d3) | reconstructions or global products read on GRL-PAL without regional products |
-| `[climate_bias]` static `dtas`/`fpr` (474f1d3) | one route to a MAR-quality reference on GRL-PAL |
+| `[bias]` static `dtas`/`fpr` (474f1d3) | one route to a MAR-quality reference on GRL-PAL |
 | downscaling to the surface grid (3151308) | coarse climate grid, finer ice/surface grid |
 | forcing at `time_rel` (7969dcb), `const_kabp` in kyr BP (ed2a6b5) | constant-time LGM spin-up holds 21 ka climate and insolation |
 | `init_method = "recon"`, `recon_time` (22a5fa5) | LGM spin-up cold-starts from GLAC-1D/ICE-6G at 21 ka |
@@ -62,7 +62,7 @@ which drops its `recon` mode).
 
 MAR covers only the Greenland crop. Options:
 
-1. ERA5 as `pd` reference plus `[climate_bias]` from MAR - ERA5 over Greenland
+1. ERA5 as `pd` reference plus `[bias]` from MAR - ERA5 over Greenland
    (`dtas` 0, `fpr` 1 elsewhere, tapered at the MAR edge). Needs a bias product.
 2. A merged MAR/ERA5 product in FesmData (MAR where valid, ERA5 elsewhere,
    blended at the edge).
@@ -212,7 +212,7 @@ and isochrones, Vinther 2009 elevations, Schumacher 2018 GPS uplift).
 3. Strip of cells, `border_width = N M` (fixed, relaxation), from the edge of
    the dynamic region; own masks via expressions or a regions layer from a
    file; works on GRL-PAL and on NH with only the GRL-PAL area active.
-4. Reference climate: ERA5 + MAR - ERA5 bias via `[climate_bias]`. FesmData:
+4. Reference climate: ERA5 + MAR - ERA5 bias via `[bias]`. FesmData:
    a bias product on GRL-PAL (`dtas`, `fpr`), tapered at the MAR edge.
 5. Reconstructions outside their coverage: regional taper, a climate modifier
    `now = ref + w (now - ref)` (atmosphere), `w` from the `f_valid` of the

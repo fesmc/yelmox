@@ -10,7 +10,7 @@ annotated git tag. Dates are release (tag) dates.
   off, `tstep_method = "rel"`, climate every 1 kyr over -130 ka to 0 or PD; `compare.jl`:
   domain means per time and maps of `t2m_ann`, `pr_ann`, `to_ann`), the regression check
   for climate backend and modifier changes.
-- Static climate bias correction `[climate_bias]` (optional): additive temperature and
+- Static climate bias correction `[bias]` (optional): additive temperature and
   multiplicative precipitation fields (monthly or annual, varslice groups, online remap
   allowed) with weights `f_tas`, `f_pr`, applied to the monthly atmosphere of snapclim,
   snapesm and esm before downscaling; written to the climate 2D file.
@@ -18,11 +18,23 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Climate modifiers, phase 2: `[ocn_fraction<sfx>]` (`active`, `f_to`, `region`) after
+  `[anom]`: `to_ann = to_ann_ref + f_to × mean(tsl_ann − tsl_ann_ref)` over `region`
+  (`"all"` or a `[regions]` selection, resolved at init), without the lag of one climate
+  update and on the sea-level anomaly (no lapse-rate cooling of the ice sheet); refused
+  for esm and rembo and with `[anom] f_to /= 0`. It replaces snapesm's `blend = "fraction"`
+  (now an error; `to` with `blend = "const"`), `[snap] f_to` and the lagged `ta_ann`,
+  which changes the results of every `fraction` config (`yelmox_Greenland_snapesm*.nml`).
+  The bias correction is the last modifier, group `[bias]` (was `[climate_bias]`, same
+  keys); `anom` with `f_to`/`f_so` /= 0 on a climate without ocean stops at the first
+  update. Climate 2D file: `t2m_sum`, the summer mean of the applied `tas`, for every
+  backend with monthly fields (esm: was the reference plus `dts`; rembo keeps REMBO's);
+  snapesm no longer writes `tsl` and `ta_sum`; `ocn_fraction_dto`.
 - Climate modifiers (`libs/climate_mods.f90`): optional groups applied to the backend's
   output in a fixed order, contracts checked at init. First one `[anom<sfx>]` (`active`,
   `index`, `f_ta`, `f_to`, `f_so`; replaces `[tsforcing]`): homogeneous dTa/dTo/dSo after
   the backend (snapesm: no longer before the elevation transform, equal up to rounding;
-  its fraction ocean no longer sees dTa), before `[climate_bias]`; refused with the esm
+  its fraction ocean no longer sees dTa), before `[bias]`; refused with the esm
   smb. rembo reads `[anom]` itself. The recon cold start (`init_method = "recon"`) is now
   forced too. Removed `[tsforcing]`, the dTa/dTo/dSo arguments of snapesm and its
   `[snap] dTa_const/dTo_const/dSo_const`. snap.nc `tas`, `pr`, `tsl_ann` are the applied

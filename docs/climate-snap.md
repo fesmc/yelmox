@@ -12,10 +12,12 @@ base. Both run on `grid_clim` and read the `[snap]` group.
 - **Program:** `yelmox` (`make yelmox`), backends in `libs/snapclim.f90` and
   `libs/snapesm.f90`, behind `libs/yelmox_climate.f90`.
 - **Select:** `[comps] climate = "snapclim"` or `"snapesm"`.
-- **Output:** with `[output] write_clim`, `snap.nc`: the annual air temperature
-  and precipitation; with snapesm also its driving indices (`idx_<name>`), the
-  surface elevation, the monthly atmosphere (`tas`, `tsl`, `pr`), `ta_sum`,
-  `tsl_ann` and the ocean profiles (`to_ann`, `so_ann` on `depth`).
+- **Output:** with `[output] write_clim`, `snap.nc`, the climate as applied
+  (after the climate modifiers): the annual air temperature and its summer
+  mean (`t2m_ann`, `t2m_sum`), the annual precipitation and the ocean profiles
+  (`to_ann`, `so_ann` on `depth`); with snapesm also the position on each axis
+  (`axis_<name>`), the surface elevation, the monthly atmosphere (`tas`, `pr`)
+  and `tsl_ann`.
 
 ## snapclim
 
@@ -35,8 +37,8 @@ the scaling parameters; up to four snapshots are read from `[snap_clim0]` to
 | `recon` | reconstructed snapshots, interpolated in time (`[snap_recon]`) |
 | `fraction` (ocean only) | an ocean anomaly of `f_to` × the mean atmospheric anomaly |
 
-The `[anom]` climate modifier (see [yelmox](yelmox.md)) applies after the
-backend, to any method.
+The climate modifiers `[anom]` and `[ocn_fraction]` (see [yelmox](yelmox.md))
+apply after the backend, to any method.
 
 A snapshot group reads the atmosphere (`clim_path`, `clim_names`, `clim_monthly`,
 `clim_stdev_path`/`clim_stdev_name`) and the ocean (`ocn_path`, `ocn_names`,
@@ -88,8 +90,8 @@ v2 products (`fesmdata/`), e.g. the Greenland reference and LGM snapshot:
 A rewrite of snapclim on the fesm-utils `varslice` reader and `tsgen` series:
 the snapclim methods become configurations of one blend model, over any number of
 snapshots, fields and axes. Example: `yelmox/yelmox_Greenland_snapesm.nml`,
-which reproduces snapclim `snap_1ind_new` / `fraction`
-(`yelmox_Greenland_snapclim.nml`).
+which reproduces the atmosphere of snapclim `snap_1ind_new`
+(`yelmox_Greenland_snapclim.nml`); its ocean anomaly comes from `[ocn_fraction]`.
 
 ```fortran
 &snap
@@ -99,7 +101,7 @@ which reproduces snapclim `snap_1ind_new` / `fraction`
     snapshots = "pd" "picontrol" "lgm"
     fields    = "tas" "pr" "to" "so" "zs"
     axes      = "at"
-    ! lapse, f_p, f_p_ne, f_stdev, f_to
+    ! lapse, f_p, f_p_ne, f_stdev
     ! as in snapclim
 /
 ```
@@ -107,7 +109,7 @@ which reproduces snapclim `snap_1ind_new` / `fraction`
 Three kinds of group follow:
 
 - **Fields**, `[snap_field_<name>]`: `kind` (`atm_temp`, `atm_precip`, `ocn`,
-  `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `fraction`, `const`) and the
+  `ocn_salt`, `elev`), `blend` (`linear`, `ratio`, `const`) and the
   `axes`, one or more names (`""` = none).
 - **Snapshots**, `[snap_<name>]`: `monthly`, optionally `clim_sigma`/`ocn_sigma`
   (as in snapclim) and, per field, the `var_defs` group(s) holding it (one =
@@ -125,7 +127,7 @@ index value):
 |---|---|
 | `linear` | `ref + sum_k a_k (hi_k - lo_k)` |
 | `ratio` | `ref * prod_k (1 + a_k (hi_k/lo_k - 1))` |
-| `fraction`, `const` | `ref` (the `fraction` ocean is set from the atmospheric anomaly) |
+| `const` | `ref` |
 
 One axis gives snapclim `snap_1ind`; two axes give `snap_2ind`, the
 orbital + millennial decomposition of Banderas et al. (2018), e.g. `at` on
@@ -173,6 +175,14 @@ fields may share one index:
 Turning a proxy series into an index is done by tsgen (`norm_t0`/`norm_t1`, see
 the fesm-utils tsgen docs); a steady state is a `const` index (`df_dt_max = 0`,
 value `f_min`), independent of the model time.
+
+**The ocean anomaly from the atmosphere** (snapclim `fraction`) is the climate
+modifier `[ocn_fraction]` (see [yelmox](yelmox.md)): the field `to` with
+`blend = "const"` stays at the reference, and the modifier adds `f_to` times
+the mean sea-level air temperature anomaly of the same update. Unlike
+snapclim's `fraction` (and snapesm's before), it has no lag of one update and
+leaves out the lapse-rate cooling of the ice sheet. `blend = "fraction"` stops
+the run.
 
 snapesm holds no state of its own: the indices restart with the driver
 (`idx_<name>_restart.nc`). The climate output carries the position on each
