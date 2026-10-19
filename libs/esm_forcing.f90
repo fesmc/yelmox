@@ -691,7 +691,11 @@ contains
                 ! ctrl/opt/spinup: run only the reference climatology. (Do nothing)
             
             case("transient")
-                if (use_esm) then ! Fields loaded from ESM
+                if (trim(esm%experiment) == "ctrl") then
+                    ! The ctrl experiment: the reference climatology only, as
+                    ! esm_forcing_init loads no ESM fields for it (use_esm or not).
+
+                else if (use_esm) then ! Fields loaded from ESM
                     ! === Reference period   ===
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=12)
@@ -800,9 +804,6 @@ contains
                                 esm%dto = esm%f_ocn*esm%f_polar*anomaly
                                 esm%dso = 0.0_wp
                             end if    
-                        
-                        case("ctrl")
-                                ! Do nothing
 
                         case DEFAULT
                             write(*,*) "esm_forcing_update:: Error: transient experiment not recognized: "//trim(esm%experiment)

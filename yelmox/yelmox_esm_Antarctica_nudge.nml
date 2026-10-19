@@ -272,7 +272,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/{grid_name}_GIA_HR24.nc"  ! {grid_name} = grid_isos
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
@@ -602,9 +602,9 @@
 &esm
     ! Experiment
     par_file        = "input/esm/esm_nudge.nml"
-    experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
-    use_esm         = True             ! use ESM snapshots?   
-    esm_name        = "UKESM"           ! esm model, if homogeneous: applied homogeneous forcing
+    experiment      = "ctrl"            ! "ctrl": the reference only; "nudgedhigh03" (with use_proj = True): + the nudged AWI-ESM anomaly
+    use_esm         = True              ! use ESM snapshots?
+    esm_name        = "AWI-ESM"         ! esm model ({gcm}; not in the nudge file names)
 
     ! Forcing switches (the smb source is [comps] surface_method)
     use_var         = False             ! include climate variability
@@ -613,7 +613,7 @@
     
     
     ! Climatic variables
-    lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
+    lapse           = 8.0e-3 6.5e-3     ! [K/m] lapse rate (ann, sum)
     f_p             = 0.05              ! Claus-Cl. term
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
     f_polar         = 1.8               ! Polar amplification

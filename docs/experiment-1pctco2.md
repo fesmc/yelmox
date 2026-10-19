@@ -43,10 +43,8 @@ without submitting them. The settings are at the top of each script:
 | `PROJ_INIT`, `PROJ_END` | 2020, 2160 | 2020, 2160 | `[transient] time_init`, `time_end` |
 | `OUTROOT` | `output/1pctco2_grl` | `output/1pctco2_ant` | spin-up in `spinup/`, scenario in `1pctCO2_<GCM>/` |
 
-The Antarctic par file reads the Earth structure of ANT-16KM (`[isos]
-rheology_file`); on ANT-32KM, also pass
-`isos.rheology_file=isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc`.
-`run_1pctco2_antarctica.sh` does not set it.
+The Antarctic Earth structure is that of the isostasy grid (`[isos]
+rheology_file = ".../{grid_name}_GIA_HR24.nc"`, `{grid_name}` = `grid_isos`).
 
 ## Spin-up
 

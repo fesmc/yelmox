@@ -52,9 +52,9 @@ while IFS='|' read -r name par g ts t0 t1 dt extra; do
     name=$(echo $name); par=$(echo $par); g=$(echo $g); ts=$(echo $ts)
     t0=$(echo $t0); t1=$(echo $t1); dt=$(echo $dt)
     [ ${#SEL[@]} -gt 0 ] && ! want "$name" && continue
-    # Climate-only: ice sheet off, climate updated and written every dt, the
-    # final restart bundle only.
-    o=("comps.with_ice_sheet=False" "comps.dt_clim=$dt" "$g.dtt=$dt"
+    # Climate-only: ice sheet and isostasy off, climate updated and written
+    # every dt, the final restart bundle only.
+    o=("comps.with_ice_sheet=False" "comps.with_isostasy=False" "comps.dt_clim=$dt" "$g.dtt=$dt"
        "tm_2D.method=const" "tm_2D.dt=$dt" "tm_2Dsm.method=const" "tm_2Dsm.dt=$dt"
        "tm_1D.method=const" "tm_1D.dt=$dt" "tm_rst.method=none")
     case $ts in

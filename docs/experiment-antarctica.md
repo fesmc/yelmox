@@ -115,6 +115,11 @@ optimized until 20 kyr; and `[transient]`, on calendar time with `dtt = 1` yr. B
 | `[esm] use_esm` | `False` | `True` |
 | `[transient]` | 1020 to 3500 | 4501 to 5000 |
 | Surface mass balance | chion ITM (`nml_itm = "itm"`) | chion PDD (`[pdd_chion]`, `cg05`) |
+| `[esm] experiment` | `"ctrl"` | `"ctrl"` (reference only) or `"nudgedhigh03"` with `use_proj = True`: the anomaly of the nudged AWI-ESM run minus its PI run, 3501--5000 (atmosphere; the ocean has no nudged files on ANT-16KM yet) |
+
+The reference climate is the mean over `time_ref` (1990--2019) of the RACMO2.3p2
+1979--2022 and ORAS5 1979--2024 monthly series. On ANT-8KM the ORAS5 reference
+needs about 15 GB: run with `--omp 32` or more (the memory follows the cores).
 
 ## Configuration
 
@@ -127,7 +132,7 @@ optimized until 20 kyr; and `[transient]`, on calendar time with `dtt = 1` yr. B
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1`; grounding-line melt `[ytopo] bmb_gl_method = "pmpt"` |
 | Calving | `calv_flt_method = calv_grnd_method = "equil"` (level set, calving rate opposite to the ice velocity) |
 | Dynamics | DIVA, regularized Coulomb friction (`beta_method = 3`), `beta_gl_scale = 2` (Zstar) |
-| Isostasy | FastIsostasy LV-ELVA (`method = 3`), Earth structure `ANT-16KM_GIA_HR24.nc` (pd: `ANT-32KM_GIA_HR24.nc`) |
+| Isostasy | FastIsostasy LV-ELVA (`method = 3`), Earth structure of the isostasy grid (`[isos] rheology_file = ".../{grid_name}_GIA_HR24.nc"`: `ANT-32KM_GIA_HR24.nc`) |
 | Geothermal heat flux | `{grid_name}_GHF-Shapiro2004.nc` |
 | Present-day data | RACMO2.3/ERA-Interim hybrid 1981--2010 smb and surface temperature, velocity `Rignot2011` (`[yelmo_data]`) |
 | Named regions | `yelmo_ts_APIS/WAIS/EAIS.nc` |

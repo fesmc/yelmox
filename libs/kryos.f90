@@ -325,8 +325,11 @@ contains
         ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
         dom%ctl%dx_isos = dom%yelmo%grd%G%dx * (grid_i%G%dx / grid_y%G%dx)
         dom%ctl%dy_isos = dom%yelmo%grd%G%dy * (grid_i%G%dy / grid_y%G%dy)
+        ! {domain}/{grid_name} of rheology_file and mask_file: the domain name
+        ! and grid_isos.
         call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
-                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%cnst)
+                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%cnst, &
+                       domain=trim(dom%ctl%domain), grid_name=trim(dom%ctl%grid_isos))
 
         call sediments_init(dom%sed, path_par, grid_y, domain, group="sed"//trim(sfx))
         dom%yelmo%bnd%H_sed = dom%sed%now%H
@@ -372,6 +375,10 @@ contains
                                  y=real(grid_s%y, wp), lat=lats_s, &
                                  group="smb_simple"//trim(sfx), units="m", &
                                  cnst=dom%cnst)
+            ! {domain}/{grid_name} of the target-mask file: the domain name and
+            ! grid_surface (the grid of the mask).
+            call nml_replace(dom%smbs%mask_file, "{domain}",    trim(dom%ctl%domain))
+            call nml_replace(dom%smbs%mask_file, "{grid_name}", trim(dom%ctl%grid_surface))
             call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_ice, &
                        Href_s, dom%ctl%grid_surface, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)

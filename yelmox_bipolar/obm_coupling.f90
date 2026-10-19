@@ -26,7 +26,7 @@ module obm_coupling
     ! initialized (cold start or restart), then obm_exchange once per step
     ! after the domains' climate steps.
 
-    use nml,           only : nml_read, nml_validate
+    use nml,           only : nml_read, nml_validate, nml_replace
     use ncio,          only : nc_read
     use precision,     only : dp
     use yelmo,         only : wp
@@ -152,11 +152,17 @@ contains
 
         if (.not. oc%ism2obm) return
 
+        ! The masks are on the Yelmo grid of their domain: {domain}/{grid_name}
+        ! of the paths are its name and grid_ice.
         if (oc%couple_fwf_north .and. active_north) then
+            call nml_replace(oc%hydro_mask_north_path, "{domain}",    trim(dom_north%ctl%domain))
+            call nml_replace(oc%hydro_mask_north_path, "{grid_name}", trim(dom_north%ctl%grid_ice))
             allocate(oc%hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_north_path, "mask", oc%hydro_mask_north)
         end if
         if (oc%couple_fwf_south .and. active_south) then
+            call nml_replace(oc%hydro_mask_south_path, "{domain}",    trim(dom_south%ctl%domain))
+            call nml_replace(oc%hydro_mask_south_path, "{grid_name}", trim(dom_south%ctl%grid_ice))
             allocate(oc%hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
         end if

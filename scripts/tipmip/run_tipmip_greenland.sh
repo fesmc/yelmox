@@ -11,7 +11,7 @@
 #                           the ramp's bundle at its branch year
 #
 # The ice sheet + isostasy are ACTIVE. The forcing is the TIPMIP piControl anomalies
-# (tas_anomaly / pr_ratio / TF_anomaly) on top of the MAR + ERA-INT-ORAS4 reference
+# (tas_anomaly / pr_ratio / TF_anomaly) on top of the MAR + ORAS5 reference
 # climatology; TIPMIP has no salinity (dso = 0) or subglacial discharge (Qd = 0).
 # See input/esm/esm_grl_tipmip.nml (ramp) and esm_grl_tipmip_gwl.nml (stabilisations).
 #
