@@ -53,10 +53,11 @@ while IFS='|' read -r name par g ts t0 t1 dt extra; do
     t0=$(echo $t0); t1=$(echo $t1); dt=$(echo $dt)
     [ ${#SEL[@]} -gt 0 ] && ! want "$name" && continue
     # Climate-only: ice sheet and isostasy off, climate updated and written
-    # every dt, the final restart bundle only.
+    # every dt (write_clim on: the ESM par files have it off), the final
+    # restart bundle only.
     o=("comps.with_ice_sheet=False" "comps.with_isostasy=False" "comps.dt_clim=$dt" "$g.dtt=$dt"
        "tm_2D.method=const" "tm_2D.dt=$dt" "tm_2Dsm.method=const" "tm_2Dsm.dt=$dt"
-       "tm_1D.method=const" "tm_1D.dt=$dt" "tm_rst.method=none")
+       "tm_1D.method=const" "tm_1D.dt=$dt" "tm_rst.method=none" "output.write_clim=True")
     case $ts in
         const) o+=("$g.tstep_method=const" "$g.tstep_const=$t0" "$g.time_init=0" "$g.time_end=$t1") ;;
         rel)   o+=("$g.tstep_method=rel" "$g.time_init=$t0" "$g.time_end=$t1") ;;
