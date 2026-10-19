@@ -56,10 +56,8 @@ as an absolute path (the run starts inside its own folder).
 
 **Other grids.** The full input set exists for `GRL-8KM`, `GRL-16KM` and
 `ANT-8KM`, `ANT-16KM`, `ANT-32KM` (GRL-4KM: inputs present since 2026-10, not yet
-tested). The Antarctic par file reads the Earth structure of ANT-16KM
-(`[isos] rheology_file`): with another grid, also pass
-`isos.rheology_file=isostasy_data/earth_structure/yelmo/<GRID>_GIA_HR24.nc`
-(as `opt_ant.sh` does).
+tested). The Antarctic Earth structure follows the grid: `[isos]
+rheology_file = ".../{grid_name}_GIA_HR24.nc"`, `{grid_name}` = `grid_isos`.
 
 **Short spin-ups.** The spin-up relaxes the ice thickness towards the
 observations at first (`[relax] tau1/2`, until `time2`: 6 kyr for

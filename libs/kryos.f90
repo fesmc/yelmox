@@ -375,6 +375,10 @@ contains
                                  y=real(grid_s%y, wp), lat=lats_s, &
                                  group="smb_simple"//trim(sfx), units="m", &
                                  cnst=dom%cnst)
+            ! {domain}/{grid_name} of the target-mask file: the domain name and
+            ! grid_surface (the grid of the mask).
+            call nml_replace(dom%smbs%mask_file, "{domain}",    trim(dom%ctl%domain))
+            call nml_replace(dom%smbs%mask_file, "{grid_name}", trim(dom%ctl%grid_surface))
             call remap(dom, dom%yelmo%bnd%H_ice_ref, dom%ctl%grid_ice, &
                        Href_s, dom%ctl%grid_surface, "bilin")
             call smb_simple_set_mask(dom%smbs, Href_s)

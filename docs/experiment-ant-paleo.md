@@ -86,6 +86,6 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |
 | Dynamics | DIVA |
-| Isostasy | FastIsostasy LV-ELVA (`[isos] method = 3`), Earth structure `ANT-32KM_GIA_HR24.nc` (mantle viscosity + lithosphere), `[comps] dt_isos = 10` yr |
+| Isostasy | FastIsostasy LV-ELVA (`[isos] method = 3`), Earth structure `ANT-32KM_GIA_HR24.nc` (`{grid_name}_GIA_HR24.nc` of the isostasy grid; mantle viscosity + lithosphere), `[comps] dt_isos = 10` yr |
 | Climate update | `[comps] dt_clim = 10` yr |
 | Named regions | `[regions] masks = "APIS" "WAIS" "EAIS"`: `yelmo_ts_APIS.nc`, `yelmo_ts_WAIS.nc`, `yelmo_ts_EAIS.nc` |

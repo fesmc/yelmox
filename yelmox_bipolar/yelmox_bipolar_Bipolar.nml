@@ -33,8 +33,8 @@
     couple_fwf_north = False            ! North freshwater flux -> obm%fn?
     couple_fwf_south = False            ! South freshwater flux -> obm%fs?
     fwf_definition   = "dVdt"           ! "dVdt", "mb", "ablation"
-    hydro_mask_north = "ice_data/Greenland/GRL-16KM/GRL-16KM_HYDRO-BASINS_zickfeld2004.nc"
-    hydro_mask_south = "ice_data/Antarctica/ANT-32KM/ANT-32KM_HYDRO-BASINS_zickfeld2004.nc"
+    hydro_mask_north = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"   ! {domain}, {grid_name}: the domain's name and grid_ice
+    hydro_mask_south = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"
 
     atm2obm          = False            ! Global air temperature anomaly ([obm_forcing]) -> OBM box air temperatures?
                                         ! OBM ocean temperature -> ice sheet: per domain, [ocn_obm_<sfx>] active

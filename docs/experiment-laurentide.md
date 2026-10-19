@@ -99,7 +99,7 @@ margin of a target ice mask (plastic profile inside, `tau0 = 36` kPa):
 with `c0 = 300` mm w.e./yr, `L_acc = 300` km, `a1 = 3900` m, `a2 = -50` m/degN,
 `beta0 = 5` (mm/yr)/m at `phiref = 60` degN, `beta1 = 0.05`. Outside the mask
 the SMB is at most `smb_min = -2000` mm w.e./yr. The mask is
-`ice_data/Laurentide/LIS-32KM/LIS-32KM_Batchelor2019_ice_masks.nc`, slice
+`ice_data/{domain}/{grid_name}/{grid_name}_Batchelor2019_ice_masks.nc` (`{grid_name}` = `grid_surface`: `LIS-32KM`), slice
 `mask_idx = 18` (LGM; 14--17: 45, 40, 35, 30 ka). The climate enters only
 through the sea-level air temperature: `t_srf = t_sl - gamma_t z_syn`
 (`gamma_t = 6.5e-3` K/m), capped at 273.15 K inside the mask.

@@ -58,11 +58,12 @@ Pyrenees on 2 km.
   (`[sim] init_method = "equil"`, `init_equil_time = 10`).
 - **Climate:** the reference only (`[snap] snapshots = "pd"`, ERA5 1981--2010:
   `tas`, `pr`, `zs`) plus `[anom]` on the index `orb` (`[idx_orb] method =
-  "series"`, `input/alpha_orbital_t2018.dat`, as is): `dTa = f_ta * f` with
-  `f_ta = 10` K, the precipitation times `exp(f_p dTa)` (`f_p = 0.05` K-1, the
-  default). The index is 0 at 21 ka and 1 at present (-0.11 to 1.14 over the
-  run), so the air temperature is the ERA5 reference at 21 ka and 10 K above it
-  at present. No ocean anomaly (`f_to = 0`, `[ocn_fraction]` inactive).
+  "series"`, `input/alpha_orbital_t2018.dat`, 1 at present and 0 at 21 ka,
+  normalised with `norm_t0 = 0`, `norm_t1 = -21e3` to 0 at present and 1 at
+  21 ka): `dTa = f_ta * f` with `f_ta = -10` K, the precipitation times
+  `exp(f_p dTa)` (`f_p = 0.05` K-1, the default). The air temperature is the
+  ERA5 reference at present and 10 K below it at 21 ka (+1.4 to -11.1 K over
+  the run). No ocean anomaly (`f_to = 0`, `[ocn_fraction]` inactive).
 - **Orbit:** present day (`[orbit] method = "time"`, `time = 0`); the PDD takes
   no insolation.
 - **Sea level:** the model's own ice (`[barysealevel] method = "fastiso"`).

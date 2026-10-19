@@ -611,7 +611,7 @@
     scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
     co2_const   = 190.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
     f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
-    mask_file   = "ice_data/Laurentide/LIS-32KM/LIS-32KM_Batchelor2019_ice_masks.nc"  ! Target ice-mask file ("" => use reference H_ice_ref > 0)
+    mask_file   = "ice_data/{domain}/{grid_name}/{grid_name}_Batchelor2019_ice_masks.nc"  ! Target ice-mask file ("" => use reference H_ice_ref > 0; {grid_name} = grid_surface)
     mask_var    = "mask"     ! Target ice-mask variable name in mask_file
     mask_idx    = 18         ! Index along 3rd dim of mask_var (Batchelor2019: 18 = "LGM")
 
