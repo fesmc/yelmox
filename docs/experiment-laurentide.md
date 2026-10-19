@@ -63,9 +63,9 @@ the climate does not depend on the forcing time. The ocean is ORAS5 1981--2010
 plus `f_to = 0.25` times the mean sea-level air temperature anomaly over the
 domain (`[ocn_fraction]`, `region = "all"`). `[anom]` is inactive.
 
-![Forcing of yelmox_LIS.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual air temperature difference and annual precipitation ratio.](figures/lis.png)
+![Forcing of yelmox_LIS.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/lis.png)
 
-![Forcing of yelmox_North.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual air temperature difference and annual precipitation ratio.](figures/north.png)
+![Forcing of yelmox_North.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/north.png)
 
 ## Initial state
 

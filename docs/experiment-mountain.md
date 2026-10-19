@@ -73,7 +73,7 @@ Pyrenees on 2 km.
 `[marine_shelf]` stays in the par file with the shelf off: the domain still
 initializes the marine shelf (no data files are read).
 
-![Forcing of yelmox_Pyrenees.nml at 21 ka minus present day, climate-only run on present-day topography: annual air temperature difference and annual precipitation ratio.](figures/pyrenees.png)
+![Forcing of yelmox_Pyrenees.nml at 21 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/pyrenees.png)
 
 ## SRG
 
@@ -94,7 +94,7 @@ initializes the marine shelf (no data files are read).
 - **Output:** 1D every 1 yr, small 2D every 10 yr, 2D every 200 yr, a restart
   bundle at the end.
 
-![Present-day reference climate of yelmox_SRG.nml (MAR v3.14 1960--1990): annual air temperature and annual precipitation.](figures/srg_pd.png)
+![Present-day reference climate of yelmox_SRG.nml (MAR v3.14 1960--1990): annual and summer air temperature, annual precipitation.](figures/srg_pd.png)
 
 ## Configuration
 

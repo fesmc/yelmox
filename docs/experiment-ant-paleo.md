@@ -72,7 +72,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   layer every 1 kyr, coupled every 50 yr.
 - **Output:** 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.
 
-![Forcing of yelmox_Antarctica_paleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual air temperature difference, precipitation ratio.](figures/ant_paleo.png)
+![Forcing of yelmox_Antarctica_paleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/ant_paleo.png)
 
 ## Configuration common to both
 

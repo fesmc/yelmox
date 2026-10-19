@@ -90,7 +90,7 @@ Present day only (`[snap] snapshots = "pd"`), without indices (`[indices]
 names = ""`), `[anom]` or `[ocn_fraction]`. `[idx_dT]` (`method = "const"`, 0)
 serves `run_mg_forward.sh`, which sets it with `idx_dT.f_min = f_max`.
 
-![Present-day reference climate of yelmox_Antarctica.nml: annual air temperature and annual precipitation.](figures/ant_pd.png)
+![Present-day reference climate of yelmox_Antarctica.nml: annual and summer air temperature, annual precipitation.](figures/ant_pd.png)
 
 ## Present day
 

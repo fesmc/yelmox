@@ -2,7 +2,8 @@
 # forcing times minus the climate at a reference time (annual and summer air
 # temperature difference, precipitation ratio, and the surface mass balance
 # difference when the climate supplies it), or with --abs the climate at the
-# reference time itself. The coast (z_srf = 0 of the climate file) is drawn.
+# reference time itself. The coast (z_srf = 0 of the climate file, else of
+# yelmo.nc in the run folder: esm.nc has no z_srf) is drawn.
 #
 # Usage:
 #   julia --project=scripts/docs-figures scripts/docs-figures/plot.jl RUN OUT.png \
@@ -53,6 +54,17 @@ function climate_file(run)
     error("no climate file in $run")
 end
 
+# The coast: z_srf of the climate file at record k, else of the run's yelmo.nc
+# (first record, on its own grid). Returns (x, y, z_srf) or nothing.
+function coast(run, ds, k)
+    haskey(ds, "z_srf") && return (Float64.(ds["xc"][:]), Float64.(ds["yc"][:]), field(ds, "z_srf", k))
+    p = joinpath(run, "yelmo.nc")
+    isfile(p) || return nothing
+    NCDataset(p) do dy
+        haskey(dy, "z_srf") ? (Float64.(dy["xc"][:]), Float64.(dy["yc"][:]), field(dy, "z_srf", 1)) : nothing
+    end
+end
+
 field(ds, v, k) = haskey(ds, v) ? Float64.(coalesce.(ds[v][:, :, k], NaN)) : nothing
 
 function record(t, t0)
@@ -70,7 +82,7 @@ function main(opt)
     # the reference: this run, or another (--ref-run)
     ds0 = isempty(opt["ref_run"]) ? ds : NCDataset(climate_file(opt["ref_run"]))
     k0 = record(Float64.(ds0["time"][:]), opt["ref"])
-    zs = field(ds0, "z_srf", k0)
+    cst = coast(isempty(opt["ref_run"]) ? opt["run"] : opt["ref_run"], ds0, k0)
     aspect = (x[end] - x[1]) / (y[end] - y[1])
 
     if opt["abs"]
@@ -112,7 +124,7 @@ function main(opt)
                       xticklabelsvisible=false, yticklabelsvisible=false)
             hm = heatmap!(ax, x, y, v; colorrange=cr, colormap=cm, colorscale=sc,
                           nan_color=:transparent)
-            zs === nothing || contour!(ax, x, y, zs; levels=[0.5], color=:black, linewidth=0.6)
+            cst === nothing || contour!(ax, cst...; levels=[0.5], color=:black, linewidth=0.6)
             Colorbar(fig[2r, c], hm; vertical=false, flipaxis=false)
         end
     end

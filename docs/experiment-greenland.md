@@ -68,7 +68,7 @@ The index `[idx_at]` is the orbital series `input/alpha_orbital_r2020.dat`
 axis: its anomaly is `f_to = 0.25` times the mean sea-level air temperature
 anomaly over the domain (`[ocn_fraction]`, `region = "all"`).
 
-![Forcing of yelmox_Greenland.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual air temperature difference and annual precipitation ratio.](figures/grl_snap.png)
+![Forcing of yelmox_Greenland.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_snap.png)
 
 ## Air temperature ramp
 
@@ -83,7 +83,7 @@ anomaly over the domain (`[ocn_fraction]`, `region = "all"`).
 - **Response:** the precipitation is multiplied by exp(`f_p`·dTa); the ocean
   follows through `[ocn_fraction]`, whose sea-level anomaly includes dTa.
 
-![Forcing of yelmox_Greenland_ramp.nml at 2000 yr minus its start, climate-only run on present-day topography: annual air temperature difference and annual precipitation ratio.](figures/grl_ramp.png)
+![Forcing of yelmox_Greenland_ramp.nml at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_ramp.png)
 
 ## Present day
 
