@@ -48,8 +48,10 @@ module climate_mods
     !   taper: now = ref + w*(now - ref) for tas, pr, ta_ann, pr_ann and
     !         tsl_ann (those the climate has, now and ref), w in [0, 1] a static
     !         field on the climate grid, the reference at the current surface
-    !         (taper_apply). Refused for a backend without a reference
-    !         atmosphere (rembo).
+    !         (taper_apply); with outside = "mean", ref + w*(now - ref) +
+    !         (1 - w)*the mean anomaly (temperature; precipitation: ratio of the
+    !         totals) over the cells with w = 1, per month. Refused for a
+    !         backend without a reference atmosphere (rembo).
     !   bias: tas, ta_ann, tsl_ann + dtas; pr * fpr, pr_ann by the ratio of the
     !         annual totals. Refused for a backend with annual fields only (rembo).
 
@@ -118,12 +120,15 @@ module climate_mods
     ! in [0, 1] (one 2D field), read from a var_defs group (a list of
     ! databases, then the par file) on the climate grid (online remap
     ! allowed): now = ref + w*(now - ref); w = 1 keeps the climate, w = 0 is
-    ! the reference.
+    ! the reference (outside = "ref") or the reference plus the mean anomaly
+    ! of the cells with w = 1 (outside = "mean").
     type taper_class
-        logical               :: active = .false.
-        character(len=64)     :: group  = ""
-        character(len=256)    :: weight = ""     ! the var_defs group of w
-        real(wp), allocatable :: w(:,:)          ! [1] (nx,ny)
+        logical               :: active  = .false.
+        character(len=64)     :: group   = ""
+        character(len=256)    :: weight  = ""      ! the var_defs group of w
+        character(len=8)      :: outside = "ref"   ! ref | mean: the climate where w = 0
+        real(wp), allocatable :: w(:,:)            ! [1] (nx,ny)
+        logical,  allocatable :: full(:,:)         ! w = 1: the cells of the mean anomaly
     end type taper_class
 
     ! [bias<sfx>]: an additive temperature field and a precipitation factor
@@ -508,6 +513,15 @@ contains
         call nml_read(filename, group, "var_defs", var_defs,   init=.true., &
                       defaults_file=def_file, defaults_group="taper")
         call nml_read(filename, group, "weight",   tap%weight, defaults_file=def_file, defaults_group="taper")
+        call nml_read(filename, group, "outside",  tap%outside, defaults_file=def_file, defaults_group="taper")
+        select case(trim(tap%outside))
+            case("ref", "mean")
+                ! ok
+            case default
+                write(*,*) "climate_mods_init:: error: ["//trim(group)//"] outside must be ref &
+                           &or mean; got '"//trim(tap%outside)//"'."
+                error stop 1
+        end select
 
         call varslice_init_nml(vs, trim(var_defs_find(var_defs, filename, trim(tap%weight), &
                                                       "["//trim(group)//"] weight")), &
@@ -528,8 +542,17 @@ contains
             error stop 1
         end if
 
+        tap%full = tap%w >= 1.0_wp
+        if (trim(tap%outside) == "mean" .and. .not. any(tap%full)) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] outside = mean needs &
+                       &cells with w = 1 (the mean anomaly); weight "//trim(tap%weight)// &
+                       " has none."
+            error stop 1
+        end if
+
         write(*,*) "climate_mods_init:: "//trim(group)//" active, weight = "//trim(tap%weight)// &
-                   ", range: ", minval(tap%w), maxval(tap%w)
+                   ", range: ", minval(tap%w), maxval(tap%w), ", outside = "//trim(tap%outside), &
+                   ", cells with w = 1: ", count(tap%full)
 
     end subroutine taper_init
 
@@ -543,42 +566,69 @@ contains
         ! w = 0 gives the reference climate at the model surface; without
         ! ref%z_srf (esm) the reference is already at the current surface.
         ! The sea-level temperature tsl_ann needs no move.
+        ! outside = "mean": where w < 1 the anomaly tends to the mean anomaly
+        ! over the cells with w = 1 instead of zero, per month: the temperature
+        ! difference dT(m) and the precipitation ratio of the totals f(m);
+        ! ta_ann and tsl_ann with the mean of dT, pr_ann with the ratio of the
+        ! annual totals.
         type(taper_class),       intent(in)    :: tap
         type(climate_out_class), intent(inout) :: out
 
-        real(wp), allocatable :: dz(:,:), tas_r(:,:,:), pr_r(:,:,:)
-        integer :: m, nx, ny
+        real(wp), allocatable :: dz(:,:), tas_r(:,:,:), pr_r(:,:,:), pr_ann_r(:,:)
+        real(wp), allocatable :: dT(:), f(:)
+        real(wp) :: dT_ann, f_ann
+        integer  :: m, nx, ny, nm
 
-        associate(now => out%now, ref => out%ref)
+        associate(now => out%now, ref => out%ref, w => tap%w, full => tap%full)
 
-        nx = size(tap%w, 1)
-        ny = size(tap%w, 2)
+        nx = size(w, 1)
+        ny = size(w, 2)
         allocate(dz(nx,ny))
         dz = 0.0_wp
         if (allocated(ref%z_srf)) dz = now%z_srf - ref%z_srf
 
+        dT_ann = 0.0_wp
         if (allocated(now%tas) .and. allocated(ref%tas)) then
-            allocate(tas_r(nx,ny,size(now%tas,3)))
-            do m = 1, size(now%tas, 3)
-                tas_r(:,:,m)   = ref%tas(:,:,m) - out%lapse(m)*dz
-                now%tas(:,:,m) = tas_r(:,:,m) + tap%w*(now%tas(:,:,m) - tas_r(:,:,m))
+            nm = size(now%tas, 3)
+            allocate(tas_r(nx,ny,nm), dT(nm))
+            dT = 0.0_wp
+            do m = 1, nm
+                tas_r(:,:,m) = ref%tas(:,:,m) - out%lapse(m)*dz
+                if (trim(tap%outside) == "mean") &
+                    dT(m) = sum(now%tas(:,:,m) - tas_r(:,:,m), mask=full) / real(count(full), wp)
+                now%tas(:,:,m) = tas_r(:,:,m) + w*(now%tas(:,:,m) - tas_r(:,:,m)) + (1.0_wp - w)*dT(m)
             end do
+            dT_ann = sum(dT) / real(nm, wp)
             if (allocated(now%ta_ann)) &
-                now%ta_ann = sum(tas_r, dim=3)/12.0_wp + &
-                             tap%w*(now%ta_ann - sum(tas_r, dim=3)/12.0_wp)
+                now%ta_ann = sum(tas_r, dim=3)/real(nm, wp) + &
+                             w*(now%ta_ann - sum(tas_r, dim=3)/real(nm, wp)) + (1.0_wp - w)*dT_ann
         end if
         if (allocated(now%pr) .and. allocated(ref%pr)) then
-            allocate(pr_r(nx,ny,size(now%pr,3)))
-            do m = 1, size(now%pr, 3)
-                pr_r(:,:,m)   = ref%pr(:,:,m) * exp(-now%beta_p*out%lapse(m)*dz)
-                now%pr(:,:,m) = pr_r(:,:,m) + tap%w*(now%pr(:,:,m) - pr_r(:,:,m))
+            nm = size(now%pr, 3)
+            allocate(pr_r(nx,ny,nm), f(nm))
+            f = 1.0_wp
+            do m = 1, nm
+                pr_r(:,:,m) = ref%pr(:,:,m) * exp(-now%beta_p*out%lapse(m)*dz)
             end do
-            if (allocated(now%pr_ann)) &
-                now%pr_ann = sum(pr_r, dim=3)/12.0_wp*365.0_wp + &
-                             tap%w*(now%pr_ann - sum(pr_r, dim=3)/12.0_wp*365.0_wp)
+            if (trim(tap%outside) == "mean") then
+                do m = 1, nm
+                    if (sum(pr_r(:,:,m), mask=full) > 0.0_wp) &
+                        f(m) = sum(now%pr(:,:,m), mask=full) / sum(pr_r(:,:,m), mask=full)
+                end do
+            end if
+            f_ann = 1.0_wp
+            if (trim(tap%outside) == "mean" .and. sum(sum(pr_r, dim=3), mask=full) > 0.0_wp) &
+                f_ann = sum(sum(now%pr, dim=3), mask=full) / sum(sum(pr_r, dim=3), mask=full)
+            do m = 1, nm
+                now%pr(:,:,m) = w*now%pr(:,:,m) + (1.0_wp - w)*pr_r(:,:,m)*f(m)
+            end do
+            if (allocated(now%pr_ann)) then
+                pr_ann_r   = sum(pr_r, dim=3)/real(nm, wp)*365.0_wp
+                now%pr_ann = w*now%pr_ann + (1.0_wp - w)*pr_ann_r*f_ann
+            end if
         end if
         if (allocated(now%tsl_ann) .and. allocated(ref%tsl_ann)) &
-            now%tsl_ann = ref%tsl_ann + tap%w*(now%tsl_ann - ref%tsl_ann)
+            now%tsl_ann = ref%tsl_ann + w*(now%tsl_ann - ref%tsl_ann) + (1.0_wp - w)*dT_ann
 
         end associate
 

@@ -137,6 +137,7 @@
     active   = False    ! apply it?
     var_defs = ""       ! varslice databases of the weight, searched in order, then the par file itself
     weight   = ""       ! group of the weight w [1] (one 2D field)
+    outside  = "ref"    ! where w < 1, towards: ref (the reference) or mean (ref + the mean anomaly of the cells with w = 1)
 /
 
 &bias

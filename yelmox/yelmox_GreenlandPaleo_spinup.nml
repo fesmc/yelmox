@@ -1,6 +1,6 @@
-! GreenlandPaleo (GRL-PAL) paleo spin-up (16 km): 15 kyr basal-friction and
-! thermal-forcing optimization under present-day climate (ERA5 1981-2010 with
-! the MAR - ERA5 bias, ORAS5), relaxation early on. "Infinite" borders.
+! GreenlandPaleo (GRL-PAL) paleo spin-up (16 km): 15 kyr under present-day
+! climate (ERA5 1981-2010 with the MAR - ERA5 bias, ORAS5), relaxation early
+! on, no optimization. "Infinite" borders.
 ! Base: yelmox_GreenlandPaleo.nml (docs/_grl-paleo-plan.md, setup A).
 
 ! ===== Run setup =====
@@ -40,7 +40,7 @@
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
 
     relax                   = True      ! relax the topography towards the reference ([relax])
-    opt                     = True      ! optimize cb_ref and tf_corr ([opt])
+    opt                     = False     ! optimize cb_ref and tf_corr ([opt])
 
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb] group)
@@ -159,6 +159,7 @@
     active   = False    ! Apply it?
     var_defs = ""       ! varslice databases of the weight, then this file
     weight   = ""       ! group of the weight w [1] (one 2D field)
+    outside  = "ref"    ! where w < 1, towards: ref or mean (ref + the mean anomaly of the cells with w = 1)
 /
 
 &bias

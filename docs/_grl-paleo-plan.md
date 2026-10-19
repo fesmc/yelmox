@@ -1,6 +1,7 @@
 # Greenland paleo: glacial cycles and a Tabone et al. (2024) deglaciation
 
-Status: design summary (2026-10-17), not started. The leading `_` keeps
+Status: design summary (2026-10-17); A and B set up 2026-10-19 (see
+"Changes (2026-10-19)" at the end and `experiment-grl-paleo.md`). The leading `_` keeps
 quarto from rendering it. Input for the unified design, `_forcing-design.md`
 (2026-10-18).
 
@@ -228,3 +229,26 @@ and isochrones, Vinther 2009 elevations, Schumacher 2018 GPS uplift).
 Still to check (data/code, section "Reconstruction forcing"): the Buizert
 month/time layout vs varslice, I/O per update, Buizert/Badgeley on GRL-PAL
 (new products or online remap from the GRL grids).
+
+## Changes (2026-10-19)
+
+Superseding the decisions above where they differ:
+
+1. Borders: "infinite" (`[yelmo] experiment = "infinite"`, `mask_border =
+   "dynamic"`) for A and B; no index-scaled border ice. `border_width` and
+   `[ice_bnd]` stay as an option, off.
+2. No optimization of `cb_ref` or `tf_corr` anywhere (A spin-up included).
+3. B: cold-start LGM spin-up from GLAC-1D at 21 ka (20 kyr, forcing held at
+   21 ka), then the transient -21 ka to 0; no PD spin-up.
+4. B forcing: Buizert temperature (axis `b18`, lo = its 1981-2010 baseline),
+   Badgeley precipitation (axis `b20`, lo = ""), constant index `one`; online
+   remap from GRL-16KM with nearest fill, `[taper]` weight from the coverage
+   (ice_data, `make_taper_recon.jl`, 100 km) with `outside = "mean"`: beyond
+   the coverage the mean anomaly of the coverage, not the reference.
+   Ocean: `ocn_fraction` only so far.
+5. Reference climate: MAR - ERA5 bias as a hand-built file in ice_data
+   (`make_bias_mar_era5.jl`), not a FesmData product.
+6. Checked: Buizert (x, y, month, time) is read by varslice with the month as
+   the third dimension (as ERA5); the time axes come from `time = 1 x0 x1 dx`
+   (oldest first, years before 1950); `extrap` reads the two bracketing records.
+

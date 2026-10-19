@@ -2,25 +2,32 @@
 title: "Greenland paleo"
 ---
 
-A Greenland simulation of the last glacial period on the GreenlandPaleo domain
-(GRL-PAL, 16 km), the Greenland domain extended 640 km to the west (Ellesmere,
-Devon Island, Baffin Bay). In two steps, as the [Antarctic paleo](experiment-ant-paleo.md):
-a 15-kyr present-day **spin-up** that optimizes the basal friction (`cb_ref`) and
-the ocean thermal-forcing correction (`tf_corr`), then a **transient** from 130
-kyr ago to the present, restarted from the spin-up, with the climate scaled by a
-glacial index and the sea level following a reconstruction.
+Greenland paleo simulations on the GreenlandPaleo domain (GRL-PAL, 16 km), the
+Greenland domain extended 640 km to the west (Ellesmere, Devon Island, Baffin
+Bay). Two setups, without optimization of the basal friction or the ocean
+thermal forcing:
+
+- **A. Last glacial period**, as the [Antarctic paleo](experiment-ant-paleo.md):
+  a 15-kyr present-day **spin-up**, then a **transient** from 130 kyr ago to the
+  present, restarted from the spin-up, with the climate scaled by a glacial index.
+- **B. Deglaciation** after Tabone et al. (2024): an **LGM spin-up** from GLAC-1D,
+  then a **transient** from 21 ka to the present forced by the Greenland
+  climate reconstructions of Buizert et al. (2018, temperature) and Badgeley et
+  al. (2020, precipitation).
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
-- **Config:** `yelmox/yelmox_GreenlandPaleo.nml` (base),
-  `yelmox/yelmox_GreenlandPaleo_spinup.nml`, `yelmox/yelmox_GreenlandPaleo_lgp.nml`.
-- **Scripts:** `scripts/grl-paleo/run_spinup.sh`, `scripts/grl-paleo/run_lgp.sh`.
-- **Design:** `docs/_grl-paleo-plan.md` (setup A; the deglaciation after Tabone
-  et al., 2024, setup B, is not set up yet).
+- **Config:** `yelmox/yelmox_GreenlandPaleo.nml` (base); A:
+  `yelmox/yelmox_GreenlandPaleo_spinup.nml`, `yelmox/yelmox_GreenlandPaleo_lgp.nml`;
+  B: `yelmox/yelmox_GreenlandPaleo_lgm.nml`, `yelmox/yelmox_GreenlandPaleo_deglac.nml`.
+- **Scripts:** `scripts/grl-paleo/`: A `run_spinup.sh`, `run_lgp.sh`; B
+  `run_lgm_spinup.sh`, `run_deglac.sh`.
+- **Design:** `docs/_grl-paleo-plan.md`.
 
 ## Running
 
-Run from the yelmox root; the transient needs the spin-up's last restart bundle.
+Run from the yelmox root; each transient needs the last restart bundle of its
+spin-up. A:
 
 ```bash
 scripts/grl-paleo/run_spinup.sh
@@ -30,11 +37,24 @@ scripts/grl-paleo/run_spinup.sh
 scripts/grl-paleo/run_lgp.sh
 ```
 
-`run_spinup.sh [output_path]` writes to `output/grl-paleo/spinup` by default.
+B:
+
+```bash
+scripts/grl-paleo/run_lgm_spinup.sh
+```
+
+```bash
+scripts/grl-paleo/run_deglac.sh
+```
+
+`run_spinup.sh [output_path]` writes to `output/grl-paleo/spinup` by default,
+`run_lgm_spinup.sh [output_path]` to `output/grl-paleo/lgm`.
 `run_lgp.sh [spinup_path] [output_path]` restarts from
-`<spinup_path>/restart-15.000-kyr` (passed as an absolute path; the script stops if
-the bundle is missing) and writes to `output/grl-paleo/lgp`. Both submit to the
-`shared` queue (2 days, 10 GB, no OpenMP).
+`<spinup_path>/restart-15.000-kyr` and writes to `output/grl-paleo/lgp`;
+`run_deglac.sh [lgm_path] [output_path]` restarts from
+`<lgm_path>/restart-20.000-kyr` and writes to `output/grl-paleo/deglac` (the
+bundles are passed as absolute paths; the scripts stop if one is missing). All
+submit to the `shared` queue (2 days, 10 GB, no OpenMP).
 
 ## Domain borders
 
@@ -45,10 +65,11 @@ outermost cells take the thickness of their inner neighbours, so the border ice
 thickens and thins with the interior. No ice enters from outside the domain: the
 ice west of the border is what the local climate builds.
 
-Prescribed border ice is the alternative (planned for the deglaciation, B): a
+Prescribed border ice is the alternative (not used now): a
 strip of fixed and relaxation cells (`[yelmo_masks] border_width = N M`, e.g.
 `2 4`) whose thickness comes from an ice history (`[ice_bnd] active = True`,
-PaleoMIST by default), with `experiment = "None"` and `mask_border = "auto"`.
+PaleoMIST by default), with `experiment = "None"`, `mask_border = "auto"` and
+`[ytopo] topo_rel = -1`.
 
 ## Reference climate
 
@@ -73,21 +94,19 @@ from the yelmox root (`fesmdata` and `ice_data` links in place; options `--res`,
 rates and `f_p` are written as attributes: remake the file when `[snap] lapse` or
 `f_p` change.
 
-## Spin-up
+## A. Spin-up
 
 - **Timeline:** `[ctrl]` 0 to 15 kyr, `dtt = 10` yr, present-day insolation
   (`[orbit] method = "time"`, `time = 0`), sea level from file at 0 ka.
-- **Optimization** (`[sim] opt = True`): `cb_ref` (`L21`) and `tf_corr`
-  (`L21-points`) over the whole 15 kyr; the ice thickness relaxes towards the
-  observations until 6 kyr (`[sim] relax = True`, `[relax] time2`).
+- **No optimization** (`[sim] opt = False`); the ice thickness relaxes towards
+  the observations until 6 kyr (`[sim] relax = True`, `[relax] time2`).
 - **Climate:** present day (`[snap] snapshots = "pd"`) with the MAR -- ERA5 bias.
 - **Output:** restart bundles at 0 and 15 kyr; 2D output every 1 kyr.
 
-## Transient
+## A. Transient
 
 - **Timeline:** `[ctrl]` -130 kyr to 0, `dtt = 10` yr, on relative time
-  (`tstep_method = "rel"`). `[sim] relax = False`, `opt = False`: `cb_ref` and
-  `tf_corr` come from the restart.
+  (`tstep_method = "rel"`). `[sim] relax = False`, `opt = False`.
 - **Climate:** snapshots `pd`, `picontrol`, `lgm` and the axis `a`
   (`[snap_axis_a]`): the present-day reference plus the PMIP3 LGM -- piControl
   anomaly, scaled by the glacial index `[idx_a]`
@@ -100,7 +119,57 @@ rates and `f_p` are written as attributes: remake the file when `[snap] lapse` o
   layer every 1 kyr, coupled every 50 yr (for comparison with MacGregor et al., 2025).
 - **Output:** 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.
 
-## Configuration common to both
+## B. Reconstruction forcing
+
+Snapshots `pd`, `b18_base`, `b18`, `b20` and two axes at a constant index `one`
+(`[idx_one]`, 1), each field bound to one axis:
+
+- **Temperature**, axis `b18` (`[snap_field_tas] axes`): the Buizert et al.
+  (2018) monthly reconstruction (`snap_b18`, decadal, 22 ka to 2005 CE) minus its
+  1981--2010 baseline (`snap_b18_base`), both at the reconstruction's elevation.
+- **Precipitation**, axis `b20` (`[snap_field_pr] axes`, `blend = "ratio"`): the
+  Badgeley et al. (2020) fraction relative to 1850--2000 CE (`snap_b20`,
+  `lo = ""`: the hi is the ratio itself; 50-yr means, 20 ka to 0; annual, the
+  same factor in every month). `b20_pr_frac_low`/`_high` are the other
+  accumulation scenarios.
+
+Swapping the axes of the two fields gives the other combinations (Badgeley
+temperature: its annual anomaly in every month). The time-varying groups are
+read in time on the forcing clock (`extrap`: the first slice before the
+record starts, e.g. Badgeley at 20 ka during the LGM spin-up).
+
+The reconstructions are GRL-16KM products, remapped online onto GRL-PAL and
+filled from the nearest cell outside the GRL box. `[taper]` with `outside =
+"mean"` replaces the anomaly there by the mean anomaly of the coverage (per
+month: the temperature difference and the precipitation ratio of the totals,
+recomputed at every climate update): `w = 1` in the coverage of both, a
+cosine to 0 over 100 km (hand-built file
+`ice_data/GreenlandPaleo/GRL-PAL-16KM/GRL-PAL-16KM_TAPER-Buizert2018-Badgeley2020.nc`,
+`clim_db.nml` group `taper_b18_b20`, made by
+`scripts/grl-paleo/make_taper_recon.jl`). West of it (Ellesmere, Baffin Bay)
+the climate is the present-day reference plus that mean anomaly.
+
+The ocean anomaly is `f_to = 0.25` times the mean sea-level air temperature
+anomaly (`[ocn_fraction]`); sea level from `input/sl_deglaciation.dat`;
+insolation at the forcing clock (`[orbit] method = "clock"`).
+
+## B. LGM spin-up
+
+- **Timeline:** `[ctrl]` 0 to 20 kyr, the forcing held at 21 ka
+  (`tstep_method = "const"`, `tstep_const = -21e3`): reconstructions, insolation
+  and sea level of 21 ka.
+- **Initial ice:** GLAC-1D at 21 ka on the whole domain (`[sim] init_method =
+  "recon"`, `recon_time = -21e3`, `recon_regions = "all"`), cold start.
+- **Output:** restart bundles at 0 and 20 kyr; 2D output every 1 kyr.
+
+## B. Transient
+
+- **Timeline:** `[ctrl]` -21 ka to 0, on relative time, restarted from the LGM
+  spin-up.
+- **Ice age:** isochrones with elsa (`[elsa_grl_paleo]`): one layer every 500 yr.
+- **Output:** 2D every 500 yr, 1D every 10 yr, restart bundles every 7 kyr.
+
+## Configuration common to all
 
 | | |
 |---|---|

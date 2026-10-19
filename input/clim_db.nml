@@ -172,6 +172,137 @@
     time     = 0 0 0 0 1
 /
 
+! ---- Greenland reconstructions (GRL-16KM products, remapped online; GRL-PAL:
+! outside the GRL box filled from the nearest cell, see [taper]) ------------
+! Buizert et al. (2018): monthly tas, pr, decadal, 22005 BP to 2005 CE (time
+! = years before 1950, oldest first), at the present-day elevation z_srf; and
+! its 1981-2010 baseline.
+
+&b18_tas
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Buizert2018.nc"
+    name     = "tas"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 1 -22005 55 10 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b18_pr
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Buizert2018.nc"
+    name     = "pr"
+    units    = "kg m-2 s-1" "mm d-1"
+    scaling  = 86400.0 0.0
+    time     = 1 -22005 55 10 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b18_zs
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Buizert2018.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b18_1981_2010_tas
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Buizert2018-1981-2010.nc"
+    name     = "tas"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b18_1981_2010_pr
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Buizert2018-1981-2010.nc"
+    name     = "pr"
+    units    = "kg m-2 s-1" "mm d-1"
+    scaling  = 86400.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b18_1981_2010_zs
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Buizert2018-1981-2010.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+! Badgeley et al. (2020): annual tas anomaly [K] and precipitation fraction
+! relative to 1850-2000 CE (moderate, low, high accumulation), 50-yr means,
+! 20 ka to 0 BP (oldest first): the hi of an axis with lo = "".
+
+&b20_tas_anom
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Badgeley2020.nc"
+    name     = "tas_anom"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 1 -20000 0 50 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b20_pr_frac
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Badgeley2020.nc"
+    name     = "pr_frac"
+    units    = "1" "1"
+    scaling  = 1.0 0.0
+    time     = 1 -20000 0 50 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b20_pr_frac_low
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Badgeley2020.nc"
+    name     = "pr_frac_low"
+    units    = "1" "1"
+    scaling  = 1.0 0.0
+    time     = 1 -20000 0 50 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+&b20_pr_frac_high
+    filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Badgeley2020.nc"
+    name     = "pr_frac_high"
+    units    = "1" "1"
+    scaling  = 1.0 0.0
+    time     = 1 -20000 0 50 1
+    remap    = "bilin"
+    grid_src = "GRL-16KM"
+    fill     = "nearest"
+/
+
+! [taper] weight of the reconstructions on GreenlandPaleo (ice_data, made by
+! scripts/grl-paleo/make_taper_recon.jl): 1 in their coverage, 0 beyond 100 km.
+
+&taper_b18_b20
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_TAPER-Buizert2018-Badgeley2020.nc"
+    name     = "w"
+    units    = "1" "1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
 ! ---- ORAS5, 1981-2010 (any domain), monthly climatology (month, depth) ----
 
 &oras5_1981_2010_to
