@@ -49,6 +49,7 @@ while [ $# -gt 0 ]; do
         --p-first) read -r -a kv <<< "$2"; P_FIRST+=("${kv[@]}"); shift 2 ;;
         --p-rest)  read -r -a kv <<< "$2"; P_REST+=("${kv[@]}");  shift 2 ;;
         -h|--help) usage 0 ;;
+        -[0-9]*) POS+=("$1"); shift ;;       # negative chunk boundary
         -*) echo "run_chunks.sh: unknown option $1" >&2; usage 1 ;;
         *)  POS+=("$1"); shift ;;
     esac
