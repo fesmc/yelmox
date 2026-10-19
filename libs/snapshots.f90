@@ -402,8 +402,9 @@ contains
 
     subroutine snapshots_transform(sc, z_srf)
         ! Inflate the blended sea-level fields to the current model elevation and
-        ! compute the annual/summer aggregates. Note the cosine
-        ! phase here is m*30-15 (vs m*30-30 in the sea-level reduction).
+        ! compute the annual/summer aggregates. The monthly lapse rate is the one
+        ! of the sea-level reduction (lapse_monthly), so a snapshot at its own
+        ! elevation is recovered exactly.
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
@@ -446,24 +447,34 @@ contains
     end subroutine snapshots_transform
 
     function snapshots_lapse_monthly(sc) result(lapse)
-        ! Monthly lapse rate [K/m] that lifts tsl to the surface:
-        ! annual lapse(1) with a seasonal cosine of amplitude lapse(1)-lapse(2),
-        ! phase m*30-15, summer at lapse(2).
+        ! Monthly lapse rate [K/m] of the backend (lapse_monthly with its pars).
         implicit none
         type(snapshots_class), intent(IN) :: sc
         real(wp) :: lapse(NMONTH)
+        lapse = lapse_monthly(sc%par%lapse(1), sc%par%lapse(2), sc%par%south)
+    end function snapshots_lapse_monthly
+
+    pure function lapse_monthly(l1, l2, south) result(lapse)
+        ! Monthly lapse rate [K/m] between sea level and the surface: the annual
+        ! l1 with a seasonal cosine of amplitude l1-l2 on the calendar of the
+        ! season synthesis, c(m) = cos(2*pi*(m-1)/12) (+1 in January, -1 in
+        ! July), so the summer lapse rate l2 holds exactly in July (north) or
+        ! January (south). Used for the sea-level reduction of a snapshot and
+        ! for the inflation of the blend to the model surface: the same rates
+        ! both ways, so a snapshot at its own elevation is recovered exactly.
+        implicit none
+        real(wp), intent(IN) :: l1, l2
+        logical,  intent(IN) :: south
+        real(wp) :: lapse(NMONTH)
         integer  :: m
-        real(wp) :: l1, l2
-        l1 = sc%par%lapse(1)
-        l2 = sc%par%lapse(2)
         do m = 1, NMONTH
-            if (sc%par%south) then
-                lapse(m) = l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp)
+            if (south) then
+                lapse(m) = l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp)
             else
-                lapse(m) = l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-15.0_wp)/360.0_wp)
+                lapse(m) = l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp)
             end if
         end do
-    end function snapshots_lapse_monthly
+    end function lapse_monthly
 
     subroutine snapshots_end(sc)
         ! Teardown: the varslice sources of every snapshot, the snapshots, axes
@@ -998,6 +1009,7 @@ contains
         integer  :: f_tas, f_pr, f_zs
         logical  :: south, has_tas, has_pr, has_zs
         real(wp) :: zmean, l1, l2
+        real(wp) :: lapse(NMONTH)
         real(wp), allocatable :: ta_seas(:,:)
 
         nx = sc%par%nx
@@ -1128,12 +1140,9 @@ contains
                 call realloc3(st%tsl, nx, ny, NMONTH)
                 call realloc2(st%tsl_ann, nx, ny)
                 st%tsl_ann = st%ta_ann + l1*st%z_srf
+                lapse = lapse_monthly(l1, l2, south)
                 do m = 1, NMONTH
-                    if (south) then
-                        st%tsl(:,:,m) = st%tas(:,:,m) + st%z_srf*(l1 + (l2-l1)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp))
-                    else
-                        st%tsl(:,:,m) = st%tas(:,:,m) + st%z_srf*(l1 + (l1-l2)*cos(2*pi*(m*30.0_wp-30.0_wp)/360.0_wp))
-                    end if
+                    st%tsl(:,:,m) = st%tas(:,:,m) + st%z_srf*lapse(m)
                 end do
             end if
             if (has_pr) then   ! with tas and zs (snapshots_check_bindings)
