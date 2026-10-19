@@ -612,7 +612,7 @@
     use_proj        = False             ! load projection period
 
     ! Climatic variables
-    lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
+    lapse           = 8.0e-3 6.5e-3     ! [K/m] lapse rate (ann, sum)
     f_p             = 0.05              ! Claus-Cl. term
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
     f_polar         = 1.8               ! Polar amplification

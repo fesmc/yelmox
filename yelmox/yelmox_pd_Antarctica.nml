@@ -238,7 +238,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/{grid_name}_GIA_HR24.nc"  ! {grid_name} = grid_isos
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
@@ -727,7 +727,7 @@
     corr_pine = "Zwally2012:14"
     corr_abbott = "Zwally2012:15"
     
-    tf_correction   = True         ! no grid-specific tf file: mshlf runs from the remapped climate forcing
+    tf_correction   = True         ! read tf_corr from tf_path (tf_name)
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  

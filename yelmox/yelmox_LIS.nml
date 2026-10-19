@@ -200,7 +200,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "ice_data/Laurentide/LIS-32KM/LIS-32KM_GEO-P22.nc"
+    rheology_file = "ice_data/{domain}/{grid_name}/{grid_name}_GEO-P22.nc"  ! {grid_name} = grid_isos
     litho_thickness_varname = "T_litho"
     log10_viscosity_varname = "none"
     stddev_log10_viscosity_varname = "none"

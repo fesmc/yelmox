@@ -25,7 +25,7 @@
     with_shelf        = False  ! Ocean forcing off (mountain glacier: no ocean)
     climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 50.0     ! [yr] Frequency of climate updates (and of the surface: 250 m grid)
+    dt_clim         = 50.0     ! [yr] Frequency of climate updates (the surface runs every step)
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -123,10 +123,12 @@
 /
 
 &idx_orb
-    ! Orbital index (alpha_orbital_t2018: 0 at 21 ka, 1 at present), as is;
-    ! scaled by [anom] f_ta.
+    ! Orbital index: alpha_orbital_t2018 (1 at present, 0 at 21 ka) normalised
+    ! to 0 at present and 1 at 21 ka; scaled by [anom] f_ta.
     method      = "series"
     series_file = "input/alpha_orbital_t2018.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
 /
 
 &anom
@@ -134,7 +136,7 @@
     ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
     active = True     ! Apply it?
     index  = "orb"    ! the index driving the anomalies ([indices] names)
-    f_ta   = 10.0     ! [K]   dTa = f * f_ta  (air temperature)
+    f_ta   = -10.0    ! [K]   dTa = f * f_ta  (air temperature): -10 K at 21 ka
     f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
     f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
 /

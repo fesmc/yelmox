@@ -325,8 +325,11 @@ contains
         ! Grid spacing in Yelmo units, scaled by the resolution ratio (per axis).
         dom%ctl%dx_isos = dom%yelmo%grd%G%dx * (grid_i%G%dx / grid_y%G%dx)
         dom%ctl%dy_isos = dom%yelmo%grd%G%dy * (grid_i%G%dy / grid_y%G%dy)
+        ! {domain}/{grid_name} of rheology_file and mask_file: the domain name
+        ! and grid_isos.
         call isos_init(dom%isos, path_par, "isos"//trim(sfx), nx_i, ny_i, &
-                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%cnst)
+                       dom%ctl%dx_isos, dom%ctl%dy_isos, cnst=dom%cnst, &
+                       domain=trim(dom%ctl%domain), grid_name=trim(dom%ctl%grid_isos))
 
         call sediments_init(dom%sed, path_par, grid_y, domain, group="sed"//trim(sfx))
         dom%yelmo%bnd%H_sed = dom%sed%now%H

@@ -272,7 +272,7 @@
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/{grid_name}_GIA_HR24.nc"  ! {grid_name} = grid_isos
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
@@ -613,7 +613,7 @@
     
     
     ! Climatic variables
-    lapse           = 8.0e-3 6.5e-3     ! lapse rate (sum, ann)
+    lapse           = 8.0e-3 6.5e-3     ! [K/m] lapse rate (ann, sum)
     f_p             = 0.05              ! Claus-Cl. term
     f_ocn           = 0.5               ! Oceanic warm fraction. Only used for homogeneous.
     f_polar         = 1.8               ! Polar amplification

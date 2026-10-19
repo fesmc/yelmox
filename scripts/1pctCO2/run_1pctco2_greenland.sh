@@ -10,7 +10,7 @@
 # atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140. The forcing is the GCM's ABSOLUTE
 # tas/pr/thetao/so, self-referenced to the run start (~1xCO2), read from the global
 # CMIP files and remapped online onto the run's grid; see input/esm/esm_grl_1pctCO2.nml.
-# The reference climatology is MAR (atmosphere) + ERA-INT-ORAS4 (ocean).
+# The reference climatology is MAR (atmosphere) + ORAS5 (ocean).
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
