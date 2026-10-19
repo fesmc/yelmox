@@ -1,6 +1,7 @@
 ! =====================================================================
 ! clim_db.nml — shared climate database (varslice groups) for the snapshot
-! backend (snapshots) and the climate modifiers.
+! backend (snapshots) and the climate modifiers, and the ice histories of the
+! prescribed ice ([ice_bnd]).
 !
 ! One group per product field. A par file lists the databases to search,
 ! first file that has a group wins, then the par file itself (searched
@@ -470,4 +471,31 @@
     remap    = "bilin"
     grid_src = "{grid_global}"
     fill     = "nearest"
+/
+
+! ===== Ice histories (prescribed ice, [ice_bnd]) =====
+! Regional products on the ice grid ({grid_name} = the Yelmo grid), time in
+! model years (negative before present; the files run from the oldest slice
+! to 0 ka, "years ago"). varslice needs a regular time axis: ICE-6G_C (1 kyr,
+! then 500 yr steps) and GLAC-1D nn9927/nn9894 (1 kyr, then 100 yr) are not
+! read as a whole.
+
+! ---- PaleoMIST 1.0 (Gowan et al., 2021), 80-0 ka every 2.5 kyr ------------
+
+&paleomist_H_ice
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_IceHistory-PaleoMIST.nc"
+    name     = "H_ice"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 1 -80e3 0 2500 1
+/
+
+! ---- GLAC-1D (PMIP4; Tarasov et al., 2012), 26-0 ka every 100 yr ----------
+
+&glac1d_H_ice
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_IceHistory-GLAC1D.nc"
+    name     = "H_ice"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 1 -26e3 0 100 1
 /

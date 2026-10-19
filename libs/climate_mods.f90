@@ -7,12 +7,13 @@ module climate_mods
     !                   air temperature anomaly over a region
     !   ocn_obm      -- ocean temperature from a box of the bipolar ocean box
     !                   model (absolute, or the reference plus the box anomaly)
+    !   taper        -- the atmosphere towards the reference with a static
+    !                   weight field (regional taper)
     !   bias         -- static bias correction of the atmosphere
-    ! (later taper, between ocn_obm and bias). Each is an optional namelist
-    ! group with `active` (default off), suffixed by the domain (anom<sfx>,
-    ! ocn_fraction<sfx>, ocn_obm<sfx>, bias<sfx>); unset keys (an absent
-    ! group: all) from the templates anom, ocn_fraction, ocn_obm, bias of
-    ! input/yelmox_defaults.nml.
+    ! Each is an optional namelist group with `active` (default off), suffixed
+    ! by the domain (anom<sfx>, ocn_fraction<sfx>, ocn_obm<sfx>, taper<sfx>,
+    ! bias<sfx>); unset keys (an absent group: all) from the templates anom,
+    ! ocn_fraction, ocn_obm, taper, bias of input/yelmox_defaults.nml.
     !
     ! ocn_obm is the one modifier that climate_mods_apply does not call: the
     ! box value belongs to the driver that owns the box model (yelmox_bipolar),
@@ -44,6 +45,11 @@ module climate_mods
     !         ocean at the shelf base (esm); a climate without ocean profiles
     !         stops at the first application. Refused with ocn_fraction or an
     !         anom f_to /= 0, since it replaces the ocean temperature.
+    !   taper: now = ref + w*(now - ref) for tas, pr, ta_ann, pr_ann and
+    !         tsl_ann (those the climate has, now and ref), w in [0, 1] a static
+    !         field on the climate grid, the reference at the current surface
+    !         (taper_apply). Refused for a backend without a reference
+    !         atmosphere (rembo).
     !   bias: tas, ta_ann, tsl_ann + dtas; pr * fpr, pr_ann by the ratio of the
     !         annual totals. Refused for a backend with annual fields only (rembo).
 
@@ -69,6 +75,7 @@ module climate_mods
         logical :: has_tsl_ann   = .false.       ! sea-level air temperature (now and ref)
         logical :: monthly       = .true.        ! monthly air temperature and precipitation
         logical :: anom_input    = .false.       ! reads [anom] itself, as an input (rembo)
+        logical :: has_ref_atm   = .true.        ! a reference atmosphere (ref%tas, ...)
     end type climate_caps_class
 
     ! [anom<sfx>]: one index mapped onto homogeneous anomalies by the gains.
@@ -107,6 +114,18 @@ module climate_mods
         real(wp)          :: dTo    = 0.0_wp       ! [K] its anomaly, theta - theta_init
     end type ocn_obm_class
 
+    ! [taper<sfx>]: the atmosphere towards the reference with a weight field w
+    ! in [0, 1] (one 2D field), read from a var_defs group (a list of
+    ! databases, then the par file) on the climate grid (online remap
+    ! allowed): now = ref + w*(now - ref); w = 1 keeps the climate, w = 0 is
+    ! the reference.
+    type taper_class
+        logical               :: active = .false.
+        character(len=64)     :: group  = ""
+        character(len=256)    :: weight = ""     ! the var_defs group of w
+        real(wp), allocatable :: w(:,:)          ! [1] (nx,ny)
+    end type taper_class
+
     ! [bias<sfx>]: an additive temperature field and a precipitation factor
     ! field, monthly (12) or annual (1 field, all months), read from var_defs
     ! groups (a list of databases, then the par file) on the climate grid
@@ -125,11 +144,12 @@ module climate_mods
         type(anom_class)         :: anom
         type(ocn_fraction_class) :: ocn_fraction
         type(ocn_obm_class)      :: ocn_obm
+        type(taper_class)        :: taper
         type(bias_class)         :: bias
     end type climate_mods_class
 
     public :: climate_caps_class
-    public :: anom_class, ocn_fraction_class, ocn_obm_class, bias_class
+    public :: anom_class, ocn_fraction_class, ocn_obm_class, taper_class, bias_class
     public :: climate_mods_class
     public :: climate_mods_init
     public :: climate_mods_apply
@@ -156,6 +176,7 @@ contains
                                mods%anom, reg)
         call ocn_obm_init(mods%ocn_obm, filename, "ocn_obm"//trim(sfx), caps, &
                           mods%anom, mods%ocn_fraction)
+        call taper_init(mods%taper, filename, "taper"//trim(sfx), caps, domain, grid)
         call bias_init(mods%bias, filename, "bias"//trim(sfx), caps, domain, grid)
 
     end subroutine climate_mods_init
@@ -164,7 +185,7 @@ contains
         ! The active modifiers on `out`, in the fixed order. idx is the driver's
         ! registry, advanced to the forcing time. ocn_obm, in the order between
         ! ocn_fraction and bias, is applied by the driver that owns the box
-        ! model (climate_mod_ocn_obm); bias does not touch the ocean.
+        ! model (climate_mod_ocn_obm); taper and bias do not touch the ocean.
         type(climate_mods_class), intent(inout) :: mods
         type(climate_out_class),  intent(inout) :: out
         type(indices_class),      intent(in)    :: idx
@@ -174,15 +195,22 @@ contains
 
         if (mods%ocn_fraction%active) call ocn_fraction_apply(mods%ocn_fraction, out)
 
+        if (mods%taper%active) call taper_apply(mods%taper, out)
+
         if (mods%bias%active) call bias_apply(mods%bias, out)
 
     end subroutine climate_mods_apply
 
     subroutine climate_mods_write_init(mods, filename)
         ! The static fields of the active modifiers, into the climate's 2D output
-        ! file (xc, yc defined): the bias correction, weighted, as annual means.
+        ! file (xc, yc defined): the taper weight; the bias correction,
+        ! weighted, as annual means.
         type(climate_mods_class), intent(in) :: mods
         character(len=*),         intent(in) :: filename
+
+        if (mods%taper%active) &
+            call nc_write(filename, "taper_w", mods%taper%w, dim1="xc", dim2="yc", units="1", &
+                          long_name="Weight of the climate towards the reference (taper)")
 
         if (mods%bias%active) then
             associate(b => mods%bias)
@@ -450,6 +478,111 @@ contains
         end associate
 
     end subroutine climate_mod_ocn_obm
+
+    ! ===== taper ===========================================================
+
+    subroutine taper_init(tap, filename, group, caps, domain, grid)
+        ! Read [taper<sfx>] (optional group; inactive without it), check its
+        ! contract (a reference atmosphere) and load the weight from its
+        ! var_defs group (static, one field) on the climate grid; a weight
+        ! outside [0, 1] (or missing) is an error.
+        type(taper_class),        intent(inout) :: tap
+        character(len=*),         intent(in)    :: filename, group, domain
+        type(climate_caps_class), intent(in)    :: caps
+        type(grid_class),         intent(in)    :: grid
+
+        character(len=256) :: var_defs(VAR_DEFS_MAX)
+        type(varslice_class) :: vs
+
+        tap%group = group
+        call nml_validate(filename, def_file, group, defaults_group="taper")
+        call nml_read(filename, group, "active", tap%active, defaults_file=def_file, defaults_group="taper")
+        if (.not. tap%active) return
+
+        if (.not. caps%has_ref_atm) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs a reference &
+                       &atmosphere; climate = "//trim(caps%name)//" has none."
+            error stop 1
+        end if
+
+        call nml_read(filename, group, "var_defs", var_defs,   init=.true., &
+                      defaults_file=def_file, defaults_group="taper")
+        call nml_read(filename, group, "weight",   tap%weight, defaults_file=def_file, defaults_group="taper")
+
+        call varslice_init_nml(vs, trim(var_defs_find(var_defs, filename, trim(tap%weight), &
+                                                      "["//trim(group)//"] weight")), &
+                               trim(tap%weight), domain=domain, grid_name=trim(grid%name), grid=grid)
+        call varslice_update(vs)
+        if (size(vs%var, 3) /= 1 .or. size(vs%var, 4) /= 1) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] weight "//trim(tap%weight)// &
+                       " must be one 2D field; got ", size(vs%var, 3), " x ", size(vs%var, 4), " slices."
+            error stop 1
+        end if
+        tap%w = vs%var(:,:,1,1)
+        call varslice_end(vs)
+
+        if (any(tap%w < 0.0_wp .or. tap%w > 1.0_wp)) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] weight "//trim(tap%weight)// &
+                       " must lie in [0, 1] (missing values: set fill in the group); range: ", &
+                       minval(tap%w), maxval(tap%w)
+            error stop 1
+        end if
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, weight = "//trim(tap%weight)// &
+                   ", range: ", minval(tap%w), maxval(tap%w)
+
+    end subroutine taper_init
+
+    subroutine taper_apply(tap, out)
+        ! The atmosphere of `out` towards its reference: now = ref + w*(now - ref),
+        ! for each field the climate has (now and ref), with the reference at
+        ! the surface of `now` (now%z_srf): a reference given at its own surface
+        ! (ref%z_srf: snapshots, the elevation of the reference snapshot) is
+        ! moved there with the monthly lapse rate and beta_p, as the backend
+        ! moves the climate (tas - lapse*dz, pr*exp(-beta_p*lapse*dz)), so that
+        ! w = 0 gives the reference climate at the model surface; without
+        ! ref%z_srf (esm) the reference is already at the current surface.
+        ! The sea-level temperature tsl_ann needs no move.
+        type(taper_class),       intent(in)    :: tap
+        type(climate_out_class), intent(inout) :: out
+
+        real(wp), allocatable :: dz(:,:), tas_r(:,:,:), pr_r(:,:,:)
+        integer :: m, nx, ny
+
+        associate(now => out%now, ref => out%ref)
+
+        nx = size(tap%w, 1)
+        ny = size(tap%w, 2)
+        allocate(dz(nx,ny))
+        dz = 0.0_wp
+        if (allocated(ref%z_srf)) dz = now%z_srf - ref%z_srf
+
+        if (allocated(now%tas) .and. allocated(ref%tas)) then
+            allocate(tas_r(nx,ny,size(now%tas,3)))
+            do m = 1, size(now%tas, 3)
+                tas_r(:,:,m)   = ref%tas(:,:,m) - out%lapse(m)*dz
+                now%tas(:,:,m) = tas_r(:,:,m) + tap%w*(now%tas(:,:,m) - tas_r(:,:,m))
+            end do
+            if (allocated(now%ta_ann)) &
+                now%ta_ann = sum(tas_r, dim=3)/12.0_wp + &
+                             tap%w*(now%ta_ann - sum(tas_r, dim=3)/12.0_wp)
+        end if
+        if (allocated(now%pr) .and. allocated(ref%pr)) then
+            allocate(pr_r(nx,ny,size(now%pr,3)))
+            do m = 1, size(now%pr, 3)
+                pr_r(:,:,m)   = ref%pr(:,:,m) * exp(-now%beta_p*out%lapse(m)*dz)
+                now%pr(:,:,m) = pr_r(:,:,m) + tap%w*(now%pr(:,:,m) - pr_r(:,:,m))
+            end do
+            if (allocated(now%pr_ann)) &
+                now%pr_ann = sum(pr_r, dim=3)/12.0_wp*365.0_wp + &
+                             tap%w*(now%pr_ann - sum(pr_r, dim=3)/12.0_wp*365.0_wp)
+        end if
+        if (allocated(now%tsl_ann) .and. allocated(ref%tsl_ann)) &
+            now%tsl_ann = ref%tsl_ann + tap%w*(now%tsl_ann - ref%tsl_ann)
+
+        end associate
+
+    end subroutine taper_apply
 
     ! ===== bias ============================================================
 

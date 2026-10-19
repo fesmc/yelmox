@@ -24,7 +24,7 @@ module kryos_startup
     use kryos_coupling, only : couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf, couple_to_yelmo, &
                                couple_isostasy_to_yelmo, couple_surface_to_yelmo, &
-                               check_isostasy_reference
+                               check_isostasy_reference, step_ice_bnd
     use kryos_forcing,  only : indices_class, indices_restart_write
     use yelmox_climate, only : climate_restart_write
 
@@ -128,6 +128,13 @@ contains
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call domain_init_isostasy(dom, ts, bsl)
+
+        ! Prescribed ice ([ice_bnd]) at the forcing time in H_ice_ref, after the
+        ! isostasy reference: that is the load of the present-day bed (the
+        ! present-day ice), so the prescribed ice of another time (e.g. the LGM
+        ! at the border) is a load anomaly. Yelmo holds the fixed cells at it
+        ! from its first step on.
+        call step_ice_bnd(dom, ts, idx)
 
         ! Refresh the hub from the initial geometry; climate/smb/mshlf read from it.
         call couple_yelmo_to_htopo(dom)
@@ -298,6 +305,9 @@ contains
             ! Store the clean thickness as the reference state (drives smb masks).
             dom%yelmo%bnd%H_ice_ref = dom%yelmo%tpo%now%H_ice
         end if
+
+        ! The prescribed ice ([ice_bnd]) again in its cells, overwritten above.
+        call step_ice_bnd(dom, ts, idx)
 
         ! Refresh the hub and climate/smb to reflect the new geometry, then land
         ! the smb on the Yelmo grid for the stabilization below.

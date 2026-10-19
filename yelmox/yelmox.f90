@@ -17,7 +17,7 @@ program yelmox
     use yelmox_climate, only : climate_end
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
-                               step_icesheet, couple_yelmo_to_htopo, step_climate, &
+                               step_ice_bnd, step_icesheet, couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : indices_class, indices_init, indices_update, indices_kill, &
@@ -192,6 +192,7 @@ program yelmox
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call timer_step(tmr, tt_isostasy)
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+        call step_ice_bnd(dom, ts, idx)   ! prescribed ice in the fixed/relaxation cells
         call timer_step(tmr, tt_couple_yelmo)
         call step_icesheet(dom, ts)       ! yelmo_update
         call timer_step(tmr, tt_icesheet)

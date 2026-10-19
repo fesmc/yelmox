@@ -10,7 +10,7 @@ module yelmox_climate
     ! Presents one interface (climate_init / climate_update) over the backends,
     ! filling a `climate_out_class`; the domain and its coupling read only that.
     ! The driver's indices registry is read by snapshots (its axes) and by the
-    ! climate modifiers (climate_mods: anom, ocn_fraction, bias), applied to
+    ! climate modifiers (climate_mods: anom, ocn_fraction, taper, bias), applied to
     ! `climate_out` after the backend in a fixed order, each checked at init
     ! against what the backend supplies; rembo reads [anom] itself
     ! (rembo_update).
@@ -163,8 +163,9 @@ contains
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))
                 cl%rembo%ta_sum = 0.0_wp
-                caps%monthly    = .false.
-                caps%anom_input = .true.
+                caps%monthly     = .false.
+                caps%anom_input  = .true.
+                caps%has_ref_atm = .false.
             case default
                 write(*,*) "climate_init:: error: climate must be snapshots, esm or rembo; got ", &
                            trim(cl%method)
@@ -252,6 +253,7 @@ contains
         type(clim_state_class),    intent(inout) :: dst
         type(climate_state_class), intent(in)    :: src
 
+        call copy_allocated(dst%z_srf,   src%z_srf)
         call copy_allocated(dst%tas,     src%tas)
         call copy_allocated(dst%pr,      src%pr)
         call copy_allocated(dst%tsl_ann, src%tsl_ann)

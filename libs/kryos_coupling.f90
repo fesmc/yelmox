@@ -19,11 +19,12 @@ module kryos_coupling
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
     use kryos_forcing, only : indices_class
+    use ice_bnd,      only : ice_bnd_update
 
     implicit none
     private
 
-    public :: step_relax, step_optimize, step_isostasy, step_icesheet, step_climate, step_shelf
+    public :: step_relax, step_optimize, step_isostasy, step_ice_bnd, step_icesheet, step_climate, step_shelf
     public :: step_surface, couple_yelmo_to_htopo
     public :: couple_to_yelmo
     public :: couple_isostasy_to_yelmo, couple_surface_to_yelmo, couple_shelf_to_yelmo
@@ -343,6 +344,20 @@ contains
         dom%yelmo%bnd%bmb_shlf = bmb_y
         dom%yelmo%bnd%T_shlf   = Tshlf_y
     end subroutine couple_shelf_to_yelmo
+
+    subroutine step_ice_bnd(dom, ts, idx)
+        ! Prescribed ice ([ice_bnd]): Yelmo's reference ice thickness H_ice_ref
+        ! in its fixed and relaxation cells from the ice history at the forcing
+        ! time (time_rel), before step_icesheet, which holds the fixed cells at
+        ! it and relaxes the others towards it. idx: the driver's indices
+        ! registry, advanced to this step (method scaled). No-op unless active.
+        type(kryos_domain),  intent(inout) :: dom
+        type(tstep_class),   intent(in)    :: ts
+        type(indices_class), intent(in)    :: idx
+
+        call ice_bnd_update(dom%ibnd, dom%yelmo%bnd%H_ice_ref, dom%yelmo%bnd%mask_ice, &
+                            dom%yelmo%bnd%tau_relax, ts%time_rel, idx)
+    end subroutine step_ice_bnd
 
     subroutine step_icesheet(dom, ts)
         ! Advance Yelmo one coupling step on the boundary state assembled by
