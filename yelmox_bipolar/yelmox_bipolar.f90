@@ -37,7 +37,7 @@ program yelmox_bipolar
     use yelmox_climate, only : climate_end
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
-                               step_icesheet, couple_yelmo_to_htopo, step_climate, &
+                               step_ice_bnd, step_icesheet, couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf
     use kryos_startup,  only : domain_startup, bsl_startup, domain_restart_write, &
                                restart_bundle_dir
@@ -227,6 +227,7 @@ program yelmox_bipolar
         ! Ice sheet, hub refresh, climate + surface mass balance (each domain).
         if (active_north) then
             call couple_to_yelmo(dom_north)   ! bedrock now; smb + shelf melt lag one step
+            call step_ice_bnd(dom_north, ts, idx)
             call timer_step(tmr, tt_couple_yelmo)
             call step_icesheet(dom_north, ts)
             call timer_step(tmr, tt_icesheet)
@@ -239,6 +240,7 @@ program yelmox_bipolar
         end if
         if (active_south) then
             call couple_to_yelmo(dom_south)
+            call step_ice_bnd(dom_south, ts, idx)
             call timer_step(tmr, tt_couple_yelmo)
             call step_icesheet(dom_south, ts)
             call timer_step(tmr, tt_icesheet)

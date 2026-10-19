@@ -31,6 +31,7 @@ module kryos
     use climate_out,    only : climate_out_class
     use yelmox_climate, only : yelmox_climate_class, climate_init
     use kryos_forcing,  only : indices_class
+    use ice_bnd,        only : ice_bnd_class, ice_bnd_init
     use smbpal,       only : smbpal_class, smbpal_init
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask
     use surface_chion, only : surface_chion_class, surface_chion_init
@@ -172,6 +173,7 @@ module kryos
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
         type(negis_params)     :: ngs     ! NEGIS cb_ref modification
         type(glacial_smb_params) :: gsmb  ! glacial smb scaling
+        type(ice_bnd_class)    :: ibnd    ! prescribed ice thickness in Yelmo's fixed/relaxation cells ([ice_bnd])
         type(domain_ctl)       :: ctl
         logical, allocatable   :: mask_recon(:,:)   ! recon: where its ice is imposed (Yelmo grid)
     end type kryos_domain
@@ -304,6 +306,10 @@ contains
         if (trim(dom%ctl%init_method) == "recon") then
             dom%mask_recon = regions_select(reg_y, dom%ctl%recon_regions)
         end if
+
+        ! Prescribed ice in Yelmo's fixed and relaxation cells ([ice_bnd]),
+        ! read on the Yelmo grid; no-op unless active.
+        call ice_bnd_init(dom%ibnd, path_par, "ice_bnd"//trim(sfx), domain, grid_y, idx)
 
         ! NEGIS cb_ref modification: its parameters and the masks of its parts,
         ! loaded when enabled, so it cannot silently run with defaults.
