@@ -27,7 +27,7 @@ CASES=$(cat <<'EOF'
 grl_snap   |yelmox/yelmox_Greenland.nml               |ctrl      |rel  |-130e3 |0      |1000 |
 grl_ramp   |yelmox/yelmox_Greenland_ramp.nml          |ctrl      |rel  |0      |2000   |500  |
 ant_pd     |yelmox/yelmox_Antarctica.nml              |ctrl      |const|0      |10     |10   |
-ant_paleo  |yelmox/yelmox_Antarctica_paleo_lgp.nml    |ctrl      |rel  |-130e3 |0      |1000 |
+ant_paleo  |yelmox/yelmox_Antarctica_paleo_lgp.nml    |ctrl      |rel  |-130e3 |0      |1000 |ytill.method=1
 grlpal_pd  |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |const|0      |10     |10   |
 grlpal_a   |yelmox/yelmox_GreenlandPaleo_lgp.nml      |ctrl      |rel  |-130e3 |0      |1000 |
 grlpal_b   |yelmox/yelmox_GreenlandPaleo_deglac.nml   |ctrl      |rel  |-21e3  |0      |500  |
