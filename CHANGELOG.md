@@ -17,9 +17,20 @@ annotated git tag. Dates are release (tag) dates.
   towards the reference with a static weight field, `now = ref + w*(now - ref)` (the
   reference at the current surface); refused for rembo.
 - `yelmox/yelmox_GreenlandPaleo.nml`: base config on GreenlandPaleo (GRL-PAL-16KM): ERA5 +
-  ORAS5 present day, the whole domain dynamic with a strip of prescribed PaleoMIST ice at
-  the border (`border_width = 2 4`, `relax_tau = 100`), sea level from file, uniform
-  mantle.
+  ORAS5 present day with the MAR - ERA5 bias over Greenland (`[bias]`), "infinite" borders
+  (`[yelmo] experiment = "infinite"`, `mask_border = "dynamic"`: the border ice follows its
+  inner neighbours), sea level from file, uniform mantle. Prescribed border ice (a
+  `border_width` strip with `[ice_bnd]`, PaleoMIST) is kept as an option, off.
+- Greenland paleo, last glacial period (docs page `experiment-grl-paleo.md`):
+  `yelmox_GreenlandPaleo_spinup.nml` (15 kyr, `cb_ref`/`tf_corr` optimization),
+  `yelmox_GreenlandPaleo_lgp.nml` (-130 kyr to 0, PMIP3 piControl/LGM on the glacial index
+  `alpha_combined_125kyr_interp`, `ocn_fraction`, transient insolation, elsa),
+  `scripts/grl-paleo/run_spinup.sh`, `run_lgp.sh`.
+- MAR v3.14 - ERA5 1981-2010 bias on GRL-PAL for `[bias]`: `scripts/grl-paleo/make_bias_mar_era5.jl`
+  (difference at sea level with the `[snap]` lapse rates and `f_p`; outside the MAR coverage
+  the 50 km-smoothed bias tapered to zero over 100 km), written to
+  `ice_data/GreenlandPaleo/GRL-PAL-16KM/`; `clim_db.nml` groups `bias_mar_era5_1981_2010_dtas`,
+  `_fpr`.
 - `input/clim_db.nml`: shared climate database of the snapshot backend, one varslice group per
   product field. Present-day references regional (`{domain}/{grid_name}`): MAR v3.14
   1961-1990, RACMO2.3p2 1981-2010, ERA5 1981-2010, ORAS5 1981-2010, ISMIP7 ocean.

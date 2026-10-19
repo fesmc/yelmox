@@ -1,7 +1,10 @@
 ! GreenlandPaleo (GRL-PAL): the Greenland domain extended to the west
-! (Ellesmere, Devon, Baffin Bay), with prescribed ice in a strip at the domain
-! border (yelmo_masks border_width, [ice_bnd]); base of the GRL paleo setups
-! (docs/_grl-paleo-plan.md). Present-day climate: ERA5 1981-2010 + ORAS5.
+! (Ellesmere, Devon, Baffin Bay), with "infinite" borders (the border ice
+! follows its inner neighbours); base of the GRL paleo setups
+! (docs/_grl-paleo-plan.md). Prescribed border ice instead: yelmo_masks
+! border_width, [ice_bnd], yelmo experiment "None", mask_border "auto",
+! ytopo topo_rel = -1.
+! Present-day climate: ERA5 1981-2010 + ORAS5, MAR - ERA5 bias ([bias]).
 
 ! ===== Run setup =====
 
@@ -162,10 +165,14 @@
 /
 
 &bias
-    ! Static bias correction of the atmosphere. Planned: MAR - ERA5 over
-    ! Greenland, a FesmData product on GRL-PAL (docs/_grl-paleo-plan.md,
-    ! "Reference climate on GRL-PAL"); not available yet.
-    active   = False    ! Apply it?
+    ! Static bias correction of the atmosphere: MAR v3.14 - ERA5 (1981-2010)
+    ! over Greenland, tapered to zero within 100 km outside the MAR coverage
+    ! (docs/_grl-paleo-plan.md, "Reference climate on GRL-PAL"). Made with
+    ! [snap] lapse and f_p = 0.06: remake it when these change.
+    active   = True     ! Apply it?
+    var_defs = "input/clim_db.nml"
+    dtas     = "bias_mar_era5_1981_2010_dtas"
+    fpr      = "bias_mar_era5_1981_2010_fpr"
 /
 
 &orbit
@@ -179,7 +186,8 @@
 &ice_bnd
     ! Prescribed ice: H_ice_ref of Yelmo in its fixed and relaxation cells (the
     ! strip of yelmo_masks border_width) from an ice history at the forcing time.
-    active     = True
+    ! Off with the "infinite" borders (yelmo experiment).
+    active     = False
     method     = "file"               ! file: H_ice at the forcing time; scaled: H = f(index)*H_ice(slice_time)
     H_ice      = "paleomist_H_ice"    ! input/clim_db.nml: PaleoMIST 1.0, 80-0 ka (glac1d_H_ice: GLAC-1D, 26-0 ka)
     index      = ""                   ! scaled: the index f ([indices] names)
@@ -332,7 +340,8 @@
 &yelmo
     ! domain, grid_name and the grid come from &domain
     phys_const      = "Earth"
-    experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
+    experiment      = "infinite"        ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions; "infinite": border = inner neighbours
+    mask_border     = "dynamic"         ! Ice mask on the domain border: "auto" (by domain), "none", "fixed", "dynamic"
     nml_ytopo       = "ytopo"
     nml_ycalv       = "ycalv"
     nml_ydyn        = "ydyn"
@@ -374,7 +383,7 @@
     front_dHdx          = 0.0               ! [m/m] Thickness gradient assumed at a full front (front_subgrid)
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel            = -1                ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points; -1: bnd%tau_relax (the border_width strip)
+    topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points; -1: bnd%tau_relax (the border_width strip)
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
 
@@ -573,7 +582,7 @@
     mask_ice_fixed   = "none"
     relax            = "none"
     relax_tau        = 100.0             ! [yr] relaxation timescale of the inner cells of border_width
-    border_width     = 2 4               ! strip at the domain border: 2 fixed cells, 4 relaxation cells (ice from [ice_bnd])
+    border_width     = 0 0               ! strip at the domain border: N fixed cells, M relaxation cells (ice from [ice_bnd]); e.g. 2 4
     mask_rmse        = "region:Greenland & ~zone:open_ocean"
 /
 
@@ -610,7 +619,7 @@
 &snap
     ! Snapshot backend (snapshots): present day only, ERA5 1981-2010 (atmosphere)
     ! and ORAS5 (ocean); a MAR-quality reference over Greenland comes with
-    ! [bias] (planned). Databases: input/clim_db.nml; unset keys:
+    ! [bias]. Databases: input/clim_db.nml; unset keys:
     ! input/yelmox_defaults.nml.
     snapshots  = "pd"
     f_p        = 0.06

@@ -37,6 +37,8 @@ website:
             href: experiment-ismip7.md
           - text: "Antarctic paleo"
             href: experiment-ant-paleo.md
+          - text: "Greenland paleo"
+            href: experiment-grl-paleo.md
       - text: "Database namelists"
         href: database-namelists.md
       - text: "Multigrid coupling"
