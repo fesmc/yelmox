@@ -156,11 +156,13 @@
 
 &taper
     ! The atmosphere towards the reference with a static weight w in [0, 1]:
-    ! now = ref + w*(now - ref); w = 1 in the coverage of the reconstructions
+    ! now = ref + w*(now - ref) + (1 - w)*the mean anomaly over the cells with
+    ! w = 1 (outside = "mean"); w = 1 in the coverage of the reconstructions
     ! (the GRL box), 0 beyond 100 km.
-    active   = True     ! Apply it?
-    var_defs = "input/clim_db.nml" ! varslice databases of the weight, then this file
-    weight   = "taper_b18_b20" ! group of the weight w [1] (one 2D field)
+    active   = True                 ! Apply it?
+    var_defs = "input/clim_db.nml"  ! varslice databases of the weight, then this file
+    weight   = "taper_b18_b20"      ! group of the weight w [1] (one 2D field)
+    outside  = "mean"               ! where w < 1, towards: ref or mean (ref + the mean anomaly of the cells with w = 1)
 /
 
 &bias
