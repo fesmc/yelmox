@@ -35,7 +35,7 @@ lis_lgm    |yelmox/yelmox_LIS.nml                     |ctrl      |const|-21e3  |
 lis_pd     |yelmox/yelmox_LIS.nml                     |ctrl      |const|0      |10     |10   |idx_a.f_min=0
 north_lgm  |yelmox/yelmox_North.nml                   |ctrl      |const|-21e3  |10     |10   |
 north_pd   |yelmox/yelmox_North.nml                   |ctrl      |const|0      |10     |10   |idx_a.f_min=0
-pyrenees   |yelmox/yelmox_Pyrenees.nml                |ctrl      |rel  |-120e3 |0      |1000 |
+pyrenees   |yelmox/yelmox_Pyrenees.nml                |ctrl      |rel  |-21e3  |0      |1000 |
 srg_pd     |yelmox/yelmox_SRG.nml                     |ctrl      |const|1950   |10     |10   |
 ismip7_grl |yelmox/yelmox_esm_Greenland.nml           |transient |cal  |1975   |2300   |25   |ctrl.run_step=transient esm.experiment=ssp585 esm.use_esm=True esm.use_hist=True esm.use_proj=True
 ismip7_ant |yelmox/yelmox_esm_Antarctica_ismip7.nml   |transient |cal  |1975   |2300   |25   |ctrl.run_step=transient esm.experiment=ssp585 esm.use_esm=True esm.use_hist=True esm.use_proj=True
