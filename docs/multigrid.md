@@ -179,7 +179,7 @@ also describe the selection expressions used below
 (`layers`, `path_<layer>`, `var_<layer>`, e.g. the ISMIP7 basins).
 
 The other inputs are FesmData v2 products as well (`fesmdata/`, the link to
-`$FESMDATA/products` that runme copies into each run folder), on the grid of the
+`$FESMDATA` that runme copies into each run folder), on the grid of the
 component that reads them. The geothermal heat flux (`[ghf]`) and the sediments
 (`[sed]`) are remapped (bilinear) onto the Yelmo grid when their file is on
 another grid (its global attribute `grid_name`), so `obs_path` may name a coarser

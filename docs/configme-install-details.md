@@ -66,6 +66,6 @@ command -v runme >/dev/null 2>&1 || pip install git+https://github.com/fesmc/run
 # runme_config: create .runme_config and set hpc/account
 runme --config  # or: cp .runme/runme_config .runme_config
 # data_link ice_data: ln -s <path> ice_data
-# data_link fesmdata: ln -s <$FESMDATA/products> fesmdata   (FesmData v2 products, e.g. /work/ba1442/fesmdata/products)
+# data_link fesmdata: ln -s <$FESMDATA> fesmdata   (FesmData v2 products, e.g. /work/ba1442/fesmdata)
 # data_link isostasy_data: ln -s <path> isostasy_data
 ```

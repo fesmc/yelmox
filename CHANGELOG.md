@@ -6,8 +6,8 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Changed
-- FesmData v2 products from the link `fesmdata` (`$FESMDATA/products`, e.g.
-  `/work/ba1442/fesmdata/products`; was `ice_data/v2`), copied into the run folders by
+- FesmData v2 products from the link `fesmdata` (`$FESMDATA`, e.g.
+  `/work/ba1442/fesmdata`; was `ice_data/v2`), copied into the run folders by
   runme (`.runme/info.json` links). SRG topography `TOPO-GLO90-GEBCO2026`.
 - Isochrones from `Stratigraphy-MacGregor2025` (`pd_age_names = "age" "depth_iso"`; was
   `STRAT-M15`). `input/yelmo_defaults.nml` synced with yelmo.
