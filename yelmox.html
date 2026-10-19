@@ -143,6 +143,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -151,8 +155,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -170,12 +174,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -208,7 +240,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#climate-backends" id="toc-climate-backends" class="nav-link" data-scroll-target="#climate-backends">Climate backends</a></li>
   </ul></li>
   <li><a href="#stepping-order" id="toc-stepping-order" class="nav-link" data-scroll-target="#stepping-order">Stepping order</a></li>
-  <li><a href="#transient-time-series-forcing-tsgen" id="toc-transient-time-series-forcing-tsgen" class="nav-link" data-scroll-target="#transient-time-series-forcing-tsgen">Transient time-series forcing (<code>tsgen</code>)</a></li>
+  <li><a href="#indices-and-the-homogeneous-anomaly-indices-anom" id="toc-indices-and-the-homogeneous-anomaly-indices-anom" class="nav-link" data-scroll-target="#indices-and-the-homogeneous-anomaly-indices-anom">Indices and the homogeneous anomaly (<code>[indices]</code>, <code>[anom]</code>)</a></li>
+  <li><a href="#ocean-anomaly-from-the-atmosphere-ocn_fraction" id="toc-ocean-anomaly-from-the-atmosphere-ocn_fraction" class="nav-link" data-scroll-target="#ocean-anomaly-from-the-atmosphere-ocn_fraction">Ocean anomaly from the atmosphere (<code>[ocn_fraction]</code>)</a></li>
+  <li><a href="#ocean-from-the-ocean-box-model-ocn_obm" id="toc-ocean-from-the-ocean-box-model-ocn_obm" class="nav-link" data-scroll-target="#ocean-from-the-ocean-box-model-ocn_obm">Ocean from the ocean box model (<code>[ocn_obm]</code>)</a></li>
+  <li><a href="#regional-taper-to-the-reference-taper" id="toc-regional-taper-to-the-reference-taper" class="nav-link" data-scroll-target="#regional-taper-to-the-reference-taper">Regional taper to the reference (<code>[taper]</code>)</a></li>
+  <li><a href="#climate-bias-correction-bias" id="toc-climate-bias-correction-bias" class="nav-link" data-scroll-target="#climate-bias-correction-bias">Climate bias correction (<code>[bias]</code>)</a></li>
+  <li><a href="#insolation-and-orbit-orbit" id="toc-insolation-and-orbit-orbit" class="nav-link" data-scroll-target="#insolation-and-orbit-orbit">Insolation and orbit (<code>[orbit]</code>)</a></li>
+  <li><a href="#prescribed-ice-ice_bnd" id="toc-prescribed-ice-ice_bnd" class="nav-link" data-scroll-target="#prescribed-ice-ice_bnd">Prescribed ice (<code>[ice_bnd]</code>)</a></li>
   <li><a href="#configuration" id="toc-configuration" class="nav-link" data-scroll-target="#configuration">Configuration</a>
   <ul class="collapse">
   <li><a href="#ctrl" id="toc-ctrl" class="nav-link" data-scroll-target="#ctrl"><code>[ctrl]</code></a></li>
@@ -267,15 +305,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td><a href="./yelmox-bipolar.html"><code>yelmox_bipolar</code></a></td>
 <td><code>make yelmox_bipolar</code></td>
 <td>north + south</td>
-<td>snapclim (×2)</td>
-<td>snapclim + shared ocean box model</td>
+<td>snapshots (×2)</td>
+<td>snapshots + shared ocean box model</td>
 </tr>
 </tbody>
 </table>
 <ul>
 <li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (thin driver) + <code>libs/kryos*.f90</code> (domain, coupling, startup, output).</li>
 <li><strong>Build:</strong> <code>make yelmox</code> (<code>make yelmox rembo=1</code> to link REMBO).</li>
-<li><strong>Configs:</strong> <code>yelmox/yelmox_&lt;domain&gt;.nml</code> (Antarctica, Greenland, North, LIS, Pyrenees, SRG, plus <code>pd_</code> present-day and paleo variants), <code>yelmox_esm_*.nml</code> (<a href="./climate-esm.html">ESM forcing</a>), <code>yelmox_rembo_Greenland.nml</code> (<a href="./climate-rembo.html">REMBO</a>), <code>yelmox_Greenland_snapesm*.nml</code> (<a href="./climate-snap.html">snapesm</a>).</li>
+<li><strong>Configs:</strong> <code>yelmox/yelmox_&lt;domain&gt;.nml</code> (Antarctica, Greenland, North, LIS, Pyrenees, SRG, plus <code>pd_</code> present-day and paleo variants), <code>yelmox_esm_*.nml</code> (<a href="./climate-esm.html">ESM forcing</a>), <code>yelmox_rembo_Greenland.nml</code> (<a href="./climate-rembo.html">REMBO</a>), <code>yelmox_Greenland_ramp.nml</code> (an air temperature ramp: <code>[anom]</code> on a <code>ramp-slope</code> index).</li>
+<li><strong>Experiments:</strong> <a href="./experiment-greenland.html">Greenland</a>, <a href="./experiment-antarctica.html">Antarctica</a>, <a href="./experiment-ismip7.html">ISMIP7 projections</a>, <a href="./experiment-1pctco2.html">1pctCO2</a>, <a href="./experiment-tipmip.html">TIPMIP</a>, <a href="./experiment-ant-paleo.html">Antarctic paleo</a>, <a href="./experiment-grl-paleo.html">Greenland paleo</a>, <a href="./experiment-laurentide.html">Laurentide</a>, <a href="./experiment-mountain.html">Mountain glaciers</a>.</li>
 </ul>
 <section id="components" class="level2">
 <h2 class="anchored" data-anchor-id="components">Components</h2>
@@ -300,7 +339,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Climate (atmosphere + ocean)</td>
-<td>backend of <code>[comps] climate</code>: <a href="./climate-snap.html">snapclim, snapesm</a>, <a href="./climate-esm.html">esm</a> or <a href="./climate-rembo.html">rembo</a></td>
+<td>backend of <code>[comps] climate</code>: <a href="./climate-snapshots.html">snapshots</a>, <a href="./climate-esm.html">esm</a> or <a href="./climate-rembo.html">rembo</a></td>
 <td><code>grid_clim</code></td>
 </tr>
 <tr class="even">
@@ -334,23 +373,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>snapclim</code></td>
-<td>atmosphere + ocean profiles, from climate snapshots blended by indices</td>
-<td><a href="./climate-snap.html">snapclim and snapesm</a></td>
+<td><code>snapshots</code></td>
+<td>atmosphere + ocean profiles, from climate snapshots blended by indices, one blend model over any number of snapshots</td>
+<td><a href="./climate-snapshots.html">Snapshots</a></td>
 </tr>
 <tr class="even">
-<td><code>snapesm</code></td>
-<td>as snapclim, configured as one blend model over any number of snapshots</td>
-<td><a href="./climate-snap.html">snapclim and snapesm</a></td>
-</tr>
-<tr class="odd">
 <td><code>esm</code></td>
 <td>reference climatology + Earth-system-model anomalies; atmosphere or smb, ocean at the shelf base, subglacial discharge</td>
 <td><a href="./climate-esm.html">ESM forcing</a></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>rembo</code></td>
-<td>REMBOv1 atmosphere + smb; ocean from snapclim</td>
+<td>REMBOv1 atmosphere + smb; ocean from snapshots (ocean-only snapshot)</td>
 <td><a href="./climate-rembo.html">REMBO climate</a></td>
 </tr>
 </tbody>
@@ -364,64 +398,132 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">call step_isostasy(dom, ts, bsl)  ! bedrock + sea level (dt_isos cadence)</span></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">call step_icesheet(dom, ts)       ! yelmo_update</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">call step_surface(dom, ts)        ! surface mass balance + temperature</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">call step_shelf(dom, ts)          ! shelf-base melt + temperature</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">call step_ice_bnd(dom, ts, idx)   ! prescribed ice in the fixed/relaxation cells ([ice_bnd])</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">call step_icesheet(dom, ts)       ! yelmo_update</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">call step_climate(dom, ts, idx)   ! climate (dt_clim cadence)</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">call step_surface(dom, ts)        ! surface mass balance + temperature</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">call step_shelf(dom, ts)          ! shelf-base melt + temperature</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>couple_to_yelmo</code> assembles the Yelmo boundary state: isostasy from this step, smb and shelf melt from the <strong>previous</strong> step (a one-step coupling lag); <code>step_climate</code>, <code>step_surface</code> and <code>step_shelf</code> then produce the forcing consumed on the next step. The climate is refreshed on the <code>comps.dt_clim</code> cadence, isostasy on the <code>comps.dt_isos</code> cadence (the bedrock is held in between); the smb every step.</p>
 </section>
-<section id="transient-time-series-forcing-tsgen" class="level2">
-<h2 class="anchored" data-anchor-id="transient-time-series-forcing-tsgen">Transient time-series forcing (<code>tsgen</code>)</h2>
-<p><code>yelmox</code> can drive a spatially-homogeneous, time-varying anomaly into the climate (atmosphere and/or ocean) from the <code>tsgen</code> time-series generator (the modern replacement for the legacy <code>hyster</code> module). It is <strong>driver-owned</strong>: the program holds a <code>tsforcing_class</code> (<code>tsf</code>), advances it each step, and passes it to <code>step_climate</code> (and the cold start), which apply its <code>dTa</code> / <code>dTo</code> / <code>dSo</code>.</p>
-<p>Two namelist groups control it:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>tsforcing</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    active <span class="kw">=</span> True     <span class="co">! turn transient forcing on</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    f_ta   <span class="kw">=</span> <span class="fl">1.0</span>      <span class="co">! dTa = f_now * f_ta   (atmospheric temperature [K])</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    f_to   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dTo = f_now * f_to   (ocean temperature [K])</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    f_so   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dSo = f_now * f_so   (ocean salinity [psu])</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>tsgen</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    method    <span class="kw">=</span> <span class="st">"ramp-time"</span>   <span class="co">! const | ramp-slope | ramp-time | ramp-time-step | sin | exp | PI42 | ...</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    f_min     <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    f_max     <span class="kw">=</span> <span class="fl">5.0</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    dt_ramp   <span class="kw">=</span> <span class="fl">200.0</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">! ... (see tsgen.f90 for the full parameter set)</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>tsgen</code> produces a single scalar <code>f_now</code>, which the <code>[tsforcing]</code> gains map onto the three anomalies. Time-driven methods (<code>ramp-*</code>, <code>sin</code>, <code>const</code>) are analytic; feedback methods (<code>exp</code>, PI/PID controllers) modulate the forcing rate from the model response — the response variable passed to <code>tsgen</code> is total ice volume (Gt).</p>
-<p>How the anomalies reach the climate depends on the backend:</p>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Backend</th>
-<th><code>dTa</code> / <code>dTo</code> / <code>dSo</code></th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>snapclim</td>
-<td>used only in the <code>"anom"</code> methods (<code>snap.atm_type</code> for <code>dTa</code>, <code>snap.ocn_type</code> for <code>dTo</code>/<code>dSo</code>); ignored in the index-based methods (<code>snap_1ind_new</code>, <code>snap_2ind</code>, <code>hybrid</code>, …), as in the legacy <code>hyster</code> contract</td>
-</tr>
-<tr class="even">
-<td>snapesm</td>
-<td>added on top in every configuration</td>
-</tr>
-<tr class="odd">
-<td>esm</td>
-<td>not used: the backend has its own forcing</td>
-</tr>
-<tr class="even">
-<td>rembo</td>
-<td>mapped onto REMBO’s summer, annual and ocean anomalies (see <a href="./climate-rembo.html">REMBO</a>)</td>
-</tr>
-</tbody>
-</table>
-<p>With <code>active = False</code> (the default in the shipped configs) <code>step_climate</code> applies no anomalies.</p>
+<section id="indices-and-the-homogeneous-anomaly-indices-anom" class="level2">
+<h2 class="anchored" data-anchor-id="indices-and-the-homogeneous-anomaly-indices-anom">Indices and the homogeneous anomaly (<code>[indices]</code>, <code>[anom]</code>)</h2>
+<p><strong>Indices</strong> are named scalar series, each a <code>tsgen</code> time-series generator (the modern replacement for the legacy <code>hyster</code> module). They are <strong>driver-owned</strong>: the program holds one registry (<code>indices_class</code>, <code>idx</code>, libs/kryos_forcing.f90), advances every index once per step on the forcing clock <code>time_rel</code>, and passes it to <code>step_climate</code> (and the cold start); consumers read an index by name (the snapshots axes, <code>[anom]</code>). Multi-domain drivers share one registry.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>indices</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    names <span class="kw">=</span> <span class="st">"ramp"</span>            <span class="co">! "" = no indices</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>idx_ramp                     <span class="co">! a tsgen group (unset keys: template [idx])</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    method    <span class="kw">=</span> <span class="st">"ramp-time"</span>   <span class="co">! const | ramp-slope | ramp-time | ramp-time-step | sin | series | exp | PI42 | ...</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    f_min     <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    f_max     <span class="kw">=</span> <span class="fl">5.0</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    dt_ramp   <span class="kw">=</span> <span class="fl">200.0</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">! ... (see the [idx] template of input/yelmox_defaults.nml)</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">! units = "K" (label of idx_&lt;name&gt; in the 1D output, default "1"),</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">! restart_every_df = 0.5 (a restart bundle each |Δf|, default 0 = off)</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>anom</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    active <span class="kw">=</span> True     <span class="co">! a homogeneous anomaly from one index</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span>  <span class="kw">=</span> <span class="st">"ramp"</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    f_ta   <span class="kw">=</span> <span class="fl">1.0</span>      <span class="co">! dTa = f * f_ta   (air temperature [K])</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    f_to   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dTo = f * f_to   (ocean temperature [K])</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    f_so   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dSo = f * f_so   (ocean salinity [psu])</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Time-driven methods (<code>ramp-*</code>, <code>sin</code>, <code>const</code>, <code>series</code>) are analytic or tabulated; feedback methods (<code>exp</code>, PI/PID controllers) modulate the forcing rate from the model response — the response variable passed to <code>tsgen</code> is total ice volume (Gt). The run stops when any index trips its kill switch (<code>with_kill</code>), and writes a restart bundle <code>restart-&lt;n&gt;</code> each time an index moves by more than its <code>restart_every_df</code>. Each index restarts from <code>idx_&lt;name&gt;_restart.nc</code> in the bundle, and is written to the 1D output as <code>idx_&lt;name&gt;</code> (plus <code>idx_&lt;name&gt;_df_dt</code>).</p>
+<p><code>[anom]</code> is a climate modifier (libs/climate_mods.f90): applied to the backend’s output after the backend, before <code>[ocn_fraction]</code>, <code>[ocn_obm]</code>, <code>[taper]</code> and <code>[bias]</code>, on the climate grid. Air temperature + <code>dTa</code>, precipitation × exp(β·<code>dTa</code>) (β the backend’s precipitation sensitivity), ocean profiles + <code>dTo</code>/<code>dSo</code> (esm: at the shelf base). The group is optional (inactive without it) and takes the domain suffix (<code>anom&lt;sfx&gt;</code>). Checked at init: the index must be in the registry, and a backend that supplies the smb (esm with <code>surface_method = "climate"</code>) refuses it. rembo reads <code>[anom]</code> itself, as an input of REMBO (see <a href="./climate-rembo.html">REMBO</a>).</p>
+</section>
+<section id="ocean-anomaly-from-the-atmosphere-ocn_fraction" class="level2">
+<h2 class="anchored" data-anchor-id="ocean-anomaly-from-the-atmosphere-ocn_fraction">Ocean anomaly from the atmosphere (<code>[ocn_fraction]</code>)</h2>
+<p>The climate modifier after <code>[anom]</code>: the ocean temperature profiles, at every depth, are the reference plus <code>f_to</code> times the mean sea-level air temperature anomaly of the current update over a region (salinity unchanged):</p>
+<pre><code>to_ann = to_ann_ref + f_to * mean_region(tsl_ann - tsl_ann_ref)</code></pre>
+<p>The anomaly is that of the same update (no lag) and includes <code>[anom]</code>’s <code>dTa</code>; at sea level, it excludes the lapse-rate cooling of the ice sheet.</p>
+<pre><code>&amp;ocn_fraction
+    active = True
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean
+/</code></pre>
+<p><code>region</code> is <code>"all"</code> or a selection expression of the domain’s regions on the climate grid (<code>[regions]</code>, resolved once at init), e.g.&nbsp;<code>"zone:open_ocean"</code>, <code>"zone:open_ocean,continental_shelf"</code>, <code>"region:Greenland"</code>, <code>"~zone:land"</code> (terms <code>layer:values</code> joined by <code>&amp;</code> and <code>|</code>; see the fesm-utils regions docs). Its cell count is printed at init; an empty region stops the run. Refused for a backend without ocean profiles or sea-level air temperature (esm, rembo), and with <code>[anom] f_to /= 0</code> (both would set the ocean temperature anomaly). The anomaly is written to the climate’s 2D file (<code>ocn_fraction_dto</code>). See <a href="./climate-snapshots.html">Snapshots</a>.</p>
+</section>
+<section id="ocean-from-the-ocean-box-model-ocn_obm" class="level2">
+<h2 class="anchored" data-anchor-id="ocean-from-the-ocean-box-model-ocn_obm">Ocean from the ocean box model (<code>[ocn_obm]</code>)</h2>
+<p>The climate modifier after <code>[ocn_fraction]</code>, for <a href="./yelmox-bipolar.html"><code>yelmox_bipolar</code></a>: the ocean temperature profiles, at every depth, from the box of the domain’s hemisphere of the ocean box model (northern box <code>tn</code>, southern box <code>ts</code>); salinity unchanged:</p>
+<pre><code>absolute:  to_ann = box
+anomaly:   to_ann = to_ann_ref + (box - box_init)</code></pre>
+<pre><code>&amp;ocn_obm_north
+    active = True
+    mode   = "absolute"   ! absolute | anomaly
+/</code></pre>
+<p>The one modifier not applied in the climate step: the driver that owns the box model applies it (<code>climate_mod_ocn_obm</code>) after both domains’ climate steps and before their shelf steps; <code>active</code> is the switch of that exchange (<code>yelmox_bipolar</code> needs <code>[ctrl] active_obm</code>). <code>box_init</code> is the box’s initial value of the par file (<code>tn_init</code>, <code>ts_init</code>), also after a restart. Refused for an ocean at the shelf base (esm), and with <code>[ocn_fraction]</code> or <code>[anom] f_to /= 0</code> (it replaces the ocean temperature). The box temperature and its anomaly are written to the climate’s 2D file (<code>ocn_obm_theta</code>, <code>ocn_obm_dto</code>).</p>
+</section>
+<section id="regional-taper-to-the-reference-taper" class="level2">
+<h2 class="anchored" data-anchor-id="regional-taper-to-the-reference-taper">Regional taper to the reference (<code>[taper]</code>)</h2>
+<p>The climate modifier after <code>[ocn_obm]</code> and before <code>[bias]</code>: the atmosphere towards the reference climate with a static weight field w in [0, 1] on the climate grid,</p>
+<pre><code>now = ref + w*(now - ref)</code></pre>
+<p>for the monthly air temperature and precipitation, their annual means and the sea-level air temperature (those the backend supplies); w = 1 keeps the climate, w = 0 is the reference (e.g.&nbsp;outside the coverage of a reconstruction). The reference is taken at the current surface: a reference at its own elevation (snapshots: the surface of the reference snapshot) is moved there with the backend’s monthly lapse rate and <code>beta_p</code>, as the climate itself. The ocean is unchanged. Refused for a backend without a reference atmosphere (rembo).</p>
+<p><code>outside</code> sets the climate where w &lt; 1:</p>
+<ul>
+<li><p><code>"ref"</code> (default): towards the reference, as above;</p></li>
+<li><p><code>"mean"</code>: towards the reference plus the mean anomaly of the cells with w = 1, per month,</p>
+<pre><code>tas = tas_ref + w*(tas - tas_ref) + (1 - w)*dT(m)
+pr  = w*pr + (1 - w)*pr_ref*f(m)</code></pre>
+<p>with dT(m) the mean temperature difference and f(m) the ratio of the precipitation totals over the cells with w = 1 (both against the reference at the current surface); <code>ta_ann</code> and <code>tsl_ann</code> take the mean of dT(m), <code>pr_ann</code> the ratio of the annual totals. A weight without cells at w = 1 stops the run.</p></li>
+</ul>
+<pre><code>&amp;taper
+    active   = True
+    var_defs = ""         ! files with the group below, searched in order, then this file
+    weight   = "taper_w"  ! var_defs group of w [1]: one 2D field (time = 0 0 0 0 1)
+    outside  = "ref"      ! ref | mean: where w &lt; 1, towards the reference (plus the mean anomaly of the cells with w = 1)
+/</code></pre>
+<p>The weight is a varslice group on the climate grid or remapped online (<code>remap</code>, <code>grid_src</code>); values outside [0, 1] (or missing) stop the run. It is written to the climate’s 2D file (<code>taper_w</code>). <code>input/clim_db.nml</code> holds <code>taper_b18_b20</code>, the weight of the Greenland reconstructions on GreenlandPaleo (1 in their coverage, 0 beyond 100 km; <code>outside = "mean"</code> in <code>yelmox_GreenlandPaleo_lgm.nml</code> and <code>yelmox_GreenlandPaleo_deglac.nml</code>).</p>
+</section>
+<section id="climate-bias-correction-bias" class="level2">
+<h2 class="anchored" data-anchor-id="climate-bias-correction-bias">Climate bias correction (<code>[bias]</code>)</h2>
+<p>A static spatial correction of the atmosphere, the last climate modifier, applied on the climate grid to the monthly air temperature and precipitation of any backend except rembo (annual fields only), before the move to the surface grid’s elevation:</p>
+<pre><code>tas = tas + f_tas*dtas,    pr = pr*(1 + f_pr*(fpr - 1))</code></pre>
+<p>The annual means follow (temperature additively, precipitation by the ratio of the annual totals); the reference climate and the ocean are unchanged. The group is optional; without it, or with <code>active = False</code>, nothing changes.</p>
+<pre><code>&amp;bias
+    active   = True
+    var_defs = ""             ! files with the groups below, searched in order, then this file
+    dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
+    fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
+    f_tas    = 1.0            ! weight of dtas
+    f_pr     = 1.0            ! weight of fpr
+/</code></pre>
+<p><code>dtas</code> and <code>fpr</code> are varslice groups (as snapshots <code>var_defs</code>): one field for all months (<code>time = 0 0 0 0 1</code>) or 12 monthly fields (<code>time = 0 0 0 0 12</code>), on the climate grid or remapped online (<code>remap</code>, <code>grid_src</code>). The weighted annual fields are written to the climate’s 2D file (<code>bias_dtas_ann</code>, <code>bias_fpr_ann</code>).</p>
+</section>
+<section id="insolation-and-orbit-orbit" class="level2">
+<h2 class="anchored" data-anchor-id="insolation-and-orbit-orbit">Insolation and orbit (<code>[orbit]</code>)</h2>
+<p>The surface models that take the top-of-atmosphere insolation (chion’s ITM and BESSI, smbpal’s ITM) compute it with the <a href="https://github.com/fesmc/insol">insol</a> library (a dependency, <code>libinsol.a</code>), the daily mean in closed form from the orbital elements of Laskar et al.&nbsp;(2004). <code>[orbit]</code> (one per domain, <code>[orbit_north]</code> in yelmox_bipolar) gives the elements; both surface models read it:</p>
+<pre><code>&amp;orbit
+    method = "time"   ! clock: at the forcing clock time_rel; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0      ! [yr] model time of the orbit (time; relative to 1950, past &lt; 0)
+    ecc    = 0.016702 ! [1]   eccentricity (fixed)
+    obl    = 23.4393  ! [deg] obliquity (fixed)
+    per    = 102.918  ! [deg] longitude of perihelion (fixed)
+    fldr   = "input"  ! folder of the orbital tables
+/</code></pre>
+<p><code>clock</code> follows the forcing clock (<code>ts%time_rel</code>: transient insolation with <code>tstep_method = "rel"</code>); <code>time</code> holds the orbit of one time (present day by default, the 1950 orbit); <code>fixed</code> takes the given elements (the defaults are the tables’ at 1950). A fixed orbit is the one exception to the single forcing clock. Each model recomputes its insolation only when the elements change, so once per run unless <code>method = "clock"</code>. The par files list <code>method</code> and <code>time</code>; the other keys come from <code>input/yelmox_defaults.nml</code>.</p>
+</section>
+<section id="prescribed-ice-ice_bnd" class="level2">
+<h2 class="anchored" data-anchor-id="prescribed-ice-ice_bnd">Prescribed ice (<code>[ice_bnd]</code>)</h2>
+<p>Yelmo prescribes the ice thickness in its fixed cells (<code>mask_ice</code> = 1: <code>H_ice = H_ice_ref</code>) and relaxes it towards <code>H_ice_ref</code> in its relaxation cells (<code>tau_relax &gt; 0</code>, with <code>ytopo.topo_rel = -1</code>), set by <code>[yelmo_masks]</code>: a strip at the edge of the region where ice is allowed (<code>border_width = N M</code>: N fixed cells, then M relaxation cells with <code>relax_tau</code>), the expressions <code>mask_ice_fixed</code> and <code>relax</code>, or <code>yelmo.mask_border</code>. <code>[ice_bnd]</code> writes the thickness of an ice history into <code>H_ice_ref</code> in these cells, each step before <code>yelmo_update</code> (<code>step_ice_bnd</code>) and at the cold start; the interior keeps its <code>H_ice_ref</code> (the present-day ice):</p>
+<pre><code>file:    H_ice_ref = H_ice(time_rel)        (interpolated; the first or last slice outside the file)
+scaled:  H_ice_ref = f * H_ice(slice_time)  (f an index, e.g. before the file starts)</code></pre>
+<pre><code>&amp;ice_bnd
+    active     = True
+    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order, then this file
+    method     = "file"               ! file | scaled
+    H_ice      = "paleomist_H_ice"    ! var_defs group of the ice thickness [m]
+    index      = ""                   ! scaled: the index f ([indices] names)
+    slice_time = -21e3                ! [yr] scaled: time of the slice
+/</code></pre>
+<p><code>input/clim_db.nml</code> holds <code>paleomist_H_ice</code> (PaleoMIST 1.0, 80-0 ka every 2.5 kyr) and <code>glac1d_H_ice</code> (GLAC-1D, 26-0 ka every 100 yr), the IceHistory products on the ice grid. The forcing clock is <code>time_rel</code> (a constant-time run holds the ice of <code>tstep_const</code>). At the cold start the isostasy reference is taken before (the present-day ice: the prescribed ice of another time is a load). With a time-varying border use <code>[barysealevel] method = "file"</code>: under <code>fastiso</code> the prescribed ice would add to the barystatic sea level. <code>H_ice_ref</code> is written to <code>yelmo.nc</code>. Example: <code>yelmox_GreenlandPaleo.nml</code> (GRL-PAL, <code>border_width = 2 4</code>, <code>mask_ice_dynamic = "all"</code>).</p>
 </section>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
 <p>A run is set by these namelist groups. Every key is required (a missing key stops the run), except the keys of an unselected <code>init_method</code> and the <code>[relax]</code> and <code>[opt]</code> groups when their switch in <code>[sim]</code> is off.</p>
+<p>The forcing groups have defaults: <code>input/yelmox_defaults.nml</code> declares every key of <code>[indices]</code>, <code>[idx_&lt;name&gt;]</code> (template <code>[idx]</code>: the tsgen keys, <code>units</code>, <code>restart_every_df</code>), the snapshot backend (<code>[snap]</code>, templates <code>[snap_field]</code>, <code>[snap_snapshot]</code>, <code>[snap_axis]</code>), the climate modifiers (<code>[anom]</code>, <code>[ocn_fraction]</code>, <code>[ocn_obm]</code>, <code>[taper]</code>, <code>[bias]</code>), the orbit of the insolation (<code>[orbit]</code>), <code>[ice_bnd]</code> and <code>[obm_forcing]</code> (yelmox_bipolar), with the domain suffix of a multi-domain driver (<code>[anom_north]</code> to <code>[anom]</code>). A par file lists only what differs; an absent group takes every default (a modifier is then inactive). Each read goes through <code>nml_read(..., defaults_file, defaults_group)</code> (the path in <code>libs/yelmox_nml.f90</code>), and a key not declared there stops the run (<code>nml_validate</code>). <code>scripts/check_par_nml.py</code> checks the yelmo groups against <code>input/yelmo_defaults.nml</code> and these groups against <code>input/yelmox_defaults.nml</code> offline (<code>--dead</code>: keys of the other groups that no source reads). The other yelmox groups below are read without defaults.</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -440,21 +542,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td><code>[domain]</code></td>
-<td>the domain: name, grid of every component, hub topography and masks (see <a href="./multigrid.html">Multigrid coupling</a>)</td>
+<td>the domain: name, physical constants, grid of every component, basin set of the hub (<code>basins</code>) (see <a href="./multigrid.html">Multigrid coupling</a>)</td>
 </tr>
 <tr class="even">
+<td><code>[topo]</code>, <code>[regions]</code></td>
+<td>the hub topography; the regions, zones, basins and named masks (<code>masks</code>, <code>mask_&lt;name&gt;</code>)</td>
+</tr>
+<tr class="odd">
 <td><code>[comps]</code></td>
 <td>the components: which are active, with which model, how often</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>[sim]</code></td>
 <td>the conditions of this simulation: cold-start ice state, relaxation, optimization, regional modifications</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>[relax]</code>, <code>[opt]</code></td>
 <td>the parameters of the relaxation and the optimization switched on in <code>[sim]</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>[output]</code></td>
 <td>the output files; their intervals are <code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, and <code>[tm_rst]</code> for restarts</td>
 </tr>
@@ -462,41 +568,41 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <p>The models have their own groups (<code>[yelmo]</code> and the Yelmo physics groups, <code>[isos]</code>, <code>[barysealevel]</code>, <code>[marine_shelf]</code>, <code>[surface_chion]</code> + <code>[chion]</code>, <code>[smbpal]</code>, the climate backend’s, …). In <code>yelmox_bipolar</code> the domain groups carry the hemisphere suffix (<code>[domain_north]</code>, <code>[comps_north]</code>, <code>[sim_north]</code>, <code>[relax_north]</code>, <code>[opt_north]</code>, <code>[output_north]</code>, …); <code>[ctrl]</code> and the timeline are shared.</p>
 <p>A minimal skeleton:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>ctrl</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    run_step        <span class="kw">=</span> <span class="st">"ctrl"</span>            <span class="co">! timeline group ("ctrl" = this group)</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    calendar        <span class="kw">=</span> False</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    calendar_ref    <span class="kw">=</span> <span class="fl">1950.0</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    restart         <span class="kw">=</span> <span class="st">"None"</span>            <span class="co">! restart bundle folder, or "None" for a cold start</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    tstep_method    <span class="kw">=</span> <span class="st">"const"</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    tstep_const     <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    time_init       <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    time_<span class="kw">end</span>        <span class="kw">=</span> <span class="fl">15e3</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    dtt             <span class="kw">=</span> <span class="fl">10.0</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>comps</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    with_ice_sheet  <span class="kw">=</span> True</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    with_isostasy   <span class="kw">=</span> True</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    with_climate    <span class="kw">=</span> True</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    with_surface    <span class="kw">=</span> True</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    with_shelf      <span class="kw">=</span> True</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    climate         <span class="kw">=</span> <span class="st">"snapclim"</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    surface_method  <span class="kw">=</span> <span class="st">"chion"</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    dt_clim         <span class="kw">=</span> <span class="fl">10.0</span></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    dt_isos         <span class="kw">=</span> <span class="fl">10.0</span></span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>sim</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    init_method       <span class="kw">=</span> <span class="st">"none"</span></span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    init_marine_H     <span class="kw">=</span> False</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    init_kill_shelves <span class="kw">=</span> False</span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    init_time_thrm    <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    relax             <span class="kw">=</span> True            <span class="co">! uses [relax]</span></span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    opt               <span class="kw">=</span> True            <span class="co">! uses [opt]</span></span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>    use_negis         <span class="kw">=</span> False</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    scale_glacial_smb <span class="kw">=</span> False</span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    lim_pd_ice        <span class="kw">=</span> False</span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>ctrl</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    run_step        <span class="kw">=</span> <span class="st">"ctrl"</span>            <span class="co">! timeline group ("ctrl" = this group)</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    calendar        <span class="kw">=</span> False</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    calendar_ref    <span class="kw">=</span> <span class="fl">1950.0</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    restart         <span class="kw">=</span> <span class="st">"None"</span>            <span class="co">! restart bundle folder, or "None" for a cold start</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    tstep_method    <span class="kw">=</span> <span class="st">"const"</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    tstep_const     <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    time_init       <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    time_<span class="kw">end</span>        <span class="kw">=</span> <span class="fl">15e3</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>    dtt             <span class="kw">=</span> <span class="fl">10.0</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>comps</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>    with_ice_sheet  <span class="kw">=</span> True</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    with_isostasy   <span class="kw">=</span> True</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    with_climate    <span class="kw">=</span> True</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    with_surface    <span class="kw">=</span> True</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>    with_shelf      <span class="kw">=</span> True</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>    climate         <span class="kw">=</span> <span class="st">"snapshots"</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>    surface_method  <span class="kw">=</span> <span class="st">"chion"</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>    dt_clim         <span class="kw">=</span> <span class="fl">10.0</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>    dt_isos         <span class="kw">=</span> <span class="fl">10.0</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>sim</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>    init_method       <span class="kw">=</span> <span class="st">"none"</span></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>    init_marine_H     <span class="kw">=</span> False</span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>    init_kill_shelves <span class="kw">=</span> False</span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>    init_time_thrm    <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    relax             <span class="kw">=</span> True            <span class="co">! uses [relax]</span></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>    opt               <span class="kw">=</span> True            <span class="co">! uses [opt]</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>    use_negis         <span class="kw">=</span> False</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>    scale_glacial_smb <span class="kw">=</span> False</span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>    lim_pd_ice        <span class="kw">=</span> False</span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <section id="ctrl" class="level3">
 <h3 class="anchored" data-anchor-id="ctrl"><code>[ctrl]</code></h3>
 <table class="caption-top table">
@@ -531,7 +637,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tbody>
 </table>
 <p>The timeline group holds <code>tstep_method</code> (<code>"const"</code>: the time advances and the forcing time stays at <code>tstep_const</code>; <code>"rel"</code>: the forcing follows the time, e.g. for paleo records; <code>"cal"</code>: calendar time), <code>tstep_const</code>, <code>time_init</code>, <code>time_end</code> and the main time step <code>dtt</code> [yr].</p>
-<p>A restart bundle is a folder <code>restart-&lt;kyr&gt;-kyr/</code>, written on the <code>[tm_rst]</code> schedule and always at <code>time_end</code>. It holds one restart file per stateful model, the shared sea level and the transient-forcing state (in <code>yelmox_bipolar</code> also the ocean box model, with each domain in a subfolder named after it). Pass <code>restart</code> as an absolute path: the run starts inside its own folder.</p>
+<p>A restart bundle is a folder <code>restart-&lt;kyr&gt;-kyr/</code>, written on the <code>[tm_rst]</code> schedule and always at <code>time_end</code>. It holds one restart file per stateful model, the shared sea level and the transient-forcing state (in <code>yelmox_bipolar</code> also the ocean box model, with each domain in a subfolder named after it). Pass <code>restart</code> as an absolute path: the run starts inside its own folder. A restart continues the run bit for bit: the state is restored, not stepped again (the surface restart files carry the annual fields of the last cycle); only the climate is re-derived from it, which equals the run’s own when the restart time lies on its <code>dt_clim</code> cadence (counted from the start of the run, as are <code>dt_isos</code> and the <code>[relax]</code>, <code>[opt]</code> time windows).</p>
 </section>
 <section id="comps" class="level3">
 <h3 class="anchored" data-anchor-id="comps"><code>[comps]</code></h3>
@@ -557,13 +663,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="even">
 <td><code>climate</code></td>
-<td><code>snapclim</code>, <code>snapesm</code>, <code>esm</code>, <code>rembo</code></td>
+<td><code>snapshots</code>, <code>esm</code>, <code>rembo</code></td>
 <td>the climate backend</td>
 </tr>
 <tr class="odd">
 <td><code>surface_method</code></td>
 <td><code>chion</code> (default), <code>smbpal</code>, <code>smb_simple</code>, <code>climate</code></td>
-<td>chion or smbpal (ITM or PDD), both from the climate’s temperature and precipitation; chion runs the ITM, BESSI or PDD snowpack (<code>[chion] model</code>) in daily steps (<code>[surface_chion]</code>, <code>[chion]</code>; ITM’s parameters are the group <code>[chion] nml_itm</code> names: smbpal’s <code>[itm]</code>, or for Greenland <code>[itm_chion]</code> (<code>alb_ice = 0.31</code>, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times <code>trans_sw</code>, the TOA insolation itself (chion’s cloud-proxy longwave), the ice thickness, a constant <code>wind_speed</code> and <code>rel_hum</code>, and the air pressure from the surface elevation; its constants are <code>[chion_const]</code>, for Greenland <code>alpha_ice = 0.55</code>, calibrated to MAR; BESSI runs pass <code>surface_chion.time_equil=20</code>, converged within 0.3 Gt/yr of the par files’ 100 yr, which ITM needs; PDD’s parameters are the group <code>[chion] nml_pdd</code> names, <code>[pdd_chion]</code> with <code>pdd_method = "cg05"</code> (Calov and Greve, 2005), smbpal’s PDD; the surface temperature of ITM and PDD is chion’s <code>chion_tsrf_annual</code>, the annual-mean air temperature warmed by <code>firn_fac</code> times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate’s own smb (esm, rembo; required by rembo)</td>
+<td>chion or smbpal (ITM or PDD), both from the climate’s temperature and precipitation; chion runs the ITM, BESSI or PDD snowpack (<code>[chion] model</code>) in daily steps (<code>[surface_chion]</code>, <code>[chion]</code>; ITM’s parameters are the group <code>[chion] nml_itm</code> names: smbpal’s <code>[itm]</code>, or for Greenland <code>[itm_chion]</code> (<code>alb_ice = 0.31</code>, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times <code>trans_sw</code>, the TOA insolation itself (chion’s cloud-proxy longwave), the ice thickness, a constant <code>wind_speed</code> and <code>rel_hum</code>, and the air pressure from the surface elevation; its constants are <code>[chion_const]</code>, for Greenland <code>alpha_ice = 0.55</code>, calibrated to MAR; BESSI runs pass <code>surface_chion.time_equil=20</code>, converged within 0.3 Gt/yr of the par files’ 100 yr, which ITM needs; PDD’s parameters are the group <code>[chion] nml_pdd</code> names, <code>[pdd_chion]</code> with <code>pdd_method = "cg05"</code> (Calov and Greve, 2005), smbpal’s PDD; the surface temperature of ITM and PDD is chion’s <code>chion_tsrf_annual</code>, the annual-mean air temperature warmed by <code>firn_fac</code> times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapshots); the climate’s own smb (esm, rembo; required by rembo)</td>
 </tr>
 <tr class="even">
 <td><code>dt_clim</code></td>
@@ -611,46 +717,51 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td><code>recon</code>, <code>recon_ref</code>: the reconstruction file (<code>{domain}</code>, <code>{grid_name}</code> = <code>grid_ice</code>) and its ice-thickness variable</td>
 </tr>
 <tr class="even">
+<td><code>recon_time</code></td>
+<td>yr</td>
+<td><code>recon</code>, <code>recon_ref</code>: model time of the state; the nearest slice of <code>recon_path</code> (its time axis converted from the units: <code>years ago</code>/<code>BP</code> count into the past, <code>kiloyears</code>/<code>ka</code> in thousands)</td>
+</tr>
+<tr class="odd">
 <td><code>recon_regions</code></td>
 <td>selection expression</td>
 <td><code>recon</code>: where its ice is imposed (e.g.&nbsp;<code>"region:North_America"</code>)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>init_marine_H</code></td>
 <td>bool</td>
 <td>LGM-like marine ice, before <code>init_method</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>init_kill_shelves</code></td>
 <td>bool</td>
 <td>no ice where the present-day bed is ocean</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>init_time_thrm</code></td>
 <td>[yr]</td>
 <td>then equilibrate with the topography fixed (<code>0</code> = off)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>relax</code></td>
 <td>bool</td>
 <td>relax the topography towards the reference (<code>[relax]</code>)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>opt</code></td>
 <td>bool</td>
 <td>optimize the basal friction and the thermal-forcing correction (<code>[opt]</code>)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>use_negis</code></td>
 <td>bool</td>
 <td>NEGIS basal-friction modification (<code>[negis]</code>)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>scale_glacial_smb</code></td>
 <td>bool</td>
 <td>reduce negative glacial smb (<code>[glacial_smb]</code>)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>lim_pd_ice</code></td>
 <td>bool</td>
 <td>extra melt (4 m/yr) outside the present-day ice extent</td>
@@ -752,7 +863,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td><code>write_yelmo</code></td>
-<td><code>yelmo.nc</code>, <code>yelmo_sm.nc</code>, <code>yelmo_ts.nc</code> (and <code>yelmo_ts_&lt;region&gt;.nc</code> for the named regions of <code>[domain]</code>)</td>
+<td><code>yelmo.nc</code>, <code>yelmo_sm.nc</code>, <code>yelmo_ts.nc</code> (and <code>yelmo_ts_&lt;name&gt;.nc</code> for the named masks of <code>[regions]</code>)</td>
 </tr>
 <tr class="even">
 <td><code>write_isos</code></td>
@@ -768,7 +879,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td><code>write_clim</code></td>
-<td>the backend’s file: <code>snap.nc</code> (snapclim, snapesm), <code>esm.nc</code> + <code>esm_ts.nc</code>, <code>rembo.nc</code> + <code>rembo_ts.nc</code></td>
+<td>the backend’s file: <code>snap.nc</code> (snapshots), <code>esm.nc</code> + <code>esm_ts.nc</code>, <code>rembo.nc</code> + <code>rembo_ts.nc</code></td>
 </tr>
 <tr class="even">
 <td><code>write_htopo</code></td>

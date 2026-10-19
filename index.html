@@ -143,6 +143,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -151,8 +155,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -170,12 +174,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -233,7 +265,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="what-configme-install-yelmox-does" class="level2">
 <h2 class="anchored" data-anchor-id="what-configme-install-yelmox-does">What <code>configme install yelmox</code> does</h2>
-<p><code>configme install yelmox</code> clones YelmoX and its component repositories (<code>fesm-utils</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>), configures each for your machine and compiler, links them into the YelmoX directory, and builds <code>fesm-utils</code> (LIS + FFTW + utils, which can take 10-30 min). If <code>configme</code> can detect your machine from the hostname it does so, otherwise it prompts you.</p>
+<p><code>configme install yelmox</code> clones YelmoX and its component repositories (<code>fesm-utils</code>, <code>yelmo</code>, <code>FastIsostasy</code>, <code>rembo1</code>, <code>chion</code>, <code>insol</code>), configures each for your machine and compiler, links them into the YelmoX directory, and builds <code>fesm-utils</code> (LIS + FFTW + utils, which can take 10-30 min). If <code>configme</code> can detect your machine from the hostname it does so, otherwise it prompts you.</p>
 <p>The only system dependency you must install yourself is <strong>netCDF</strong> (see the <a href="https://fesmc.github.io/yelmo/getting-started.html#dependencies">Yelmo dependencies notes</a> for installation tips). Everything else — LIS, FFTW, the <code>fesm-utils</code> libraries, the component repositories, their links, and <code>runme</code> — is managed by <code>configme</code>.</p>
 <p>Common options:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">configme</span> install yelmox <span class="at">-m</span> dkrz_levante <span class="at">-c</span> ifx   <span class="co"># pick the machine + compiler explicitly</span></span>

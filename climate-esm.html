@@ -108,6 +108,10 @@ ul.task-list li input[type="checkbox"] {
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -116,8 +120,8 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -135,12 +139,40 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -199,15 +231,17 @@ ul.task-list li input[type="checkbox"] {
 <p>Runs forced by <strong>Earth-System-Model (ESM) output</strong> (ISMIP7, TIPMIP, 1pctCO2) use the <code>yelmox</code> program with the ESM climate backend: <code>[comps] climate = "esm"</code>. The backend wraps <code>libs/esm_forcing.f90</code>: a reference climatology at the current surface (lapse rate, precipitation scaling), plus ESM anomalies over historical and projection periods, optional climate variability and subglacial discharge.</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (<code>make yelmox</code>), backend in <code>libs/yelmox_climate.f90</code>.</li>
-<li><strong>Config:</strong> <code>yelmox/yelmox_esm_*.nml</code> (Antarctica ISMIP7, Greenland, 1pctCO2, TIPMIP).</li>
-<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> (spin-ups <code>opt_*.sh</code>, workflows <code>run_ismip7_*.sh</code>; see <a href="./experiment-ismip7.html">ISMIP7 projections</a>), <code>scripts/tipmip/</code>, <code>scripts/1pctCO2/</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_esm_*.nml</code>: ISMIP7 (<code>yelmox_esm_Greenland.nml</code>, <code>yelmox_esm_Greenland_k24.nml</code>, <code>yelmox_esm_Antarctica_ismip7.nml</code>), 1pctCO2 (<code>yelmox_esm_*_1pctCO2.nml</code>), TIPMIP (<code>yelmox_esm_Greenland_tipmip.nml</code>), and <code>yelmox_esm_Antarctica.nml</code>, <code>yelmox_esm_Antarctica_nudge.nml</code>.</li>
+<li><strong>Forcing data:</strong> <code>input/esm/esm_*.nml</code> (<code>[esm] par_file</code>).</li>
+<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> (spin-ups <code>opt_*.sh</code>, workflows <code>run_ismip7_*.sh</code>; see <a href="./experiment-ismip7.html">ISMIP7 projections</a>), <code>scripts/1pctCO2/</code> (see <a href="./experiment-1pctco2.html">1pctCO2</a>), <code>scripts/tipmip/</code> (see <a href="./experiment-tipmip.html">TIPMIP Greenland</a>).</li>
 </ul>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
 <ul>
 <li><strong>Run phase and calendar.</strong> <code>[ctrl] run_step</code> names the group holding the timeline (<code>"spinup"</code> or <code>"transient"</code>), with <code>calendar = True</code> and <code>calendar_ref = 2000.0</code>: the timeline is in calendar years. The same group holds the ESM periods (<code>time_ref</code>, <code>time_hist</code>, <code>time_proj</code>, <code>time_esm_ref</code>) and the variability switches (<code>clim_var</code>, <code>clim_seed</code>).</li>
-<li><strong>Experiment.</strong> <code>[esm]</code>: <code>par_file</code> (the ESM data configuration in <code>input/esm/</code>), <code>experiment</code>, <code>esm_name</code>, <code>use_esm</code> / <code>use_var</code> / <code>use_hist</code> / <code>use_proj</code>, and the physical parameters <code>lapse</code>, <code>f_p</code>, <code>f_ocn</code>, <code>f_polar</code>, <code>dT_threshold</code>.</li>
-<li><strong>Forcing on other grids.</strong> A field group of the <code>par_file</code> is normally read on the climate grid. With <code>remap</code> (a kernel: <code>bilinear</code>, <code>shepard</code>, <code>nn</code>, <code>quadrant</code>, <code>con</code>) and <code>grid_src</code> (a name for the file’s grid, e.g.&nbsp;<code>"{gcm}-atm"</code>) it is read on its own grid and remapped online: a projected grid with a cdo description <code>grid_&lt;grid_src&gt;.txt</code> next to the file (as FesmData writes it) or in <code>maps/</code>, a regular lon-lat grid from its 1D axes (the map is cached in <code>maps/</code>), or a curvilinear grid (e.g.&nbsp;a tripolar ocean) from the 2D lon/lat named in the variable’s <code>coordinates</code> attribute. The 1pctCO2 configs read the global CMIP fields this way, and the Greenland configs the ORAS5 reference ocean, which FesmData provides on GRL-16KM and GRL-32KM only, from GRL-16KM.</li>
+<li><strong>Experiment.</strong> <code>[esm]</code>: <code>par_file</code> (the ESM data configuration in <code>input/esm/</code>), <code>experiment</code> and <code>esm_name</code> (the <code>{experiment}</code> and <code>{gcm}</code> of its file paths), <code>use_esm</code> / <code>use_var</code> / <code>use_hist</code> / <code>use_proj</code>, <code>basins</code> (the basins of the ocean extrapolation), and the physical parameters <code>lapse</code> (annual mean and summer lapse rate; the monthly lapse rate follows a seasonal cosine), <code>f_p</code> (precipitation scaled by <code>exp(f_p dT)</code> with the temperature change <code>dT</code> of the elevation correction), <code>f_ocn</code>, <code>f_polar</code>, <code>dT_threshold</code>.</li>
+<li><strong>Anomalies.</strong> In the spin-up the backend applies the reference climatology only. In a transient run (<code>run_step = "transient"</code>) with <code>use_esm = True</code> and <code>experiment</code> other than <code>"ctrl"</code>, it reads the ESM groups of the <code>par_file</code> and adds anomalies relative to the mean over <code>time_esm_ref</code>: up to <code>time_hist(2)</code> from the historical groups, from <code>time_proj(1)</code> on from the projection groups. Air temperature and smb anomalies are differences, precipitation a ratio, the ocean anomalies are annual means taken at the shelf base. 1pctCO2 and TIPMIP point the reference and projection groups at the same file. With <code>use_esm = False</code>, <code>experiment = "1pctCO2"</code> instead applies a spatially uniform anomaly (a linear warming of 17 K from 1995 to 2300, capped at <code>dT_threshold</code>, times <code>f_polar</code>; the ocean <code>f_ocn</code> times that); <code>f_ocn</code>, <code>f_polar</code> and <code>dT_threshold</code> act only there.</li>
+<li><strong>Forcing on other grids.</strong> A field group of the <code>par_file</code> is normally read on the climate grid. With <code>remap</code> (a kernel: <code>bilinear</code>, <code>shepard</code>, <code>nn</code>, <code>quadrant</code>, <code>con</code>) and <code>grid_src</code> (a name for the file’s grid, e.g.&nbsp;<code>"{gcm}-atm"</code>) it is read on its own grid and remapped online: a projected grid with a cdo description <code>grid_&lt;grid_src&gt;.txt</code> next to the file (as FesmData writes it) or in <code>maps/</code>, a regular lon-lat grid from its 1D axes (the map is cached in <code>maps/</code>), or a curvilinear grid (e.g.&nbsp;a tripolar ocean) from the 2D lon/lat named in the variable’s <code>coordinates</code> attribute. <code>fill = "nearest"</code> fills the missing values from the nearest valid cell. The 1pctCO2 configs read the global CMIP fields this way, and the Greenland configs the ORAS5 reference ocean, which FesmData provides on GRL-16KM and GRL-32KM only, from GRL-16KM.</li>
 <li><strong>Surface mass balance.</strong> <code>[comps] surface_method = "climate"</code> takes the ESM’s own SMB (reference + anomaly, corrected from the present-day surface with the SMB elevation gradient); <code>"chion"</code> (the default) or <code>"smbpal"</code> computes it from the ESM temperature and precipitation.</li>
 <li><strong>Update cadence.</strong> <code>[comps] dt_clim = 1.0</code>: the forcing is updated every step. The spin-up scripts pass <code>comps.dt_clim=10</code>: the forcing of a spin-up is a fixed climatology, so only the geometry correction changes between updates.</li>
 <li><strong>Cold start.</strong> <code>[sim] init_kill_shelves</code> (no ice where the present-day bed is ocean) and <code>init_time_thrm</code> (equilibration with topography fixed), shared with the other configurations.</li>

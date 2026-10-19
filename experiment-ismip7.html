@@ -143,6 +143,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -151,8 +155,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -170,12 +174,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -205,7 +237,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#running-the-workflow" id="toc-running-the-workflow" class="nav-link active" data-scroll-target="#running-the-workflow">Running the workflow</a></li>
   <li><a href="#tuned-spin-ups" id="toc-tuned-spin-ups" class="nav-link" data-scroll-target="#tuned-spin-ups">Tuned spin-ups</a></li>
-  <li><a href="#forcing" id="toc-forcing" class="nav-link" data-scroll-target="#forcing">Forcing</a></li>
+  <li><a href="#greenland-with-k24-hydrology" id="toc-greenland-with-k24-hydrology" class="nav-link" data-scroll-target="#greenland-with-k24-hydrology">Greenland with K24 hydrology</a></li>
+  <li><a href="#forcing" id="toc-forcing" class="nav-link" data-scroll-target="#forcing">Forcing</a>
+  <ul class="collapse">
+  <li><a href="#forcing-figures" id="toc-forcing-figures" class="nav-link" data-scroll-target="#forcing-figures">Forcing figures</a></li>
+  </ul></li>
   <li><a href="#output" id="toc-output" class="nav-link" data-scroll-target="#output">Output</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/experiment-ismip7.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -237,9 +273,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the ESM climate backend (<code>[comps] climate = "esm"</code>, see <a href="./climate-esm.html">ESM forcing</a>).</li>
 <li><strong>Config:</strong> <code>yelmox/yelmox_esm_Greenland.nml</code>, <code>yelmox/yelmox_esm_Antarctica_ismip7.nml</code>.</li>
 <li><strong>Forcing data:</strong> <code>input/esm/esm_grl_ismip7.nml</code>, <code>input/esm/esm_ant_ismip7.nml</code> (see <a href="./database-namelists.html">Database namelists</a>).</li>
-<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> – workflows <code>run_ismip7_greenland.sh</code>, <code>run_ismip7_antarctica.sh</code>; tuned spin-ups <code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code>, <code>opt_ant.sh</code>.</li>
+<li><strong>Scripts:</strong> <code>scripts/ismip7/</code> – workflows <code>run_ismip7_greenland.sh</code>, <code>run_ismip7_antarctica.sh</code>; tuned spin-ups <code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code>, <code>opt_grl_k24.sh</code>, <code>opt_ant.sh</code>.</li>
 </ul>
-<p>The par files on their own run a 10-yr forcing-only smoke test (<code>[sim] opt = False</code>, <code>[spinup] time_end = 10</code>); the scripts set the run phase and length.</p>
+<p>The par files on their own run the optimization spin-up without relaxation (<code>[ctrl] run_step = "spinup"</code>, <code>[sim] opt = True</code>, <code>relax = False</code>, <code>[spinup] time_end</code> = 15 kyr for Greenland, 20 kyr for Antarctica); the scripts set the run phase, the relaxation and the run length. <a href="./experiment-1pctco2.html">1pctCO2</a> and <a href="./experiment-tipmip.html">TIPMIP</a> follow the same two-step workflow.</p>
 <section id="running-the-workflow" class="level2">
 <h2 class="anchored" data-anchor-id="running-the-workflow">Running the workflow</h2>
 <p>Run from the yelmox root, one step after the other: the scenarios read the spin-up’s last restart bundle.</p>
@@ -300,7 +336,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p>The spin-up passes <code>ctrl.run_step=spinup sim.relax=True sim.opt=True</code>; each scenario passes <code>ctrl.run_step=transient</code>, <code>esm.use_esm/use_hist/use_proj=True</code> and <code>ctrl.restart</code> = the bundle <code>&lt;OUTROOT&gt;/spinup/restart-&lt;SPINUP_YEARS/1e3&gt;-kyr</code> as an absolute path (the run starts inside its own folder).</p>
+<p>The spin-up passes <code>ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True</code>; each scenario passes <code>ctrl.run_step=transient</code>, <code>esm.experiment=&lt;ssp&gt;</code>, <code>esm.esm_name=&lt;GCM&gt;</code>, <code>esm.use_esm/use_hist/use_proj=True</code> and <code>ctrl.restart</code> = the bundle <code>&lt;OUTROOT&gt;/spinup/restart-&lt;SPINUP_YEARS/1e3&gt;-kyr</code> as an absolute path (the run starts inside its own folder).</p>
 <p><strong>Other grids.</strong> The full input set exists for <code>GRL-8KM</code>, <code>GRL-16KM</code> and <code>ANT-8KM</code>, <code>ANT-16KM</code>, <code>ANT-32KM</code> (GRL-4KM: inputs present since 2026-10, not yet tested). The Antarctic par file reads the Earth structure of ANT-16KM (<code>[isos] rheology_file</code>): with another grid, also pass <code>isos.rheology_file=isostasy_data/earth_structure/yelmo/&lt;GRID&gt;_GIA_HR24.nc</code> (as <code>opt_ant.sh</code> does).</p>
 <p><strong>Short spin-ups.</strong> The spin-up relaxes the ice thickness towards the observations at first (<code>[relax] tau1/2</code>, until <code>time2</code>: 6 kyr for Greenland). A spin-up that ends before then hands the scenarios ice that the relaxation was holding in place, e.g.&nbsp;thin margin ice under negative SMB, which is then lost within the first years.</p>
 </section>
@@ -308,9 +344,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="tuned-spin-ups">Tuned spin-ups</h2>
 <p><code>opt_grl.sh</code>, <code>opt_grl_ismip.sh</code> (L. Gutierrez Gonzalez) and <code>opt_ant.sh</code> are 15-kyr optimization spin-ups with tuned parameters on top of the par files: <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>, the <code>ytill</code> parameters), a short relaxation (<code>relax.time1/2 = 100</code>), equilibrium calving, DIVA dynamics and shelf enhancement 0.5; <code>opt_grl_ismip.sh</code> uses von Mises calving (<code>vm-l19</code>) and a linear melt law. To run the scenarios from one of them, set <code>BUNDLE</code> in the workflow script to its last restart bundle.</p>
 </section>
+<section id="greenland-with-k24-hydrology" class="level2">
+<h2 class="anchored" data-anchor-id="greenland-with-k24-hydrology">Greenland with K24 hydrology</h2>
+<p><code>yelmox/yelmox_esm_Greenland_k24.nml</code> is <code>yelmox_esm_Greenland.nml</code> with the K24 subglacial hydrology of FastHydrology: <code>[yhyd] method_transport = 1</code>, so K24 sets the effective pressure <code>N_eff</code> (the bucket closure <code>bkt_N_closure</code> is not used), with <code>k24_sliding_law = 4</code> (the frictional heat of Yelmo’s basal stress enters the K24 water source), <code>k24_N_ub_coupled = True</code> (<code>N_eff</code> re-evaluated from the basal velocity inside the DIVA iteration) and the physical water viscosity <code>k24_water_viscosity = 1.8e-3</code> Pa s. <code>opt_grl_k24.sh</code> is <code>opt_grl.sh</code> with this par file, written to <code>output/ismip7/GRL-8KM/opt-l21-grimp-k24</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/ismip7/opt_grl_k24.sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>run_ismip7_greenland.sh</code> reads <code>yelmox_esm_Greenland.nml</code>; there is no K24 workflow script.</p>
+</section>
 <section id="forcing" class="level2">
 <h2 class="anchored" data-anchor-id="forcing">Forcing</h2>
-<p>The atmosphere and ocean are a reference climatology plus ESM anomalies relative to <code>time_esm_ref</code> (1960–1989), applied over <code>time_hist</code> (1850–2014) and <code>time_proj</code> (2015–2300).</p>
+<p>The atmosphere and ocean are a reference climatology plus ESM anomalies relative to <code>time_esm_ref</code> (1960–1989), applied over <code>time_hist</code> (1850–2014) and <code>time_proj</code> (2015–2300). The spin-up (<code>run_step = "spinup"</code>, <code>[esm] experiment = "ctrl"</code>) applies the reference climatology only; the ESM fields are read in the scenarios (<code>run_step = "transient"</code>, <code>use_esm = True</code>).</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -337,7 +379,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>ESM atmosphere</td>
-<td>ISMIP7 SDBN1 <code>tas</code>, <code>pr</code>, <code>acabf</code>, <code>dacabfdz</code></td>
+<td>ISMIP7 SDBN1 <code>tas</code>, <code>acabf</code>, <code>dacabfdz</code> (<code>pr</code> instead of <code>acabf</code>, <code>dacabfdz</code> with <code>surface_method = "chion"</code>)</td>
 <td>same, <code>v2</code></td>
 </tr>
 <tr class="even">
@@ -347,8 +389,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>ESM ocean</td>
-<td>ISMIP7 <code>tf</code>, <code>so</code> (2D)</td>
-<td>ISMIP7 <code>thetao</code>, <code>so</code> (3D, <code>v3</code>)</td>
+<td>ISMIP7 <code>tf</code>, <code>so</code> (2D, monthly)</td>
+<td>ISMIP7 <code>thetao</code>, <code>so</code> (3D, annual, <code>v3</code>; projection files to 2299)</td>
 </tr>
 <tr class="even">
 <td>Subglacial discharge</td>
@@ -399,10 +441,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
+<section id="forcing-figures" class="level3">
+<h3 class="anchored" data-anchor-id="forcing-figures">Forcing figures</h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/ismip7_grl.png" class="img-fluid figure-img"></p>
+<figcaption>ISMIP7 ssp585 forcing of CESM2-WACCM over Greenland at 2100 and 2300 minus 1975: annual and summer air temperature and surface mass balance difference, climate-only run on present-day topography.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/ismip7_ant.png" class="img-fluid figure-img"></p>
+<figcaption>ISMIP7 ssp585 forcing of CESM2-WACCM over Antarctica at 2100 and 2300 minus 1975: annual and summer air temperature and surface mass balance difference, climate-only run on present-day topography.</figcaption>
+</figure>
+</div>
+</section>
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>The shared per-module files (<code>yelmo.nc</code>, <code>yelmo_ts.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>htopo.nc</code>; Antarctica also <code>yelmo_ts_APIS/WAIS/EAIS.nc</code>) and the restart bundles <code>restart-&lt;kyr&gt;-kyr/</code>. For ISMIP7 submissions, <code>[output] write_cmip = True</code> writes <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code> every <code>dt_cmip</code>; <code>write_clim = True</code> adds the ESM forcing (<code>esm.nc</code>, <code>esm_ts.nc</code>), with the smb applied (<code>smb_ann</code>, <code>tsrf_ann</code>).</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>yelmo_ts.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>htopo.nc</code>; Antarctica also <code>yelmo_ts_APIS/WAIS/EAIS.nc</code>) and the restart bundles <code>restart-&lt;kyr&gt;-kyr/</code>. With the par-file timing, the scenarios write the 1D output every year, the 2D output (<code>[tm_2D]</code>) and restart bundles at 2015 and 2300, and the reduced 2D output (<code>[tm_2Dsm]</code>) every 100 yr for Greenland. For ISMIP7 submissions, <code>[output] write_cmip = True</code> writes <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code> every <code>dt_cmip</code>; <code>write_clim = True</code> adds the ESM forcing (<code>esm.nc</code>, <code>esm_ts.nc</code>), with the smb applied (<code>smb_ann</code>, <code>tsrf_ann</code>).</p>
 
 
 </section>

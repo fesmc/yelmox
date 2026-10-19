@@ -143,6 +143,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -151,8 +155,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -170,12 +174,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -243,7 +275,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="building-blocks" class="level2">
 <h2 class="anchored" data-anchor-id="building-blocks">Building blocks</h2>
 <ul>
-<li><strong>Component modules are grid-agnostic.</strong> <code>marshelf_update</code>, <code>isos_update</code>, <code>snapclim_update</code>, <code>smbpal_update</code> all take/return plain <code>(nx,ny)</code> arrays; the grid is the caller’s choice. Moving a module onto another grid is a caller-side change, not a module change.</li>
+<li><strong>Component modules are grid-agnostic.</strong> <code>marshelf_update</code>, <code>isos_update</code>, <code>snapshots_update</code>, <code>smbpal_update</code> all take/return plain <code>(nx,ny)</code> arrays; the grid is the caller’s choice. Moving a module onto another grid is a caller-side change, not a module change.</li>
 <li><strong><code>map_class</code> self-identifies and self-caches.</strong> It stores <code>name1</code>, <code>name2</code>, <code>method</code>, and <code>map_init</code> loads from / saves to a <code>maps/</code> folder on disk. A map object already carries its own identity key; disk caching across runs is free.</li>
 <li><strong><code>method</code> is baked into the map</strong> at <code>map_init</code> time (<code>"con"</code> = area weights, <code>"bilin"</code> = neighbor weights). So <code>method</code> is part of the map cache key. <strong><code>stat</code></strong> (<code>mean</code>/<code>count</code>/<code>stdev</code>) is applied at <code>map_field</code> time and does not change the map — it is a per-call pass-through, not a key.</li>
 <li><strong><code>map_field</code> is generic over kind.</strong> The interface already covers <code>dp</code>, <code>sp</code> (<code>map_field_grid_grid_sp</code>) and <code>int</code> (<code>map_field_grid_grid_int</code>); the sp/int variants accumulate in <code>dp</code> internally. So <code>remap</code> never converts precision outside — it calls the generic <code>map_field</code> and lets it dispatch by kind.</li>
@@ -264,8 +296,9 @@ yelmox/libs/
   kryos_startup.f90     cold start, restart bundles (domain_startup, ...)
   kryos_output.f90      per-module 2D/1D output, CMIP output
   kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
-  kryos_forcing.f90     driver-owned transient forcing (tsgen)
+  kryos_forcing.f90     driver-owned indices registry (tsgen)
   yelmox_climate.f90    climate backends behind one interface (climate_out)
+  climate_mods.f90      climate modifiers after the backend (anom, ocn_fraction, bias)
         │
         ▼
 yelmox/yelmox.f90                 single domain
@@ -334,7 +367,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
     mask_EAIS    = "region:East_Antarctica"
 /</code></pre>
 <p><code>{domain}/{grid_name}</code> in the paths resolve to <code>name</code>/<code>grid_hub</code>. The groups are those of fesm-utils <code>topodata</code> and <code>regions</code> (see the fesm-utils docs), which also describe the selection expressions used below (<code>"region:Greenland &amp; ~zone:open_ocean"</code>) and layers of other files (<code>layers</code>, <code>path_&lt;layer&gt;</code>, <code>var_&lt;layer&gt;</code>, e.g.&nbsp;the ISMIP7 basins).</p>
-<p>The other inputs are FesmData v2 products as well (<code>fesmdata/</code>, the link to <code>$FESMDATA/products</code> that runme copies into each run folder), on the grid of the component that reads them. The geothermal heat flux (<code>[ghf]</code>) and the sediments (<code>[sed]</code>) are remapped (bilinear) onto the Yelmo grid when their file is on another grid (its global attribute <code>grid_name</code>), so <code>obs_path</code> may name a coarser grid, e.g.&nbsp;<code>fesmdata/{domain}/PYR-2KM/PYR-2KM_GHF-Lucazeau2019.nc</code> on PYR-250M.</p>
+<p>The other inputs are FesmData v2 products as well (<code>fesmdata/</code>, the link to <code>$FESMDATA</code> that runme copies into each run folder), on the grid of the component that reads them. The geothermal heat flux (<code>[ghf]</code>) and the sediments (<code>[sed]</code>) are remapped (bilinear) onto the Yelmo grid when their file is on another grid (its global attribute <code>grid_name</code>), so <code>obs_path</code> may name a coarser grid, e.g.&nbsp;<code>fesmdata/{domain}/PYR-2KM/PYR-2KM_GHF-Lucazeau2019.nc</code> on PYR-250M.</p>
 <p>The domain loads its physical constants once (<code>phys_const_load</code>, the group <code>phys_const</code> of <code>input/yelmo_phys_const.nml</code>) and hands the same record to every component: the hub, Yelmo (<code>yelmo_init</code> <code>cnst</code>), isostasy, the marine shelf and <code>smb_simple</code>. Yelmo’s own <code>yelmo.phys_const</code> then only selects its calendar year (<code>sec_year</code>).</p>
 <p><code>htopo</code> (fesm-utils) holds the hub. It sits <em>above</em> every physics module (including Yelmo): its grid (<code>grid_hub</code>) is the finest resolution in the setup, and it is the reference geometry the coupler remaps <em>from</em>. On the hub grid it holds the reference topography (<code>topo%ref</code>: <code>z_bed</code>, <code>H_ice</code>, <code>z_srf</code>, <code>z_bed_sd</code>), the regions (<code>topo%reg</code>) and the current geometry <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>f_grnd</code>/<code>z_sl</code> (refreshed each step, see below). <code>htopo_init</code> resolves the grid from <code>grid_&lt;name&gt;.txt</code> (the disk grid table). Gaps in the topography (missing values, e.g.&nbsp;outside the coverage of the source dataset) are filled: no ice, the bed from the nearest valid cell, the surface from the bed and the ice thickness (sea level 0).</p>
 <p>Yelmo is populated from the domain like the other components. Its grid comes from <code>maps/grid_&lt;grid_ice&gt;.txt</code> (<code>yelmo_init_grid</code>, <code>grid_def="none"</code>), and the hub’s <code>z_bed</code>/<code>H_ice</code>/<code>z_srf</code>/<code>z_bed_sd</code>, remapped conservatively to <code>grid_ice</code>, are both its initial topography and its present-day reference (<code>yelmo_init</code> <code>topo_init</code>/<code>topo_pd</code>). Yelmo then processes them as it would its own files (<code>[yelmo_init_topo]</code> keeps <code>init_topo_state</code>, <code>z_bed_f_sd</code>, smoothing; its <code>grad_lim_zb</code> applies). Where <code>grid_ice = grid_hub</code> the remap is a copy.</p>
@@ -363,10 +396,12 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <li><code>couple_to_yelmo</code> — assemble the Yelmo boundary state from the component outputs (incl.&nbsp;the climate’s subglacial discharge, when supplied).</li>
 <li><code>step_icesheet</code> — run <code>yelmo_update</code>.</li>
 <li><code>couple_yelmo_to_htopo</code> — the hub’s current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo’s anomalies on a finer hub).</li>
-<li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the transient forcing, on the <code>dt_clim</code> cadence.</li>
+<li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the indices registry and the transient forcing, on the <code>dt_clim</code> cadence.</li>
 <li><code>step_surface</code> — surface mass balance on <code>grid_surface</code> (<code>surface_method</code>: chion, smbpal, smb_simple, or the climate’s own, <code>climate</code>).</li>
-<li><code>step_shelf</code> — sub-shelf melt on <code>grid_shelf</code>, from the climate’s ocean as depth profiles or at the shelf base.</li>
 </ul>
+<p>The hub geometry reaches <code>grid_clim</code> and <code>grid_surface</code> averaged over the target cell when the hub is finer (conservative), else interpolated (<code>remap_method_smooth</code>). The atmosphere is computed on <code>grid_clim</code> for the surface elevation there (<code>clim%now%z_srf</code>). On a different <code>grid_surface</code>, the monthly <code>tas</code> and <code>pr</code> are interpolated (bilinear) and moved to the surface elevation of <code>grid_surface</code> with the backend’s monthly lapse rate (<code>clim%lapse</code>) and precipitation sensitivity (<code>clim%now%beta_p</code>):</p>
+<pre><code>tas_s = tas - lapse*dz,   pr_s = pr*exp(-beta_p*lapse*dz),   dz = z_srf_s - z_srf_c</code></pre>
+<p>the same elevation dependence the backend applies on its own grid (snapshots, esm; none for rembo). A coarse <code>grid_clim</code> thus keeps the elevation detail of the surface grid; on the same grid nothing changes. - <code>step_shelf</code> — sub-shelf melt on <code>grid_shelf</code>, from the climate’s ocean as depth profiles or at the shelf base.</p>
 <p>Every driver writes the sequence out in its time loop, so the coupling order can be read directly from the program; <code>yelmox_bipolar</code> interleaves the second domain and the ocean box model there.</p>
 <section id="initialization-ordering" class="level3">
 <h3 class="anchored" data-anchor-id="initialization-ordering">Initialization ordering</h3>
@@ -378,9 +413,9 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <p><code>yelmox</code> and <code>yelmox_bipolar</code> use the same driver plumbing:</p>
 <ul>
 <li><strong><code>tstep_init(ts, path_par, group, dtt [, time_ref, cal])</code></strong> (fesm-utils <code>timestepping</code>) — reads the run’s timeline group (<code>[ctrl] run_step</code>: <code>"ctrl"</code> for <code>[ctrl]</code> itself, or a phase group such as <code>[spinup]</code>/<code>[transient]</code>) and initializes the driver-owned timestepper; <code>[ctrl] calendar</code> / <code>calendar_ref</code> give <code>cal</code> / <code>time_ref</code> (calendar years, e.g.&nbsp;ESM runs). <code>domain_init</code> takes the same group name (<code>timeline_group</code>) and reads the values the domain needs (<code>tstep_method</code>, <code>dtt</code>) itself.</li>
-<li><strong><code>domain_startup(dom, ts, bsl, restart [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>restart = "None"</code>, <code>domain_init_state</code>) or restore of the domain bundle <code>restart</code> + hub rebuild. The driver reads <code>[ctrl] restart</code>. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, fldr)</code></strong>, passes each domain its subfolder of the bundle and <code>restore_bsl=.false.</code>.</li>
-<li><strong><code>domain_init_ice(dom, ts)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[sim]</code> <code>init_kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>init_time_thrm</code>; see <a href="./yelmox.html#configuration">yelmox</a>).</li>
-<li><strong><code>run_restart_write(dom, bsl, time [, tsf])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + the tsforcing state, one auto-named folder).</li>
+<li><strong><code>domain_startup(dom, ts, bsl, restart, idx [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>restart = "None"</code>, <code>domain_init_state</code>) or restore of the domain bundle <code>restart</code> + hub rebuild, continuing the restored state: only the climate (and a stateless <code>smb_simple</code> surface) is re-derived, nothing is stepped. The driver reads <code>[ctrl] restart</code>. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, fldr)</code></strong>, passes each domain its subfolder of the bundle and <code>restore_bsl=.false.</code>.</li>
+<li><strong><code>domain_init_ice(dom, ts, idx)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[sim]</code> <code>init_kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>init_time_thrm</code>; see <a href="./yelmox.html#configuration">yelmox</a>).</li>
+<li><strong><code>run_restart_write(dom, bsl, time, idx [, fldr])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + one <code>idx_&lt;name&gt;_restart.nc</code> per index, one auto-named folder).</li>
 <li><strong><code>cadence_due(time, dt)</code></strong> (<code>kryos</code>) — the cadence predicate for <code>dt_clim</code>, <code>dt_isos</code> and <code>dt_cmip</code>; <code>dt &lt;= 0</code> disables a cadence. Output and restart bundles follow fesm-utils <code>timeout</code> schedules (<code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, <code>[tm_rst]</code>); a restart bundle is always written at <code>time_end</code>.</li>
 </ul>
 <p>Every driver loop has the same shape: output and restarts are written at the top of the loop for the current time (<code>time_init</code> on the first pass), then the loop exits if the run is finished (<code>time_end</code>, or a tripped kill switch), else <code>tstep_update</code> advances the time and the domain is stepped with the coupling sequence written out inline. Each output call appears once, and the final state + restart bundle are written on the last pass (<code>timeout_check(...) .or. ts%is_finished</code>).</p>

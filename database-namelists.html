@@ -143,6 +143,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -151,8 +155,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -170,12 +174,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -237,7 +269,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>Most forcing in YelmoX is now loaded through the shared <a href="https://github.com/fesmc/fesm-utils"><code>varslice</code></a> reader. A <strong>database namelist</strong> is a small, static description of a dataset on disk: where the file lives, which variable to read, how to convert its units, and how its records map onto a time axis. The consuming modules — <code>varslice</code> itself, <code>esm_forcing</code>, <code>snapesm</code>, <code>ismip6</code> — all read the <em>same</em> group layout, so once you understand one group you understand them all.</p>
+<p>Most forcing in YelmoX is now loaded through the shared <a href="https://github.com/fesmc/fesm-utils"><code>varslice</code></a> reader. A <strong>database namelist</strong> is a small, static description of a dataset on disk: where the file lives, which variable to read, how to convert its units, and how its records map onto a time axis. The consuming modules — <code>varslice</code> itself, <code>esm_forcing</code>, <code>snapshots</code>, <code>ismip6</code> — all read the <em>same</em> group layout, so once you understand one group you understand them all.</p>
 <p>The point of these files is to keep the <em>provenance</em> of every forcing field visible and in one place. Nothing in the namelist runs code; each group is a declarative record that says “this NetCDF file, this variable, these units, this period” — everything the reader needs to ingest the dataset and hand back a time-indexed field.</p>
 <p>See <code>input/esm/esm_ant_ismip7.nml</code> for a full, real-world example.</p>
 <section id="anatomy-of-a-group" class="level2">
@@ -369,7 +401,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><p><code>{domain}</code> and <code>{grid_name}</code> are built in — every module supplies them (e.g. <code>Antarctica</code>, <code>ANT-16KM</code>).</p></li>
 <li><p>Additional keys are passed by the consuming module. <code>esm_forcing</code>, for instance, supplies <code>{gcm}</code> and <code>{experiment}</code>, so an ISMIP7 projection path can read:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>filename <span class="kw">=</span> <span class="st">"ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/{experiment}/ocean/thetao/v3/{grid_name}_{gcm}_{experiment}_v3_2015-2299_thetao.nc"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>and the same namelist serves every GCM/experiment combination — you select the concrete values in the driver’s <code>[esm]</code> configuration, not here.</p></li>
+<p>and the same namelist serves every GCM/experiment combination — you select the concrete values in the driver’s <code>[esm]</code> configuration, not here. snapshots supplies <code>{grid_global}</code> (<code>[snap] grid_global</code>) and <code>{exp}</code> (the snapshot’s <code>exp</code>) for its database <code>input/clim_db.nml</code> (see <a href="./climate-snapshots.html">Snapshots</a>).</p></li>
 </ul>
 <p><strong>Wildcards</strong> (shell globs, <code>*</code> and <code>?</code>) are also allowed. The reader expands the pattern with <code>ls -1 … | sort</code>, so a dataset split across many files is matched and concatenated in alphabetical order:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>filename <span class="kw">=</span> <span class="st">"ice_data/{domain}/{grid_name}/{gcm}/historical/tas/*.nc"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -415,7 +447,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>A module loads a group into a <code>varslice</code> object once at initialization (<code>varslice_init_nml(vs, filename, group, domain, grid_name, subs=…)</code>) and then asks for a field at a given time during the run (<code>varslice_update(vs, time, method=…)</code>). The database namelist supplies everything the object needs; the <code>method</code> (e.g.&nbsp;<code>exact</code>, <code>interp</code>, <code>extrap</code>) is chosen by the caller at read time, not in the namelist.</p>
 <ul>
 <li><strong><code>esm_forcing</code></strong> groups the atmosphere/ocean database groups into reference, variability, ESM-reference, historical, and projection periods (<code>&amp;gcm_ts_ref</code>, <code>&amp;gcm_to_proj</code>, …) and supplies <code>{gcm}</code>/<code>{experiment}</code>. See <a href="./climate-esm.html">ESM forcing</a>.</li>
-<li><strong><code>snapesm</code></strong> uses the same reader for its snapshot climate database.</li>
+<li><strong><code>snapshots</code></strong> uses the same reader for its snapshot climate database.</li>
 <li><strong><code>ismip6</code></strong> uses it for the ISMIP6 atmosphere/ocean forcing files.</li>
 </ul>
 <p>Because they share the reader, the layout documented here is identical across all of them — a group is a group regardless of which module owns it.</p>

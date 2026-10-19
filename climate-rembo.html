@@ -108,6 +108,10 @@ ul.task-list li input[type="checkbox"] {
     <a class="dropdown-item" href="./yelmox-bipolar.html">
  <span class="dropdown-text">yelmox_bipolar</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./run-chunks.html">
+ <span class="dropdown-text">Long runs in chunks</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -116,8 +120,8 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-climate-backends">    
         <li>
-    <a class="dropdown-item" href="./climate-snap.html">
- <span class="dropdown-text">snapclim and snapesm</span></a>
+    <a class="dropdown-item" href="./climate-snapshots.html">
+ <span class="dropdown-text">Snapshots</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="./climate-esm.html">
@@ -135,12 +139,40 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-experiments">    
         <li>
+    <a class="dropdown-item" href="./experiment-greenland.html">
+ <span class="dropdown-text">Greenland</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-antarctica.html">
+ <span class="dropdown-text">Antarctica</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ismip7.html">
  <span class="dropdown-text">ISMIP7 projections</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="./experiment-1pctco2.html">
+ <span class="dropdown-text">1pctCO2</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-tipmip.html">
+ <span class="dropdown-text">TIPMIP</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="./experiment-ant-paleo.html">
  <span class="dropdown-text">Antarctic paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-grl-paleo.html">
+ <span class="dropdown-text">Greenland paleo</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-laurentide.html">
+ <span class="dropdown-text">Laurentide and North America</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="./experiment-mountain.html">
+ <span class="dropdown-text">Mountain glaciers</span></a>
   </li>  
     </ul>
   </li>
@@ -195,27 +227,28 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<p>Runs with <strong>REMBOv1</strong>, an energy/moisture-balance regional atmosphere with an integrated surface-mass-balance scheme, use the <code>yelmox</code> program with the REMBO climate backend: <code>[comps] climate = "rembo"</code>. REMBO supplies the atmosphere and the surface mass balance; the ocean comes from snapclim.</p>
+<p>Runs with <strong>REMBOv1</strong>, an energy/moisture-balance regional atmosphere with an integrated surface-mass-balance scheme, use the <code>yelmox</code> program with the REMBO climate backend: <code>[comps] climate = "rembo"</code>. REMBO supplies the atmosphere and the surface mass balance; the ocean comes from the snapshot backend.</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox/yelmox.f90</code>, backend in <code>libs/yelmox_climate.f90</code>, with the REMBO adapter <code>libs/climate_rembo.f90</code>.</li>
 <li><strong>Build:</strong> <code>make yelmox rembo=1</code> (links rembo1; prerequisite <code>rembo-static</code>). Without <code>rembo=1</code>, a stub (<code>libs/climate_rembo_stub.f90</code>) stops the run if <code>climate = "rembo"</code>.</li>
 <li><strong>Config:</strong> <code>yelmox/yelmox_rembo_Greenland.nml</code>, plus REMBO’s own parameters in <code>yelmox/rembo_Greenland.nml</code> (staged into the run folder via <code>.runme/info.json</code>).</li>
-<li><strong>Script:</strong> <code>scripts/rembo/run_rembo.sh</code>.</li>
+<li><strong>Script:</strong> <code>scripts/rembo/run_rembo.sh [output_dir]</code> (default <code>output/rembo</code>; runs locally, <code>runopts='-rs ...'</code> submits to the queue).</li>
 </ul>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
 <ul>
 <li><strong>Grid.</strong> REMBO runs on the grid it was compiled for (Greenland, GRL-16KM), which must be <code>grid_clim</code>; the backend checks this at start-up.</li>
-<li><strong>Surface mass balance.</strong> <code>[comps] surface_method = "climate"</code>: REMBO’s smb and surface temperature, at the current surface. REMBO gives annual fields only, so smbpal and smb_simple are not available with it.</li>
-<li><strong>Update cadence.</strong> <code>[comps] dt_clim = dtt</code>: REMBO updates its energy balance and its smb on its own intervals (<code>dtime_emb</code>, <code>dtime_smb</code>).</li>
-<li><strong>Ocean.</strong> The <code>[snap]</code> group, as for snapclim.</li>
-<li><strong>Transient forcing.</strong> <code>[tsforcing]</code> maps the tsgen value <code>f_now</code> onto REMBO’s anomalies: the summer air temperature <code>dT_sum = f_now·f_ta</code>, the annual <code>dT_ann = 1.3·dT_sum</code> (REMBO’s winter factor 1.6), and the ocean <code>dT_ocn = dT_ann·f_to</code>, added to a snapclim ocean held at its reference (<code>ocn_type = "const"</code>).</li>
+<li><strong>Surface mass balance.</strong> <code>[comps] surface_method = "climate"</code>: REMBO’s smb and surface temperature, at the current surface; any other <code>surface_method</code> stops the run at start-up (REMBO gives annual fields only).</li>
+<li><strong>Update cadence.</strong> <code>[comps] dt_clim = dtt</code> (10 yr): REMBO updates its energy balance and its smb on its own intervals (<code>dtime_emb = 100</code>, <code>dtime_smb = 1</code> in <code>rembo_Greenland.nml</code>), with the insolation at the forcing clock <code>time_rel</code>.</li>
+<li><strong>Ocean.</strong> The <code>[snap]</code> groups of the snapshot backend (see <a href="./climate-snapshots.html">Snapshots</a>) with an ocean-only reference snapshot: <code>snapshots = "pd"</code>, <code>ref_name = "pd"</code>, no axes, the <code>pd</code> snapshot binding the ORAS5 1981-2010 climatology (<code>oras5_1981_2010_to</code>, <code>oras5_1981_2010_so</code> of <code>input/clim_db.nml</code>). The reference must bind <code>to</code> and no atmosphere (checked at start-up); <code>so</code> is optional (salinity 0 without it).</li>
+<li><strong>Transient forcing.</strong> <code>[anom]</code>, read by the rembo backend itself (an input of REMBO, not a modifier after it), maps the value <code>f</code> of its index onto REMBO’s anomalies: the summer air temperature <code>dT_sum = f·f_ta</code>, the annual <code>dT_ann = 1.3·dT_sum</code> (REMBO’s winter factor 1.6), and the ocean <code>dT_ocn = dT_ann·f_to</code>, added to the snapshot ocean; <code>f_so</code> is not used. Off in the par file (<code>[anom] active = False</code>, <code>[indices] names = ""</code>).</li>
+<li><strong>Climate modifiers.</strong> <code>[ocn_fraction]</code>, <code>[taper]</code> and <code>[bias]</code> are refused at start-up (no sea-level air temperature, no reference atmosphere, annual fields only).</li>
 <li><strong>Cold start.</strong> REMBO is equilibrated (10 years) before its first update.</li>
 </ul>
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>rembo.nc</code> (annual and summer air temperature, precipitation, smb) and <code>rembo_ts.nc</code> (the applied anomalies, the smb integrated over the ice sheet and the accumulation-area ratio). The tsgen forcing goes to <code>yelmo_ts.nc</code>, as for the other climates. Restart bundles hold REMBO’s <code>rembo_restart.nc</code>; REMBO reads its restart as set in <code>rembo_Greenland.nml</code>.</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>rembo.nc</code> (annual and summer air temperature, precipitation, smb, surface temperature, ocean profiles) and <code>rembo_ts.nc</code> (the applied anomalies, the smb integrated over the ice sheet and the accumulation-area ratio). The indices go to the Yelmo 1D file (<code>idx_&lt;name&gt;</code>), as for the other climates. The shipped <code>rembo_Greenland</code> keeps the hysteresis setup as an unlisted <code>[idx_hyst]</code> (PI42 with kill switch): add <code>"hyst"</code> to <code>[indices] names</code> and set <code>[anom] active = True, index = "hyst"</code> to run it. Restart bundles hold REMBO’s <code>rembo_restart.nc</code>; REMBO reads its restart as set in <code>rembo_Greenland.nml</code>.</p>
 
 
 </section>
