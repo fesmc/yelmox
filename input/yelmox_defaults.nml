@@ -4,8 +4,8 @@
 !
 ! The schema of the forcing groups: the indices ([indices], [idx_<name>]),
 ! the snapshot backend ([snap*]), the climate modifiers ([anom],
-! [ocn_fraction], [ocn_obm], [bias]) and the forcing of the bipolar ocean box
-! model ([obm_forcing]). Every key yelmox reads in these groups is declared
+! [ocn_fraction], [ocn_obm], [taper], [bias]), the prescribed ice
+! ([ice_bnd]) and the forcing of the bipolar ocean box model ([obm_forcing]). Every key yelmox reads in these groups is declared
 ! here and read with nml_read(..., defaults_file = this file): a par file
 ! lists only what differs, and nml_validate stops a run on a key that is not
 ! declared (a typo, a removed key); scripts/check_par_nml.py checks the same
@@ -17,8 +17,9 @@
 !   snap<sfx>_field_<name>        -> snap_field
 !   snap<sfx>_<snapshot>          -> snap_snapshot
 !   snap<sfx>_axis_<name>         -> snap_axis
-!   anom<sfx>, ocn_fraction<sfx>, ocn_obm<sfx>, bias<sfx>
-!                                 -> anom, ocn_fraction, ocn_obm, bias
+!   anom<sfx>, ocn_fraction<sfx>, ocn_obm<sfx>, taper<sfx>, bias<sfx>
+!                                 -> anom, ocn_fraction, ocn_obm, taper, bias
+!   ice_bnd<sfx>                  -> ice_bnd
 ! (<sfx>: the domain suffix of a multi-domain driver, e.g. _north). An absent
 ! group takes every default: a modifier without its group is inactive.
 !
@@ -98,7 +99,7 @@
     index = ""          ! the index giving the position on the axis ([indices] names)
 /
 
-! ===== Climate modifiers (fixed order: anom, ocn_fraction, ocn_obm, bias) =====
+! ===== Climate modifiers (fixed order: anom, ocn_fraction, ocn_obm, taper, bias) =====
 
 &anom
     active = False      ! apply it?
@@ -120,6 +121,14 @@
     mode   = "absolute" ! absolute: to = box; anomaly: to = to_ref + (box - box_init)
 /
 
+&taper
+    ! The atmosphere towards the reference with a weight w in [0, 1] (static, on
+    ! the climate grid): now = ref + w*(now - ref) for tas, pr and their annual means.
+    active   = False    ! apply it?
+    var_defs = ""       ! varslice databases of the weight, searched in order, then the par file itself
+    weight   = ""       ! group of the weight w [1] (one 2D field)
+/
+
 &bias
     active   = False    ! apply it?
     var_defs = ""       ! varslice databases of dtas/fpr, searched in order, then the par file itself
@@ -127,6 +136,21 @@
     fpr      = ""       ! group of the precipitation factor [1] (1 or 12 slices); "" = none
     f_tas    = 1.0      ! weight of dtas
     f_pr     = 1.0      ! weight of fpr
+/
+
+! ===== Prescribed ice (Yelmo's fixed and relaxation cells) =====
+
+&ice_bnd
+    ! H_ice_ref of Yelmo in its fixed (mask_ice = fixed) and relaxation
+    ! (tau_relax > 0) cells, e.g. the strip of yelmo_masks.border_width, from
+    ! an ice history at the forcing time; the interior keeps its H_ice_ref.
+    active     = False                ! apply it?
+    var_defs   = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
+    method     = "file"               ! file: H_ice at the forcing time (clamped to the file's range);
+                                      ! scaled: H = f*H_ice(slice_time), f an index
+    H_ice      = "paleomist_H_ice"    ! group of the ice thickness [m] (on the ice grid, or remap)
+    index      = ""                   ! scaled: the index f ([indices] names)
+    slice_time = -21e3                ! [yr] scaled: time of the slice H_ice(slice_time)
 /
 
 ! ===== Ocean box model forcing (yelmox_bipolar) =====

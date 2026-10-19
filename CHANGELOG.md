@@ -6,6 +6,20 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- Prescribed ice `[ice_bnd]` (`libs/ice_bnd.f90`, optional): Yelmo's `H_ice_ref` in its
+  fixed and relaxation cells (e.g. the yelmo `yelmo_masks.border_width` strip) from an ice
+  history, `method = "file"` (at the forcing time, clamped to the file's range) or
+  `"scaled"` (an index times one slice); `step_ice_bnd` in the drivers before
+  `step_icesheet` and at the cold start (after the isostasy reference). `clim_db.nml`:
+  `paleomist_H_ice` (PaleoMIST, 80-0 ka), `glac1d_H_ice` (GLAC-1D, 26-0 ka). Needs yelmo
+  with `border_width`. `H_ice_ref` is in `yelmo.nc`. `input/yelmo_defaults.nml` synced.
+- Climate modifier `[taper]` (optional), between `ocn_obm` and `bias`: the atmosphere
+  towards the reference with a static weight field, `now = ref + w*(now - ref)` (the
+  reference at the current surface); refused for rembo.
+- `yelmox/yelmox_GreenlandPaleo.nml`: base config on GreenlandPaleo (GRL-PAL-16KM): ERA5 +
+  ORAS5 present day, the whole domain dynamic with a strip of prescribed PaleoMIST ice at
+  the border (`border_width = 2 4`, `relax_tau = 100`), sea level from file, uniform
+  mantle.
 - `input/clim_db.nml`: shared climate database of the snapshot backend, one varslice group per
   product field. Present-day references regional (`{domain}/{grid_name}`): MAR v3.14
   1961-1990, RACMO2.3p2 1981-2010, ERA5 1981-2010, ORAS5 1981-2010, ISMIP7 ocean.

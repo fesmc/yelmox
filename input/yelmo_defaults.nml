@@ -372,6 +372,7 @@
     mask_ice_fixed   = "none"            ! where ice thickness is prescribed (over mask_ice_dynamic)
     relax            = "none"            ! where ice relaxes to H_ice_ref (ytopo.topo_rel = -1)
     relax_tau        = 0.0               ! [yr] relaxation timescale there
+    border_width     = 0 0               ! N M: strip of N fixed cells, then M relaxation cells (relax_tau) inward, at the edge of the region where ice is allowed; 0 0 = none
     mask_rmse        = "all"             ! where the error metrics are computed
     dynamic_connected = False            ! keep only the dynamic cells connected to the ice sheet (largest region of present-day, else initial, ice); others no ice
 /

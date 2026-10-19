@@ -14,7 +14,7 @@ script reproduces that check offline, with more:
      group of the defaults file (`nml_validate` would stop the run).
   2. duplicate: a group or key defined twice in one file. `nml_read` takes the
      first occurrence, so later copies are silently ignored.
-  3. var_defs: a snapshot (or an active [bias]) binds a varslice group that
+  3. var_defs: a snapshot (or an active [bias], [taper] or [ice_bnd]) binds a varslice group that
      neither its var_defs files nor the par file itself (searched implicitly
      last) holds, or a var_defs file is missing. Bound groups in the par file
      are not reported by --dead.
@@ -35,8 +35,8 @@ the defaults. Files without a control block are skipped.
 The yelmox forcing groups, with <sfx> the same domain suffixes, and their
 group in yelmox_defaults.nml:
   [indices] -> indices, [idx_<name>] -> idx, [obm_forcing] -> obm_forcing,
-  [anom<sfx>], [ocn_fraction<sfx>], [ocn_obm<sfx>], [bias<sfx>] -> anom,
-  ocn_fraction, ocn_obm, bias,
+  [anom<sfx>], [ocn_fraction<sfx>], [ocn_obm<sfx>], [taper<sfx>], [bias<sfx>]
+  -> anom, ocn_fraction, ocn_obm, taper, bias, [ice_bnd<sfx>] -> ice_bnd,
   with [comps<sfx>] climate = snapshots or rembo (the snapshot backend):
   [snap<sfx>] -> snap, [snap<sfx>_field_<f>] -> snap_field (f in fields),
   [snap<sfx>_<s>] -> snap_snapshot (s in snapshots),
@@ -179,7 +179,7 @@ def yelmox_groups(groups, ydefaults):
         if g.startswith("idx_"):
             out[g] = "idx"
     for sfx in domain_suffixes(groups):
-        for base in ("anom", "ocn_fraction", "ocn_obm", "bias"):
+        for base in ("anom", "ocn_fraction", "ocn_obm", "taper", "bias", "ice_bnd"):
             if base + sfx in groups:
                 out[base + sfx] = base
         climate = scalar(groups.get("comps" + sfx, {}).get("climate", ""))
@@ -216,7 +216,8 @@ def var_defs_files(path, listed, label, errors):
 
 
 def var_defs_errors(path, groups, ygroups, ydefaults):
-    """Bindings of the snapshots (and [bias] dtas/fpr) to varslice groups that
+    """Bindings of the snapshots (and [bias] dtas/fpr, [taper] weight, [ice_bnd]
+    H_ice) to varslice groups that
     neither the var_defs files nor the par file hold. Also returns the bound
     groups found in the par file itself (read by varslice, not dead)."""
     errors, local = [], set()
@@ -243,15 +244,17 @@ def var_defs_errors(path, groups, ygroups, ydefaults):
                     continue
                 check(name, files, [(key, ref) for key in ("tas", "pr", "zs", "to", "so")
                                     for ref in listval(groups[name].get(key, ""))])
-        elif tmpl == "bias":
+        elif tmpl in ("bias", "taper", "ice_bnd"):
             g = groups[snap]
-            if scalar(g.get("active", ydefaults["bias"]["active"])).lower() not in (
+            if scalar(g.get("active", ydefaults[tmpl]["active"])).lower() not in (
                     "true", ".true.", "t"):
                 continue
             files = var_defs_files(path, listval(g.get(
-                "var_defs", ydefaults["bias"]["var_defs"])), snap, errors)
-            check(snap, files, [(key, scalar(g[key])) for key in ("dtas", "fpr")
-                                if scalar(g.get(key, ""))])
+                "var_defs", ydefaults[tmpl]["var_defs"])), snap, errors)
+            keys = {"bias": ("dtas", "fpr"), "taper": ("weight",), "ice_bnd": ("H_ice",)}[tmpl]
+            check(snap, files, [(key, scalar(g.get(key, ydefaults[tmpl].get(key, ""))))
+                                for key in keys
+                                if scalar(g.get(key, ydefaults[tmpl].get(key, "")))])
     return errors, local
 
 

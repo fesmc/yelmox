@@ -59,6 +59,7 @@ call step_relax(dom, ts)          ! topography relaxation (relax)
 call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level (dt_isos cadence)
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+call step_ice_bnd(dom, ts, idx)   ! prescribed ice in the fixed/relaxation cells ([ice_bnd])
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
 call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
@@ -116,8 +117,8 @@ moves by more than its `restart_every_df`. Each index restarts from
 `idx_<name>` (plus `idx_<name>_df_dt`).
 
 `[anom]` is a climate modifier (libs/climate_mods.f90): applied to the
-backend's output after the backend, before `[ocn_fraction]`, `[ocn_obm]` and
-`[bias]`, on the climate grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
+backend's output after the backend, before `[ocn_fraction]`, `[ocn_obm]`,
+`[taper]` and `[bias]`, on the climate grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
 precipitation sensitivity), ocean profiles + `dTo`/`dSo` (esm: at the shelf
 base). The group is optional (inactive without it) and takes the domain suffix
 (`anom<sfx>`). Checked at init: the index must be in the registry, and a
@@ -180,6 +181,35 @@ an ocean at the shelf base (esm), and with `[ocn_fraction]` or `[anom] f_to /= 0
 (it replaces the ocean temperature). The box temperature and its anomaly are
 written to the climate's 2D file (`ocn_obm_theta`, `ocn_obm_dto`).
 
+## Regional taper to the reference (`[taper]`)
+
+The climate modifier after `[ocn_obm]` and before `[bias]`: the atmosphere
+towards the reference climate with a static weight field w in [0, 1] on the
+climate grid,
+
+    now = ref + w*(now - ref)
+
+for the monthly air temperature and precipitation, their annual means and the
+sea-level air temperature (those the backend supplies); w = 1 keeps the
+climate, w = 0 is the reference (e.g. outside the coverage of a
+reconstruction, w from its `f_valid`). The reference is taken at the current
+surface: a reference at its own elevation (snapshots: the surface of the
+reference snapshot) is moved there with the backend's monthly lapse rate and
+`beta_p`, as the climate itself. The ocean is unchanged. Refused for a backend
+without a reference atmosphere (rembo).
+
+```
+&taper
+    active   = True
+    var_defs = ""         ! files with the group below, searched in order, then this file
+    weight   = "taper_w"  ! var_defs group of w [1]: one 2D field (time = 0 0 0 0 1)
+/
+```
+
+The weight is a varslice group on the climate grid or remapped online
+(`remap`, `grid_src`); values outside [0, 1] (or missing) stop the run. It is
+written to the climate's 2D file (`taper_w`).
+
 ## Climate bias correction (`[bias]`)
 
 A static spatial correction of the atmosphere, the last climate modifier,
@@ -209,6 +239,42 @@ months (`time = 0 0 0 0 1`) or 12 monthly fields (`time = 0 0 0 0 12`), on the
 climate grid or remapped online (`remap`, `grid_src`). The weighted annual
 fields are written to the climate's 2D file (`bias_dtas_ann`, `bias_fpr_ann`).
 
+## Prescribed ice (`[ice_bnd]`)
+
+Yelmo prescribes the ice thickness in its fixed cells (`mask_ice` = 1:
+`H_ice = H_ice_ref`) and relaxes it towards `H_ice_ref` in its relaxation cells
+(`tau_relax > 0`, with `ytopo.topo_rel = -1`), set by `[yelmo_masks]`: a strip
+at the edge of the region where ice is allowed (`border_width = N M`: N fixed
+cells, then M relaxation cells with `relax_tau`), the expressions
+`mask_ice_fixed` and `relax`, or `yelmo.mask_border`. `[ice_bnd]` writes the
+thickness of an ice history into `H_ice_ref` in these cells, each step before
+`yelmo_update` (`step_ice_bnd`) and at the cold start; the interior keeps its
+`H_ice_ref` (the present-day ice):
+
+    file:    H_ice_ref = H_ice(time_rel)        (interpolated; the first or last slice outside the file)
+    scaled:  H_ice_ref = f * H_ice(slice_time)  (f an index, e.g. before the file starts)
+
+```
+&ice_bnd
+    active     = True
+    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order, then this file
+    method     = "file"               ! file | scaled
+    H_ice      = "paleomist_H_ice"    ! var_defs group of the ice thickness [m]
+    index      = ""                   ! scaled: the index f ([indices] names)
+    slice_time = -21e3                ! [yr] scaled: time of the slice
+/
+```
+
+`input/clim_db.nml` holds `paleomist_H_ice` (PaleoMIST 1.0, 80-0 ka every
+2.5 kyr) and `glac1d_H_ice` (GLAC-1D, 26-0 ka every 100 yr), the IceHistory
+products on the ice grid. The forcing clock is `time_rel` (a constant-time
+run holds the ice of `tstep_const`). At the cold start the isostasy
+reference is taken before (the present-day ice: the prescribed ice of another
+time is a load). With a time-varying border use `[barysealevel] method =
+"file"`: under `fastiso` the prescribed ice would add to the barystatic sea
+level. `H_ice_ref` is written to `yelmo.nc`. Example: `yelmox_GreenlandPaleo.nml`
+(GRL-PAL, `border_width = 2 4`, `mask_ice_dynamic = "all"`).
+
 ## Configuration
 
 A run is set by these namelist groups. Every key is required (a missing key stops
@@ -219,7 +285,8 @@ The forcing groups have defaults: `input/yelmox_defaults.nml` declares every
 key of `[indices]`, `[idx_<name>]` (template `[idx]`: the tsgen keys, `units`,
 `restart_every_df`), the snapshot backend (`[snap]`, templates `[snap_field]`,
 `[snap_snapshot]`, `[snap_axis]`), the climate modifiers (`[anom]`,
-`[ocn_fraction]`, `[ocn_obm]`, `[bias]`) and `[obm_forcing]` (yelmox_bipolar),
+`[ocn_fraction]`, `[ocn_obm]`, `[taper]`, `[bias]`), `[ice_bnd]` and
+`[obm_forcing]` (yelmox_bipolar),
 with the domain suffix of a multi-domain driver
 (`[anom_north]` to `[anom]`). A par file lists only what differs; an absent
 group takes every default (a modifier is then inactive). Each read goes through
