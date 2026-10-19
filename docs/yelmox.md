@@ -209,6 +209,34 @@ months (`time = 0 0 0 0 1`) or 12 monthly fields (`time = 0 0 0 0 12`), on the
 climate grid or remapped online (`remap`, `grid_src`). The weighted annual
 fields are written to the climate's 2D file (`bias_dtas_ann`, `bias_fpr_ann`).
 
+## Insolation and orbit (`[orbit]`)
+
+The surface models that take the top-of-atmosphere insolation (chion's ITM and
+BESSI, smbpal's ITM) compute it with the [insol](https://github.com/fesmc/insol)
+library (a dependency, `libinsol.a`), the daily mean in closed form from the
+orbital elements of Laskar et al. (2004). `[orbit]` (one per domain,
+`[orbit_north]` in yelmox_bipolar) gives the elements; both surface models read
+it:
+
+```
+&orbit
+    method = "time"   ! clock: at the forcing clock time_rel; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0      ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+    ecc    = 0.016702 ! [1]   eccentricity (fixed)
+    obl    = 23.4393  ! [deg] obliquity (fixed)
+    per    = 102.918  ! [deg] longitude of perihelion (fixed)
+    fldr   = "input"  ! folder of the orbital tables
+/
+```
+
+`clock` follows the forcing clock (`ts%time_rel`: transient insolation with
+`tstep_method = "rel"`); `time` holds the orbit of one time (present day by
+default, the 1950 orbit); `fixed` takes the given elements (the defaults are the
+tables' at 1950). A fixed orbit is the one exception to the single forcing
+clock. Each model recomputes its insolation only when the elements change, so
+once per run unless `method = "clock"`. The par files list `method` and `time`;
+the other keys come from `input/yelmox_defaults.nml`.
+
 ## Configuration
 
 A run is set by these namelist groups. Every key is required (a missing key stops
@@ -219,7 +247,8 @@ The forcing groups have defaults: `input/yelmox_defaults.nml` declares every
 key of `[indices]`, `[idx_<name>]` (template `[idx]`: the tsgen keys, `units`,
 `restart_every_df`), the snapshot backend (`[snap]`, templates `[snap_field]`,
 `[snap_snapshot]`, `[snap_axis]`), the climate modifiers (`[anom]`,
-`[ocn_fraction]`, `[ocn_obm]`, `[bias]`) and `[obm_forcing]` (yelmox_bipolar),
+`[ocn_fraction]`, `[ocn_obm]`, `[bias]`), the orbit of the insolation (`[orbit]`)
+and `[obm_forcing]` (yelmox_bipolar),
 with the domain suffix of a multi-domain driver
 (`[anom_north]` to `[anom]`). A par file lists only what differs; an absent
 group takes every default (a modifier is then inactive). Each read goes through

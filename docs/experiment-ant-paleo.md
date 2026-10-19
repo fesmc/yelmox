@@ -35,7 +35,8 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 
 ## Spin-up
 
-- **Timeline:** `[ctrl]` 0 to 15 kyr, `dtt = 5` yr, constant insolation; the
+- **Timeline:** `[ctrl]` 0 to 15 kyr, `dtt = 5` yr, present-day insolation
+  (`[orbit] method = "time"`, `time = 0`); the
   sea level follows the model's own ice-volume change (`[barysealevel] method =
   "fastiso"`).
 - **Optimization** (`[sim] opt = True`): `cb_ref` and `tf_corr`
@@ -60,7 +61,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
   21 ka, -0.2 in the last interglacial). The ocean anomaly is `f_to = 0.25`
   times the mean sea-level air temperature anomaly (`[ocn_fraction]`). Insolation varies in time
-  (`[surface_chion] const_insol = False`, and `[smbpal]` for smbpal).
+  (`[orbit] method = "clock"`, the orbit at the forcing clock, for chion and smbpal).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
 - **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_ant_paleo]`): one
   layer every 1 kyr, coupled every 50 yr.

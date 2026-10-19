@@ -35,6 +35,20 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Insolation from the [insol](https://github.com/fesmc/insol) library, now a dependency
+  (`.configme/manifest.toml` `insol:main`, `make insol-static`, `libinsol.a`); the vendored
+  copy `libs/insol/` (and its `interp1D`, smbpal's `interp_time` now uses fesm-utils') is
+  removed. The orbit is `[orbit<sfx>]` (`libs/orbit_forcing.f90`, defaults in
+  `input/yelmox_defaults.nml`), shared by chion's host and smbpal: `method = "clock"` (at the
+  forcing clock), `"time"` (at a fixed `time`) or `"fixed"` (`ecc`, `obl`, `per`); it
+  replaces `const_insol`, `const_kabp` and `insol_fldr` of `[surface_chion]` and `[smbpal]`
+  (`const_insol = True, const_kabp = X` -> `method = "time", time = -X*1e3`;
+  `const_insol = False` -> `"clock"`). smbpal computes its insolation on the grid and only
+  when the orbit changes. The insolation changes by up to ~2.5 W/m², mostly at low
+  latitudes: insol integrates the daily mean exactly, the vendored copy summed 24 hourly
+  samples. Existing builds: `make clean` once (stale `insolation.mod`, `interp1D.mod`).
+- `yelmox/run_mg_forward.sh`: the anomaly from `[anom]` on the constant index `[idx_dT]`
+  (`yelmox_Antarctica.nml`) instead of the removed `snap.dTa_const`/`dTo_const`.
 - snapclim removed (`libs/snapclim.f90`, `[comps] climate = "snapclim"`, its tests,
   `input/greenland_snp.nml`, `yelmox_Greenland_snapclim.nml`); the snapshot backend snapesm
   renamed `snapshots` (`[comps] climate = "snapshots"`, `libs/snapshots.f90`,

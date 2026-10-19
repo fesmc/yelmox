@@ -9,7 +9,7 @@ your behalf.
 `configme install` performs the following phases:
 
 1. **Clone** the YelmoX checkout and each component repository it needs
-   (`fesm-utils`, `yelmo`, `FastIsostasy`, `rembo1`).
+   (`fesm-utils`, `yelmo`, `FastIsostasy`, `rembo1`, `chion`, `insol`).
 2. **Manifest** — write `.configme/manifest.toml` so the checkout is
    self-describing regardless of its directory name.
 3. **Link** each component into the directories where the build expects it.
