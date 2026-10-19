@@ -144,7 +144,8 @@ program yelmox_bipolar
 
         ! The domains' ocean from the box (ocn_obm<sfx>) and their shelf
         ! forcing, so the first record and the first step see it.
-        call obm_ocean_init(oc, obox, dom_north, dom_south, active_north, active_south, ts)
+        call obm_ocean_init(oc, obox, dom_north, dom_south, active_north, active_south, ts, &
+                            cold_start=(trim(restart) == "None"))
     end if
 
     ! === Output + restart schedules (shared cadence, from [tm_2D]/[tm_2Dsm]/
@@ -313,19 +314,15 @@ contains
 
         call domain_regions_init(dom, trim(outfldr))
 
-        ! Cold start or restart from the domain's subfolder of the run bundle;
-        ! the shared bsl was already initialized/restored once by the driver
-        ! (bsl_startup above). On a restart, re-establish the climate/smb and
-        ! marine-shelf forcing from the restored state (the bundle does not hold
-        ! them), so the first step and the first output see a valid boundary state.
+        ! Cold start or restart from the domain's subfolder of the run bundle
+        ! (state continued, climate re-derived: see domain_startup); the shared
+        ! bsl was already initialized/restored once by the driver (bsl_startup
+        ! above).
         if (trim(restart) == "None") then
             call domain_startup(dom, ts, bsl, "None", idx, restore_bsl=.false.)
         else
             call domain_startup(dom, ts, bsl, trim(restart)//"/"//trim(dom%ctl%domain), idx, &
                                 restore_bsl=.false.)
-            call step_climate(dom, ts, idx)
-            call step_surface(dom, ts)
-            call step_shelf(dom, ts)
         end if
 
         write(*,*)

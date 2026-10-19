@@ -664,6 +664,16 @@ annotated git tag. Dates are release (tag) dates.
   regenerated on 2026-10-16, which now shares the grid of the legacy `ice_data` SRG inputs);
   it held a stale 257 x 129 description. `yelmox_SRG.nml` runs every component on
   `SRG-250M`; `maps/grid_SRG-250M-v1.txt` removed.
+- Exact restarts (bit-for-bit with the continuous run, `yelmox` and `yelmox_bipolar`): the
+  restart path re-ran `step_surface`, stepping the chion/smbpal snowpack one extra year
+  (smb, refreezing, H_snow off by up to ~100 %). The chion and smbpal restart files now
+  carry the annual fields of the last cycle (`ann_*`), and `domain_startup` continues the
+  restored state, re-deriving only the climate (and a stateless `smb_simple` surface); the
+  drivers no longer re-step surface and shelf (`obm_ocean_init` steps the shelf on a cold
+  start only). Bundles without `ann_*` still restart, inexactly, with a warning. Needs
+  FastIsostasy dev ca616b3 (each domain keeps its own restored bsl, which the
+  continuous multi-domain run sees). Remaining differences at the restart record only: the
+  Yelmo diagnostics `visc_bar`, `mb_clip_tot` (not in the Yelmo restart).
 - `const_kabp` (surface_chion, smbpal) is kyr BP: the constant insolation used the orbit at
   +const_kabp kyr (future) instead of -const_kabp kyr. No effect for `const_kabp = 0` or
   model-time insolation.

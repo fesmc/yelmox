@@ -98,16 +98,10 @@ program yelmox
     call domain_regions_init(dom, trim(outfldr))
 
     ! Cold start: build the initial boundary state. Restart: restore the bundle
-    ! (incl. the shared bsl), rebuild the hi-res hub from the restored models,
-    ! then re-establish the climate/smb and marine-shelf forcing from the
-    ! restored state (the bundle does not hold them), so the first step and the
-    ! first output see a valid boundary state.
+    ! (incl. the shared bsl) and continue its state: the hi-res hub rebuilt
+    ! from the restored models, the climate (and a stateless surface)
+    ! re-derived from it (see domain_startup).
     call domain_startup(dom, ts, bsl, trim(restart), idx)
-    if (trim(restart) /= "None") then
-        call step_climate(dom, ts, idx)
-        call step_surface(dom, ts)
-        call step_shelf(dom, ts)
-    end if
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"

@@ -63,10 +63,20 @@ contains
         ! bundle folder -- the single-domain convention, where the run-level
         ! bsl_restart.nc lives in the domain's bundle. Multi-domain drivers
         ! restore the bsl once themselves (bsl_startup) and pass .false..
-        ! The restart branch does not rebuild the climate/smb or marine-shelf
-        ! forcing (not held in the bundle): every driver re-establishes it
-        ! after this call with its own climate step + marine-shelf step.
         ! idx is the driver-owned indices registry (restored by the driver).
+        !
+        ! A restart continues the state at the top of the time loop of the run
+        ! that wrote the bundle, so nothing is stepped here: the stateful
+        ! components are restored with their outputs (the surface output
+        ! Yelmo receives at the next step, the marine shelf), and only what
+        ! the bundle does not hold is re-derived from the restored state --
+        ! the climate (snapshots and esm are functions of the geometry, the
+        ! time and the indices; rembo is stepped, as before) and a stateless
+        ! surface (smb_simple). The climate so re-derived is the one the run
+        ! held when the restart time lies on its dt_clim cadence (counted from
+        ! its start). A stateful surface would be stepped one extra year by a
+        ! re-derivation (bundles written before its outputs were added;
+        ! restart_read warns).
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
@@ -74,7 +84,7 @@ contains
         type(indices_class), intent(in)  :: idx
         logical, intent(in), optional    :: restore_bsl
 
-        logical :: do_bsl
+        logical :: do_bsl, surface_restored
 
         do_bsl = .true.
         if (present(restore_bsl)) do_bsl = restore_bsl
@@ -83,8 +93,10 @@ contains
             call domain_init_state(dom, ts, bsl, idx)
         else
             if (do_bsl) call bsl_startup(bsl, trim(restart))
-            call domain_restart_read(dom, trim(restart), ts, bsl)
+            call domain_restart_read(dom, trim(restart), ts, bsl, surface_restored)
             call couple_yelmo_to_htopo(dom)
+            call step_climate(dom, ts, idx)
+            if (.not. surface_restored) call step_surface(dom, ts)
         end if
     end subroutine domain_startup
 
@@ -422,8 +434,12 @@ contains
         write(*,*) "domain_restart_write:: wrote bundle "//trim(bundle)
     end subroutine domain_restart_write
 
-    subroutine domain_restart_read(dom, fldr, ts, bsl)
-        ! Restore all stateful sub-models from a restart bundle folder. The shared
+    subroutine domain_restart_read(dom, fldr, ts, bsl, surface_restored)
+        ! Restore all stateful sub-models from a restart bundle folder.
+        ! surface_restored: the surface output (smb, tsrf) was restored with the
+        ! surface model's state (chion, smbpal), so it must not be re-derived;
+        ! false for a stateless surface (smb_simple; climate: nothing to do)
+        ! and for a bundle without the surface output. The shared
         ! barystatic sea level (bsl) is restored by the driver (bsl is prognostic
         ! under method="fastiso"/"mixed" and cannot be re-derived from time, so the
         ! driver restores it from the run's bsl_restart.nc, bsl_startup); this
@@ -439,6 +455,7 @@ contains
         character(len=*),  intent(in)    :: fldr
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
+        logical,           intent(out)   :: surface_restored
 
         real(wp), allocatable :: z_bed_i(:,:), H_ice_i(:,:)
         character(len=256) :: gi, gy
@@ -481,12 +498,14 @@ contains
         call check_isostasy_reference(dom)
         call couple_isostasy_to_yelmo(dom)
 
-        ! Restore marine shelf and the (prognostic, for ITM) snowpack state.
+        ! Restore marine shelf and the snowpack state with the surface output
+        ! of its last annual cycle.
         call marshelf_restart_read(dom%mshlf, trim(fldr)//"/marine_shelf.nc")
+        surface_restored = .false.
         if (trim(dom%ctl%surface_method) == "smbpal") &
-            call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc")
+            call smbpal_restart_read(dom%smb, trim(fldr)//"/smbpal_restart.nc", surface_restored)
         if (trim(dom%ctl%surface_method) == "chion") &
-            call surface_chion_restart_read(dom%schn, trim(fldr)//"/chion_restart.nc")
+            call surface_chion_restart_read(dom%schn, trim(fldr)//"/chion_restart.nc", surface_restored)
 
         ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) from the
         ! restored H_ice and the isostasy-updated z_bed/z_sl, then recompute the

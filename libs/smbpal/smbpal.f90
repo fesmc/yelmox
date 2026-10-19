@@ -929,6 +929,9 @@ contains
         ! Write the prognostic snowpack state carried across timesteps
         ! (H_snow, alb_s). With the ITM ablation method the snowpack is
         ! prognostic, so it must be restored to continue a run seamlessly.
+        ! Also the annual fields of the last update (smb%ann, as ann_<name>):
+        ! they are the output the host receives at its next step and cannot
+        ! be rebuilt from the state without stepping it another year.
 
         implicit none
 
@@ -952,19 +955,50 @@ contains
                       start=[1,1,1],count=[nx,ny,1],ncid=ncid)
         call nc_write(filename,"alb_s", smb%now%alb_s, dim1="xc",dim2="yc",dim3="time", &
                       start=[1,1,1],count=[nx,ny,1],ncid=ncid)
+
+        call write_ann("t2m",      smb%ann%t2m)
+        call write_ann("pr",       smb%ann%pr)
+        call write_ann("sf",       smb%ann%sf)
+        call write_ann("S",        smb%ann%S)
+        call write_ann("sigma",    smb%ann%sigma)
+        call write_ann("PDDs",     smb%ann%PDDs)
+        call write_ann("tsrf",     smb%ann%tsrf)
+        call write_ann("H_snow",   smb%ann%H_snow)
+        call write_ann("alb_s",    smb%ann%alb_s)
+        call write_ann("smbi",     smb%ann%smbi)
+        call write_ann("smb",      smb%ann%smb)
+        call write_ann("melt",     smb%ann%melt)
+        call write_ann("runoff",   smb%ann%runoff)
+        call write_ann("refrz",    smb%ann%refrz)
+        call write_ann("melt_net", smb%ann%melt_net)
         call nc_close(ncid)
 
         return
 
+    contains
+
+        subroutine write_ann(name,var)
+            character(len=*), intent(IN) :: name
+            real(prec),       intent(IN) :: var(:,:)
+
+            call nc_write(filename,"ann_"//name,var,dim1="xc",dim2="yc",dim3="time", &
+                          start=[1,1,1],count=[nx,ny,1],ncid=ncid)
+        end subroutine write_ann
+
     end subroutine smbpal_restart_write
 
-    subroutine smbpal_restart_read(smb,filename)
-        ! Restore the prognostic snowpack state (H_snow, alb_s).
+    subroutine smbpal_restart_read(smb,filename,ann_restored)
+        ! Restore the prognostic snowpack state (H_snow, alb_s) and the annual
+        ! fields of the last update. ann_restored is false for a file without
+        ! the annual fields (written before they were added): smb%ann is then
+        ! unset and the host must rebuild it with an update, which steps the
+        ! snowpack one extra year (the restart is not exact).
 
         implicit none
 
         type(smbpal_class), intent(INOUT) :: smb
         character(len=*),   intent(IN)    :: filename
+        logical,            intent(OUT)   :: ann_restored
 
         ! Local variables
         integer :: nx, ny
@@ -975,9 +1009,40 @@ contains
         call nc_read(filename,"H_snow",smb%now%H_snow,start=[1,1,1],count=[nx,ny,1])
         call nc_read(filename,"alb_s", smb%now%alb_s, start=[1,1,1],count=[nx,ny,1])
 
+        ann_restored = nc_exists_var(filename,"ann_smb")
+        if (ann_restored) then
+            call read_ann("t2m",      smb%ann%t2m)
+            call read_ann("pr",       smb%ann%pr)
+            call read_ann("sf",       smb%ann%sf)
+            call read_ann("S",        smb%ann%S)
+            call read_ann("sigma",    smb%ann%sigma)
+            call read_ann("PDDs",     smb%ann%PDDs)
+            call read_ann("tsrf",     smb%ann%tsrf)
+            call read_ann("H_snow",   smb%ann%H_snow)
+            call read_ann("alb_s",    smb%ann%alb_s)
+            call read_ann("smbi",     smb%ann%smbi)
+            call read_ann("smb",      smb%ann%smb)
+            call read_ann("melt",     smb%ann%melt)
+            call read_ann("runoff",   smb%ann%runoff)
+            call read_ann("refrz",    smb%ann%refrz)
+            call read_ann("melt_net", smb%ann%melt_net)
+        else
+            write(*,*) "smbpal_restart_read:: warning: "//trim(filename)//" has no annual fields &
+                       &(ann_*); they are rebuilt by an update, so the restart is not exact."
+        end if
+
         write(*,*) "smbpal_restart_read:: read "//trim(filename)
 
         return
+
+    contains
+
+        subroutine read_ann(name,var)
+            character(len=*), intent(IN)    :: name
+            real(prec),       intent(INOUT) :: var(:,:)
+
+            call nc_read(filename,"ann_"//name,var,start=[1,1,1],count=[nx,ny,1])
+        end subroutine read_ann
 
     end subroutine smbpal_restart_read
 
