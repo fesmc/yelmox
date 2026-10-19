@@ -6,6 +6,17 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- `{domain}`/`{grid_name}` in the isostasy `rheology_file`/`mask_file` (`grid_isos`; needs
+  FastIsostasy `isos_init(..., domain, grid_name)`), the `smb_simple` target mask
+  (`grid_surface`) and the bipolar hydro masks (each domain's `grid_ice`); the Antarctic,
+  LIS, bipolar and SRG par files use them (the ANT-32KM configs and bipolar south read the
+  ANT-16KM Earth structure before).
+- ESM: `experiment = "ctrl"` in a transient runs on the reference (no crash with
+  `use_esm`); `esm_nudge.nml` on the existing ANT-16KM files with the experiment
+  `nudgedhigh03`; `esm_ant.nml`/`esm_nudge.nml` reference from the RACMO2.3p2 1979-2022 and
+  ORAS5 1979-2024 series (the DETRENDED products are missing).
+- Pyrenees: the anomaly sign (index 0 at present, 1 at 21 ka, `f_ta = -10` K); comments of
+  par files and scripts updated.
 - `scripts/run_chunks.sh`: a long run as a chain of short Slurm jobs (each chunk restarts from
   the bundle of the previous one at its `time_end`; `afterok` dependencies; overrides for the
   first or later chunks, e.g. `sim.relax=False`, `ytrc.elsa_restart=True`); docs page

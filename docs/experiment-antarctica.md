@@ -115,6 +115,11 @@ optimized until 20 kyr; and `[transient]`, on calendar time with `dtt = 1` yr. B
 | `[esm] use_esm` | `False` | `True` |
 | `[transient]` | 1020 to 3500 | 4501 to 5000 |
 | Surface mass balance | chion ITM (`nml_itm = "itm"`) | chion PDD (`[pdd_chion]`, `cg05`) |
+| `[esm] experiment` | `"ctrl"` | `"ctrl"` (reference only) or `"nudgedhigh03"` with `use_proj = True`: the anomaly of the nudged AWI-ESM run minus its PI run, 3501--5000 (atmosphere; the ocean has no nudged files on ANT-16KM yet) |
+
+The reference climate is the mean over `time_ref` (1990--2019) of the RACMO2.3p2
+1979--2022 and ORAS5 1979--2024 monthly series. On ANT-8KM the ORAS5 reference
+needs about 15 GB: run with `--omp 32` or more (the memory follows the cores).
 
 ## Configuration
 
