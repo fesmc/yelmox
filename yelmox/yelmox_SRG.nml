@@ -61,14 +61,12 @@
     ! A blank component grid takes the default given in brackets.
     name         = "SRG"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "SRG-250M"         ! hi-res geometry hub (FesmData v2)
-    ! The other inputs are still on the v1 250 m grid (SRG-250M-v1: shifted by
-    ! half a cell, smaller extent), so Yelmo, climate and surface run there.
-    grid_ice     = "SRG-250M-v1"      ! Yelmo [grid_hub]
+    grid_hub     = "SRG-250M"         ! hi-res geometry hub (FesmData v2; the legacy ice_data inputs share this grid)
+    grid_ice     = "SRG-250M"         ! Yelmo [grid_hub]
     grid_isos    = "SRG-16KM"         ! isostasy [grid_ice] (coarse: the glacier grid is not needed)
-    grid_clim    = "SRG-250M-v1"      ! reference climate + transient forcing [grid_ice]
-    grid_surface = "SRG-250M-v1"      ! surface mass balance [grid_clim]
-    grid_shelf   = "SRG-250M-v1"      ! marine shelf [grid_hub]
+    grid_clim    = "SRG-250M"         ! reference climate + transient forcing [grid_ice]
+    grid_surface = "SRG-250M"         ! surface mass balance [grid_clim]
+    grid_shelf   = "SRG-250M"         ! marine shelf [grid_hub]
     basins       = "domain"  ! basin ids of the hub output: <set>, <set>.group, None or domain
 /
 
@@ -572,8 +570,7 @@
 /
 
 ! ---- run-specific database groups (found in this par file, after var_defs) --
-! MAR v3.14 1960-1990 on the v1 250 m grid (legacy ice_data, not in FesmData;
-! the folder is SRG-250M, the grid SRG-250M-v1), monthly.
+! MAR v3.14 1960-1990 on the 250 m grid (legacy ice_data, not in FesmData), monthly.
 
 &srg_mar314_1960_1990_tas
     filename = "ice_data/{domain}/SRG-250M/SRG-250M_CLIM_PD-1960-1990_MAR3V14.nc"
