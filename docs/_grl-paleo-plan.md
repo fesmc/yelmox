@@ -236,7 +236,9 @@ Superseding the decisions above where they differ:
 
 1. Borders: "infinite" (`[yelmo] experiment = "infinite"`, `mask_border =
    "dynamic"`) for A and B; no index-scaled border ice. `border_width` and
-   `[ice_bnd]` stay as an option, off.
+   `[ice_bnd]` stay as an option, off. Needs Yelmo with outflow-only "infinite"
+   borders: before, the border fed unbooked inflow, which killed the first B LGM
+   spin-up at 11 kyr.
 2. No optimization of `cb_ref` or `tf_corr` anywhere (A spin-up included).
 3. B: cold-start LGM spin-up from GLAC-1D at 21 ka (20 kyr, forcing held at
    21 ka), then the transient -21 ka to 0; no PD spin-up.
