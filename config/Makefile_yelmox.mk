@@ -71,14 +71,14 @@ $(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/smbpal.o $(objdir)/smb_simple.o \
 						$(objdir)/surface_chion.o \
 						$(objdir)/sediments.o $(objdir)/geothermal.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 $(objdir)/kryos_regions.o: $(libdir)/kryos_regions.f90 $(objdir)/kryos.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 $(objdir)/kryos_coupling.o: $(libdir)/kryos_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o $(objdir)/kryos_forcing.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 $(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90 $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -86,14 +86,14 @@ $(objdir)/kryos_forcing.o: $(libdir)/kryos_forcing.f90 $(objdir)/yelmox_nml.o
 $(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \
 						$(objdir)/kryos_regions.o $(objdir)/kryos_coupling.o \
 						$(objdir)/kryos_forcing.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 # CMIP/ISMIP-formatted output ([output] write_cmip)
 $(objdir)/cmip_output.o: $(libdir)/cmip_output.f90 $(objdir)/marine_shelf.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
 $(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)/cmip_output.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 # Bipolar ocean coupling: bridge over kryos_domain + the obm box model. Lives
 # alongside the bipolar driver in yelmox_bipolar/ -- it is only pertinent to
@@ -102,7 +102,7 @@ $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/kryos_coupling.o $(objdir)/kryos_forcing.o $(objdir)/climate_mods.o \
 						$(objdir)/yelmox_nml.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 # $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
 # 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
@@ -122,13 +122,9 @@ $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
 # $(objdir)/xarray.o: $(libdir)/xarray.f90 $(objdir)/nml.o $(objdir)/ncio.o
 # 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
-# insol library 
-$(objdir)/interp1D.o: $(libdir)/insol/interp1D.f90
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-$(objdir)/insolation.o: $(libdir)/insol/insolation.f90 $(objdir)/interp1D.o
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
+# The orbit of the insolation ([orbit]): elements from the insol library.
+$(objdir)/orbit_forcing.o: $(libdir)/orbit_forcing.f90 $(objdir)/yelmox_nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_INSOL) -c -o $@ $<
 
 # smbpal library
 $(objdir)/smbpal_precision.o: $(libdir)/smbpal/smbpal_precision.f90
@@ -141,18 +137,17 @@ $(objdir)/smb_pdd.o: $(libdir)/smbpal/smb_pdd.f90 $(objdir)/smbpal_precision.o
 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/interp_time.o: $(libdir)/smbpal/interp_time.f90
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-$(objdir)/smbpal.o: $(libdir)/smbpal/smbpal.f90 $(objdir)/smbpal_precision.o $(objdir)/insolation.o  \
-					$(objdir)/interp1D.o  $(objdir)/interp_time.o \
-					$(objdir)/smb_pdd.o $(objdir)/smb_itm.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+$(objdir)/smbpal.o: $(libdir)/smbpal/smbpal.f90 $(objdir)/smbpal_precision.o $(objdir)/orbit_forcing.o \
+					$(objdir)/interp_time.o $(objdir)/smb_pdd.o $(objdir)/smb_itm.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_INSOL) -c -o $@ $<
 
 # chion surface model wrapper (surface_method = "chion"): annual cycle of daily
 # chion steps on grid_surface, host-supplied insolation.
-$(objdir)/surface_chion.o: $(libdir)/surface_chion.f90 $(objdir)/insolation.o \
+$(objdir)/surface_chion.o: $(libdir)/surface_chion.f90 $(objdir)/orbit_forcing.o \
 						$(CHIONROOT)/libchion/include/libchion.a
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_CHION) -c -o $@ $<
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 # smb_simple library
 $(objdir)/smb_simple.o: $(libdir)/smb_simple.f90
@@ -189,8 +184,7 @@ $(objdir)/obm.o: $(libdir)/obm/obm.f90
 #############################################################
 
 yelmox_libs = 			$(objdir)/geothermal.o \
-					    $(objdir)/interp1D.o \
-					    $(objdir)/insolation.o \
+					    $(objdir)/orbit_forcing.o \
 					    $(objdir)/esm_forcing.o \
 					    $(objdir)/marine_shelf.o \
                         $(objdir)/pico_geometry.o \
@@ -234,5 +228,8 @@ obm_libs = 				$(objdir)/obm_defs.o\
 $(yelmox_libs) $(obm_libs): $(FESMUTILSLIBDIR)/libfesmutils.a \
                             $(YELMOROOT)/libyelmo/include/libyelmo.a \
                             $(ISOSTASYROOT)/libisostasy/include/libisostasy.a
+
+# The insol types (insol_class) are embedded in the surface models' state.
+$(objdir)/orbit_forcing.o $(objdir)/smbpal.o $(objdir)/surface_chion.o: $(INSOLROOT)/libinsol/include/libinsol.a
 
 $(objdir)/climate_rembo.o: $(REMBOROOT)/librembo/include/librembo.a

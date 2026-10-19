@@ -6,4 +6,5 @@ deps = [
     "FastIsostasy:2.4-beta",
     "rembo1:2.4-beta",
     "chion:2.4-beta",
+    "insol:main",
 ]

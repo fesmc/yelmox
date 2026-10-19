@@ -344,7 +344,8 @@ contains
         call regions_end(reg_c)
 
         ! --- smb on its configured grid (grid_surface) ---
-        ! The surface models read no grid-specific data; only lats (insolation) is physical.
+        ! The surface models read no grid-specific data; only lats (insolation, on the
+        ! orbit of [orbit<sfx>]) is physical.
         call grid_cdo_read_desc(grid_s, trim(dom%ctl%grid_surface), MAP_FLDR)
         dom%ctl%dx_surface = dom%yelmo%grd%G%dx * (grid_s%G%dx / grid_y%G%dx)
         nx_s = grid_s%G%nx
@@ -355,7 +356,8 @@ contains
         lats_s = real(grid_s%lat, wp)
         if (trim(dom%ctl%surface_method) == "smbpal") &
             call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s, &
-                             group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx))
+                             group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx), &
+                             orbit_group="orbit"//trim(sfx))
 
         ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
         ! smbpal (1D axes), smb_simple takes 2D projected coordinates.
@@ -374,7 +376,7 @@ contains
         if (trim(dom%ctl%surface_method) == "chion") then
             call surface_chion_init(dom%schn, path_par, lats_s, &
                                     group="surface_chion"//trim(sfx), chion_group="chion"//trim(sfx), &
-                                    cnst=dom%cnst)
+                                    orbit_group="orbit"//trim(sfx), cnst=dom%cnst)
         end if
 
         ! --- marine_shelf on its configured grid (grid_y already read above) ---

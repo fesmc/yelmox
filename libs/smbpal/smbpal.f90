@@ -2,7 +2,9 @@
 
     use nml
     use smbpal_precision
-    use insolation
+    use insolation, only : insol_class, insol_init, calc_insol_days, insol_wp => wp
+    use orbit_forcing, only : orbit_ctl_class, orbit_pars_class, orbit_ctl_load, &
+                              orbit_pars_now, orbit_pars_equal
     use interp_time 
     use ncio
     use smb_pdd 
@@ -23,9 +25,7 @@
         
     type smbpal_param_class
         type(itm_par_class) :: itm
-        logical    :: const_insol
-        real(dp)   :: const_kabp
-        character(len=512)  :: insol_fldr 
+        type(orbit_ctl_class) :: orbit        ! [orbit<sfx>]: the orbit of the insolation
         character(len=16)   :: abl_method 
         real(prec) :: sigma_snow, sigma_melt, sigma_land
         real(prec) :: sf_a, sf_b, firn_fac  
@@ -52,9 +52,19 @@
         real(prec), allocatable   :: melt_net(:,:)       ! Net surface melt, for calculating surface temp [mm]
     end type 
 
+    type smbpal_insol_class
+        ! Daily TOA insolation of each itm step on the grid (itm only),
+        ! recomputed only when the orbital elements change.
+        type(insol_class)       :: is                   ! insol state on the grid latitudes
+        type(orbit_pars_class)  :: orbit                ! the elements of S
+        logical                 :: set = .FALSE.        ! S holds the insolation of orbit
+        real(prec), allocatable :: S(:,:,:)             ! [W/m2] [nstep_itm,nx,ny]
+    end type
+
     type smbpal_class
         type(smbpal_param_class) :: par 
         type(smbpal_state_class) :: now, mon(12), ann
+        type(smbpal_insol_class) :: ins
     end type
 
     type smbpal_point_class
@@ -73,7 +83,6 @@
         real(prec), allocatable :: t2m(:,:,:)       ! [K] Daily temperature [nx,ny,ndays_daily]
         real(prec), allocatable :: pr(:,:,:)        ! [mm we/d] Daily precipitation
         real(prec), allocatable :: sf(:,:,:)        ! [mm we/d] Daily snowfall
-        type(insol_day_class)   :: insol(nstep_itm) ! Insolation of each itm step
     end type 
 
     interface operator(+)
@@ -95,19 +104,18 @@
 
 contains 
 
-    subroutine smbpal_init(smb,filename,x,y,lats,group,itm_group)
+    subroutine smbpal_init(smb,filename,x,y,lats,group,itm_group,orbit_group)
 
         implicit none 
 
         type(smbpal_class) :: smb
         character(len=*), intent(IN)  :: filename  ! Parameter file 
         real(prec) :: x(:), y(:), lats(:,:)
-        character(len=*),  intent(IN), optional :: group, itm_group
+        character(len=*),  intent(IN), optional :: group, itm_group, orbit_group
 
         ! Local variables
         integer :: nx, ny, m  
-        real(prec) :: tmp 
-        character(len=32) :: nml_group, itm_nml_group
+        character(len=32) :: nml_group, itm_nml_group, orbit_nml_group
 
         ! Make sure we know the namelist group for the smbpal block
         if (present(group)) then
@@ -123,11 +131,19 @@ contains
             itm_nml_group = "itm"         ! Default parameter blcok name
         end if
 
+        ! Make sure we know the namelist group of the orbit
+        if (present(orbit_group)) then
+            orbit_nml_group = trim(orbit_group)
+        else
+            orbit_nml_group = "orbit"     ! Default parameter block name
+        end if
+
         nx = size(x,1)
         ny = size(y,1)
 
         ! Load smbpal parameters
         call smbpal_par_load(smb%par,filename,init=.TRUE.,group=nml_group,itm_group=itm_nml_group)
+        call orbit_ctl_load(smb%par%orbit,filename,orbit_nml_group)
 
         ! Additionally define dimension info 
         if (allocated(smb%par%x)) deallocate(smb%par%x)
@@ -150,8 +166,13 @@ contains
         ! Initialize the state variables 
         smb%now%H_snow = smb%par%itm%H_snow_max 
 
-        ! Test calculation of insolation to load orbital params 
-        tmp = calc_insol_day(180,65.d0,0.d0,fldr=smb%par%insol_fldr)
+        ! Insolation state on the grid latitudes (itm only)
+        if (trim(smb%par%abl_method) .eq. "itm") then 
+            call insol_init(smb%ins%is,dble(lats),fldr=trim(smb%par%orbit%fldr),day_year=ndays)
+            allocate(smb%ins%S(nstep_itm,nx,ny))
+            smb%ins%S   = 0.0 
+            smb%ins%set = .FALSE. 
+        end if 
 
         return 
 
@@ -166,7 +187,7 @@ contains
         type(smbpal_class), intent(INOUT) :: smb
         real(prec), intent(IN) :: t2m_ann(:,:), t2m_sum(:,:)
         real(prec), intent(IN) ::  pr_ann(:,:), z_srf(:,:), H_ice(:,:)
-        real(dp),   intent(IN) :: time_bp       ! years BP 
+        real(dp),   intent(IN) :: time_bp       ! [yr] model time (relative to 1950, past < 0), for the orbit 
         real(prec), intent(IN), optional :: sf_ann(:,:)
         character(len=*), intent(IN), optional :: file_out      ! Annual output
         character(len=*), intent(IN), optional :: file_out_mon  ! Monthly output
@@ -210,7 +231,7 @@ contains
         type(smbpal_class), intent(INOUT) :: smb
         real(prec), intent(IN) :: t2m(:,:,:), pr(:,:,:)
         real(prec), intent(IN) ::  z_srf(:,:), H_ice(:,:)
-        real(dp),   intent(IN) :: time_bp       ! years BP 
+        real(dp),   intent(IN) :: time_bp       ! [yr] model time (relative to 1950, past < 0), for the orbit 
         real(prec), intent(IN) :: time_equil    ! years to equilibrate
         real(prec), intent(IN), optional :: sf(:,:,:)
 
@@ -221,7 +242,8 @@ contains
         ! Loop over equilibration years to update snowpack thickness 
         if (trim(smb%par%abl_method) .eq. "itm") then 
             ! The daily forcing is the same every year: prepare it once
-            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,time_bp,sf)
+            call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
+            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,sf)
             do n = 1, int(time_equil) 
                 call smbpal_update_itm(smb,frc,z_srf,H_ice,calc_monthly=.FALSE.)
             end do 
@@ -247,7 +269,7 @@ contains
         real(prec),         intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
         real(prec),         intent(IN) :: z_srf(:,:)                ! [m] Surface elevation 
         real(prec),         intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
-        real(dp),           intent(IN) :: time_bp                   ! [years BP] Current time (for insolation) 
+        real(dp),           intent(IN) :: time_bp                   ! [yr] Model time (relative to 1950, past < 0), for the orbit 
         real(prec),         intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
         character(len=*),   intent(IN), optional :: file_out        ! Annual output filename
         character(len=*),   intent(IN), optional :: file_out_mon    ! Monthly output filename
@@ -281,7 +303,8 @@ contains
             if (present(file_out_mon)) calc_monthly = .TRUE. 
 
             ! Generate daily climate from monthly input and run the year
-            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,time_bp,sf)
+            call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
+            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,sf)
             call smbpal_update_itm(smb,frc,z_srf,H_ice,calc_monthly)
 
             ! Monthly I/O 
@@ -348,10 +371,45 @@ contains
 
     end subroutine smbpal_update_monthly
 
-    subroutine smbpal_itm_forcing_init(frc,par,t2m,pr,time_bp,sf)
+    subroutine smbpal_insol_update(ins,orbit)
+        ! Daily TOA insolation of each itm step on the grid, only when the
+        ! orbital elements have changed since the last call.
+
+        implicit none 
+
+        type(smbpal_insol_class), intent(INOUT) :: ins 
+        type(orbit_pars_class),   intent(IN)    :: orbit 
+
+        ! Local variables
+        integer :: n 
+        integer :: days(nstep_itm)
+        real(insol_wp), allocatable :: S(:,:,:)
+
+        if (ins%set) then 
+            if (orbit_pars_equal(orbit,ins%orbit)) return 
+        end if 
+
+        do n = 1, nstep_itm 
+            days(n) = 1 + (n-1)*dt_itm
+        end do 
+
+        allocate(S(size(ins%S,2),size(ins%S,3),nstep_itm))
+        call calc_insol_days(ins%is,S,days,orbit)
+        do n = 1, nstep_itm 
+            ins%S(n,:,:) = real(S(:,:,n),prec)
+        end do 
+
+        ins%orbit = orbit 
+        ins%set   = .TRUE. 
+
+        return 
+
+    end subroutine smbpal_insol_update
+
+    subroutine smbpal_itm_forcing_init(frc,par,t2m,pr,sf)
         ! Daily forcing of one itm year: the monthly fields interpolated to
-        ! the forcing days and the insolation of each itm step. It depends
-        ! only on the climate, so it is shared by all grid points and years.
+        ! the forcing days. It depends only on the climate, so it is shared
+        ! by all grid points and years.
 
         implicit none 
 
@@ -359,12 +417,10 @@ contains
         type(smbpal_param_class),       intent(IN)  :: par 
         real(prec), intent(IN) :: t2m(:,:,:)                ! [K] Monthly temperature fields
         real(prec), intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
-        real(dp),   intent(IN) :: time_bp                   ! [years BP] Current time (for insolation) 
         real(prec), intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
 
         ! Local variables
-        integer :: nx, ny, k, n, day 
-        real(dp) :: insol_time
+        integer :: nx, ny, k, n 
         double precision, allocatable :: tmp(:,:,:)
 
         nx = size(t2m,1)
@@ -405,16 +461,6 @@ contains
             end do 
         end if 
 
-        ! Determine year to use for insolation calcs
-        insol_time = time_bp
-        if (par%const_insol) insol_time = -par%const_kabp*1e3   ! kyr BP -> model time
-        
-        ! Insolation of each itm step at the latitude nodes 
-        do n = 1, nstep_itm 
-            day = 1 + (n-1)*dt_itm
-            frc%insol(n) = calc_insol_day_spline(day,insol_time,fldr=par%insol_fldr)
-        end do 
-
         return 
 
     end subroutine smbpal_itm_forcing_init
@@ -443,7 +489,7 @@ contains
             
             now = smbpal_point_get(smb%now,i,j)
 
-            call smbpal_itm_point(now,ann,mon,smb%par,frc,i,j,z_srf(i,j),H_ice(i,j),calc_monthly)
+            call smbpal_itm_point(now,ann,mon,smb%par,frc,smb%ins%S(:,i,j),i,j,z_srf(i,j),H_ice(i,j),calc_monthly)
 
             call smbpal_point_set(smb%now,i,j,now)
             call smbpal_point_set(smb%ann,i,j,ann)
@@ -461,7 +507,7 @@ contains
 
     end subroutine smbpal_update_itm
 
-    subroutine smbpal_itm_point(now,ann,mon,par,frc,i,j,z_srf,H_ice,calc_monthly)
+    subroutine smbpal_itm_point(now,ann,mon,par,frc,S,i,j,z_srf,H_ice,calc_monthly)
         ! One itm year at grid point (i,j): the annual PDDs, then the
         ! snowpack budget every dt_itm days, averaged over the year
         ! (and the months, if calc_monthly). 
@@ -473,6 +519,7 @@ contains
         type(smbpal_point_class),       intent(INOUT) :: mon(12)    ! Monthly means (if calc_monthly)
         type(smbpal_param_class),       intent(IN)    :: par 
         type(smbpal_itm_forcing_class), intent(IN)    :: frc 
+        real(prec),                     intent(IN)    :: S(nstep_itm)   ! [W/m2] TOA insolation of each itm step
         integer,                        intent(IN)    :: i, j 
         real(prec),                     intent(IN)    :: z_srf, H_ice 
         logical,                        intent(IN)    :: calc_monthly
@@ -513,7 +560,7 @@ contains
             now%pr  = var_today(frc%days(k1-1),frc%days(k1),frc%pr(i,j,k1-1), frc%pr(i,j,k1),day)
             now%sf  = var_today(frc%days(k1-1),frc%days(k1),frc%sf(i,j,k1-1), frc%sf(i,j,k1),day)
             
-            now%S   = insol_day_eval(frc%insol(n),dble(par%lats(i,j)))
+            now%S   = S(n)
 
             ! Call mass budget for today [mm/d]
             call calc_snowpack_budget_step(par%itm,dt,par%lats(i,j),z_srf,H_ice,now%S,now%t2m,now%PDDs, &
@@ -644,9 +691,6 @@ contains
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE.
 
-        call nml_read(filename,nml_group,"insol_fldr",par%insol_fldr,init=init_pars)
-        call nml_read(filename,nml_group,"const_insol",par%const_insol,init=init_pars)
-        call nml_read(filename,nml_group,"const_kabp",par%const_kabp,init=init_pars)
         call nml_read(filename,nml_group,"abl_method",par%abl_method,init=init_pars)
         call nml_read(filename,nml_group,"sigma_snow",par%sigma_snow,init=init_pars)
         call nml_read(filename,nml_group,"sigma_land",par%sigma_land,init=init_pars)
@@ -661,22 +705,16 @@ contains
         call itm_par_load(par%itm,filename,init=init,group=itm_nml_group)
 
         ! Local parameter definitions (identical to object)
-        ! character(len=512) :: insol_fldr 
-        ! logical    :: const_insol
-        ! real(prec) :: const_kabp
         ! character(len=16)  :: abl_method
         ! real(prec)         :: sigma_snow, sigma_melt, sigma_land
         ! real(prec)         :: sf_a, sf_b, firn_fac 
         ! real(prec)         :: mm_snow, mm_ice 
 
-        ! namelist /smbpal/ insol_fldr, const_insol, const_kabp, &
+        ! namelist /smbpal/ &
         !     abl_method, sigma_snow, sigma_melt, sigma_land, &
         !     sf_a, sf_b, firn_fac, mm_snow, mm_ice 
                 
         ! ! Store initial values in local parameter values 
-        ! insol_fldr  = par%insol_fldr
-        ! const_insol = par%const_insol
-        ! const_kabp  = par%const_kabp
         ! abl_method  = par%abl_method
         ! sigma_snow  = par%sigma_snow 
         ! sigma_melt  = par%sigma_melt 
@@ -698,9 +736,6 @@ contains
         ! end if 
 
         ! ! Store local parameter values in output object
-        ! par%insol_fldr  = insol_fldr 
-        ! par%const_insol = const_insol
-        ! par%const_kabp  = const_kabp
         ! par%abl_method  = abl_method
         ! par%sigma_snow  = sigma_snow 
         ! par%sigma_melt  = sigma_melt 

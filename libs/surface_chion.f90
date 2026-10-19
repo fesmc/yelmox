@@ -9,8 +9,9 @@ module surface_chion
     ! units so couple_surface_to_yelmo treats both models alike.
     !
     ! Inputs chion does not own, supplied here (as smbpal does internally):
-    !   - daily top-of-atmosphere insolation (ITM, BESSI; libs/insol) from a per-day latitude
-    !     table (insol_dlat) interpolated to the columns, as shortwave_down: as is
+    !   - daily top-of-atmosphere insolation (ITM, BESSI; fesmc/insol, on the orbit of
+    !     [orbit<sfx>], orbit_forcing) from a per-day latitude table (insol_dlat)
+    !     interpolated to the columns, as shortwave_down: as is
     !     for ITM (which applies its own transmissivity), times a constant
     !     transmissivity trans_sw for BESSI (surface shortwave), and as the
     !     TOA itself (toa_shortwave) for BESSI's cloud-proxy longwave, so
@@ -48,7 +49,9 @@ module surface_chion
 
     use nml,        only : nml_read
     use phys_constants, only : phys_const_class, sec_day
-    use insolation, only : calc_insol_day
+    use insolation, only : insol_class, insol_init, calc_insol_days, insol_wp => wp
+    use orbit_forcing, only : orbit_ctl_class, orbit_pars_class, orbit_ctl_load, &
+                              orbit_pars_now, orbit_pars_equal
     use chion,      only : wp, dp, wp_acc, MV, chion_class, chion_init, chion_init_state, &
                            chion_update, chion_end, chion_set_active_mask, &
                            chion_get_surface_flux_totals, chion_get_surface, &
@@ -70,9 +73,6 @@ module surface_chion
     real(wp), parameter :: days_trop  = 365.2422_wp  ! [d] tropical year, for the solar longitude
 
     type surface_chion_param_class
-        logical            :: const_insol   ! insolation at const_kabp instead of the model time
-        real(dp)           :: const_kabp    ! [kyr BP] insolation time when const_insol
-        character(len=512) :: insol_fldr    ! folder of the orbital-parameter tables
         real(wp)           :: sf_a, sf_b    ! snowfall fraction, -0.5*tanh(sf_a*(T-sf_b))+0.5
         real(wp)           :: sigma_pdd     ! [K] temperature standard deviation for the PDDs
         real(wp)           :: time_equil    ! [yr] cold-start snowpack spin-up
@@ -101,9 +101,13 @@ module surface_chion
 
     type surface_chion_insol_class
         ! Daily TOA insolation on a regular latitude table, rebuilt only when
-        ! the insolation time changes (once per run with const_insol), and the
-        ! fixed linear-interpolation stencil of every column into it.
-        real(dp)              :: time = huge(1.0_dp)   ! [yr] insolation time of the table
+        ! the orbital elements change (once per run unless [orbit] method =
+        ! "clock"), and the fixed linear-interpolation stencil of every column
+        ! into it.
+        type(orbit_ctl_class)  :: ctl                  ! [orbit<sfx>]
+        type(insol_class)      :: is                   ! insol state on the table latitudes
+        type(orbit_pars_class) :: orbit                ! the elements of the table
+        logical               :: set = .false.         ! the table holds the insolation of orbit
         real(dp), allocatable :: lat(:)                ! (nlat) [deg N]
         real(wp), allocatable :: S(:,:)                ! (nlat,nday) [W m-2]
         integer,  allocatable :: j0(:)                 ! (ncol) table row below the column
@@ -132,7 +136,7 @@ module surface_chion
 
 contains
 
-    subroutine surface_chion_init(sc, filename, lats, group, chion_group, cnst)
+    subroutine surface_chion_init(sc, filename, lats, group, chion_group, orbit_group, cnst)
         ! Parameters, chion (cold state) and the annual fields on an (nx,ny) grid.
         ! chion takes its shared physical constants from the domain's record.
         type(surface_chion_class), intent(inout) :: sc
@@ -140,6 +144,7 @@ contains
         real(wp),                  intent(in)    :: lats(:,:)      ! [deg N]
         character(len=*),          intent(in)    :: group          ! &surface_chion
         character(len=*),          intent(in)    :: chion_group    ! &chion
+        character(len=*),          intent(in)    :: orbit_group    ! &orbit
         type(phys_const_class),    intent(in)    :: cnst
 
         call surface_chion_par_load(sc%par, filename, group)
@@ -179,7 +184,8 @@ contains
 
         ! Column icol = i + (j-1)*nx: reshape order.
         sc%chn%forc%latitude_deg = reshape(lats, [sc%ncol])
-        if (sc%insol) call insol_init(sc%ins, sc%chn%forc%latitude_deg, sc%md%nday_year)
+        if (sc%insol) call insol_table_init(sc%ins, sc%chn%forc%latitude_deg, sc%md%nday_year, &
+                                            filename, orbit_group)
 
         ! Constant for the run.
         sc%chn%forc%wind_speed            = sc%par%wind_speed
@@ -198,7 +204,7 @@ contains
         type(surface_chion_class), intent(inout) :: sc
         real(wp), intent(in) :: t2m(:,:,:), pr(:,:,:)       ! [K], [mm w.e./d] monthly
         real(wp), intent(in) :: z_srf(:,:), z_bed(:,:), H_ice(:,:), z_sl(:,:)
-        real(dp), intent(in) :: time_rel   ! [yr] model time relative to 1950 (past < 0)
+        real(dp), intent(in) :: time_rel   ! [yr] model time relative to 1950 (past < 0), for the orbit
 
         integer :: n
 
@@ -217,7 +223,7 @@ contains
         real(wp), intent(in) :: z_bed(:,:)          ! [m]
         real(wp), intent(in) :: H_ice(:,:)          ! [m]
         real(wp), intent(in) :: z_sl(:,:)           ! [m]
-        real(dp), intent(in) :: time_rel            ! [yr] model time relative to 1950 (past < 0), for the insolation
+        real(dp), intent(in) :: time_rel            ! [yr] model time relative to 1950 (past < 0), for the orbit
 
         real(wp), allocatable :: t_ctl(:,:), p_ctl(:,:), mon(:,:), ctl(:,:), col(:), t_ann(:)
         real(wp), allocatable :: t_sum(:), pr_sum(:), sf_sum(:), S_sum(:), PDDs(:)
@@ -229,7 +235,6 @@ contains
         integer,  allocatable :: idx(:)
         integer  :: na, i, icol, m, day, nday, j0
         real(wp) :: dt, spd, T0, t_d, p_d, sf_d, S_d
-        real(dp) :: insol_time
 
         nday = sc%md%nday_year
         dt   = real(sc%par%dt_days, wp)
@@ -241,11 +246,8 @@ contains
         na  = sc%chn%grd%n_active
         idx = sc%chn%grd%active_idx(1:na)
 
-        if (sc%insol) then
-            insol_time = time_rel
-            if (sc%par%const_insol) insol_time = -sc%par%const_kabp*1e3_dp   ! kyr BP -> model time
-            call insol_update(sc%ins, insol_time, sc%par%dt_days, trim(sc%par%insol_fldr))
-        end if
+        if (sc%insol) call insol_table_update(sc%ins, orbit_pars_now(sc%ins%ctl, sc%ins%is, time_rel), &
+                                             sc%par%dt_days)
 
         ! Mean-preserving daily control values, (nmon,na) so a column is contiguous.
         allocate(mon(na,nmon), ctl(na,nmon))
@@ -422,9 +424,6 @@ contains
         character(len=*),                intent(in)  :: filename
         character(len=*),                intent(in)  :: group
 
-        call nml_read(filename, group, "const_insol", par%const_insol)
-        call nml_read(filename, group, "const_kabp",  par%const_kabp)
-        call nml_read(filename, group, "insol_fldr",  par%insol_fldr)
         call nml_read(filename, group, "sf_a",        par%sf_a)
         call nml_read(filename, group, "sf_b",        par%sf_b)
         call nml_read(filename, group, "sigma_pdd",   par%sigma_pdd)
@@ -495,12 +494,14 @@ contains
         if (tot1 /= real(MV, wp_acc) .and. tot0 /= real(MV, wp_acc)) y = real(tot1 - tot0, wp)
     end function annual_total
 
-    subroutine insol_init(ins, lats, nday)
-        ! Regular latitude table (insol_dlat) over [-90,90] and each column's
+    subroutine insol_table_init(ins, lats, nday, filename, orbit_group)
+        ! The orbit ([orbit<sfx>]), the regular latitude table (insol_dlat)
+        ! over [-90,90] with its insol state, and each column's
         ! linear-interpolation stencil into it.
         type(surface_chion_insol_class), intent(inout) :: ins
         real(wp),                        intent(in)    :: lats(:)     ! (ncol) [deg N]
         integer,                         intent(in)    :: nday
+        character(len=*),                intent(in)    :: filename, orbit_group
 
         integer :: nlat, j, icol
         real(dp) :: x
@@ -510,8 +511,11 @@ contains
         do j = 1, nlat
             ins%lat(j) = -90.0_dp + real(j-1, dp)*insol_dlat
         end do
-        ins%S    = 0.0_wp
-        ins%time = huge(1.0_dp)
+        ins%S   = 0.0_wp
+        ins%set = .false.
+
+        call orbit_ctl_load(ins%ctl, filename, orbit_group)
+        call insol_init(ins%is, ins%lat, fldr=trim(ins%ctl%fldr), day_year=nday)
 
         allocate(ins%j0(size(lats)), ins%w1(size(lats)))
         do icol = 1, size(lats)
@@ -519,25 +523,32 @@ contains
             ins%j0(icol) = min(max(int(x) + 1, 1), nlat - 1)
             ins%w1(icol) = real(x - real(ins%j0(icol) - 1, dp), wp)
         end do
-    end subroutine insol_init
+    end subroutine insol_table_init
 
-    subroutine insol_update(ins, time, dt_days, fldr)
+    subroutine insol_table_update(ins, orbit, dt_days)
         ! Daily TOA insolation on the latitude table for the stepped days, only
-        ! when the insolation time has changed since the last call.
+        ! when the orbital elements have changed since the last call.
         type(surface_chion_insol_class), intent(inout) :: ins
-        real(dp),                        intent(in)    :: time      ! [yr]
+        type(orbit_pars_class),          intent(in)    :: orbit
         integer,                         intent(in)    :: dt_days
-        character(len=*),                intent(in)    :: fldr
 
-        integer :: day
+        integer, allocatable :: days(:)
+        real(insol_wp), allocatable :: S(:,:)
+        integer :: q
 
-        if (time == ins%time) return
+        if (ins%set) then
+            if (orbit_pars_equal(orbit, ins%orbit)) return
+        end if
 
-        do day = 1, size(ins%S,2), dt_days
-            ins%S(:,day) = real(calc_insol_day(day, ins%lat, time, fldr=fldr), wp)
+        days = [(q, q = 1, size(ins%S,2), dt_days)]
+        allocate(S(size(ins%lat), size(days)))
+        call calc_insol_days(ins%is, S, days, orbit)
+        do q = 1, size(days)
+            ins%S(:,days(q)) = real(S(:,q), wp)
         end do
-        ins%time = time
-    end subroutine insol_update
+        ins%orbit = orbit
+        ins%set   = .true.
+    end subroutine insol_table_update
 
 
     pure function solar_longitude_deg(day, nday) result(lon)
