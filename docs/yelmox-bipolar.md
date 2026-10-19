@@ -14,7 +14,15 @@ across both domains plus the OBM.
 
 - **Program:** `yelmox_bipolar/yelmox_bipolar.f90` + `yelmox_bipolar/obm_coupling.f90` + `libs/kryos*.f90`.
 - **Build:** `make yelmox_bipolar` (links the OBM stack, `$(obm_libs)`).
-- **Config:** `yelmox_bipolar/yelmox_bipolar_Bipolar.nml`.
+- **Config:** `yelmox_bipolar/yelmox_bipolar_Bipolar.nml`: north = Greenland
+  (hub and ice `GRL-16KM`, the other components `GRL-32KM`), south = Antarctica
+  (hub and shelf `ANT-16KM`, the other components `ANT-32KM`, with `relax` and
+  `opt`); `[ctrl]` 0 to 40 yr, `dtt = 10` yr, the box model off (`active_obm`,
+  `atm2obm`, `ism2obm` = False). `[ctrl]`, `[barysealevel]` and the Yelmo
+  physics groups (`ydyn`, `ytopo`, ...) are shared (no suffix).
+- **Tests:** `yelmox_bipolar/run_tests.sh` (local runs under `tmp/`): coupling
+  off; the box model on (`atm2obm` + `ocn_obm_<sfx>`, `ocn_fraction_north` off);
+  with `RUN_FWF=1` also `ism2obm` (needs the hydrographic masks).
 
 ## What's distinct
 
@@ -26,14 +34,18 @@ across both domains plus the OBM.
   (`bsl_startup`) and written to the run restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
-  (`obm_coupling_init`, `obm_exchange`). The OBM writes its own 1D output; its restart
-  (`obm_restart.nc`) goes into the run restart bundle next to `bsl_restart.nc`.
+  (`obm_coupling_init`, `obm_ocean_init`, `obm_exchange`). The OBM writes its own
+  1D output, `<obm_name>.nc` (`[ctrl] obm_name`, `nautilus` or `stommel`), on the
+  `[tm_1D]` cadence; its restart (`obm_restart.nc`) goes into the run restart
+  bundle next to `bsl_restart.nc`.
 - **One restart bundle per run** — `restart-<kyr>-kyr/` holds the shared
-  `bsl_restart.nc` and `obm_restart.nc`, and each domain in a subfolder named
-  after it (`Greenland/`, `Antarctica/`). `[ctrl] restart` is the bundle to start
-  from.
+  `bsl_restart.nc`, `obm_restart.nc` and the indices (`idx_<name>_restart.nc`),
+  and each domain in a subfolder named after it (`Greenland/`, `Antarctica/`).
+  `[ctrl] restart` is the bundle to start from. The output of each domain goes
+  to the same subfolder of the run folder.
 
-Climate/SMB per domain is **snapshots + chion**, as in the single-domain driver;
+Climate/SMB per domain is **snapshots + chion** (`[chion_north] model = "itm"`,
+`[chion_south] model = "pdd"`), as in the single-domain driver;
 the OBM's contribution is folded into the ocean forcing — `obm_exchange` applies
 each domain's `[ocn_obm_<sfx>]` (the OBM ocean temperature into `to_ann`) before
 the marine-shelf step reads it.
@@ -44,6 +56,7 @@ Main loop (per timestep):
 
 ```fortran
 call bsl_update(bsl, ts%time_rel)              ! shared sea level, once
+call indices_update(idx, ts%time_rel, var=fvar) ! shared indices, once (fvar: ice volume of the active domains [Gt])
 
 if (active_north) then                         ! relaxation + optimization + isostasy, per domain
     call step_relax(dom_north, ts)
@@ -52,13 +65,14 @@ if (active_north) then                         ! relaxation + optimization + iso
 end if
 (same for dom_south)
 
-if (oc%active_obm) call obm_update(obox, dtt, oc%obm_name)   ! ocean box model, one step
+if (oc%active_obm) call obm_update(obox, real(dtt,wp), oc%obm_name)   ! ocean box model, one step
 
 if (active_north) then                         ! ice sheet, hub, climate + smb, per domain
     call couple_to_yelmo(dom_north)
+    call step_ice_bnd(dom_north, ts, idx)
     call step_icesheet(dom_north, ts)
     call couple_yelmo_to_htopo(dom_north)
-    call step_climate(dom_north, ts)
+    call step_climate(dom_north, ts, idx)
     call step_surface(dom_north, ts)
 end if
 (same for dom_south)
@@ -108,7 +122,14 @@ One global index drives the box model and, with regional gains, the domains
   a restart restores the shelf), so the first record and the first step see
   the box. It needs `active_obm`, and replaces `[ocn_fraction_<sfx>]`
   (refused together).
-- **`ism2obm`**: freshwater flux of each domain into the boxes (`fn`, `fs`).
+- **`ism2obm`**: freshwater flux of each domain into the boxes (`fn`, `fs`),
+  per hemisphere with `[ctrl] couple_fwf_north`/`couple_fwf_south`, from the
+  Yelmo mass balance (`fwf_definition`: `dVdt`, `mb`, `ablation`) within the
+  hydrographic mask (`hydro_mask_north`/`hydro_mask_south`, on the Yelmo grid).
+- **Hysteresis** (`nautilus` only): `[nautilus] hyster_on` nudges one box-model
+  control (`hyster_forcing`: `phit`, `phin`, `fn`, `fs`, `global_melt`) along
+  `hyster_forcing_method` (`triangular`, `sin`, `noise`, `linear`) in
+  `obm_exchange`.
 
 `obm_restart.nc` (run bundle) holds the box state, the fluxes and the box air
 temperatures; the `*_init` values stay those of the par file, the reference of

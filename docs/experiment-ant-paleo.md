@@ -39,15 +39,17 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`[orbit] method = "time"`, `time = 0`); the
   sea level follows the model's own ice-volume change (`[barysealevel] method =
   "fastiso"`).
-- **Optimization** (`[sim] opt = True`): `cb_ref` and `tf_corr`
-  until 7.5 kyr (`[opt] cf_time_end`, `tf_time_end`), starting from the till
-  friction of the bed (`cf_init = -1`); the ice thickness relaxes towards the
-  observations until 3 kyr (`[sim] relax = True`, `[relax] time2`).
+- **Optimization** (`[sim] opt = True`): `cb_ref` (`[opt] opt_cf = "L21"`)
+  and `tf_corr` per point (`opt_tf = "L21-points"`) until 7.5 kyr
+  (`cf_time_end`, `tf_time_end`), starting from the till friction of the bed
+  (`cf_init = -1`); the ice relaxes towards the observations at the grounding
+  line and grounding zone (`[relax] topo_rel = 4`) until 3 kyr (`[sim] relax =
+  True`, `[relax] time2`).
 - **Climate:** present day (`[snap] snapshots = "pd"`); `[ocn_fraction]`
   (`f_to = 0.40`) is active but sees no anomaly (the sea-level air temperature
   is the reference's).
 - **Output:** restart bundles every 15 kyr, so `restart-0.000-kyr` and
-  `restart-15.000-kyr`; 2D output every 5 kyr.
+  `restart-15.000-kyr`; 2D output every 5 kyr, 1D every 100 yr.
 
 ## Transient
 
@@ -56,28 +58,34 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
   from the restart.
 - **Climate:** snapshots `pd`, `picontrol`, `lgm` and the axis `a`
-  (`[snap_axis_a]`): the present-day reference plus the PMIP3 LGM -- piControl
-  anomaly, scaled by the glacial index `[idx_a]`
-  (`input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
-  21 ka, -0.2 in the last interglacial). The ocean anomaly is `f_to = 0.25`
-  times the mean sea-level air temperature anomaly (`[ocn_fraction]`). Insolation varies in time
+  (`[snap_axis_a]`, `picontrol` -> `lgm`): the present-day reference plus the
+  PMIP3 LGM -- piControl anomaly of the air temperature (`[snap_field_tas]`,
+  `blend = "linear"`) and ratio of the precipitation (`[snap_field_pr]`,
+  `blend = "ratio"`), scaled by the glacial index `[idx_a]`
+  (`method = "series"`, `input/alpha_combined_125kyr_interp.dat`, as is: 0 =
+  present day, 0.92 at 21 ka, -0.2 in the last interglacial). The ocean
+  anomaly is `f_to = 0.25` times the mean sea-level air temperature anomaly
+  (`[ocn_fraction]`). Insolation varies in time
   (`[orbit] method = "clock"`, the orbit at the forcing clock, for chion and smbpal).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
 - **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_ant_paleo]`): one
   layer every 1 kyr, coupled every 50 yr.
 - **Output:** 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.
 
+![Forcing of yelmox_Antarctica_paleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual air temperature difference, precipitation ratio.](figures/ant_paleo.png)
+
 ## Configuration common to both
 
 | | |
 |---|---|
 | Grids | `ANT-32KM` for every component (single-grid setup) |
-| Topography | BedMachine (`ANT-32KM_TOPO-BedMachine.nc`) |
-| Reference climate (`snap_pd`) | RACMO2.3p2 1981--2010 (surface temperature, precipitation); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
-| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows `[ocn_fraction]`) |
+| Topography | BedMachine v4 (`[topo]`, FesmData `ANT-32KM_TOPO-BedMachine-v4.nc`) |
+| Reference climate (`snap_pd`) | RACMO2.3p2 1981--2010, monthly (2 m air temperature, precipitation, surface elevation; FesmData `SMB-RACMO2.3p2-1981-2010`); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
+| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; annual mean and DJF air temperature, annual precipitation; atmosphere only, the ocean follows `[ocn_fraction]`) |
 | Surface mass balance | chion ITM (`[comps] surface_method = "chion"`) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |
 | Dynamics | DIVA |
-| Isostasy | FastIsostasy LV-ELVA, Earth structure `ANT-32KM_GIA_HR24.nc` (mantle viscosity + lithosphere) |
-| Named regions | `yelmo_ts_APIS/WAIS/EAIS.nc` |
+| Isostasy | FastIsostasy LV-ELVA (`[isos] method = 3`), Earth structure `ANT-32KM_GIA_HR24.nc` (mantle viscosity + lithosphere), `[comps] dt_isos = 10` yr |
+| Climate update | `[comps] dt_clim = 10` yr |
+| Named regions | `[regions] masks = "APIS" "WAIS" "EAIS"`: `yelmo_ts_APIS.nc`, `yelmo_ts_WAIS.nc`, `yelmo_ts_EAIS.nc` |

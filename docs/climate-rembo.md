@@ -16,17 +16,20 @@ the surface mass balance; the ocean comes from the snapshot backend.
   `climate = "rembo"`.
 - **Config:** `yelmox/yelmox_rembo_Greenland.nml`, plus REMBO's own parameters in
   `yelmox/rembo_Greenland.nml` (staged into the run folder via `.runme/info.json`).
-- **Script:** `scripts/rembo/run_rembo.sh`.
+- **Script:** `scripts/rembo/run_rembo.sh [output_dir]` (default `output/rembo`;
+  runs locally, `runopts='-rs ...'` submits to the queue).
 
 ## Configuration
 
 - **Grid.** REMBO runs on the grid it was compiled for (Greenland, GRL-16KM),
   which must be `grid_clim`; the backend checks this at start-up.
 - **Surface mass balance.** `[comps] surface_method = "climate"`: REMBO's smb and
-  surface temperature, at the current surface. REMBO gives annual fields only, so
-  smbpal and smb_simple are not available with it.
-- **Update cadence.** `[comps] dt_clim = dtt`: REMBO updates its energy balance
-  and its smb on its own intervals (`dtime_emb`, `dtime_smb`).
+  surface temperature, at the current surface; any other `surface_method` stops
+  the run at start-up (REMBO gives annual fields only).
+- **Update cadence.** `[comps] dt_clim = dtt` (10 yr): REMBO updates its energy
+  balance and its smb on its own intervals (`dtime_emb = 100`, `dtime_smb = 1`
+  in `rembo_Greenland.nml`), with the insolation at the forcing clock
+  `time_rel`.
 - **Ocean.** The `[snap]` groups of the snapshot backend (see [Snapshots](climate-snapshots.md))
   with an ocean-only reference snapshot: `snapshots = "pd"`, `ref_name = "pd"`,
   no axes, the `pd` snapshot binding the ORAS5 1981-2010 climatology
@@ -37,14 +40,18 @@ the surface mass balance; the ocean comes from the snapshot backend.
   REMBO, not a modifier after it), maps the value `f` of its index onto REMBO's
   anomalies: the summer air temperature `dT_sum = f·f_ta`, the annual
   `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6), and the ocean
-  `dT_ocn = dT_ann·f_to`, added to the snapshot ocean.
+  `dT_ocn = dT_ann·f_to`, added to the snapshot ocean; `f_so` is not used.
+  Off in the par file (`[anom] active = False`, `[indices] names = ""`).
+- **Climate modifiers.** `[ocn_fraction]`, `[taper]` and `[bias]` are refused
+  at start-up (no sea-level air temperature, no reference atmosphere, annual
+  fields only).
 - **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
 ## Output
 
 The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, ...), plus, with
 `[output] write_clim`, `rembo.nc` (annual and summer air temperature,
-precipitation, smb) and `rembo_ts.nc` (the applied anomalies, the smb integrated
+precipitation, smb, surface temperature, ocean profiles) and `rembo_ts.nc` (the applied anomalies, the smb integrated
 over the ice sheet and the accumulation-area ratio). The indices go to
 the Yelmo 1D file (`idx_<name>`), as for the other climates. The shipped
 `rembo_Greenland` keeps the hysteresis setup as an unlisted `[idx_hyst]`

@@ -11,9 +11,15 @@ surface (lapse rate, precipitation scaling), plus ESM anomalies over historical 
 projection periods, optional climate variability and subglacial discharge.
 
 - **Program:** `yelmox/yelmox.f90` (`make yelmox`), backend in `libs/yelmox_climate.f90`.
-- **Config:** `yelmox/yelmox_esm_*.nml` (Antarctica ISMIP7, Greenland, 1pctCO2, TIPMIP).
+- **Config:** `yelmox/yelmox_esm_*.nml`: ISMIP7 (`yelmox_esm_Greenland.nml`,
+  `yelmox_esm_Greenland_k24.nml`, `yelmox_esm_Antarctica_ismip7.nml`), 1pctCO2
+  (`yelmox_esm_*_1pctCO2.nml`), TIPMIP (`yelmox_esm_Greenland_tipmip.nml`), and
+  `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`.
+- **Forcing data:** `input/esm/esm_*.nml` (`[esm] par_file`).
 - **Scripts:** `scripts/ismip7/` (spin-ups `opt_*.sh`, workflows `run_ismip7_*.sh`;
-  see [ISMIP7 projections](experiment-ismip7.md)), `scripts/tipmip/`, `scripts/1pctCO2/`.
+  see [ISMIP7 projections](experiment-ismip7.md)), `scripts/1pctCO2/` (see
+  [1pctCO2](experiment-1pctco2.md)), `scripts/tipmip/` (see
+  [TIPMIP Greenland](experiment-tipmip.md)).
 
 ## Configuration
 
@@ -23,8 +29,24 @@ projection periods, optional climate variability and subglacial discharge.
   the ESM periods (`time_ref`, `time_hist`, `time_proj`, `time_esm_ref`) and the
   variability switches (`clim_var`, `clim_seed`).
 - **Experiment.** `[esm]`: `par_file` (the ESM data configuration in `input/esm/`),
-  `experiment`, `esm_name`, `use_esm` / `use_var` / `use_hist` / `use_proj`, and
-  the physical parameters `lapse`, `f_p`, `f_ocn`, `f_polar`, `dT_threshold`.
+  `experiment` and `esm_name` (the `{experiment}` and `{gcm}` of its file paths),
+  `use_esm` / `use_var` / `use_hist` / `use_proj`, `basins` (the basins of the
+  ocean extrapolation), and the physical parameters `lapse` (annual mean and
+  summer lapse rate; the monthly lapse rate follows a seasonal cosine), `f_p`
+  (precipitation scaled by `exp(f_p dT)` with the temperature change `dT` of the
+  elevation correction), `f_ocn`, `f_polar`, `dT_threshold`.
+- **Anomalies.** In the spin-up the backend applies the reference climatology
+  only. In a transient run (`run_step = "transient"`) with `use_esm = True` and
+  `experiment` other than `"ctrl"`, it reads the ESM groups of the `par_file` and
+  adds anomalies relative to the mean over `time_esm_ref`: up to `time_hist(2)`
+  from the historical groups, from `time_proj(1)` on from the projection groups.
+  Air temperature and smb anomalies are differences, precipitation a ratio, the
+  ocean anomalies are annual means taken at the shelf base. 1pctCO2 and TIPMIP
+  point the reference and projection groups at the same file. With `use_esm =
+  False`, `experiment = "1pctCO2"` instead applies a spatially uniform anomaly (a
+  linear warming of 17 K from 1995 to 2300, capped at `dT_threshold`, times
+  `f_polar`; the ocean `f_ocn` times that); `f_ocn`, `f_polar` and
+  `dT_threshold` act only there.
 - **Forcing on other grids.** A field group of the `par_file` is normally read on
   the climate grid. With `remap` (a kernel: `bilinear`, `shepard`, `nn`, `quadrant`,
   `con`) and `grid_src` (a name for the file's grid, e.g. `"{gcm}-atm"`) it is read
@@ -32,7 +54,8 @@ projection periods, optional climate variability and subglacial discharge.
   `grid_<grid_src>.txt` next to the file (as FesmData writes it) or in `maps/`, a
   regular lon-lat grid from its 1D axes (the map is cached in `maps/`), or a
   curvilinear grid (e.g. a tripolar ocean) from the 2D lon/lat named in the
-  variable's `coordinates` attribute. The 1pctCO2 configs read the global CMIP
+  variable's `coordinates` attribute. `fill = "nearest"` fills the missing
+  values from the nearest valid cell. The 1pctCO2 configs read the global CMIP
   fields this way, and the Greenland configs the ORAS5 reference ocean, which
   FesmData provides on GRL-16KM and GRL-32KM only, from GRL-16KM.
 - **Surface mass balance.** `[comps] surface_method = "climate"` takes the ESM's

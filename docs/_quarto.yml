@@ -23,6 +23,8 @@ website:
             href: yelmox.md
           - text: "yelmox_bipolar"
             href: yelmox-bipolar.md
+          - text: "Long runs in chunks"
+            href: run-chunks.md
       - text: "Climate backends"
         menu:
           - text: "Snapshots"
@@ -33,12 +35,24 @@ website:
             href: climate-rembo.md
       - text: "Experiments"
         menu:
+          - text: "Greenland"
+            href: experiment-greenland.md
+          - text: "Antarctica"
+            href: experiment-antarctica.md
           - text: "ISMIP7 projections"
             href: experiment-ismip7.md
+          - text: "1pctCO2"
+            href: experiment-1pctco2.md
+          - text: "TIPMIP"
+            href: experiment-tipmip.md
           - text: "Antarctic paleo"
             href: experiment-ant-paleo.md
           - text: "Greenland paleo"
             href: experiment-grl-paleo.md
+          - text: "Laurentide and North America"
+            href: experiment-laurentide.md
+          - text: "Mountain glaciers"
+            href: experiment-mountain.md
       - text: "Database namelists"
         href: database-namelists.md
       - text: "Multigrid coupling"
