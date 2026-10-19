@@ -1,0 +1,689 @@
+module climate_mods
+    ! Climate modifiers: changes applied to a backend's `climate_out` after the
+    ! backend update, in a fixed order (docs/_forcing-design.md, section 7):
+    !   anom         -- homogeneous anomaly from one index of the driver's
+    !                   registry: dTa = f*f_ta, dTo = f*f_to, dSo = f*f_so
+    !   ocn_fraction -- ocean temperature anomaly = f_to * the mean sea-level
+    !                   air temperature anomaly over a region
+    !   ocn_obm      -- ocean temperature from a box of the bipolar ocean box
+    !                   model (absolute, or the reference plus the box anomaly)
+    !   taper        -- the atmosphere towards the reference with a static
+    !                   weight field (regional taper)
+    !   bias         -- static bias correction of the atmosphere
+    ! Each is an optional namelist group with `active` (default off), suffixed
+    ! by the domain (anom<sfx>, ocn_fraction<sfx>, ocn_obm<sfx>, taper<sfx>,
+    ! bias<sfx>); unset keys (an absent group: all) from the templates anom,
+    ! ocn_fraction, ocn_obm, taper, bias of input/yelmox_defaults.nml.
+    !
+    ! ocn_obm is the one modifier that climate_mods_apply does not call: the
+    ! box value belongs to the driver that owns the box model (yelmox_bipolar),
+    ! which applies it with climate_mod_ocn_obm after the climate update and
+    ! before the shelf step (obm_coupling). climate_mods_init reads its group
+    ! and checks its contract like the others.
+    !
+    ! Contract: each modifier states what it touches in `now` (`ref` is never
+    ! touched) and which backends it refuses; climate_mods_init checks every
+    ! active modifier against what the backend supplies (climate_caps_class)
+    ! and stops on a mismatch, never a silent partial application.
+    !   anom: tas, ta_ann, tsl_ann + dTa; pr, pr_ann * exp(beta_p*dTa); the ocean
+    !         profiles to_ann/so_ann + dTo/dSo, or at the shelf base T_shlf/S_shlf
+    !         and dT_shlf/dS_shlf. Refused when the backend supplies the smb
+    !         (has_smb), which a post-hoc air anomaly cannot reach. Exception:
+    !         rembo takes the anomaly as an input (dT_sum) and reads [anom]
+    !         itself (yelmox_climate, rembo_update); anom is skipped here for it.
+    !         With f_to or f_so /= 0, a climate without any ocean field stops at
+    !         the first update (the fields are known only then).
+    !   ocn_fraction: to_ann = ref%to_ann + f_to * mean over the region of
+    !         (tsl_ann - ref%tsl_ann), at every depth; salinity untouched. Uses
+    !         the current update's tsl_ann, which carries anom (no lag). Needs
+    !         ocean profiles and tsl_ann: refused for an ocean at the shelf base
+    !         (esm) and a backend without tsl_ann (esm, rembo); refused with an
+    !         anom f_to /= 0, since it replaces the ocean temperature anomaly.
+    !   ocn_obm: to_ann = theta (absolute) or ref%to_ann + (theta - theta_init)
+    !         (anomaly), at every depth, theta the box temperature passed by the
+    !         driver; salinity untouched. Needs ocean profiles: refused for an
+    !         ocean at the shelf base (esm); a climate without ocean profiles
+    !         stops at the first application. Refused with ocn_fraction or an
+    !         anom f_to /= 0, since it replaces the ocean temperature.
+    !   taper: now = ref + w*(now - ref) for tas, pr, ta_ann, pr_ann and
+    !         tsl_ann (those the climate has, now and ref), w in [0, 1] a static
+    !         field on the climate grid, the reference at the current surface
+    !         (taper_apply). Refused for a backend without a reference
+    !         atmosphere (rembo).
+    !   bias: tas, ta_ann, tsl_ann + dtas; pr * fpr, pr_ann by the ratio of the
+    !         annual totals. Refused for a backend with annual fields only (rembo).
+
+    use precision,     only : wp
+    use nml,           only : nml_read, nml_validate
+    use ncio,          only : nc_write
+    use coordinates,   only : grid_class
+    use varslice,      only : varslice_class, varslice_init_nml, varslice_update, varslice_end
+    use regions,       only : regions_class, regions_select
+    use climate_out,   only : climate_out_class
+    use kryos_forcing, only : indices_class, indices_value, indices_has
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
+
+    implicit none
+
+    private
+
+    ! What a backend supplies, for the contracts (set by climate_init).
+    type climate_caps_class
+        character(len=16) :: name = ""           ! the backend, for messages
+        logical :: has_smb       = .false.       ! supplies the surface mass balance
+        logical :: has_ocn_shelf = .false.       ! ocean at the shelf base (else profiles)
+        logical :: has_tsl_ann   = .false.       ! sea-level air temperature (now and ref)
+        logical :: monthly       = .true.        ! monthly air temperature and precipitation
+        logical :: anom_input    = .false.       ! reads [anom] itself, as an input (rembo)
+        logical :: has_ref_atm   = .true.        ! a reference atmosphere (ref%tas, ...)
+    end type climate_caps_class
+
+    ! [anom<sfx>]: one index mapped onto homogeneous anomalies by the gains.
+    type anom_class
+        logical           :: active = .false.
+        character(len=64) :: group  = ""
+        character(len=64) :: index  = ""        ! the index driving the anomalies
+        real(wp) :: f_ta = 1.0_wp               ! [K]   dTa = f * f_ta
+        real(wp) :: f_to = 0.0_wp               ! [K]   dTo = f * f_to
+        real(wp) :: f_so = 0.0_wp               ! [psu] dSo = f * f_so
+    end type anom_class
+
+    ! [ocn_fraction<sfx>]: the ocean temperature anomaly as a fraction of the
+    ! mean sea-level air temperature anomaly over a region. region: a selection
+    ! expression of the domain's regions on the climate grid ([regions<sfx>]),
+    ! resolved once at init: "all" (every cell), or layer:values terms, e.g.
+    ! "zone:open_ocean,continental_shelf", "region:Greenland", "~zone:land",
+    ! "Zwally2012:11,12", joined by & and | (fesm-utils regions_select).
+    type ocn_fraction_class
+        logical            :: active = .false.
+        character(len=64)  :: group  = ""
+        real(wp)           :: f_to   = 0.0_wp   ! [1] dTo = f_to * mean(tsl_ann - ref%tsl_ann)
+        character(len=512) :: region = "all"
+        logical, allocatable :: mask(:,:)       ! the region's cells
+        integer            :: n      = 0        ! number of cells of the region
+        real(wp)           :: dTo    = 0.0_wp   ! [K] the anomaly of the last update
+    end type ocn_fraction_class
+
+    ! [ocn_obm<sfx>]: the ocean temperature profiles from a box temperature of
+    ! the bipolar ocean box model, passed by the driver (climate_mod_ocn_obm).
+    type ocn_obm_class
+        logical           :: active = .false.
+        character(len=64) :: group  = ""
+        character(len=16) :: mode   = "absolute"   ! absolute | anomaly
+        real(wp)          :: theta  = 0.0_wp       ! [K] the box temperature of the last application
+        real(wp)          :: dTo    = 0.0_wp       ! [K] its anomaly, theta - theta_init
+    end type ocn_obm_class
+
+    ! [taper<sfx>]: the atmosphere towards the reference with a weight field w
+    ! in [0, 1] (one 2D field), read from a var_defs group (a list of
+    ! databases, then the par file) on the climate grid (online remap
+    ! allowed): now = ref + w*(now - ref); w = 1 keeps the climate, w = 0 is
+    ! the reference.
+    type taper_class
+        logical               :: active = .false.
+        character(len=64)     :: group  = ""
+        character(len=256)    :: weight = ""     ! the var_defs group of w
+        real(wp), allocatable :: w(:,:)          ! [1] (nx,ny)
+    end type taper_class
+
+    ! [bias<sfx>]: an additive temperature field and a precipitation factor
+    ! field, monthly (12) or annual (1 field, all months), read from var_defs
+    ! groups (a list of databases, then the par file) on the climate grid
+    ! (online remap allowed), each with a weight:
+    !   tas = tas + f_tas*dtas,   pr = pr*(1 + f_pr*(fpr - 1))
+    type bias_class
+        logical               :: active = .false.
+        character(len=64)     :: group  = ""
+        real(wp)              :: f_tas = 1.0_wp, f_pr = 1.0_wp
+        real(wp), allocatable :: dtas(:,:,:)     ! [K]  (nx,ny,12), 0 without a dtas group
+        real(wp), allocatable :: fpr(:,:,:)      ! [1]  (nx,ny,12), 1 without a fpr group
+    end type bias_class
+
+    type climate_mods_class
+        type(climate_caps_class) :: caps
+        type(anom_class)         :: anom
+        type(ocn_fraction_class) :: ocn_fraction
+        type(ocn_obm_class)      :: ocn_obm
+        type(taper_class)        :: taper
+        type(bias_class)         :: bias
+    end type climate_mods_class
+
+    public :: climate_caps_class
+    public :: anom_class, ocn_fraction_class, ocn_obm_class, taper_class, bias_class
+    public :: climate_mods_class
+    public :: climate_mods_init
+    public :: climate_mods_apply
+    public :: climate_mod_ocn_obm
+    public :: climate_mods_write_init, climate_mods_write_step
+
+contains
+
+    subroutine climate_mods_init(mods, filename, sfx, idx, caps, domain, grid, reg)
+        ! Read the modifier groups (suffix sfx) and check each active modifier's
+        ! contract against what the backend supplies (caps). grid: the climate
+        ! grid, with the domain's regions on it (reg). Call after the backend init.
+        type(climate_mods_class), intent(inout) :: mods
+        character(len=*),         intent(in)    :: filename, sfx, domain
+        type(indices_class),      intent(in)    :: idx
+        type(climate_caps_class), intent(in)    :: caps
+        type(grid_class),         intent(in)    :: grid
+        type(regions_class),      intent(in)    :: reg
+
+        mods%caps = caps
+
+        call anom_init(mods%anom, filename, "anom"//trim(sfx), idx, caps)
+        call ocn_fraction_init(mods%ocn_fraction, filename, "ocn_fraction"//trim(sfx), caps, &
+                               mods%anom, reg)
+        call ocn_obm_init(mods%ocn_obm, filename, "ocn_obm"//trim(sfx), caps, &
+                          mods%anom, mods%ocn_fraction)
+        call taper_init(mods%taper, filename, "taper"//trim(sfx), caps, domain, grid)
+        call bias_init(mods%bias, filename, "bias"//trim(sfx), caps, domain, grid)
+
+    end subroutine climate_mods_init
+
+    subroutine climate_mods_apply(mods, out, idx)
+        ! The active modifiers on `out`, in the fixed order. idx is the driver's
+        ! registry, advanced to the forcing time. ocn_obm, in the order between
+        ! ocn_fraction and bias, is applied by the driver that owns the box
+        ! model (climate_mod_ocn_obm); taper and bias do not touch the ocean.
+        type(climate_mods_class), intent(inout) :: mods
+        type(climate_out_class),  intent(inout) :: out
+        type(indices_class),      intent(in)    :: idx
+
+        if (mods%anom%active .and. .not. mods%caps%anom_input) &
+            call anom_apply(mods%anom, out, indices_value(idx, mods%anom%index))
+
+        if (mods%ocn_fraction%active) call ocn_fraction_apply(mods%ocn_fraction, out)
+
+        if (mods%taper%active) call taper_apply(mods%taper, out)
+
+        if (mods%bias%active) call bias_apply(mods%bias, out)
+
+    end subroutine climate_mods_apply
+
+    subroutine climate_mods_write_init(mods, filename)
+        ! The static fields of the active modifiers, into the climate's 2D output
+        ! file (xc, yc defined): the taper weight; the bias correction,
+        ! weighted, as annual means.
+        type(climate_mods_class), intent(in) :: mods
+        character(len=*),         intent(in) :: filename
+
+        if (mods%taper%active) &
+            call nc_write(filename, "taper_w", mods%taper%w, dim1="xc", dim2="yc", units="1", &
+                          long_name="Weight of the climate towards the reference (taper)")
+
+        if (mods%bias%active) then
+            associate(b => mods%bias)
+            call nc_write(filename, "bias_dtas_ann", b%f_tas*sum(b%dtas, dim=3)/12.0_wp, &
+                          dim1="xc", dim2="yc", units="K", &
+                          long_name="Bias correction of the air temperature (ann)")
+            call nc_write(filename, "bias_fpr_ann", &
+                          1.0_wp + b%f_pr*(sum(b%fpr, dim=3)/12.0_wp - 1.0_wp), &
+                          dim1="xc", dim2="yc", units="1", &
+                          long_name="Bias correction factor of the precipitation (ann)")
+            end associate
+        end if
+
+    end subroutine climate_mods_write_init
+
+    subroutine climate_mods_write_step(mods, filename, ncid, n)
+        ! Record n of the active modifiers' diagnostics, into an open 2D output
+        ! file: the ocean temperature anomaly of ocn_fraction, the box
+        ! temperature of ocn_obm and its anomaly.
+        type(climate_mods_class), intent(in) :: mods
+        character(len=*),         intent(in) :: filename
+        integer,                  intent(in) :: ncid, n
+
+        if (mods%ocn_fraction%active) &
+            call nc_write(filename, "ocn_fraction_dto", mods%ocn_fraction%dTo, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="K", &
+                          long_name="Ocean temperature anomaly of ocn_fraction")
+
+        if (mods%ocn_obm%active) then
+            call nc_write(filename, "ocn_obm_theta", mods%ocn_obm%theta, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="K", &
+                          long_name="Box temperature of ocn_obm")
+            call nc_write(filename, "ocn_obm_dto", mods%ocn_obm%dTo, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="K", &
+                          long_name="Box temperature anomaly of ocn_obm")
+        end if
+
+    end subroutine climate_mods_write_step
+
+    ! ===== anom ============================================================
+
+    subroutine anom_init(anom, filename, group, idx, caps)
+        ! Read [anom<sfx>] (optional group; inactive without it) and check its
+        ! contract: a registry index, and a backend that does not supply the smb
+        ! (but rembo, which reads the group itself).
+        type(anom_class),         intent(inout) :: anom
+        character(len=*),         intent(in)    :: filename, group
+        type(indices_class),      intent(in)    :: idx
+        type(climate_caps_class), intent(in)    :: caps
+
+        anom%group = group
+        call nml_validate(filename, def_file, group, defaults_group="anom")
+        call nml_read(filename, group, "active", anom%active, defaults_file=def_file, defaults_group="anom")
+        if (.not. anom%active) return
+
+        call nml_read(filename, group, "index",  anom%index,  defaults_file=def_file, defaults_group="anom")
+        call nml_read(filename, group, "f_ta",   anom%f_ta,   defaults_file=def_file, defaults_group="anom")
+        call nml_read(filename, group, "f_to",   anom%f_to,   defaults_file=def_file, defaults_group="anom")
+        call nml_read(filename, group, "f_so",   anom%f_so,   defaults_file=def_file, defaults_group="anom")
+
+        if (.not. indices_has(idx, anom%index)) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] index = '"// &
+                       trim(anom%index)//"' is not in [indices] names."
+            error stop 1
+        end if
+        if (caps%has_smb .and. .not. caps%anom_input) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs a climate that &
+                       &does not supply the surface mass balance (an air anomaly cannot reach &
+                       &it); climate = "//trim(caps%name)//" supplies it (esm: use the esm &
+                       &smb anomalies or surface_method /= climate)."
+            error stop 1
+        end if
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, index "//trim(anom%index)// &
+                   "; f_ta/f_to/f_so =", anom%f_ta, anom%f_to, anom%f_so
+
+    end subroutine anom_init
+
+    subroutine anom_apply(anom, out, f)
+        ! Homogeneous anomaly on `now` at the index value f: the air temperature
+        ! + dTa, the precipitation * exp(beta_p*dTa) (beta_p: the backend's
+        ! sensitivity), the ocean + dTo/dSo, as profiles or, without them, at the
+        ! shelf base.
+        type(anom_class),        intent(in)    :: anom
+        type(climate_out_class), intent(inout) :: out
+        real(wp),                intent(in)    :: f
+
+        real(wp) :: dTa, dTo, dSo
+        integer  :: m
+
+        dTa = f*anom%f_ta
+        dTo = f*anom%f_to
+        dSo = f*anom%f_so
+
+        associate(now => out%now)
+
+        now%tas    = now%tas + dTa
+        now%ta_ann = now%ta_ann + dTa
+        if (allocated(now%tsl_ann)) now%tsl_ann = now%tsl_ann + dTa
+
+        do m = 1, size(now%pr, 3)
+            now%pr(:,:,m) = now%pr(:,:,m) * exp(now%beta_p*dTa)
+        end do
+        if (allocated(now%pr_ann)) now%pr_ann = now%pr_ann * exp(now%beta_p*dTa)
+
+        if (out%has_ocn_shelf) then
+            now%T_shlf  = now%T_shlf  + dTo
+            now%S_shlf  = now%S_shlf  + dSo
+            now%dT_shlf = now%dT_shlf + dTo
+            now%dS_shlf = now%dS_shlf + dSo
+        else if (allocated(now%to_ann) .or. allocated(now%so_ann)) then
+            if (allocated(now%to_ann)) now%to_ann = now%to_ann + dTo
+            if (allocated(now%so_ann)) now%so_ann = now%so_ann + dSo
+        else if (anom%f_to /= 0.0_wp .or. anom%f_so /= 0.0_wp) then
+            write(*,*) "climate_mods_apply:: error: ["//trim(anom%group)//"] f_to or f_so /= 0, &
+                       &but the climate has no ocean (neither profiles nor at the shelf base); &
+                       &set f_to = f_so = 0."
+            error stop 1
+        end if
+
+        end associate
+
+    end subroutine anom_apply
+
+    ! ===== ocn_fraction ====================================================
+
+    subroutine ocn_fraction_init(ocf, filename, group, caps, anom, reg)
+        ! Read [ocn_fraction<sfx>] (optional group; inactive without it), check its
+        ! contract (ocean profiles and tsl_ann; no anom ocean temperature
+        ! anomaly, which it would replace) and resolve the region on the
+        ! climate grid; an empty region is an error.
+        type(ocn_fraction_class), intent(inout) :: ocf
+        character(len=*),         intent(in)    :: filename, group
+        type(climate_caps_class), intent(in)    :: caps
+        type(anom_class),         intent(in)    :: anom
+        type(regions_class),      intent(in)    :: reg
+
+        ocf%group = group
+        call nml_validate(filename, def_file, group, defaults_group="ocn_fraction")
+        call nml_read(filename, group, "active", ocf%active, defaults_file=def_file, defaults_group="ocn_fraction")
+        if (.not. ocf%active) return
+
+        call nml_read(filename, group, "f_to",   ocf%f_to,   defaults_file=def_file, defaults_group="ocn_fraction")
+        call nml_read(filename, group, "region", ocf%region, defaults_file=def_file, defaults_group="ocn_fraction")
+
+        if (caps%has_ocn_shelf .or. .not. caps%has_tsl_ann) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs ocean profiles &
+                       &and the sea-level air temperature (snapshot backends); climate = "// &
+                       trim(caps%name)//" has the ocean at the shelf base or no tsl_ann."
+            error stop 1
+        end if
+        if (anom%active .and. anom%f_to /= 0.0_wp) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] sets the ocean &
+                       &temperature anomaly, ["//trim(anom%group)//"] f_to /= 0 adds one; &
+                       &set "//trim(anom%group)//".f_to = 0."
+            error stop 1
+        end if
+
+        ocf%mask = regions_select(reg, trim(ocf%region))
+        ocf%n    = count(ocf%mask)
+        if (ocf%n == 0) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] region = '"// &
+                       trim(ocf%region)//"' selects no cell of the climate grid."
+            error stop 1
+        end if
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, f_to =", ocf%f_to, &
+                   "; region '"//trim(ocf%region)//"':", ocf%n, "of", size(ocf%mask), "cells"
+
+    end subroutine ocn_fraction_init
+
+    subroutine ocn_fraction_apply(ocf, out)
+        ! The ocean temperature profiles: the reference plus f_to times the mean
+        ! sea-level air temperature anomaly of this update over the region.
+        type(ocn_fraction_class), intent(inout) :: ocf
+        type(climate_out_class),  intent(inout) :: out
+
+        ocf%dTo = ocf%f_to * sum(out%now%tsl_ann - out%ref%tsl_ann, mask=ocf%mask) &
+                  / real(ocf%n, wp)
+        out%now%to_ann = out%ref%to_ann + ocf%dTo
+
+    end subroutine ocn_fraction_apply
+
+    ! ===== ocn_obm =========================================================
+
+    subroutine ocn_obm_init(ocm, filename, group, caps, anom, ocf)
+        ! Read [ocn_obm<sfx>] (optional group; inactive without it) and check its
+        ! contract: ocean profiles, and no other ocean temperature modifier
+        ! (ocn_fraction, anom f_to), which it would replace.
+        type(ocn_obm_class),      intent(inout) :: ocm
+        character(len=*),         intent(in)    :: filename, group
+        type(climate_caps_class), intent(in)    :: caps
+        type(anom_class),         intent(in)    :: anom
+        type(ocn_fraction_class), intent(in)    :: ocf
+
+        ocm%group = group
+        call nml_validate(filename, def_file, group, defaults_group="ocn_obm")
+        call nml_read(filename, group, "active", ocm%active, defaults_file=def_file, defaults_group="ocn_obm")
+        if (.not. ocm%active) return
+
+        call nml_read(filename, group, "mode",   ocm%mode,   defaults_file=def_file, defaults_group="ocn_obm")
+
+        select case(trim(ocm%mode))
+            case("absolute", "anomaly")
+                ! ok
+            case default
+                write(*,*) "climate_mods_init:: error: ["//trim(group)//"] mode must be &
+                           &absolute or anomaly; got '"//trim(ocm%mode)//"'."
+                error stop 1
+        end select
+        if (caps%has_ocn_shelf) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs ocean profiles; &
+                       &climate = "//trim(caps%name)//" has the ocean at the shelf base."
+            error stop 1
+        end if
+        if (ocf%active) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] sets the ocean &
+                       &temperature, ["//trim(ocf%group)//"] too; set "// &
+                       trim(ocf%group)//".active = False."
+            error stop 1
+        end if
+        if (anom%active .and. anom%f_to /= 0.0_wp) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] sets the ocean &
+                       &temperature, ["//trim(anom%group)//"] f_to /= 0 adds an anomaly; &
+                       &set "//trim(anom%group)//".f_to = 0."
+            error stop 1
+        end if
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, mode "//trim(ocm%mode)// &
+                   " (the box temperature from the ocean box model)"
+
+    end subroutine ocn_obm_init
+
+    subroutine climate_mod_ocn_obm(mods, out, theta, theta_init)
+        ! ocn_obm on `out`: the ocean temperature profiles, at every depth, from
+        ! the box temperature theta [K] of the ocean box model: theta itself
+        ! (absolute), or the reference plus the box anomaly theta - theta_init
+        ! (anomaly, keeping the pattern of the reference). Called by the driver
+        ! that owns the box model, after the climate update (see the header).
+        type(climate_mods_class), intent(inout) :: mods
+        type(climate_out_class),  intent(inout) :: out
+        real(wp),                 intent(in)    :: theta, theta_init
+
+        associate(ocm => mods%ocn_obm)
+
+        if (.not. ocm%active) then
+            write(*,*) "climate_mod_ocn_obm:: error: ["//trim(ocm%group)//"] is not active."
+            error stop 1
+        end if
+        if (.not. allocated(out%now%to_ann)) then
+            write(*,*) "climate_mod_ocn_obm:: error: ["//trim(ocm%group)//"] needs ocean &
+                       &profiles; the climate has no ocean temperature (to_ann)."
+            error stop 1
+        end if
+
+        ocm%theta = theta
+        ocm%dTo   = theta - theta_init
+        select case(trim(ocm%mode))
+            case("absolute")
+                out%now%to_ann = theta
+            case("anomaly")
+                out%now%to_ann = out%ref%to_ann + ocm%dTo
+        end select
+
+        end associate
+
+    end subroutine climate_mod_ocn_obm
+
+    ! ===== taper ===========================================================
+
+    subroutine taper_init(tap, filename, group, caps, domain, grid)
+        ! Read [taper<sfx>] (optional group; inactive without it), check its
+        ! contract (a reference atmosphere) and load the weight from its
+        ! var_defs group (static, one field) on the climate grid; a weight
+        ! outside [0, 1] (or missing) is an error.
+        type(taper_class),        intent(inout) :: tap
+        character(len=*),         intent(in)    :: filename, group, domain
+        type(climate_caps_class), intent(in)    :: caps
+        type(grid_class),         intent(in)    :: grid
+
+        character(len=256) :: var_defs(VAR_DEFS_MAX)
+        type(varslice_class) :: vs
+
+        tap%group = group
+        call nml_validate(filename, def_file, group, defaults_group="taper")
+        call nml_read(filename, group, "active", tap%active, defaults_file=def_file, defaults_group="taper")
+        if (.not. tap%active) return
+
+        if (.not. caps%has_ref_atm) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs a reference &
+                       &atmosphere; climate = "//trim(caps%name)//" has none."
+            error stop 1
+        end if
+
+        call nml_read(filename, group, "var_defs", var_defs,   init=.true., &
+                      defaults_file=def_file, defaults_group="taper")
+        call nml_read(filename, group, "weight",   tap%weight, defaults_file=def_file, defaults_group="taper")
+
+        call varslice_init_nml(vs, trim(var_defs_find(var_defs, filename, trim(tap%weight), &
+                                                      "["//trim(group)//"] weight")), &
+                               trim(tap%weight), domain=domain, grid_name=trim(grid%name), grid=grid)
+        call varslice_update(vs)
+        if (size(vs%var, 3) /= 1 .or. size(vs%var, 4) /= 1) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] weight "//trim(tap%weight)// &
+                       " must be one 2D field; got ", size(vs%var, 3), " x ", size(vs%var, 4), " slices."
+            error stop 1
+        end if
+        tap%w = vs%var(:,:,1,1)
+        call varslice_end(vs)
+
+        if (any(tap%w < 0.0_wp .or. tap%w > 1.0_wp)) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] weight "//trim(tap%weight)// &
+                       " must lie in [0, 1] (missing values: set fill in the group); range: ", &
+                       minval(tap%w), maxval(tap%w)
+            error stop 1
+        end if
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, weight = "//trim(tap%weight)// &
+                   ", range: ", minval(tap%w), maxval(tap%w)
+
+    end subroutine taper_init
+
+    subroutine taper_apply(tap, out)
+        ! The atmosphere of `out` towards its reference: now = ref + w*(now - ref),
+        ! for each field the climate has (now and ref), with the reference at
+        ! the surface of `now` (now%z_srf): a reference given at its own surface
+        ! (ref%z_srf: snapshots, the elevation of the reference snapshot) is
+        ! moved there with the monthly lapse rate and beta_p, as the backend
+        ! moves the climate (tas - lapse*dz, pr*exp(-beta_p*lapse*dz)), so that
+        ! w = 0 gives the reference climate at the model surface; without
+        ! ref%z_srf (esm) the reference is already at the current surface.
+        ! The sea-level temperature tsl_ann needs no move.
+        type(taper_class),       intent(in)    :: tap
+        type(climate_out_class), intent(inout) :: out
+
+        real(wp), allocatable :: dz(:,:), tas_r(:,:,:), pr_r(:,:,:)
+        integer :: m, nx, ny
+
+        associate(now => out%now, ref => out%ref)
+
+        nx = size(tap%w, 1)
+        ny = size(tap%w, 2)
+        allocate(dz(nx,ny))
+        dz = 0.0_wp
+        if (allocated(ref%z_srf)) dz = now%z_srf - ref%z_srf
+
+        if (allocated(now%tas) .and. allocated(ref%tas)) then
+            allocate(tas_r(nx,ny,size(now%tas,3)))
+            do m = 1, size(now%tas, 3)
+                tas_r(:,:,m)   = ref%tas(:,:,m) - out%lapse(m)*dz
+                now%tas(:,:,m) = tas_r(:,:,m) + tap%w*(now%tas(:,:,m) - tas_r(:,:,m))
+            end do
+            if (allocated(now%ta_ann)) &
+                now%ta_ann = sum(tas_r, dim=3)/12.0_wp + &
+                             tap%w*(now%ta_ann - sum(tas_r, dim=3)/12.0_wp)
+        end if
+        if (allocated(now%pr) .and. allocated(ref%pr)) then
+            allocate(pr_r(nx,ny,size(now%pr,3)))
+            do m = 1, size(now%pr, 3)
+                pr_r(:,:,m)   = ref%pr(:,:,m) * exp(-now%beta_p*out%lapse(m)*dz)
+                now%pr(:,:,m) = pr_r(:,:,m) + tap%w*(now%pr(:,:,m) - pr_r(:,:,m))
+            end do
+            if (allocated(now%pr_ann)) &
+                now%pr_ann = sum(pr_r, dim=3)/12.0_wp*365.0_wp + &
+                             tap%w*(now%pr_ann - sum(pr_r, dim=3)/12.0_wp*365.0_wp)
+        end if
+        if (allocated(now%tsl_ann) .and. allocated(ref%tsl_ann)) &
+            now%tsl_ann = ref%tsl_ann + tap%w*(now%tsl_ann - ref%tsl_ann)
+
+        end associate
+
+    end subroutine taper_apply
+
+    ! ===== bias ============================================================
+
+    subroutine bias_init(bias, filename, group, caps, domain, grid)
+        ! Read [bias<sfx>] (optional group; inactive without it), check its
+        ! contract (monthly fields) and load its fields from the var_defs groups
+        ! it names (static, 1 or 12 slices) on the climate grid.
+        type(bias_class),         intent(inout) :: bias
+        character(len=*),         intent(in)    :: filename, group, domain
+        type(climate_caps_class), intent(in)    :: caps
+        type(grid_class),         intent(in)    :: grid
+
+        character(len=256) :: var_defs(VAR_DEFS_MAX)
+        character(len=256) :: grp_dtas, grp_fpr
+        integer :: nx, ny
+
+        bias%group = group
+        call nml_validate(filename, def_file, group, defaults_group="bias")
+        call nml_read(filename, group, "active", bias%active, defaults_file=def_file, defaults_group="bias")
+        if (.not. bias%active) return
+
+        if (.not. caps%monthly) then
+            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs monthly air &
+                       &temperature and precipitation; climate = "//trim(caps%name)// &
+                       " has annual fields only."
+            error stop 1
+        end if
+
+        call nml_read(filename, group, "var_defs", var_defs,   init=.true., &
+                      defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "dtas",     grp_dtas,   init=.true., &
+                      defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "fpr",      grp_fpr,    init=.true., &
+                      defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "f_tas",    bias%f_tas, defaults_file=def_file, defaults_group="bias")
+        call nml_read(filename, group, "f_pr",     bias%f_pr,  defaults_file=def_file, defaults_group="bias")
+
+        nx = grid%G%nx
+        ny = grid%G%ny
+        allocate(bias%dtas(nx,ny,12), bias%fpr(nx,ny,12))
+        bias%dtas = 0.0_wp
+        bias%fpr  = 1.0_wp
+        if (len_trim(grp_dtas) > 0) call load_monthly(bias%dtas, trim(grp_dtas))
+        if (len_trim(grp_fpr)  > 0) call load_monthly(bias%fpr,  trim(grp_fpr))
+
+        write(*,*) "climate_mods_init:: "//trim(group)//" active, dtas = ", trim(grp_dtas), &
+                   ", fpr = ", trim(grp_fpr), ", f_tas = ", bias%f_tas, ", f_pr = ", bias%f_pr
+        write(*,*) "climate_mods_init:: "//trim(group)//" range dtas [K]: ", &
+                   minval(bias%dtas), maxval(bias%dtas), ", fpr: ", minval(bias%fpr), maxval(bias%fpr)
+
+    contains
+
+        subroutine load_monthly(var, vgroup)
+            ! One field for all months, or 12 monthly fields.
+            real(wp),         intent(out) :: var(:,:,:)
+            character(len=*), intent(in)  :: vgroup
+            type(varslice_class) :: vs
+            integer :: m, nm
+
+            call varslice_init_nml(vs, trim(var_defs_find(var_defs, filename, vgroup, &
+                                                          "["//trim(group)//"]")), &
+                                   vgroup, domain=domain, &
+                                   grid_name=trim(grid%name), grid=grid)
+            call varslice_update(vs)
+            nm = size(vs%var, 3)
+            if (nm /= 1 .and. nm /= 12) then
+                write(*,*) "climate_mods_init:: error: ", vgroup, " must have 1 or 12 &
+                           &slices; got ", nm
+                error stop 1
+            end if
+            do m = 1, 12
+                var(:,:,m) = vs%var(:,:,min(m,nm),1)
+            end do
+            call varslice_end(vs)
+
+        end subroutine load_monthly
+
+    end subroutine bias_init
+
+    subroutine bias_apply(bias, out)
+        ! Correct the monthly air temperature and precipitation of `out`, and their
+        ! annual means (the temperature additively, the precipitation by the
+        ! ratio of the annual totals). The reference climate is unchanged.
+        type(bias_class),        intent(in)    :: bias
+        type(climate_out_class), intent(inout) :: out
+
+        real(wp), allocatable :: pr_sum0(:,:)
+        real(wp) :: dtas_ann(size(bias%dtas,1),size(bias%dtas,2))
+
+        dtas_ann = sum(bias%dtas, dim=3) / 12.0_wp
+
+        out%now%tas    = out%now%tas + bias%f_tas*bias%dtas
+        out%now%ta_ann = out%now%ta_ann + bias%f_tas*dtas_ann
+        if (allocated(out%now%tsl_ann)) out%now%tsl_ann = out%now%tsl_ann + bias%f_tas*dtas_ann
+
+        pr_sum0     = sum(out%now%pr, dim=3)
+        out%now%pr  = out%now%pr * (1.0_wp + bias%f_pr*(bias%fpr - 1.0_wp))
+        if (allocated(out%now%pr_ann)) then
+            where (pr_sum0 > 0.0_wp) out%now%pr_ann = out%now%pr_ann * sum(out%now%pr, dim=3) / pr_sum0
+        end if
+
+    end subroutine bias_apply
+
+end module climate_mods

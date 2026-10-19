@@ -25,11 +25,13 @@ module kryos_output
     ! extend them per context without editing the write routines, e.g.
     !   call domain_write_step(dom, outfldr, time, nms=[YELMO_VARS_2D, "my_var"])
     ! Any name valid for yelmo_write_var may be added. The heavy set adds
-    ! bmb_shlf (coupled shelf melt) to the Yelmo default set.
-    character(len=56), parameter :: YELMO_VARS_2D(23) = [ character(len=56) :: &
+    ! bmb_shlf (coupled shelf melt) and H_ice_ref (the reference ice, in time
+    ! with [ice_bnd] or recon) to the Yelmo default set.
+    character(len=56), parameter :: YELMO_VARS_2D(24) = [ character(len=56) :: &
         "H_ice","z_srf","z_bed","mask_bed","uxy_b","uxy_s","uxy_bar", &
         "ux_bar","uy_bar","cb_ref","N_eff","beta","taub","taud","visc_bar", &
-        "T_prime_b","hyd_W_til","mb_net","smb","bmb","cmb","z_sl","bmb_shlf" ]
+        "T_prime_b","hyd_W_til","mb_net","smb","bmb","cmb","z_sl","bmb_shlf", &
+        "H_ice_ref" ]
 
     ! Small set: the minimal fields for frequent monitoring (yelmo_sm.nc).
     character(len=56), parameter :: YELMO_VARS_2D_SM(10) = [ character(len=56) :: &
@@ -72,7 +74,7 @@ contains
             call io_dims_init(trim(io_fname(outfldr,trim(dom%ctl%surface_method))), dom%ctl%grid_surface, time)
         if (dom%ctl%write_clim) then
             call io_dims_init(trim(io_fname(outfldr,climate_file_base(dom%cl))), dom%ctl%grid_clim, time)
-            call climate_write_init(dom%cl, trim(io_fname(outfldr,climate_file_base(dom%cl))))
+            call climate_write_init(dom%cl, dom%clim, trim(io_fname(outfldr,climate_file_base(dom%cl))))
         end if
     end subroutine domain_write_init
 

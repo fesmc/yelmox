@@ -1,3 +1,8 @@
+! GreenlandPaleo (GRL-PAL): the Greenland domain extended to the west
+! (Ellesmere, Devon, Baffin Bay), with prescribed ice in a strip at the domain
+! border (yelmo_masks border_width, [ice_bnd]); base of the GRL paleo setups
+! (docs/_grl-paleo-plan.md). Present-day climate: ERA5 1981-2010 + ORAS5.
+
 ! ===== Run setup =====
 
 &ctrl
@@ -20,9 +25,9 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "snapesm"  ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
+    dt_clim         = 10.0     ! [yr] Frequency of climate updates
     dt_isos         = 10.0     ! [yr] isostasy update interval
 /
 
@@ -57,14 +62,14 @@
     ! Domain definition: name, the grid of every component, and the basins
     ! of the hub output (topography: [topo], regions: [regions]).
     ! A blank component grid takes the default given in brackets.
-    name         = "Greenland"
+    name         = "GreenlandPaleo"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "GRL-32KM"         ! hi-res geometry hub
+    grid_hub     = "GRL-PAL-16KM"     ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
-    grid_isos    = "GRL-32KM"         ! isostasy [grid_ice]
-    grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
-    grid_surface = "GRL-32KM"         ! surface mass balance [grid_clim]
-    grid_shelf   = "GRL-32KM"         ! marine shelf [grid_hub]
+    grid_isos    = "GRL-PAL-16KM"     ! isostasy [grid_ice]
+    grid_clim    = "GRL-PAL-16KM"     ! reference climate + transient forcing [grid_ice]
+    grid_surface = "GRL-PAL-16KM"     ! surface mass balance [grid_clim]
+    grid_shelf   = "GRL-PAL-16KM"     ! marine shelf [grid_hub]
     basins       = "Zwally2012.group"  ! basin ids of the hub output: <set>, <set>.group, None or domain
 /
 
@@ -77,7 +82,7 @@
 &regions
     path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
-    basin_sets   = "Zwally2012"
+    basin_sets   = "Zwally2012" "NEGIS"
 /
 
 ! ===== Output timing =====
@@ -112,28 +117,73 @@
 
 ! ===== Forcing =====
 
-&tsforcing
-    active = False    ! Apply transient tsgen forcing as snapclim anomalies?
-    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
-    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
-    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
+&indices
+    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
+    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
+    ! from the template [idx] of input/yelmox_defaults.nml.
+    names  = "at"
 /
 
-&tsgen
-    method     = "const"    ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
-    with_kill  = False      ! stop the run once the response equilibrates at a bound
-    dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
-    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
-    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
-    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
-    df_sign    = 1          ! +1/-1 direction of forcing change
-    tol        = 1.0        ! response-rate tolerance (feedback/kill)
-    df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
-    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
-    f_min      = 0.0        ! [f]   lower forcing bound
-    f_max      = 5.0        ! [f]   upper forcing bound
-    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+&idx_at
+    ! Glacial index: the orbital series normalised to 0 at present (piControl)
+    ! and 1 at 21 ka (LGM); the position on the snapshots axis "at".
+    method      = "series"
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
+/
+
+&anom
+    ! Homogeneous anomaly from one index, applied after the climate backend:
+    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
+    active = False    ! Apply it?
+    index  = ""       ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+/
+
+&ocn_fraction
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = False    ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
+&taper
+    ! The atmosphere towards the reference with a static weight w in [0, 1]:
+    ! now = ref + w*(now - ref) (e.g. w from the coverage of a reconstruction).
+    active   = False    ! Apply it?
+    var_defs = ""       ! varslice databases of the weight, then this file
+    weight   = ""       ! group of the weight w [1] (one 2D field)
+/
+
+&bias
+    ! Static bias correction of the atmosphere. Planned: MAR - ERA5 over
+    ! Greenland, a FesmData product on GRL-PAL (docs/_grl-paleo-plan.md,
+    ! "Reference climate on GRL-PAL"); not available yet.
+    active   = False    ! Apply it?
+/
+
+&orbit
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
+    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
+    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+/
+
+
+&ice_bnd
+    ! Prescribed ice: H_ice_ref of Yelmo in its fixed and relaxation cells (the
+    ! strip of yelmo_masks border_width) from an ice history at the forcing time.
+    active     = True
+    method     = "file"               ! file: H_ice at the forcing time; scaled: H = f(index)*H_ice(slice_time)
+    H_ice      = "paleomist_H_ice"    ! input/clim_db.nml: PaleoMIST 1.0, 80-0 ka (glac1d_H_ice: GLAC-1D, 26-0 ka)
+    index      = ""                   ! scaled: the index f ([indices] names)
+    slice_time = -21e3                ! [yr] scaled: time of the slice
 /
 
 ! ===== Simulation options =====
@@ -173,6 +223,18 @@
     basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 /
 
+&negis
+    ! NEGIS basal friction scaling ([sim] use_negis): cb_ref of each part times its factor
+    cf_0          = 1.0             ! [-] before -11 ka, ramping to cf_1 at 0 ka
+    cf_1          = 1.0
+    cf_centre     = 1.0             ! [-] factor of the centre part
+    cf_south      = 1.0             ! [-] factor of the south part
+    cf_north      = 1.0             ! [-] factor of the north part (paleo ice stream)
+    region_centre = "NEGIS:centre"  ! basin set NEGIS (FesmData; NEGIS-v1: the hand-drawn v1 parts)
+    region_south  = "NEGIS:south"
+    region_north  = "NEGIS:north"
+/
+
 ! ===== Solid earth =====
 
 &isos
@@ -188,6 +250,8 @@
                                     ! of 2 multiplied by the resolution)
 
     ! Rheology methods
+    ! GRL-PAL SolidEarth-Lloyd2024 (3D log10_visc on "depth", no lithosphere)
+    ! does not have the layout of rheology_file (zc, lithosphere thickness).
     mantle = "uniform"          ! Choose mantle viscosity field, options:
                                 ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
     lithosphere = "uniform"     ! Choose lithospheric thickness field:
@@ -234,7 +298,7 @@
 /
 
 &barysealevel
-    method      = "fastiso" ! "const": BSL = bsl_init throughout sim
+    method      = "file"    ! "const": BSL = bsl_init throughout sim (file: the border ice must not add to it)
                             ! "file": BSL = time series provided from sl_path
                             ! "fastiso": BSL = sum of contributions from fastiso domains
                             ! "mixed": combine "file" and "fastiso"
@@ -310,7 +374,7 @@
     front_dHdx          = 0.0               ! [m/m] Thickness gradient assumed at a full front (front_subgrid)
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
-    topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
+    topo_rel            = -1                ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points; -1: bnd%tau_relax (the border_width strip)
     topo_rel_tau        = 10.0              ! [a] Time scale for relaxation 
     topo_rel_field      = "H_ref"           ! "H_ref" or "H_ice_n"
 
@@ -505,10 +569,11 @@
 &yelmo_masks
     regions_group    = "None"            ! the regions come from the driver ([regions])
     basins           = "Zwally2012.group"    ! <set>, <set>.group, None or domain (one basin)
-    mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"
+    mask_ice_dynamic = "all"
     mask_ice_fixed   = "none"
     relax            = "none"
-    relax_tau        = 0.0
+    relax_tau        = 100.0             ! [yr] relaxation timescale of the inner cells of border_width
+    border_width     = 2 4               ! strip at the domain border: 2 fixed cells, 4 relaxation cells (ice from [ice_bnd])
     mask_rmse        = "region:Greenland & ~zone:open_ocean"
 /
 
@@ -523,15 +588,15 @@
 
 &yelmo_data 
     ! The present-day topography comes from the hub ([domain])
-    pd_tsrf_load      = True 
+    pd_tsrf_load      = False            ! (MAR is not on GRL-PAL)
     pd_tsrf_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
-    pd_smb_load       = True 
+    pd_smb_load       = False            ! (MAR is not on GRL-PAL)
     pd_smb_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
-    pd_vel_load       = True 
+    pd_vel_load       = False            ! (Joughin2018 is not on GRL-PAL)
     pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Joughin2018.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
     pd_age_load       = True 
@@ -543,118 +608,25 @@
 ! ===== Climate =====
 
 &snap
-    ! snapesm assembly config — reproduces snapclim atm_type=snap_1ind_new (except f_hol),
-    ! ocn_type=fraction (see yelmox_Greenland_snapclim.nml &snap). Params copied
-    ! verbatim from that block. var_defs database: input/greenland_clim.nml.
-    var_defs   = "input/greenland_clim.nml"
-    combine    = "anomaly"
-    ref_name   = "pd"
-    lapse      = 0.0080 0.0065
+    ! Snapshot backend (snapshots): present day only, ERA5 1981-2010 (atmosphere)
+    ! and ORAS5 (ocean); a MAR-quality reference over Greenland comes with
+    ! [bias] (planned). Databases: input/clim_db.nml; unset keys:
+    ! input/yelmox_defaults.nml.
+    snapshots  = "pd"
     f_p        = 0.06
-    f_p_ne     = 1.0
-    f_stdev    = 0.0
-    f_to       = 0.25
-    dTa_const  = 2.0
-    dTo_const  = 0.5
-    dSo_const  = 3.0
-    snapshots  = "pd" "picontrol" "lgm"
-    fields     = "tas" "pr" "to" "so" "zs"
-    indices    = "at" "ap"
 /
-
-! ---- field registry (semantics + blend rule; no file bindings here) ---------
-
-&snap_field_tas
-    kind  = "atm_temp"
-    blend = "linear"
-    index = "at"
-/
-
-&snap_field_pr
-    kind  = "atm_precip"
-    blend = "ratio"
-    index = "ap"
-/
-
-&snap_field_to
-    kind  = "ocn"
-    blend = "fraction"
-    index = ""
-/
-
-&snap_field_so
-    kind  = "ocn_salt"
-    blend = "const"
-    index = ""
-/
-
-&snap_field_zs
-    kind  = "elev"
-    blend = "const"
-    index = ""
-/
-
-! ---- snapshots (state -> var_defs group refs per field) ---------------------
 
 &snap_pd
-    monthly   = True
-    tas = "clim_pd_tas"
-    pr  = "clim_pd_pr_sf" "clim_pd_pr_rf"
-    zs  = "clim_pd_zs"
-    to  = "clim_pd_to"
-    so  = "clim_pd_so"
-/
-
-&snap_picontrol
-    monthly   = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "clim_picontrol_tas_ann" "clim_picontrol_tas_sum"
-    pr  = "clim_picontrol_pr_ann"
-    zs  = "clim_picontrol_zs"
-    to  = ""
-    so  = ""
-/
-
-&snap_lgm
-    monthly   = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "clim_lgm_tas_ann" "clim_lgm_tas_sum"
-    pr  = "clim_lgm_pr_ann"
-    zs  = "clim_lgm_zs"
-    to  = ""
-    so  = ""
-/
-
-! ---- driving indices (tsgen; groups named &snap_idx_<name>) ------------------
-! Each index is the position on the axis snap_lo -> snap_hi (0 -> 1). The
-! orbital series is normalised to 0 at present (piControl) and 1 at 21 ka (LGM).
-
-&snap_idx_at
-    snap_lo     = "picontrol"
-    snap_hi     = "lgm"
-    method      = "series"
-    sigma       = 0.0
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
-/
-
-&snap_idx_ap
-    snap_lo     = "picontrol"
-    snap_hi     = "lgm"
-    method      = "series"
-    sigma       = 0.0
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
+    tas = "era5_1981_2010_tas"
+    pr  = "era5_1981_2010_pr"
+    zs  = "era5_1981_2010_zs"
+    to  = "oras5_1981_2010_to"
+    so  = "oras5_1981_2010_so"
 /
 
 ! ===== Surface =====
 
 &smbpal
-    const_insol = True
-    const_kabp  = 0.0
-    insol_fldr  = "input"
     abl_method  = "itm"   ! "itm" or "pdd"
     sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
     sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
@@ -781,9 +753,6 @@
 
 &surface_chion
     ! Host side of chion (surface_method = "chion"): forcing chion does not own.
-    const_insol = True    ! Insolation at const_kabp instead of the model time
-    const_kabp  = 0.0     ! [kyr BP] Insolation time when const_insol
-    insol_fldr  = "input" ! Folder of the orbital-parameter tables
     sf_a        = 0.273   ! Snow fraction function (parameter a)
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs

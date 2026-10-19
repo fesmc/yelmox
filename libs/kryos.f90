@@ -18,7 +18,7 @@ module kryos
     !   kryos_coupling  the per-step coupling primitives (step_*, couple_*)
     !   kryos_startup   initial state (cold start) and restart bundles
     !   kryos_output    per-module 2D/1D output
-    !   kryos_forcing   driver-owned transient forcing (tsgen)
+    !   kryos_forcing   driver-owned indices registry
 
     use precision,    only : dp
     use nml,          only : nml_read, nml_replace
@@ -30,6 +30,8 @@ module kryos
     use fastisostasy, only : isos_class, isos_init
     use climate_out,    only : climate_out_class
     use yelmox_climate, only : yelmox_climate_class, climate_init
+    use kryos_forcing,  only : indices_class
+    use ice_bnd,        only : ice_bnd_class, ice_bnd_init
     use smbpal,       only : smbpal_class, smbpal_init
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask
     use surface_chion, only : surface_chion_class, surface_chion_init
@@ -62,7 +64,7 @@ module kryos
         logical :: with_climate   = .true.   ! atmosphere + ocean
         logical :: with_surface   = .true.   ! surface mass balance + temperature (needs climate)
         logical :: with_shelf     = .true.   ! shelf-base melt + temperature (needs climate)
-        character(len=56) :: climate        = ""         ! climate backend: snapclim | snapesm | esm | rembo
+        character(len=56) :: climate        = ""         ! climate backend: snapshots | esm | rembo
         character(len=56) :: surface_method = "chion"    ! chion | smbpal | smb_simple | climate (from the backend)
         real(dp) :: dt_clim     = 10.0_dp   ! [yr] climate update interval
         real(dp) :: dt_isos     = 10.0_dp   ! [yr] isostasy update interval
@@ -171,6 +173,7 @@ module kryos
         type(ice_opt_params)   :: opt     ! basal-friction / thermal-forcing optimization
         type(negis_params)     :: ngs     ! NEGIS cb_ref modification
         type(glacial_smb_params) :: gsmb  ! glacial smb scaling
+        type(ice_bnd_class)    :: ibnd    ! prescribed ice thickness in Yelmo's fixed/relaxation cells ([ice_bnd])
         type(domain_ctl)       :: ctl
         logical, allocatable   :: mask_recon(:,:)   ! recon: where its ice is imposed (Yelmo grid)
     end type kryos_domain
@@ -213,7 +216,7 @@ contains
         if (dt > 0.0_dp) due = (mod(nint(time*100), nint(dt*100)) == 0)
     end function cadence_due
 
-    subroutine domain_init(dom, path_par, time, group_suffix, timeline_group)
+    subroutine domain_init(dom, path_par, time, idx, group_suffix, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
@@ -235,9 +238,13 @@ contains
         ! timeline_group (optional, default "ctrl") names the group holding the
         ! run's shared timeline -- the same group the driver passes to
         ! tstep_init -- from which the domain reads tstep_method/dtt itself.
+        !
+        ! idx is the driver's indices registry (shared by every domain); the
+        ! climate checks the indices it names against it.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(dp),         intent(in)    :: time       ! model time
+        type(indices_class), intent(in) :: idx
         character(len=*), intent(in), optional :: group_suffix
         character(len=*), intent(in), optional :: timeline_group
 
@@ -300,6 +307,10 @@ contains
             dom%mask_recon = regions_select(reg_y, dom%ctl%recon_regions)
         end if
 
+        ! Prescribed ice in Yelmo's fixed and relaxation cells ([ice_bnd]),
+        ! read on the Yelmo grid; no-op unless active.
+        call ice_bnd_init(dom%ibnd, path_par, "ice_bnd"//trim(sfx), domain, grid_y, idx)
+
         ! NEGIS cb_ref modification: its parameters and the masks of its parts,
         ! loaded when enabled, so it cannot silently run with defaults.
         if (dom%ctl%use_negis) call negis_par_load(dom%ngs, path_par, trim(sfx), reg_y)
@@ -335,11 +346,12 @@ contains
         call climate_init(dom%cl, dom%ctl%climate, path_par, domain, grid_c, &
                           time, reg_c, dom%ctl%south, sfx=trim(sfx), &
                           timeline_group=trim(tgroup), &
-                          smb_direct=(trim(dom%ctl%surface_method) == "climate"))
+                          smb_direct=(trim(dom%ctl%surface_method) == "climate"), idx=idx)
         call regions_end(reg_c)
 
         ! --- smb on its configured grid (grid_surface) ---
-        ! The surface models read no grid-specific data; only lats (insolation) is physical.
+        ! The surface models read no grid-specific data; only lats (insolation, on the
+        ! orbit of [orbit<sfx>]) is physical.
         call grid_cdo_read_desc(grid_s, trim(dom%ctl%grid_surface), MAP_FLDR)
         dom%ctl%dx_surface = dom%yelmo%grd%G%dx * (grid_s%G%dx / grid_y%G%dx)
         nx_s = grid_s%G%nx
@@ -350,7 +362,8 @@ contains
         lats_s = real(grid_s%lat, wp)
         if (trim(dom%ctl%surface_method) == "smbpal") &
             call smbpal_init(dom%smb, path_par, x=xs, y=ys, lats=lats_s, &
-                             group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx))
+                             group="smbpal"//trim(sfx), itm_group="itm"//trim(sfx), &
+                             orbit_group="orbit"//trim(sfx))
 
         ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
         ! smbpal (1D axes), smb_simple takes 2D projected coordinates.
@@ -369,7 +382,7 @@ contains
         if (trim(dom%ctl%surface_method) == "chion") then
             call surface_chion_init(dom%schn, path_par, lats_s, &
                                     group="surface_chion"//trim(sfx), chion_group="chion"//trim(sfx), &
-                                    cnst=dom%cnst)
+                                    orbit_group="orbit"//trim(sfx), cnst=dom%cnst)
         end if
 
         ! --- marine_shelf on its configured grid (grid_y already read above) ---
@@ -545,7 +558,7 @@ contains
             case("smb_simple")
                 if (trim(ctl%climate) == "esm" .or. trim(ctl%climate) == "rembo") then
                     write(*,*) "domain_ctl_load:: error: "//trim(gc)//".surface_method = smb_simple needs &
-                               &a sea-level air temperature (climate = snapclim or snapesm)."
+                               &a sea-level air temperature (climate = snapshots)."
                     stop 1
                 end if
             case default

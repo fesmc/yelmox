@@ -1,9 +1,10 @@
 # configme manifest for yelmox.
 package = "yelmox"
 deps = [
-    "fesm-utils:2.4-beta",
+    "fesm-utils:dev",
     "yelmo:2.4-beta",
     "FastIsostasy:2.4-beta",
     "rembo1:2.4-beta",
     "chion:2.4-beta",
+    "insol:main",
 ]

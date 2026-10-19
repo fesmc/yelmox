@@ -5,8 +5,10 @@
 # Follow-up to run_mg_resolution.sh. Branches 1 kyr forward runs off the
 # spun-up (t=25 kyr) state of each COMPLETED core/multigrid run, under two
 # forcings:
-#   - ctrl  : present-day climate held fixed (dTa=dTo=0);
-#   - warm  : uniform +2 K atmosphere and +2 K ocean anomaly (dTa=dTo=+2).
+#   - ctrl  : present-day climate held fixed (dT = 0);
+#   - warm  : uniform +2 K atmosphere and +2 K ocean anomaly (dT = +2, f_to = 1).
+# The anomaly is [anom] driven by the constant index dT ([idx_dT] of the par
+# file): dTa = dT, dTo = f_to*dT.
 #
 # Only the three Yelmo-32KM spin-ups finished within the wall-clock limit, so
 # the projections branch from those (marine_shelf grid = 8 / 16 / 32 KM). This
@@ -43,9 +45,10 @@ OUTROOT="output/mg_fwd"            # where projections are written
 RESTART_KYR="restart-25.000-kyr"   # spun-up bundle to branch from
 TIME_END=1000                      # [yr] projection length
 
-# run_fwd <parent_subdir> <yelmo_grid> <mshlf_grid> <scenario> <dTa> <dTo>
+# run_fwd <parent_subdir> <yelmo_grid> <mshlf_grid> <scenario> <dT> <f_to>
+#   dT [K]: the air temperature anomaly; f_to [1]: the ocean anomaly per K of dT
 run_fwd() {
-    local parent="$1" ygrid="$2" mgrid="$3" scen="$4" dTa="$5" dTo="$6"
+    local parent="$1" ygrid="$2" mgrid="$3" scen="$4" dT="$5" f_to="$6"
     local restart="$SPINROOT/$parent/$RESTART_KYR"
     local out="$OUTROOT/${parent}_${scen}"
 
@@ -62,14 +65,15 @@ run_fwd() {
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \
            tm_2D.dt=100 ytopo.gz_Hg1=100 \
-           snap.dTa_const="$dTa" snap.dTo_const="$dTo"
+           indices.names=dT anom.active=True anom.index=dT \
+           anom.f_ta=1 anom.f_to="$f_to" idx_dT.f_min="$dT" idx_dT.f_max="$dT"
 }
 
 # For each completed spin-up: a ctrl run and a +2/+2 warming run.
-# run_fwd <parent>      <yelmo>   <mshlf>   <scen> <dTa> <dTo>
-run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  ctrl   0  0
-run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  warm   2  2
-run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  ctrl   0  0
-run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  warm   2  2
-run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   ctrl   0  0
-run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   warm   2  2
+# run_fwd <parent>      <yelmo>   <mshlf>   <scen> <dT> <f_to>
+run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  ctrl   0  1
+run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  warm   2  1
+run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  ctrl   0  1
+run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  warm   2  1
+run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   ctrl   0  1
+run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   warm   2  1

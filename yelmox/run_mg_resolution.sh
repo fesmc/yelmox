@@ -16,7 +16,7 @@
 #
 # Grid mapping per run: Yelmo, isostasy and smb share <yelmo_grid>; marine_shelf
 # and the hi-res topography hub share <mshlf_grid> (the finest grid, >= Yelmo
-# resolution). For a core run the two grids are equal. Climate (snapclim
+# resolution). For a core run the two grids are equal. Climate (snapshot
 # atmosphere + ocean) always runs on ANT-32KM -- the only grid with the ISMIP6
 # ocean forcing -- and is remapped by the coupler to the consumer grids.
 #

@@ -6,7 +6,7 @@ Most forcing in YelmoX is now loaded through the shared
 [`varslice`](https://github.com/fesmc/fesm-utils) reader. A **database namelist**
 is a small, static description of a dataset on disk: where the file lives, which
 variable to read, how to convert its units, and how its records map onto a time
-axis. The consuming modules — `varslice` itself, `esm_forcing`, `snapesm`,
+axis. The consuming modules — `varslice` itself, `esm_forcing`, `snapshots`,
 `ismip6` — all read the *same* group layout, so once you understand one group you
 understand them all.
 
@@ -157,7 +157,10 @@ dimension, or the reader stops with an error — a useful check that `x0`, `x1`,
   ```
 
   and the same namelist serves every GCM/experiment combination — you select the
-  concrete values in the driver's `[esm]` configuration, not here.
+  concrete values in the driver's `[esm]` configuration, not here. snapshots
+  supplies `{grid_global}` (`[snap] grid_global`) and `{exp}` (the snapshot's
+  `exp`) for its database `input/clim_db.nml` (see
+  [Snapshots](climate-snapshots.md)).
 
 **Wildcards** (shell globs, `*` and `?`) are also allowed. The reader expands the
 pattern with `ls -1 … | sort`, so a dataset split across many files is matched
@@ -232,7 +235,7 @@ not in the namelist.
   variability, ESM-reference, historical, and projection periods
   (`&gcm_ts_ref`, `&gcm_to_proj`, …) and supplies `{gcm}`/`{experiment}`. See
   [ESM forcing](climate-esm.md).
-- **`snapesm`** uses the same reader for its snapshot climate database.
+- **`snapshots`** uses the same reader for its snapshot climate database.
 - **`ismip6`** uses it for the ISMIP6 atmosphere/ocean forcing files.
 
 Because they share the reader, the layout documented here is identical across all

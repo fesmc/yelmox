@@ -2,7 +2,7 @@
 #
 # Default REMBO-coupled Greenland run (yelmox with climate = "rembo").
 #
-# Single grid (GRL-16KM): ice sheet + isostasy + REMBO atmosphere/SMB + snapclim
+# Single grid (GRL-16KM): ice sheet + isostasy + REMBO atmosphere/SMB + snapshots
 # ocean + marine_shelf, present-day style (no hysteresis, no optimization). REMBO
 # provides the surface mass balance; the shared multigrid couplers land it (and
 # isostasy / marine_shelf) on the Yelmo grid each step. See

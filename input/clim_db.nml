@@ -1,0 +1,501 @@
+! =====================================================================
+! clim_db.nml — shared climate database (varslice groups) for the snapshot
+! backend (snapshots) and the climate modifiers, and the ice histories of the
+! prescribed ice ([ice_bnd]).
+!
+! One group per product field. A par file lists the databases to search,
+! first file that has a group wins, then the par file itself (searched
+! implicitly last: it can hold run-specific groups without naming itself):
+!     &snap
+!         var_defs = "input/clim_db.nml"
+! A snapshot binds groups by name: &snap_lgm  exp = "lgm"
+! tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja".
+!
+! Path keywords:
+!   {domain}, {grid_name}  the domain ([domain] name) and the climate grid
+!   {grid_global}          the global grid of the paleoclimate products,
+!                          [snap] grid_global (default GLOBAL-1DEG)
+!   {exp}                  the experiment of the snapshot, its exp key
+!                          (lgm, piControl, present, stadial, ...)
+! Present-day references are regional ({domain}/{grid_name}, high
+! resolution); paleoclimate snapshots are global products, remapped online
+! onto the climate grid (remap = "bilin", map cached in maps/).
+!
+! Compact varslice format: units = "in" "out"; scaling = scale offset
+! (var*scale + offset, so degC -> K uses offset 273.15); time = active x0 x1
+! dx nsub (active >= 0.5: time axis; nsub > 1: sub-annual cycle, the last
+! dimension; a monthly atmosphere (month, y, x) is read as is, nsub = 1).
+! Optional: fill = "nearest" (missing values from the nearest valid cell, per
+! level), remap + grid_src (online remap from the named grid).
+! Units: temperatures in K, precipitation in mm d-1 (water equivalent), ocean
+! temperature in K, salinity in PSU, elevations in m.
+! =====================================================================
+
+! ===== Present day: regional references =====
+
+! ---- MAR v3.14, 1961-1990 (Greenland), monthly --------------------------
+
+&mar314_1961_1990_tas
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name     = "t2m"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&mar314_1961_1990_sf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name     = "sf"
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
+    time     = 0 0 0 0 1
+/
+
+&mar314_1961_1990_rf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name     = "rf"
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
+    time     = 0 0 0 0 1
+/
+
+&mar314_1961_1990_pr
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name     = "pr"
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
+    time     = 0 0 0 0 1
+/
+
+&mar314_1961_1990_zs
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+! ---- RACMO2.3p2, 1981-2010 (Antarctica), monthly ------------------------
+! tas: 2 m air temperature; tsrf: surface temperature.
+
+&racmo23p2_1981_2010_tas
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1981-2010.nc"
+    name     = "t2m"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&racmo23p2_1981_2010_tsrf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1981-2010.nc"
+    name     = "T_srf"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&racmo23p2_1981_2010_pr
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1981-2010.nc"
+    name     = "pr"
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
+    time     = 0 0 0 0 1
+/
+
+&racmo23p2_1981_2010_sf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1981-2010.nc"
+    name     = "sf"
+    units    = "kg m-2 yr-1" "mm d-1"
+    scaling  = 2.73785e-3 0.0
+    time     = 0 0 0 0 1
+/
+
+&racmo23p2_1981_2010_zs
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1981-2010.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+! ---- ERA5, 1981-2010 (any domain: North, Laurentide, Pyrenees, ...), monthly
+
+&era5_1981_2010_tas
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
+    name     = "t2m"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&era5_1981_2010_pr
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
+    name     = "pr"
+    units    = "kg m-2 d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&era5_1981_2010_sf
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
+    name     = "sf"
+    units    = "kg m-2 d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&era5_1981_2010_zs
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Atmosphere-ERA5-1981-2010.nc"
+    name     = "zs"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+! ---- ORAS5, 1981-2010 (any domain), monthly climatology (month, depth) ----
+
+&oras5_1981_2010_to
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
+    name     = "to"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 12
+    fill     = "nearest"
+/
+
+&oras5_1981_2010_so
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
+    name     = "so"
+    units    = "PSU" "PSU"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 12
+    fill     = "nearest"
+/
+
+! ---- ISMIP7 ocean (Antarctica), annual (depth z) --------------------------
+
+&ismip7_to
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ISMIP7.nc"
+    name     = "to"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    fill     = "nearest"
+/
+
+&ismip7_so
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ISMIP7.nc"
+    name     = "so"
+    units    = "PSU" "PSU"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    fill     = "nearest"
+/
+
+! ===== Paleoclimate: global products ({grid_global}, {exp}) =====
+
+! ---- PMIP3 ensemble mean, {exp} = lgm | midHolocene | piControl ----------
+! Annual means and seasons (jja, djf; tas_season of the snapshot).
+
+&pmip3_mean_tas_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP3-{exp}-mean.nc"
+    name     = "t2m_ann"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip3_mean_tas_jja
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP3-{exp}-mean.nc"
+    name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip3_mean_tas_djf
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP3-{exp}-mean.nc"
+    name     = "t2m_djf"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip3_mean_pr_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP3-{exp}-mean.nc"
+    name     = "pr_ann"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip3_mean_zs
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP3-{exp}-mean.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+! ---- PMIP4 ensemble mean, {exp} = lgm | midHolocene | piControl ----------
+! Monthly (tas_mon, pr_mon: monthly snapshot) or annual means and seasons.
+
+&pmip4_mean_tas_mon
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "t2m_mon"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip4_mean_pr_mon
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "pr_mon"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip4_mean_tas_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "t2m_ann"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip4_mean_tas_jja
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip4_mean_tas_djf
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "t2m_djf"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip4_mean_pr_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "pr_ann"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&pmip4_mean_zs
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-PMIP4-{exp}-mean.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+! ---- CLIMBER-3alpha (Montoya et al., 2008), {exp} = present | lgm_1p7weak
+! | lgm_1p7strong. Annual means and JJA only (tas_season = "jja", also in
+! the south); the ocean (to, annual) in the -ocean file.
+
+&c3a_tas_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBER3a-{exp}.nc"
+    name     = "t2m_ann"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&c3a_tas_jja
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBER3a-{exp}.nc"
+    name     = "t2m_jja"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&c3a_pr_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBER3a-{exp}.nc"
+    name     = "pr_ann"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&c3a_zs
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBER3a-{exp}.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&c3a_to
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBER3a-{exp}-ocean.nc"
+    name     = "to"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+    fill     = "nearest"
+/
+
+! ---- CLIMBER-X (Willeit et al., 2025), {exp} = piControl | interstadial |
+! stadial | heinrich. Monthly and annual means; the _anom fields are the
+! anomalies to piControl (the hi of a lo = "" axis; pr_mon_anom is a
+! difference in mm d-1, not a ratio); the ocean (to, so, annual) in the
+! -ocean file.
+
+&cx_tas_mon
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "t2m_mon"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_pr_mon
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "pr_mon"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_tas_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "t2m_ann"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_pr_ann
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "pr_ann"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_zs
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "z_srf"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_tas_mon_anom
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "t2m_mon_anom"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_pr_mon_anom
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}.nc"
+    name     = "pr_mon_anom"
+    units    = "mm d-1" "mm d-1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+/
+
+&cx_to
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}-ocean.nc"
+    name     = "to"
+    units    = "degC" "K"
+    scaling  = 1.0 273.15
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+    fill     = "nearest"
+/
+
+&cx_so
+    filename = "fesmdata/Global/{grid_global}/{grid_global}_Paleoclimate-CLIMBERX-Willeit2025-{exp}-ocean.nc"
+    name     = "so"
+    units    = "PSU" "PSU"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+    remap    = "bilin"
+    grid_src = "{grid_global}"
+    fill     = "nearest"
+/
+
+! ===== Ice histories (prescribed ice, [ice_bnd]) =====
+! Regional products on the ice grid ({grid_name} = the Yelmo grid), time in
+! model years (negative before present; the files run from the oldest slice
+! to 0 ka, "years ago"). varslice needs a regular time axis: ICE-6G_C (1 kyr,
+! then 500 yr steps) and GLAC-1D nn9927/nn9894 (1 kyr, then 100 yr) are not
+! read as a whole.
+
+! ---- PaleoMIST 1.0 (Gowan et al., 2021), 80-0 ka every 2.5 kyr ------------
+
+&paleomist_H_ice
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_IceHistory-PaleoMIST.nc"
+    name     = "H_ice"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 1 -80e3 0 2500 1
+/
+
+! ---- GLAC-1D (PMIP4; Tarasov et al., 2012), 26-0 ka every 100 yr ----------
+
+&glac1d_H_ice
+    filename = "fesmdata/{domain}/{grid_name}/{grid_name}_IceHistory-GLAC1D.nc"
+    name     = "H_ice"
+    units    = "m" "m"
+    scaling  = 1.0 0.0
+    time     = 1 -26e3 0 100 1
+/

@@ -60,7 +60,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "esm"      ! climate backend: "snapclim", "snapesm", "esm" or "rembo"
+    climate         = "esm"      ! climate backend: "snapshots", "esm" or "rembo"
     surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
     dt_clim         = 1.0      ! [yr] climate update interval (esm: every step, = dtt)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -158,28 +158,37 @@
 
 ! ===== Forcing =====
 
-&tsforcing
-    active = False    ! Apply transient tsgen forcing? (yelmox; unused by the esm climate)
-    f_ta   = 1.0      ! [K]   dTa = f_now * f_ta  (atmospheric temperature)
-    f_to   = 0.0      ! [K]   dTo = f_now * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f_now * f_so  (ocean salinity)
-    restart_every_df = 0.0  ! [f] write a restart bundle each |Δf|; 0 = off
+&indices
+    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
+    ! units and restart_every_df), advanced on the forcing clock time_rel.
+    names  = ""       ! e.g. "at" "ramp"; "" = none
 /
 
-&tsgen
-    method     = "const"    ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
-    with_kill  = False      ! stop the run once the response equilibrates at a bound
-    dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
-    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
-    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
-    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
-    df_sign    = 1          ! +1/-1 direction of forcing change
-    tol        = 1.0        ! response-rate tolerance (feedback/kill)
-    df_dt_max  = 0.001      ! [f/yr] maximum forcing rate
-    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
-    f_min      = 0.0        ! [f]   lower forcing bound
-    f_max      = 5.0        ! [f]   upper forcing bound
-    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+&anom
+    ! Homogeneous anomaly from one index, applied after the climate backend:
+    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
+    active = False    ! Apply it? (refused with the esm smb, surface_method = "climate")
+    index  = ""       ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
+    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
+    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+/
+
+&ocn_fraction
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = False    ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
+&orbit
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
+    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
+    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
 /
 
 ! ===== Simulation options =====
@@ -624,9 +633,6 @@
 ! ===== Surface =====
 
 &smbpal
-    const_insol = True
-    const_kabp  = 0.0
-    insol_fldr  = "input"
     abl_method  = "itm"   ! "itm" or "pdd"
     sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
     sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
@@ -670,9 +676,6 @@
 
 &surface_chion
     ! Host side of chion (surface_method = "chion"): forcing chion does not own.
-    const_insol = True    ! Insolation at const_kabp instead of the model time
-    const_kabp  = 0.0     ! [kyr BP] Insolation time when const_insol
-    insol_fldr  = "input" ! Folder of the orbital-parameter tables
     sf_a        = 0.273   ! Snow fraction function (parameter a)
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs

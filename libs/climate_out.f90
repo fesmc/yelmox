@@ -57,5 +57,23 @@ module climate_out
 
     public :: clim_state_class
     public :: climate_out_class
+    public :: summer_mean
+
+contains
+
+    function summer_mean(var, south) result(var_sum)
+        ! Mean of a monthly field over the summer months: DJF in the southern
+        ! hemisphere, JJA in the northern.
+        real(wp), intent(in) :: var(:,:,:)
+        logical,  intent(in) :: south
+        real(wp) :: var_sum(size(var,1),size(var,2))
+
+        if (south) then
+            var_sum = (var(:,:,1)+var(:,:,2)+var(:,:,12)) / 3.0_wp
+        else
+            var_sum = (var(:,:,6)+var(:,:,7)+var(:,:,8)) / 3.0_wp
+        end if
+
+    end function summer_mean
 
 end module climate_out

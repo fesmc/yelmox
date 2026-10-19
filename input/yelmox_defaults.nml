@@ -1,0 +1,186 @@
+! ============================================================
+! yelmox_defaults.nml — defaults of the yelmox forcing groups.
+! ============================================================
+!
+! The schema of the forcing groups: the indices ([indices], [idx_<name>]),
+! the snapshot backend ([snap*]), the climate modifiers ([anom],
+! [ocn_fraction], [ocn_obm], [taper], [bias]), the orbit of the insolation ([orbit]),
+! the prescribed ice ([ice_bnd]) and the forcing of the bipolar ocean box model ([obm_forcing]). Every key yelmox reads in these groups is declared
+! here and read with nml_read(..., defaults_file = this file): a par file
+! lists only what differs, and nml_validate stops a run on a key that is not
+! declared (a typo, a removed key); scripts/check_par_nml.py checks the same
+! offline.
+!
+! Named groups fall back to a template group (defaults_group):
+!   idx_<name>                    -> idx
+!   snap<sfx>                     -> snap
+!   snap<sfx>_field_<name>        -> snap_field
+!   snap<sfx>_<snapshot>          -> snap_snapshot
+!   snap<sfx>_axis_<name>         -> snap_axis
+!   anom<sfx>, ocn_fraction<sfx>, ocn_obm<sfx>, taper<sfx>, bias<sfx>, orbit<sfx>
+!                                 -> anom, ocn_fraction, ocn_obm, taper, bias, orbit
+!   ice_bnd<sfx>                  -> ice_bnd
+! (<sfx>: the domain suffix of a multi-domain driver, e.g. _north). An absent
+! group takes every default: a modifier without its group is inactive.
+!
+! The other yelmox groups (ctrl, comps, domain, sim, output, marine_shelf,
+! ...) are read without defaults for now. Yelmo's groups: yelmo_defaults.nml.
+
+! ===== Indices =====
+
+&indices
+    names            = ""            ! the indices, each a group [idx_<name>]; "" = none
+/
+
+&idx
+    ! A tsgen series (fesm-utils tsgen), advanced on the forcing clock time_rel.
+    method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1
+    sigma            = 0.0           ! [f] std. dev. of gaussian noise added to the series
+    ! series
+    series_file      = ""            ! table (time, f) or netcdf file of the series
+    series_var       = ""            ! variable of a netcdf series_file
+    series_time_name = "time"        ! its time variable
+    norm_t0          = 0.0           ! [yr] normalise: f = (S - S(t0))/(S(t1) - S(t0)), t one time or a window t0 t1;
+    norm_t1          = 0.0           ! [yr]   only when both are set in the par group (the values here are not used)
+    ! analytic and feedback methods
+    with_kill        = False         ! stop the run once the response equilibrates at a bound
+    dt_init          = 0.0           ! [yr] hold the forcing flat during this initial interval
+    dt_ramp          = 1000.0        ! [yr] ramp/period length (ramp-time, ramp-time-step, sin)
+    dt_conv          = 1000.0        ! [yr] convergence interval (ramp-time-step)
+    dt_ave           = 100.0         ! [yr] averaging window of the response derivative (feedback, kill)
+    df_sign          = 1.0           ! +1/-1 direction of the forcing change
+    tol              = 1.0           ! response-rate tolerance (feedback, kill)
+    df_dt_max        = 0.0           ! [f/yr] forcing rate (const/ramp-slope; maximum for feedback)
+    f_min            = 0.0           ! [f] lower bound; the value of const (f_min + df_dt_max*t, clamped)
+    f_max            = 1.0           ! [f] upper bound
+    f_conv           = 0.0           ! [f] value held after convergence (ramp-time-step)
+    ! yelmox
+    units            = "1"           ! units label of idx_<name> in the 1D output
+    restart_every_df = 0.0           ! [f] write a restart each time f moves by this much; 0 = off
+    ! window modifier (tsgen): inside win_t0 < t < win_t1, f = win_ref + win_fac*(f - win_ref)
+    ! (only where f > win_ref if win_above), with linear ramps of win_taper at the edges;
+    ! off when win_t1 <= win_t0. The old snapclim f_hol rule: -12e3 -1e3, win_fac = f_hol,
+    ! win_ref = 1, win_above = True.
+    win_t0           = 0.0           ! [yr] window start
+    win_t1           = 0.0           ! [yr] window end
+    win_taper        = 0.0           ! [yr] ramp width inside the window edges
+    win_fac          = 1.0           ! [1] factor on f - win_ref inside the window
+    win_ref          = 0.0           ! [f] reference value of the scaling
+    win_above        = False         ! apply only where f > win_ref
+/
+
+! ===== Snapshot backend (snapshots) =====
+
+&snap
+    var_defs    = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
+    grid_global = "GLOBAL-1DEG"     ! global grid of the paleoclimate products ({grid_global})
+    combine     = "anomaly"         ! anomaly | absolute
+    ref_name    = "pd"              ! the reference snapshot
+    snapshots   = "pd"              ! the snapshots, each a group [snap_<name>]
+    fields      = "tas" "pr" "to" "so" "zs"  ! the fields, each a group [snap_field_<name>]
+    axes        = ""                ! the axes, each a group [snap_axis_<name>]; "" = none
+    lapse       = 0.0080 0.0065     ! [K m-1] lapse rates: annual, summer
+    f_p         = 0.05              ! [K-1] precipitation-temperature scaling (beta_p)
+    f_p_ne      = 1.0               ! NE-Greenland multiplier of beta_p (not active)
+/
+
+&snap_field
+    blend = "linear"    ! linear | ratio | const (const and linear without axes: the reference)
+    axes  = ""          ! the axes added to the reference ([snap] axes); "" = none
+/
+
+&snap_snapshot
+    exp        = ""     ! experiment, the {exp} of its var_defs paths (lgm, piControl, ...)
+    monthly    = True   ! tas/pr monthly (else tas = [annual, season], pr annual)
+    clim_sigma = 0.0    ! [km] gaussian smoothing of the atmosphere at loading; 0 = none
+    ocn_sigma  = 0.0    ! [km] gaussian smoothing of the ocean at loading; 0 = none
+    tas_season = ""     ! season of the second tas group: jja | djf; "" = the summer of the hemisphere
+    ! bindings: var_defs group(s) of each field; "" = not bound
+    tas        = ""
+    pr         = ""
+    zs         = ""
+    to         = ""
+    so         = ""
+/
+
+&snap_axis
+    lo    = ""          ! snapshot at index 0; "" = none (hi is the anomaly or ratio)
+    hi    = ""          ! snapshot at index 1
+    index = ""          ! the index giving the position on the axis ([indices] names)
+/
+
+! ===== Climate modifiers (fixed order: anom, ocn_fraction, ocn_obm, taper, bias) =====
+
+&anom
+    active = False      ! apply it?
+    index  = ""         ! the index driving the anomalies ([indices] names)
+    f_ta   = 1.0        ! [K]   dTa = f * f_ta (air temperature)
+    f_to   = 0.0        ! [K]   dTo = f * f_to (ocean temperature)
+    f_so   = 0.0        ! [psu] dSo = f * f_so (ocean salinity)
+/
+
+&ocn_fraction
+    active = False      ! apply it?
+    f_to   = 0.25       ! [1] fraction of the sea-level air temperature anomaly
+    region = "all"      ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
+&ocn_obm
+    ! Applied by yelmox_bipolar (the box model's driver), after the climate update.
+    active = False      ! apply it? (the ocean temperature from the box of the domain's hemisphere)
+    mode   = "absolute" ! absolute: to = box; anomaly: to = to_ref + (box - box_init)
+/
+
+&taper
+    ! The atmosphere towards the reference with a weight w in [0, 1] (static, on
+    ! the climate grid): now = ref + w*(now - ref) for tas, pr and their annual means.
+    active   = False    ! apply it?
+    var_defs = ""       ! varslice databases of the weight, searched in order, then the par file itself
+    weight   = ""       ! group of the weight w [1] (one 2D field)
+/
+
+&bias
+    active   = False    ! apply it?
+    var_defs = ""       ! varslice databases of dtas/fpr, searched in order, then the par file itself
+    dtas     = ""       ! group of the temperature correction [K] (1 or 12 slices); "" = none
+    fpr      = ""       ! group of the precipitation factor [1] (1 or 12 slices); "" = none
+    f_tas    = 1.0      ! weight of dtas
+    f_pr     = 1.0      ! weight of fpr
+/
+
+! ===== Orbit of the insolation =====
+
+&orbit
+    ! The orbital elements of the insolation of the surface models (chion
+    ! itm/bessi, smbpal itm; fesmc/insol, Laskar et al. 2004 tables).
+    method = "time"     ! clock: at the forcing clock time_rel; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+    ecc    = 0.016702   ! [1]   eccentricity (fixed; these: the tables at 1950)
+    obl    = 23.4393    ! [deg] obliquity (fixed)
+    per    = 102.918    ! [deg] longitude of perihelion (fixed)
+    fldr   = "input"    ! folder of the orbital tables (LA2004.INSOLN.5Ma.txt, LA2004.INSOLP.1Ma.txt)
+/
+
+! ===== Prescribed ice (Yelmo's fixed and relaxation cells) =====
+
+&ice_bnd
+    ! H_ice_ref of Yelmo in its fixed (mask_ice = fixed) and relaxation
+    ! (tau_relax > 0) cells, e.g. the strip of yelmo_masks.border_width, from
+    ! an ice history at the forcing time; the interior keeps its H_ice_ref.
+    active     = False                ! apply it?
+    var_defs   = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
+    method     = "file"               ! file: H_ice at the forcing time (clamped to the file's range);
+                                      ! scaled: H = f*H_ice(slice_time), f an index
+    H_ice      = "paleomist_H_ice"    ! group of the ice thickness [m] (on the ice grid, or remap)
+    index      = ""                   ! scaled: the index f ([indices] names)
+    slice_time = -21e3                ! [yr] scaled: time of the slice H_ice(slice_time)
+/
+
+! ===== Ocean box model forcing (yelmox_bipolar) =====
+
+&obm_forcing
+    ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init +
+    ! ampl_i * gain * index (north, tropics, south) and the vapour fluxes.
+    index = ""          ! the global mean air temperature anomaly [K] ([indices] names)
+    gain  = 1.0         ! [1] dT_glob = gain * index
+/

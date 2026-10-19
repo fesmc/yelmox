@@ -15,15 +15,15 @@ through the sea level and an ocean box model.
 | Program | Build | Domains | Climate | Ocean |
 |---|---|---|---|---|
 | `yelmox` | `make yelmox` (`rembo=1` for REMBO) | one | any backend (`[comps] climate`) | the climate (depth profiles or shelf base) |
-| [`yelmox_bipolar`](yelmox-bipolar.md) | `make yelmox_bipolar` | north + south | snapclim (×2) | snapclim + shared ocean box model |
+| [`yelmox_bipolar`](yelmox-bipolar.md) | `make yelmox_bipolar` | north + south | snapshots (×2) | snapshots + shared ocean box model |
 
 - **Program:** `yelmox/yelmox.f90` (thin driver) + `libs/kryos*.f90` (domain, coupling, startup, output).
 - **Build:** `make yelmox` (`make yelmox rembo=1` to link REMBO).
 - **Configs:** `yelmox/yelmox_<domain>.nml` (Antarctica, Greenland, North, LIS,
   Pyrenees, SRG, plus `pd_` present-day and paleo variants), `yelmox_esm_*.nml`
   ([ESM forcing](climate-esm.md)), `yelmox_rembo_Greenland.nml`
-  ([REMBO](climate-rembo.md)), `yelmox_Greenland_snapesm*.nml`
-  ([snapesm](climate-snap.md)).
+  ([REMBO](climate-rembo.md)), `yelmox_Greenland_ramp.nml` (an air temperature
+  ramp: `[anom]` on a `ramp-slope` index).
 
 ## Components
 
@@ -31,7 +31,7 @@ through the sea level and an ocean box model.
 |---|---|---|
 | Ice sheet | Yelmo | `grid_ice` |
 | Isostasy + sea level | FastIsostasy (`isos`) + shared `bsl` | `grid_isos` |
-| Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapclim, snapesm](climate-snap.md), [esm](climate-esm.md) or [rembo](climate-rembo.md) | `grid_clim` |
+| Climate (atmosphere + ocean) | backend of `[comps] climate`: [snapshots](climate-snapshots.md), [esm](climate-esm.md) or [rembo](climate-rembo.md) | `grid_clim` |
 | Surface mass balance | chion (default), smbpal, `smb_simple` or the climate's own | `grid_surface` |
 | Sub-shelf melt | marine_shelf | `grid_shelf` |
 | Geometry hub | htopo | `grid_hub` (hi-res) |
@@ -45,10 +45,9 @@ The forcing of a run is set at runtime by its climate backend, `[comps] climate`
 
 | Backend | Supplies | Page |
 |---|---|---|
-| `snapclim` | atmosphere + ocean profiles, from climate snapshots blended by indices | [snapclim and snapesm](climate-snap.md) |
-| `snapesm` | as snapclim, configured as one blend model over any number of snapshots | [snapclim and snapesm](climate-snap.md) |
+| `snapshots` | atmosphere + ocean profiles, from climate snapshots blended by indices, one blend model over any number of snapshots | [Snapshots](climate-snapshots.md) |
 | `esm` | reference climatology + Earth-system-model anomalies; atmosphere or smb, ocean at the shelf base, subglacial discharge | [ESM forcing](climate-esm.md) |
-| `rembo` | REMBOv1 atmosphere + smb; ocean from snapclim | [REMBO climate](climate-rembo.md) |
+| `rembo` | REMBOv1 atmosphere + smb; ocean from snapshots (ocean-only snapshot) | [REMBO climate](climate-rembo.md) |
 
 ## Stepping order
 
@@ -60,6 +59,7 @@ call step_relax(dom, ts)          ! topography relaxation (relax)
 call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level (dt_isos cadence)
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
+call step_ice_bnd(dom, ts, idx)   ! prescribed ice in the fixed/relaxation cells ([ice_bnd])
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
 call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
@@ -74,57 +74,148 @@ consumed on the next step.
 The climate is refreshed on the `comps.dt_clim` cadence, isostasy on the
 `comps.dt_isos` cadence (the bedrock is held in between); the smb every step.
 
-## Transient time-series forcing (`tsgen`)
+## Indices and the homogeneous anomaly (`[indices]`, `[anom]`)
 
-`yelmox` can drive a spatially-homogeneous, time-varying anomaly into the climate
-(atmosphere and/or ocean) from the `tsgen` time-series generator (the modern
-replacement for the legacy `hyster` module). It is **driver-owned**: the program
-holds a `tsforcing_class` (`tsf`), advances it each step, and passes it to
-`step_climate` (and the cold start), which apply its `dTa` / `dTo` / `dSo`.
-
-Two namelist groups control it:
+**Indices** are named scalar series, each a `tsgen` time-series generator (the
+modern replacement for the legacy `hyster` module). They are **driver-owned**:
+the program holds one registry (`indices_class`, `idx`, libs/kryos_forcing.f90),
+advances every index once per step on the forcing clock `time_rel`, and passes
+it to `step_climate` (and the cold start); consumers read an index by name
+(the snapshots axes, `[anom]`). Multi-domain drivers share one registry.
 
 ```fortran
-&tsforcing
-    active = True     ! turn transient forcing on
-    f_ta   = 1.0      ! dTa = f_now * f_ta   (atmospheric temperature [K])
-    f_to   = 0.0      ! dTo = f_now * f_to   (ocean temperature [K])
-    f_so   = 0.0      ! dSo = f_now * f_so   (ocean salinity [psu])
+&indices
+    names = "ramp"            ! "" = no indices
 /
 
-&tsgen
-    method    = "ramp-time"   ! const | ramp-slope | ramp-time | ramp-time-step | sin | exp | PI42 | ...
+&idx_ramp                     ! a tsgen group (unset keys: template [idx])
+    method    = "ramp-time"   ! const | ramp-slope | ramp-time | ramp-time-step | sin | series | exp | PI42 | ...
     f_min     = 0.0
     f_max     = 5.0
     dt_ramp   = 200.0
-    ! ... (see tsgen.f90 for the full parameter set)
+    ! ... (see the [idx] template of input/yelmox_defaults.nml)
+    ! units = "K" (label of idx_<name> in the 1D output, default "1"),
+    ! restart_every_df = 0.5 (a restart bundle each |Δf|, default 0 = off)
+/
+
+&anom
+    active = True     ! a homogeneous anomaly from one index
+    index  = "ramp"
+    f_ta   = 1.0      ! dTa = f * f_ta   (air temperature [K])
+    f_to   = 0.0      ! dTo = f * f_to   (ocean temperature [K])
+    f_so   = 0.0      ! dSo = f * f_so   (ocean salinity [psu])
 /
 ```
 
-`tsgen` produces a single scalar `f_now`, which the `[tsforcing]` gains map onto
-the three anomalies. Time-driven methods (`ramp-*`, `sin`, `const`) are
-analytic; feedback methods (`exp`, PI/PID controllers) modulate the forcing rate
-from the model response — the response variable passed to `tsgen` is total ice
-volume (Gt).
+Time-driven methods (`ramp-*`, `sin`, `const`, `series`) are analytic or
+tabulated; feedback methods (`exp`, PI/PID controllers) modulate the forcing
+rate from the model response — the response variable passed to `tsgen` is
+total ice volume (Gt). The run stops when any index trips its kill switch
+(`with_kill`), and writes a restart bundle `restart-<n>` each time an index
+moves by more than its `restart_every_df`. Each index restarts from
+`idx_<name>_restart.nc` in the bundle, and is written to the 1D output as
+`idx_<name>` (plus `idx_<name>_df_dt`).
 
-How the anomalies reach the climate depends on the backend:
+`[anom]` is a climate modifier (libs/climate_mods.f90): applied to the
+backend's output after the backend, before `[ocn_fraction]`, `[ocn_obm]`,
+`[taper]` and `[bias]`, on the climate grid. Air temperature + `dTa`, precipitation × exp(β·`dTa`) (β the backend's
+precipitation sensitivity), ocean profiles + `dTo`/`dSo` (esm: at the shelf
+base). The group is optional (inactive without it) and takes the domain suffix
+(`anom<sfx>`). Checked at init: the index must be in the registry, and a
+backend that supplies the smb (esm with `surface_method = "climate"`) refuses
+it. rembo reads `[anom]` itself, as an input of REMBO (see
+[REMBO](climate-rembo.md)).
 
-| Backend | `dTa` / `dTo` / `dSo` |
-|---|---|
-| snapclim | used only in the `"anom"` methods (`snap.atm_type` for `dTa`, `snap.ocn_type` for `dTo`/`dSo`); ignored in the index-based methods (`snap_1ind_new`, `snap_2ind`, `hybrid`, …), as in the legacy `hyster` contract |
-| snapesm | added on top in every configuration |
-| esm | not used: the backend has its own forcing |
-| rembo | mapped onto REMBO's summer, annual and ocean anomalies (see [REMBO](climate-rembo.md)) |
+## Ocean anomaly from the atmosphere (`[ocn_fraction]`)
 
-With `active = False` (the default in the shipped configs) `step_climate`
-applies no anomalies.
+The climate modifier after `[anom]`: the ocean temperature profiles, at every
+depth, are the reference plus `f_to` times the mean sea-level air temperature
+anomaly of the current update over a region (salinity unchanged):
 
-## Climate bias correction (`[climate_bias]`)
+    to_ann = to_ann_ref + f_to * mean_region(tsl_ann - tsl_ann_ref)
 
-A static spatial correction of the atmosphere, applied on the climate grid to
-the monthly air temperature and precipitation of any backend except rembo
-(annual fields only), after the backend and before the move to the surface
-grid's elevation:
+The anomaly is that of the same update (no lag) and includes `[anom]`'s
+`dTa`; at sea level, it excludes the lapse-rate cooling of the ice sheet.
+
+```
+&ocn_fraction
+    active = True
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean
+/
+```
+
+`region` is `"all"` or a selection expression of the domain's regions on the
+climate grid (`[regions]`, resolved once at init), e.g. `"zone:open_ocean"`,
+`"zone:open_ocean,continental_shelf"`, `"region:Greenland"`, `"~zone:land"`
+(terms `layer:values` joined by `&` and `|`; see the fesm-utils regions docs).
+Its cell count is printed at init; an empty region stops the run. Refused for
+a backend without ocean profiles or sea-level air temperature (esm, rembo),
+and with `[anom] f_to /= 0` (both would set the ocean temperature anomaly).
+The anomaly is written to the climate's 2D file (`ocn_fraction_dto`). See
+[Snapshots](climate-snapshots.md).
+
+## Ocean from the ocean box model (`[ocn_obm]`)
+
+The climate modifier after `[ocn_fraction]`, for
+[`yelmox_bipolar`](yelmox-bipolar.md): the ocean temperature profiles, at every
+depth, from the box of the domain's hemisphere of the ocean box model
+(northern box `tn`, southern box `ts`); salinity unchanged:
+
+    absolute:  to_ann = box
+    anomaly:   to_ann = to_ann_ref + (box - box_init)
+
+```
+&ocn_obm_north
+    active = True
+    mode   = "absolute"   ! absolute | anomaly
+/
+```
+
+The one modifier not applied in the climate step: the driver that owns the box
+model applies it (`climate_mod_ocn_obm`) after both domains' climate steps and
+before their shelf steps; `active` is the switch of that exchange
+(`yelmox_bipolar` needs `[ctrl] active_obm`). `box_init` is the box's initial
+value of the par file (`tn_init`, `ts_init`), also after a restart. Refused for
+an ocean at the shelf base (esm), and with `[ocn_fraction]` or `[anom] f_to /= 0`
+(it replaces the ocean temperature). The box temperature and its anomaly are
+written to the climate's 2D file (`ocn_obm_theta`, `ocn_obm_dto`).
+
+## Regional taper to the reference (`[taper]`)
+
+The climate modifier after `[ocn_obm]` and before `[bias]`: the atmosphere
+towards the reference climate with a static weight field w in [0, 1] on the
+climate grid,
+
+    now = ref + w*(now - ref)
+
+for the monthly air temperature and precipitation, their annual means and the
+sea-level air temperature (those the backend supplies); w = 1 keeps the
+climate, w = 0 is the reference (e.g. outside the coverage of a
+reconstruction, w from its `f_valid`). The reference is taken at the current
+surface: a reference at its own elevation (snapshots: the surface of the
+reference snapshot) is moved there with the backend's monthly lapse rate and
+`beta_p`, as the climate itself. The ocean is unchanged. Refused for a backend
+without a reference atmosphere (rembo).
+
+```
+&taper
+    active   = True
+    var_defs = ""         ! files with the group below, searched in order, then this file
+    weight   = "taper_w"  ! var_defs group of w [1]: one 2D field (time = 0 0 0 0 1)
+/
+```
+
+The weight is a varslice group on the climate grid or remapped online
+(`remap`, `grid_src`); values outside [0, 1] (or missing) stop the run. It is
+written to the climate's 2D file (`taper_w`).
+
+## Climate bias correction (`[bias]`)
+
+A static spatial correction of the atmosphere, the last climate modifier,
+applied on the climate grid to the monthly air temperature and precipitation
+of any backend except rembo (annual fields only), before the move to the
+surface grid's elevation:
 
     tas = tas + f_tas*dtas,    pr = pr*(1 + f_pr*(fpr - 1))
 
@@ -133,9 +224,9 @@ of the annual totals); the reference climate and the ocean are unchanged. The
 group is optional; without it, or with `active = False`, nothing changes.
 
 ```
-&climate_bias
+&bias
     active   = True
-    var_defs = ""             ! file with the groups below ("" = this file)
+    var_defs = ""             ! files with the groups below, searched in order, then this file
     dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
     fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
     f_tas    = 1.0            ! weight of dtas
@@ -143,16 +234,96 @@ group is optional; without it, or with `active = False`, nothing changes.
 /
 ```
 
-`dtas` and `fpr` are varslice groups (as snapesm `var_defs`): one field for all
+`dtas` and `fpr` are varslice groups (as snapshots `var_defs`): one field for all
 months (`time = 0 0 0 0 1`) or 12 monthly fields (`time = 0 0 0 0 12`), on the
 climate grid or remapped online (`remap`, `grid_src`). The weighted annual
 fields are written to the climate's 2D file (`bias_dtas_ann`, `bias_fpr_ann`).
+
+## Insolation and orbit (`[orbit]`)
+
+The surface models that take the top-of-atmosphere insolation (chion's ITM and
+BESSI, smbpal's ITM) compute it with the [insol](https://github.com/fesmc/insol)
+library (a dependency, `libinsol.a`), the daily mean in closed form from the
+orbital elements of Laskar et al. (2004). `[orbit]` (one per domain,
+`[orbit_north]` in yelmox_bipolar) gives the elements; both surface models read
+it:
+
+```
+&orbit
+    method = "time"   ! clock: at the forcing clock time_rel; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0      ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+    ecc    = 0.016702 ! [1]   eccentricity (fixed)
+    obl    = 23.4393  ! [deg] obliquity (fixed)
+    per    = 102.918  ! [deg] longitude of perihelion (fixed)
+    fldr   = "input"  ! folder of the orbital tables
+/
+```
+
+`clock` follows the forcing clock (`ts%time_rel`: transient insolation with
+`tstep_method = "rel"`); `time` holds the orbit of one time (present day by
+default, the 1950 orbit); `fixed` takes the given elements (the defaults are the
+tables' at 1950). A fixed orbit is the one exception to the single forcing
+clock. Each model recomputes its insolation only when the elements change, so
+once per run unless `method = "clock"`. The par files list `method` and `time`;
+the other keys come from `input/yelmox_defaults.nml`.
+
+## Prescribed ice (`[ice_bnd]`)
+
+Yelmo prescribes the ice thickness in its fixed cells (`mask_ice` = 1:
+`H_ice = H_ice_ref`) and relaxes it towards `H_ice_ref` in its relaxation cells
+(`tau_relax > 0`, with `ytopo.topo_rel = -1`), set by `[yelmo_masks]`: a strip
+at the edge of the region where ice is allowed (`border_width = N M`: N fixed
+cells, then M relaxation cells with `relax_tau`), the expressions
+`mask_ice_fixed` and `relax`, or `yelmo.mask_border`. `[ice_bnd]` writes the
+thickness of an ice history into `H_ice_ref` in these cells, each step before
+`yelmo_update` (`step_ice_bnd`) and at the cold start; the interior keeps its
+`H_ice_ref` (the present-day ice):
+
+    file:    H_ice_ref = H_ice(time_rel)        (interpolated; the first or last slice outside the file)
+    scaled:  H_ice_ref = f * H_ice(slice_time)  (f an index, e.g. before the file starts)
+
+```
+&ice_bnd
+    active     = True
+    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order, then this file
+    method     = "file"               ! file | scaled
+    H_ice      = "paleomist_H_ice"    ! var_defs group of the ice thickness [m]
+    index      = ""                   ! scaled: the index f ([indices] names)
+    slice_time = -21e3                ! [yr] scaled: time of the slice
+/
+```
+
+`input/clim_db.nml` holds `paleomist_H_ice` (PaleoMIST 1.0, 80-0 ka every
+2.5 kyr) and `glac1d_H_ice` (GLAC-1D, 26-0 ka every 100 yr), the IceHistory
+products on the ice grid. The forcing clock is `time_rel` (a constant-time
+run holds the ice of `tstep_const`). At the cold start the isostasy
+reference is taken before (the present-day ice: the prescribed ice of another
+time is a load). With a time-varying border use `[barysealevel] method =
+"file"`: under `fastiso` the prescribed ice would add to the barystatic sea
+level. `H_ice_ref` is written to `yelmo.nc`. Example: `yelmox_GreenlandPaleo.nml`
+(GRL-PAL, `border_width = 2 4`, `mask_ice_dynamic = "all"`).
 
 ## Configuration
 
 A run is set by these namelist groups. Every key is required (a missing key stops
 the run), except the keys of an unselected `init_method` and the `[relax]` and
 `[opt]` groups when their switch in `[sim]` is off.
+
+The forcing groups have defaults: `input/yelmox_defaults.nml` declares every
+key of `[indices]`, `[idx_<name>]` (template `[idx]`: the tsgen keys, `units`,
+`restart_every_df`), the snapshot backend (`[snap]`, templates `[snap_field]`,
+`[snap_snapshot]`, `[snap_axis]`), the climate modifiers (`[anom]`,
+`[ocn_fraction]`, `[ocn_obm]`, `[taper]`, `[bias]`), the orbit of the insolation (`[orbit]`),
+`[ice_bnd]` and `[obm_forcing]` (yelmox_bipolar),
+with the domain suffix of a multi-domain driver
+(`[anom_north]` to `[anom]`). A par file lists only what differs; an absent
+group takes every default (a modifier is then inactive). Each read goes through
+`nml_read(..., defaults_file, defaults_group)` (the path in `libs/yelmox_nml.f90`),
+and a key not declared there stops the run (`nml_validate`).
+`scripts/check_par_nml.py` checks the yelmo groups against
+`input/yelmo_defaults.nml` and these groups against `input/yelmox_defaults.nml`
+offline (`--dead`: keys of the other groups that no source reads). The other
+yelmox groups below are read without defaults.
 
 | Group | Sets |
 |---|---|
@@ -191,7 +362,7 @@ A minimal skeleton:
     with_climate    = True
     with_surface    = True
     with_shelf      = True
-    climate         = "snapclim"
+    climate         = "snapshots"
     surface_method  = "chion"
     dt_clim         = 10.0
     dt_isos         = 10.0
@@ -236,8 +407,8 @@ The components: which are active, with which model, how often.
 | Key | Values | |
 |---|---|---|
 | `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
-| `climate` | `snapclim`, `snapesm`, `esm`, `rembo` | the climate backend |
-| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM, BESSI or PDD snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs; PDD's parameters are the group `[chion] nml_pdd` names, `[pdd_chion]` with `pdd_method = "cg05"` (Calov and Greve, 2005), smbpal's PDD; the surface temperature of ITM and PDD is chion's `chion_tsrf_annual`, the annual-mean air temperature warmed by `firn_fac` times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapclim, snapesm); the climate's own smb (esm, rembo; required by rembo) |
+| `climate` | `snapshots`, `esm`, `rembo` | the climate backend |
+| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM, BESSI or PDD snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs; PDD's parameters are the group `[chion] nml_pdd` names, `[pdd_chion]` with `pdd_method = "cg05"` (Calov and Greve, 2005), smbpal's PDD; the surface temperature of ITM and PDD is chion's `chion_tsrf_annual`, the annual-mean air temperature warmed by `firn_fac` times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapshots); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
 | `dt_isos` | [yr] | isostasy update interval (> 0; 10 in all par files): FastIsostasy integrates the whole interval in one call, the bedrock is held in between |
 
@@ -309,7 +480,7 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
 | `write_shelf` | `mshlf.nc` |
 | `write_surface` | the surface model's file, `<surface_method>.nc`: `chion.nc`, `smbpal.nc`, `smb_simple.nc`; none with `climate` (the climate's file has the smb, `smb_ann`, `tsrf_ann`) |
-| `write_clim` | the backend's file: `snap.nc` (snapclim, snapesm), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
+| `write_clim` | the backend's file: `snap.nc` (snapshots), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
 | `write_htopo` | `htopo.nc` (the hub) |
 | `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_shelf = grid_ice`) |
 

@@ -5,47 +5,32 @@ module ocean2ice
     implicit none
     
     private
-    public :: calc_ocean_temperature_field
-    public :: calc_ocean_salinity_field
+    public :: obm_temperature_kelvin
 
     integer,  parameter :: wp = kind(1.0)
 
 
 contains
 
-subroutine calc_ocean_temperature_field(orig_otf, obm_temp, name)
-    ! This subroutine computes a new ocean temperature field (otf)
+function obm_temperature_kelvin(obm_temp, name) result(t_K)
+    ! A box-model ocean temperature in K, the unit of the ice-sheet ocean
+    ! forcing: nautilus works in degC, stommel in K.
     implicit none
-    real(wp), allocatable :: orig_otf(:,:,:)
-    real(wp) :: obm_temp
-    character(len=512):: name
+    real(wp),         intent(in) :: obm_temp
+    character(len=*), intent(in) :: name
+    real(wp) :: t_K
     real(wp), parameter :: deg2kelvin = 273.15
 
-    select case(name)
+    select case(trim(name))
         case("stommel")
-            !orig_otf(:,:,:) = orig_otf(:,:,:) + obm_temp
-            orig_otf(:,:,:) = obm_temp
+            t_K = obm_temp
         case("nautilus")
-            !orig_otf(:,:,:) = orig_otf(:,:,:) + (obm_temp + deg2kelvin)
-            orig_otf(:,:,:) = obm_temp + deg2kelvin
+            t_K = obm_temp + deg2kelvin
         case DEFAULT
-            orig_otf(:,:,:) = -9999
+            write(*,*) "obm_temperature_kelvin:: error: unknown ocean box model '"//trim(name)//"'."
+            error stop 1
     end select
 
-    return 
-
-end subroutine calc_ocean_temperature_field
-
-subroutine calc_ocean_salinity_field(orig_osf, obm_salt)
-    ! This subroutine computes a new ocean salinity field (osf)
-    implicit none
-    real(wp), allocatable :: orig_osf(:,:,:)
-    real(wp) :: obm_salt
-
-    orig_osf(:,:,:) = obm_salt
-
-    return
-
-end subroutine calc_ocean_salinity_field
+end function obm_temperature_kelvin
 
 end module ocean2ice

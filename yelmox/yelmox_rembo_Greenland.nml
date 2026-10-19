@@ -21,7 +21,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapclim ocean
+    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapshots ocean ([snap])
     surface_method  = "climate" ! the smb from the climate (REMBO)
     dt_clim         = 10.0     ! [yr] climate update interval (= dtt: REMBO has its own intervals)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -114,15 +114,36 @@
 
 ! ===== Forcing =====
 
-&tsforcing
-    active           = False    ! Apply transient tsgen forcing? (was ctrl.use_hyster)
-    f_ta             = 1.0      ! [K] dT_sum = f_now * f_ta  (summer air; dT_ann = 1.3*dT_sum)
-    f_to             = 0.25     ! [K] dT_ocn = dT_ann * f_to (ocean, if snap ocn_type = "const")
-    f_so             = 0.0      ! [psu] unused by REMBO
-    restart_every_df = 0.0      ! [f] write a restart bundle each |Δf|; 0 = off
+&indices
+    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
+    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
+    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
+    ! from the template [idx] of input/yelmox_defaults.nml.
+    names  = ""       ! e.g. "at" "ramp"; "" = none
 /
 
-&tsgen
+&anom
+    ! Homogeneous anomaly from one index. rembo reads it itself, as an input of
+    ! REMBO (dT_sum), not as a modifier after the backend.
+    active = False    ! Apply it? (was ctrl.use_hyster)
+    index  = ""       ! the index driving the anomalies ([indices] names), e.g. "hyst"
+    f_ta   = 1.0      ! [K] dT_sum = f * f_ta  (summer air; dT_ann = 1.3*dT_sum)
+    f_to   = 0.25     ! [K] dT_ocn = dT_ann * f_to, added to the [snap] ocean
+    f_so   = 0.0      ! [psu] unused by REMBO
+/
+
+&ocn_fraction
+    ! Ocean temperature anomaly as a fraction of the mean sea-level air
+    ! temperature anomaly over a region, applied after [anom]: to_ann =
+    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
+    active = False    ! Apply it?
+    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
+    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+/
+
+&idx_hyst
+    ! Hysteresis template (not listed in [indices] names): add "hyst" to names
+    ! and set [anom] active = True, index = "hyst".
     method     = "PI42"     ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
     with_kill  = True       ! stop the run once the response equilibrates at a bound
     dt_init    = 200.0      ! [yr]  hold forcing flat during this initial interval
@@ -136,6 +157,13 @@
     f_min      = 0.0        ! [f]   lower forcing bound
     f_max      = 4.0        ! [f]   upper forcing bound
     f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+/
+
+&orbit
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
+    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
+    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
 /
 
 ! ===== Simulation options =====
@@ -546,97 +574,23 @@
 ! ===== Climate =====
 
 &snap
-    atm_type           = "snap_1ind_new"
-    ocn_type           = "const"
-    fname_at           = "input/alpha_orbital_r2020.dat"
-    fname_ao           = "input/alpha_orbital_r2020.dat"
-    fname_ap           = "input/alpha_orbital_r2020.dat"
-    fname_as           = "input/salinity_index_deglaciation.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
-    dSo_const          = 3.0
-    f_to               = 0.25 
-    f_p                = 0.06
-    f_stdev            = 0.0 
+    ! The ocean of the rembo climate: an ocean-only reference snapshot (ORAS5,
+    ! databases input/clim_db.nml), no axes; [anom] adds dT_ocn = dT_ann*f_to
+    ! to it. REMBO supplies the atmosphere, so no tas, pr, zs. Unset keys:
+    ! input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml"
+    ref_name   = "pd"
+    snapshots  = "pd"
 /
 
-&snap_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 0.3 
-    f_glac             = 1.0 
-    f_hol              = 0.5 
-    f_seas             = 1.0 
-    f_to               = 0.2
-/
-
-&snap_clim0
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
-    clim_names      = "z_srf" "t2m" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "tas" "sf" "rf"
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    !ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Ocean-ORAS5-1981-2010.nc"
-    ocn_path        = "none"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = True
-    ocn_time        = 0
-/
-
-&snap_clim1
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-piControl-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = 0
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
-/
-
-&snap_clim2
-    clim_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    clim_sigma      = 50.0                                                                   ! [km] smoothing of the PMIP3 atmosphere
-    ocn_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_Paleoclimate-PMIP3-lgm-mean.nc"
-    ocn_names       = "none" "none" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = -21000
-    ocn_sigma       = 50.0                                                                   ! [km] smoothing of the PMIP3 sst
-/
-
-&snap_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
+&snap_pd
+    to  = "oras5_1981_2010_to"    ! ORAS5 1981-2010, monthly climatology
+    so  = "oras5_1981_2010_so"
 /
 
 ! ===== Surface =====
 
 &smbpal
-    const_insol = True
-    const_kabp  = 0.0
-    insol_fldr  = "input"
     abl_method  = "pdd"   ! "itm" or "pdd"
     sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
     sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
