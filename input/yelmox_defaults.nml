@@ -74,7 +74,6 @@
 /
 
 &snap_field
-    kind  = ""          ! "" = the kind of the field: tas atm_temp, pr atm_precip, to ocn, so ocn_salt, zs elev
     blend = "linear"    ! linear | ratio | const (const and linear without axes: the reference)
     axes  = ""          ! the axes added to the reference ([snap] axes); "" = none
 /

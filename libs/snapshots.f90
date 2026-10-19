@@ -67,7 +67,7 @@ module snapshots
     ! One physical field in the registry (immutable after load).
     type field_spec_class
         character(len=32) :: name           ! "tas","pr","to","so","zs","smb","bmb_shlf",...
-        character(len=16) :: kind           ! "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
+        character(len=16) :: kind           ! from the name: "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
         character(len=16) :: blend          ! "linear" | "ratio" | "const"
         character(len=64) :: axes(AXS_MAX)  ! names of the axes of this field ("" = none)
@@ -802,36 +802,32 @@ contains
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
         fs%seasonal_synth = .FALSE.
-        ! Only the keys the current model uses are read (kind/blend/axes, template
+        ! Only the keys the current model uses are read (blend/axes, template
         ! snap_field); the remaining knobs (combine/enabled/*_flags) keep their
-        ! struct defaults. kind "" (default) is the kind of the field name.
+        ! struct defaults. The field name decides its kind.
         call nml_validate(filename, def_file, group, defaults_group="snap_field")
-        call nml_read(filename, group, "kind",  fs%kind,  init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_field")
         call nml_read(filename, group, "blend", fs%blend, init=.TRUE., &
                       defaults_file=def_file, defaults_group="snap_field")
         call nml_read(filename, group, "axes",  fs%axes,  init=.TRUE., &
                       defaults_file=def_file, defaults_group="snap_field")
         fs%n_axis = count(len_trim(fs%axes) > 0)
 
-        if (len_trim(fs%kind) == 0) then
-            select case(trim(name))
-                case("tas")
-                    fs%kind = "atm_temp"
-                case("pr")
-                    fs%kind = "atm_precip"
-                case("to")
-                    fs%kind = "ocn"
-                case("so")
-                    fs%kind = "ocn_salt"
-                case("zs")
-                    fs%kind = "elev"
-                case default
-                    write(*,*) "snapshots:: Error: &"//trim(group)//": unknown field '"// &
-                               trim(name)//"' (tas, pr, to, so, zs)."
-                    stop 1
-            end select
-        end if
+        select case(trim(name))
+            case("tas")
+                fs%kind = "atm_temp"
+            case("pr")
+                fs%kind = "atm_precip"
+            case("to")
+                fs%kind = "ocn"
+            case("so")
+                fs%kind = "ocn_salt"
+            case("zs")
+                fs%kind = "elev"
+            case default
+                write(*,*) "snapshots:: Error: &"//trim(group)//": unknown field '"// &
+                           trim(name)//"' (tas, pr, to, so, zs)."
+                stop 1
+        end select
 
         select case(trim(fs%blend))
             case("linear", "ratio", "const")
