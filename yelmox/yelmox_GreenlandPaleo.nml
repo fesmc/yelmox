@@ -162,10 +162,14 @@
 /
 
 &bias
-    ! Static bias correction of the atmosphere. Planned: MAR - ERA5 over
-    ! Greenland, a FesmData product on GRL-PAL (docs/_grl-paleo-plan.md,
-    ! "Reference climate on GRL-PAL"); not available yet.
-    active   = False    ! Apply it?
+    ! Static bias correction of the atmosphere: MAR v3.14 - ERA5 (1981-2010)
+    ! over Greenland, tapered to zero within 100 km outside the MAR coverage
+    ! (docs/_grl-paleo-plan.md, "Reference climate on GRL-PAL"). Made with
+    ! [snap] lapse and f_p = 0.06: remake it when these change.
+    active   = True     ! Apply it?
+    var_defs = "input/clim_db.nml"
+    dtas     = "bias_mar_era5_1981_2010_dtas"
+    fpr      = "bias_mar_era5_1981_2010_fpr"
 /
 
 &orbit
@@ -610,7 +614,7 @@
 &snap
     ! Snapshot backend (snapshots): present day only, ERA5 1981-2010 (atmosphere)
     ! and ORAS5 (ocean); a MAR-quality reference over Greenland comes with
-    ! [bias] (planned). Databases: input/clim_db.nml; unset keys:
+    ! [bias]. Databases: input/clim_db.nml; unset keys:
     ! input/yelmox_defaults.nml.
     snapshots  = "pd"
     f_p        = 0.06

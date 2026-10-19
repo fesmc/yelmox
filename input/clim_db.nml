@@ -152,6 +152,26 @@
     time     = 0 0 0 0 1
 /
 
+! ---- Bias MAR v3.14 - ERA5, 1981-2010, GreenlandPaleo, monthly ([bias]) ----
+! ice_data, made by scripts/grl-paleo/make_bias_mar_era5.jl: at sea level with
+! [snap] lapse = 0.0080 0.0065 and f_p = 0.06 (file attributes).
+
+&bias_mar_era5_1981_2010_dtas
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_BIAS-MARv3.14-ERA5-1981-2010.nc"
+    name     = "dtas"
+    units    = "K" "K"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
+&bias_mar_era5_1981_2010_fpr
+    filename = "ice_data/{domain}/{grid_name}/{grid_name}_BIAS-MARv3.14-ERA5-1981-2010.nc"
+    name     = "fpr"
+    units    = "1" "1"
+    scaling  = 1.0 0.0
+    time     = 0 0 0 0 1
+/
+
 ! ---- ORAS5, 1981-2010 (any domain), monthly climatology (month, depth) ----
 
 &oras5_1981_2010_to
