@@ -177,6 +177,13 @@
     region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
 /
 
+&orbit
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm): method =
+    ! "clock" (at the forcing clock), "time" (at a fixed time [yr], model time)
+    ! or "fixed" (ecc, obl, per); unset keys from input/yelmox_defaults.nml
+    ! (method = "time", time = 0.0: present day).
+/
+
 ! ===== Simulation options =====
 
 &relax
@@ -618,9 +625,6 @@
 ! ===== Surface =====
 
 &smbpal
-    const_insol = True
-    const_kabp  = 0.0
-    insol_fldr  = "input"
     abl_method  = "pdd" !"itm"   ! "itm" or "pdd"
     sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
     sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
@@ -664,9 +668,6 @@
 
 &surface_chion
     ! Host side of chion (surface_method = "chion"): forcing chion does not own.
-    const_insol = True    ! Insolation at const_kabp instead of the model time
-    const_kabp  = 0.0     ! [kyr BP] Insolation time when const_insol
-    insol_fldr  = "input" ! Folder of the orbital-parameter tables
     sf_a        = 0.273   ! Snow fraction function (parameter a)
     sf_b        = 273.6   ! Snow fraction function (parameter b)
     sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs (itm)
