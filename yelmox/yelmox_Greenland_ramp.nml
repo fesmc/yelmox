@@ -166,10 +166,10 @@
 /
 
 &orbit
-    ! The orbit of the insolation (chion itm/bessi, smbpal itm): method =
-    ! "clock" (at the forcing clock), "time" (at a fixed time [yr], model time)
-    ! or "fixed" (ecc, obl, per); unset keys from input/yelmox_defaults.nml
-    ! (method = "time", time = 0.0: present day).
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
+    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
+    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
 /
 
 ! ===== Simulation options =====
