@@ -24,6 +24,11 @@ through the sea level and an ocean box model.
   ([ESM forcing](climate-esm.md)), `yelmox_rembo_Greenland.nml`
   ([REMBO](climate-rembo.md)), `yelmox_Greenland_ramp.nml` (an air temperature
   ramp: `[anom]` on a `ramp-slope` index).
+- **Experiments:** [Greenland](experiment-greenland.md),
+  [Antarctica](experiment-antarctica.md), [ISMIP7 projections](experiment-ismip7.md),
+  [1pctCO2](experiment-1pctco2.md), [TIPMIP](experiment-tipmip.md),
+  [Antarctic paleo](experiment-ant-paleo.md), [Greenland paleo](experiment-grl-paleo.md),
+  [Laurentide](experiment-laurentide.md), [Mountain glaciers](experiment-mountain.md).
 
 ## Components
 
@@ -62,7 +67,7 @@ call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_ice_bnd(dom, ts, idx)   ! prescribed ice in the fixed/relaxation cells ([ice_bnd])
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
-call step_climate(dom, ts, tsf)   ! climate (dt_clim cadence)
+call step_climate(dom, ts, idx)   ! climate (dt_clim cadence)
 call step_surface(dom, ts)        ! surface mass balance + temperature
 call step_shelf(dom, ts)          ! shelf-base melt + temperature
 ```
@@ -192,23 +197,42 @@ climate grid,
 for the monthly air temperature and precipitation, their annual means and the
 sea-level air temperature (those the backend supplies); w = 1 keeps the
 climate, w = 0 is the reference (e.g. outside the coverage of a
-reconstruction, w from its `f_valid`). The reference is taken at the current
+reconstruction). The reference is taken at the current
 surface: a reference at its own elevation (snapshots: the surface of the
 reference snapshot) is moved there with the backend's monthly lapse rate and
 `beta_p`, as the climate itself. The ocean is unchanged. Refused for a backend
 without a reference atmosphere (rembo).
+
+`outside` sets the climate where w < 1:
+
+- `"ref"` (default): towards the reference, as above;
+- `"mean"`: towards the reference plus the mean anomaly of the cells with
+  w = 1, per month,
+
+      tas = tas_ref + w*(tas - tas_ref) + (1 - w)*dT(m)
+      pr  = w*pr + (1 - w)*pr_ref*f(m)
+
+  with dT(m) the mean temperature difference and f(m) the ratio of the
+  precipitation totals over the cells with w = 1 (both against the reference
+  at the current surface); `ta_ann` and `tsl_ann` take the mean of dT(m),
+  `pr_ann` the ratio of the annual totals. A weight without cells at w = 1
+  stops the run.
 
 ```
 &taper
     active   = True
     var_defs = ""         ! files with the group below, searched in order, then this file
     weight   = "taper_w"  ! var_defs group of w [1]: one 2D field (time = 0 0 0 0 1)
+    outside  = "ref"      ! ref | mean: where w < 1, towards the reference (plus the mean anomaly of the cells with w = 1)
 /
 ```
 
 The weight is a varslice group on the climate grid or remapped online
 (`remap`, `grid_src`); values outside [0, 1] (or missing) stop the run. It is
-written to the climate's 2D file (`taper_w`).
+written to the climate's 2D file (`taper_w`). `input/clim_db.nml` holds
+`taper_b18_b20`, the weight of the Greenland reconstructions on GreenlandPaleo
+(1 in their coverage, 0 beyond 100 km; `outside = "mean"` in
+`yelmox_GreenlandPaleo_lgm.nml` and `yelmox_GreenlandPaleo_deglac.nml`).
 
 ## Climate bias correction (`[bias]`)
 
@@ -329,7 +353,8 @@ yelmox groups below are read without defaults.
 |---|---|
 | `[ctrl]` | the run: its timeline group, calendar years, the restart bundle to start from |
 | timeline group (`[ctrl] run_step`) | the timeline: `tstep_method`, `tstep_const`, `time_init`, `time_end`, `dtt` |
-| `[domain]` | the domain: name, grid of every component, hub topography and masks (see [Multigrid coupling](multigrid.md)) |
+| `[domain]` | the domain: name, physical constants, grid of every component, basin set of the hub (`basins`) (see [Multigrid coupling](multigrid.md)) |
+| `[topo]`, `[regions]` | the hub topography; the regions, zones, basins and named masks (`masks`, `mask_<name>`) |
 | `[comps]` | the components: which are active, with which model, how often |
 | `[sim]` | the conditions of this simulation: cold-start ice state, relaxation, optimization, regional modifications |
 | `[relax]`, `[opt]` | the parameters of the relaxation and the optimization switched on in `[sim]` |
@@ -481,7 +506,7 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 
 | Key | Files |
 |---|---|
-| `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<region>.nc` for the named regions of `[domain]`) |
+| `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<name>.nc` for the named masks of `[regions]`) |
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
 | `write_shelf` | `mshlf.nc` |
 | `write_surface` | the surface model's file, `<surface_method>.nc`: `chion.nc`, `smbpal.nc`, `smb_simple.nc`; none with `climate` (the climate's file has the smb, `smb_ann`, `tsrf_ann`) |

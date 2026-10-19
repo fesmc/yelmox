@@ -21,10 +21,12 @@ ocean-only reference snapshot).
   (after the climate modifiers): the annual air temperature and its summer
   mean (`t2m_ann`, `t2m_sum`), the annual precipitation, the ocean profiles
   (`to_ann`, `so_ann` on `depth`), the position on each axis (`axis_<name>`),
-  the surface elevation, the monthly atmosphere (`tas`, `pr`) and `tsl_ann`.
+  the surface elevation, the monthly atmosphere (`tas`, `pr`), `tsl_ann` and
+  the diagnostics of the active climate modifiers.
 
-The climate modifiers `[anom]` and `[ocn_fraction]` (see [yelmox](yelmox.md))
-apply after the backend.
+The climate modifiers `[anom]`, `[ocn_fraction]`, `[taper]` and `[bias]` (see
+[yelmox](yelmox.md)) apply after the backend, in this order; `[ocn_obm]` is
+applied by `yelmox_bipolar`.
 
 ## Configuration
 
@@ -103,7 +105,28 @@ remapped online onto the climate grid (`remap = "bilin"`, the map cached in
 | `Paleoclimate-PMIP3-{exp}-mean` | lgm, midHolocene, piControl | `pmip3_mean_{tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
 | `Paleoclimate-PMIP4-{exp}-mean` | lgm, midHolocene, piControl | `pmip4_mean_{tas_mon,pr_mon,tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
 | `Paleoclimate-CLIMBER3a-{exp}`, `-ocean` | present, lgm_1p7weak, lgm_1p7strong | `c3a_{tas_ann,tas_jja,pr_ann,zs}`, `c3a_to` |
-| `Paleoclimate-CLIMBERX-Willeit2025-{exp}`, `-ocean` | piControl, interstadial, stadial, heinrich | `cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}`, `cx_{tas_mon_anom,pr_mon_anom}` (anomalies to piControl, for `lo = ""` axes), `cx_{to,so}` |
+| `Paleoclimate-CLIMBERX-Willeit2025-{exp}`, `-ocean` | piControl, interstadial, stadial, heinrich | `cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}`, `cx_{tas_mon_anom,pr_mon_anom}` (anomalies to piControl, for `lo = ""` axes; `pr_mon_anom` is a difference in mm d-1, not a ratio), `cx_{to,so}` |
+
+The Greenland reconstructions are regional products on GRL-16KM, remapped
+online (`grid_src = "GRL-16KM"`) and filled from the nearest cell outside
+their box (`fill = "nearest"`, e.g. on GRL-PAL):
+
+| Product (FesmData) | Time axis | Groups |
+|---|---|---|
+| `Paleoclimate-Buizert2018` | monthly, every 10 yr, -22005 to 55 yr (22005 BP to 2005 CE) | `b18_{tas,pr}` (time-varying), `b18_zs` (static) |
+| `Paleoclimate-Buizert2018-1981-2010` | none (its 1981-2010 baseline) | `b18_1981_2010_{tas,pr,zs}` |
+| `Paleoclimate-Badgeley2020` | annual, every 50 yr, 20 ka to 0 | `b20_tas_anom` [K], `b20_pr_frac`, `b20_pr_frac_low`, `b20_pr_frac_high` (anomaly and ratios relative to 1850-2000 CE, for `lo = ""` axes) |
+
+The database also holds the groups of the climate modifiers (`[bias]`:
+`bias_mar_era5_1981_2010_{dtas,fpr}`; `[taper]`: `taper_b18_b20`) and the ice
+histories of `[ice_bnd]` (`paleomist_H_ice`, `glac1d_H_ice`).
+
+**Time-varying groups.** A group with a time axis (`time = 1 x0 x1 dx nsub`)
+is sliced at the forcing clock `time_rel` at the start and at every climate
+update: linear interpolation between the two bracketing records, the first or
+last record outside the axis (varslice `extrap`). Its snapshot is then reduced
+to sea level again (and the reference reset, if it is the reference). A group
+without a time axis (`time = 0 ...`) is read once at the start.
 
 ```fortran
 &snap_pd
@@ -186,10 +209,10 @@ no elevation correction of their own). If it binds `zs`, it is reduced to sea
 level like any other snapshot.
 
 ```fortran
-&snap_axis_recon
+&snap_axis_b20                ! yelmox_GreenlandPaleo_deglac.nml
     lo    = ""
-    hi    = "badgeley"      ! snapshot binding tas (anomaly) and pr (ratio), no zs
-    index = "one"
+    hi    = "b20"             ! snapshot binding tas (anomaly) and pr (ratio), no zs
+    index = "one"             ! a const index, f = 1
 /
 ```
 

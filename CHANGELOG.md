@@ -6,6 +6,14 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- `scripts/run_chunks.sh`: a long run as a chain of short Slurm jobs (each chunk restarts from
+  the bundle of the previous one at its `time_end`; `afterok` dependencies; overrides for the
+  first or later chunks, e.g. `sim.relax=False`, `ytrc.elsa_restart=True`); docs page
+  `run-chunks.md`.
+- `scripts/docs-figures/`: climate-only runs of the test cases and the forcing figures of the
+  docs pages (`docs/figures/`).
+- Docs: experiment pages for Greenland, Antarctica, 1pctCO2, TIPMIP, Laurentide/North America
+  and mountain glaciers; existing pages checked against the code.
 - Prescribed ice `[ice_bnd]` (`libs/ice_bnd.f90`, optional): Yelmo's `H_ice_ref` in its
   fixed and relaxation cells (e.g. the yelmo `yelmo_masks.border_width` strip) from an ice
   history, `method = "file"` (at the forcing time, clamped to the file's range) or

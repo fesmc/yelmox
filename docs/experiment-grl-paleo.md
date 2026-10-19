@@ -54,7 +54,9 @@ scripts/grl-paleo/run_deglac.sh
 `run_deglac.sh [lgm_path] [output_path]` restarts from
 `<lgm_path>/restart-20.000-kyr` and writes to `output/grl-paleo/deglac` (the
 bundles are passed as absolute paths; the scripts stop if one is missing). All
-submit to the `shared` queue (2 days, 10 GB, no OpenMP).
+submit to the `shared` queue (2 days, 10 GB, no OpenMP). On a busy cluster, run
+them as chains of short jobs instead: [Long runs in chunks](run-chunks.md) has
+the commands.
 
 ## Domain borders
 
@@ -94,6 +96,8 @@ from the yelmox root (`fesmdata` and `ice_data` links in place; options `--res`,
 rates and `f_p` are written as attributes: remake the file when `[snap] lapse` or
 `f_p` change.
 
+![Present-day climate of yelmox_GreenlandPaleo.nml (ERA5 1981--2010 with the MAR -- ERA5 bias), climate-only run: annual and summer air temperature, annual precipitation.](figures/grlpal_pd.png)
+
 ## A. Spin-up
 
 - **Timeline:** `[ctrl]` 0 to 15 kyr, `dtt = 10` yr, present-day insolation
@@ -115,6 +119,9 @@ rates and `f_p` are written as attributes: remake the file when `[snap] lapse` o
   the mean sea-level air temperature anomaly (`[ocn_fraction]`). Insolation varies
   in time (`[orbit] method = "clock"`).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
+
+![Forcing of yelmox_GreenlandPaleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grlpal_a.png)
+
 - **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_grl_paleo]`): one
   layer every 1 kyr, coupled every 50 yr (for comparison with MacGregor et al., 2025).
 - **Output:** 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.
@@ -152,6 +159,8 @@ the climate is the present-day reference plus that mean anomaly.
 The ocean anomaly is `f_to = 0.25` times the mean sea-level air temperature
 anomaly (`[ocn_fraction]`); sea level from `input/sl_deglaciation.dat`;
 insolation at the forcing clock (`[orbit] method = "clock"`).
+
+![Forcing of yelmox_GreenlandPaleo_deglac.nml at 21 ka and 12.5 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio. West of the GRL box: the mean anomaly of the reconstructions.](figures/grlpal_b.png)
 
 ## B. LGM spin-up
 
