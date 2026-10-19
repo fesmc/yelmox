@@ -64,8 +64,12 @@ The west border cuts Baffin Island and the Canadian Arctic Archipelago, where
 Innuitian and Laurentide ice crosses it in glacial periods. The borders are
 "infinite" (`[yelmo] experiment = "infinite"`, `mask_border = "dynamic"`): the
 outermost cells take the thickness of their inner neighbours, so the border ice
-thickens and thins with the interior. No ice enters from outside the domain: the
-ice west of the border is what the local climate builds.
+thickens and thins with the interior. Ice flows out through the border but not
+in (the outflow is booked in `mb_resid`): the ice west of the border is what the
+local climate builds. Before Yelmo fixed this (2026-10-19), the border cells fed
+the interior wherever the flow pointed inwards, without limit and unbooked; in
+the first B LGM spin-up this inflow grew exponentially (above the domain SMB
+after ~8 kyr) and piled ice up to 10 km at the front in northern Baffin Bay.
 
 Prescribed border ice is the alternative (not used now): a
 strip of fixed and relaxation cells (`[yelmo_masks] border_width = N M`, e.g.
