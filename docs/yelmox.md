@@ -398,7 +398,12 @@ A restart bundle is a folder `restart-<kyr>-kyr/`, written on the `[tm_rst]`
 schedule and always at `time_end`. It holds one restart file per stateful model,
 the shared sea level and the transient-forcing state (in `yelmox_bipolar` also the
 ocean box model, with each domain in a subfolder named after it). Pass `restart`
-as an absolute path: the run starts inside its own folder.
+as an absolute path: the run starts inside its own folder. A restart continues the
+run bit for bit: the state is restored, not stepped again (the surface restart
+files carry the annual fields of the last cycle); only the climate is re-derived
+from it, which equals the run's own when the restart time lies on its `dt_clim`
+cadence (counted from the start of the run, as are `dt_isos` and the `[relax]`,
+`[opt]` time windows).
 
 ### `[comps]`
 

@@ -311,7 +311,9 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
   (`tstep_method`, `dtt`) itself.
 - **`domain_startup(dom, ts, bsl, restart, idx [, restore_bsl, tsf])`**
   (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
-  restore of the domain bundle `restart` + hub rebuild. The driver reads
+  restore of the domain bundle `restart` + hub rebuild, continuing the
+  restored state: only the climate (and a stateless `smb_simple` surface) is
+  re-derived, nothing is stepped. The driver reads
   `[ctrl] restart`. `yelmox` restores the shared bsl from the same bundle;
   `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
   each domain its subfolder of the bundle and `restore_bsl=.false.`.
