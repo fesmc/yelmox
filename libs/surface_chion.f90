@@ -48,6 +48,7 @@ module surface_chion
     ! trans_sw). PDD takes the air temperature and the snowfall/rainfall only.
 
     use nml,        only : nml_read
+    use ncio,       only : nc_open, nc_close, nc_write, nc_read, nc_exists_var
     use phys_constants, only : phys_const_class, sec_day
     use insolation, only : insol_class, insol_init, calc_insol_days, insol_wp => wp
     use orbit_forcing, only : orbit_ctl_class, orbit_pars_class, orbit_ctl_load, &
@@ -395,22 +396,100 @@ contains
     end subroutine surface_chion_update
 
     subroutine surface_chion_restart_write(sc, filename, time)
+        ! chion's prognostic state (chion_restart_write), plus the annual fields
+        ! of the last annual cycle (sc%ann, on chion's `column` dimension as
+        ! ann_<name>): they are the surface output Yelmo receives at the next
+        ! step (the one-step coupling lag) and cannot be rebuilt from the state
+        ! without stepping it another year.
         type(surface_chion_class), intent(in) :: sc
         character(len=*),          intent(in) :: filename
         real(dp),                  intent(in) :: time
 
+        integer :: ncid
+
         call chion_restart_write(sc%chn, filename, time)
+
+        call nc_open(filename, ncid, writable=.true.)
+        call write_ann("mask",   sc%ann%mask,   "1",          "chion active (land or ice)")
+        call write_ann("t2m",    sc%ann%t2m,    "K",          "Near-surface air temperature")
+        call write_ann("pr",     sc%ann%pr,     "mm w.e./yr", "Precipitation")
+        call write_ann("sf",     sc%ann%sf,     "mm w.e./yr", "Snowfall")
+        call write_ann("S",      sc%ann%S,      "W m-2",      "TOA insolation")
+        call write_ann("PDDs",   sc%ann%PDDs,   "K d",        "Positive degree days")
+        call write_ann("melt",   sc%ann%melt,   "mm w.e./yr", "Melt")
+        call write_ann("runoff", sc%ann%runoff, "mm w.e./yr", "Runoff")
+        call write_ann("refrz",  sc%ann%refrz,  "mm w.e./yr", "Refreezing")
+        call write_ann("smb",    sc%ann%smb,    "mm w.e./yr", "Surface mass balance (sf+rf-runoff-subl)")
+        call write_ann("tsrf",   sc%ann%tsrf,   "K",          "Surface temperature")
+        call write_ann("alb_s",  sc%ann%alb_s,  "1",          "Surface albedo")
+        call write_ann("H_snow", sc%ann%H_snow, "mm w.e.",    "Snowpack thickness (end of year)")
+        call nc_close(ncid)
+
+    contains
+
+        subroutine write_ann(name, var, units, long_name)
+            character(len=*), intent(in) :: name, units, long_name
+            real(wp),         intent(in) :: var(:,:)
+
+            call nc_write(filename, "ann_"//name, reshape(var, [sc%ncol]), dim1="column", dim2="time", &
+                          start=[1,1], units=units, long_name="Annual "//long_name, &
+                          grid_mapping="", ncid=ncid)
+        end subroutine write_ann
+
     end subroutine surface_chion_restart_write
 
-    subroutine surface_chion_restart_read(sc, filename)
-        ! Snowpack state (and active mask) from a chion restart file; the annual
-        ! fields are rebuilt by the next surface_chion_update.
+    subroutine surface_chion_restart_read(sc, filename, ann_restored)
+        ! chion's prognostic state (and active mask) and the annual fields of
+        ! the last annual cycle from a restart file written by
+        ! surface_chion_restart_write. ann_restored is false for a file without
+        ! the annual fields (written before they were added): sc%ann is then
+        ! unset and the host must rebuild it with an annual update, which
+        ! steps the snowpack one extra year (the restart is not exact).
         type(surface_chion_class), intent(inout) :: sc
         character(len=*),          intent(in)    :: filename
+        logical,                   intent(out)   :: ann_restored
 
         real(dp) :: time_file
+        integer  :: ncid
 
         call chion_restart_read(sc%chn, filename, time_file)
+
+        ann_restored = nc_exists_var(filename, "ann_smb")
+        if (.not. ann_restored) then
+            write(*,*) "surface_chion_restart_read:: warning: "//trim(filename)//" has no annual &
+                       &fields (ann_*); they are rebuilt by an annual update, so the restart is &
+                       &not exact."
+            return
+        end if
+
+        call nc_open(filename, ncid, writable=.false.)
+        call read_ann("mask",   sc%ann%mask)
+        call read_ann("t2m",    sc%ann%t2m)
+        call read_ann("pr",     sc%ann%pr)
+        call read_ann("sf",     sc%ann%sf)
+        call read_ann("S",      sc%ann%S)
+        call read_ann("PDDs",   sc%ann%PDDs)
+        call read_ann("melt",   sc%ann%melt)
+        call read_ann("runoff", sc%ann%runoff)
+        call read_ann("refrz",  sc%ann%refrz)
+        call read_ann("smb",    sc%ann%smb)
+        call read_ann("tsrf",   sc%ann%tsrf)
+        call read_ann("alb_s",  sc%ann%alb_s)
+        call read_ann("H_snow", sc%ann%H_snow)
+        call nc_close(ncid)
+
+    contains
+
+        subroutine read_ann(name, var)
+            character(len=*), intent(in)    :: name
+            real(wp),         intent(inout) :: var(:,:)
+
+            real(wp) :: col(sc%ncol)
+
+            call nc_read(filename, "ann_"//name, col, start=[1,1], count=[sc%ncol,1], ncid=ncid)
+            var = reshape(col, [sc%nx, sc%ny])
+        end subroutine read_ann
+
     end subroutine surface_chion_restart_read
 
     subroutine surface_chion_end(sc)

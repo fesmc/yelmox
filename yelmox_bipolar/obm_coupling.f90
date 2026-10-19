@@ -162,28 +162,31 @@ contains
         end if
     end subroutine obm_coupling_init
 
-    subroutine obm_ocean_init(oc, obm, dom_north, dom_south, active_north, active_south, ts)
+    subroutine obm_ocean_init(oc, obm, dom_north, dom_south, active_north, active_south, ts, &
+                              cold_start)
         ! The domains' ocean from the box model at the start of the run (cold
-        ! start or restart), as after every exchange (ocn_obm<sfx>), and their
-        ! shelf forcing from it: the domains' startup ran their shelf step on
-        ! the backend's ocean, so the first record and the first step would
-        ! otherwise miss the box.
+        ! start or restart), as after every exchange (ocn_obm<sfx>). On a cold
+        ! start also their shelf forcing from it: the domains' startup ran their
+        ! shelf step on the backend's ocean, so the first record and the first
+        ! step would otherwise miss the box. A restart restored the shelf state
+        ! the run held, computed from the box.
         type(obm_coupling_ctl), intent(in)    :: oc
         type(obm_class),        intent(in)    :: obm
         type(kryos_domain),     intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         type(tstep_class),      intent(in)    :: ts
+        logical,                intent(in)    :: cold_start
 
         if (active_north) then
             if (dom_north%cl%mods%ocn_obm%active) then
                 call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
-                call step_shelf(dom_north, ts)
+                if (cold_start) call step_shelf(dom_north, ts)
             end if
         end if
         if (active_south) then
             if (dom_south%cl%mods%ocn_obm%active) then
                 call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
-                call step_shelf(dom_south, ts)
+                if (cold_start) call step_shelf(dom_south, ts)
             end if
         end if
     end subroutine obm_ocean_init
