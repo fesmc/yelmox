@@ -49,6 +49,15 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Snapshots: one monthly lapse rate both ways. The inflation of the blended sea-level
+  fields to the model surface (`snapshots_transform`, also the surface hosts' monthly lapse
+  rates) used the seasonal cosine at phase `m*30-15`, the sea-level reduction of a snapshot
+  at `m*30-30` (as the season synthesis, `cos(2π(m-1)/12)`: summer lapse rate in July, or
+  January in the south). Both now use `lapse_monthly` on the calendar of the synthesis, so a
+  snapshot at its own elevation is recovered exactly (the `taper` reference was off by
+  `z_srf*(lapse(1)-lapse(2))*(cos(φ-15°)-cos(φ-30°))`). Monthly `tas` at the surface changes by
+  up to ~0.4 K per km of elevation in spring/autumn (sign alternating, zero in the annual
+  mean to first order); summer `tas` and `smb` change slightly.
 - Index window modifier (fesm-utils tsgen `win_t0`, `win_t1`, `win_taper`, `win_fac`, `win_ref`,
   `win_above` in `[idx_<name>]`; replaces the snapclim `f_hol` rule) and the RNG state in
   the index restart files (noisy indices continue identically after a restart). Needs fesm-utils
@@ -651,6 +660,10 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `maps/grid_SRG-250M.txt` is the FesmData v2 SRG-250M grid (208 x 120, as the product
+  regenerated on 2026-10-16, which now shares the grid of the legacy `ice_data` SRG inputs);
+  it held a stale 257 x 129 description. `yelmox_SRG.nml` runs every component on
+  `SRG-250M`; `maps/grid_SRG-250M-v1.txt` removed.
 - `const_kabp` (surface_chion, smbpal) is kyr BP: the constant insolation used the orbit at
   +const_kabp kyr (future) instead of -const_kabp kyr. No effect for `const_kabp = 0` or
   model-time insolation.
