@@ -15,7 +15,9 @@ annotated git tag. Dates are release (tag) dates.
   with `border_width`. `H_ice_ref` is in `yelmo.nc`. `input/yelmo_defaults.nml` synced.
 - Climate modifier `[taper]` (optional), between `ocn_obm` and `bias`: the atmosphere
   towards the reference with a static weight field, `now = ref + w*(now - ref)` (the
-  reference at the current surface); refused for rembo.
+  reference at the current surface); refused for rembo. `outside = "mean"`: where `w < 1`
+  towards the reference plus the mean anomaly of the cells with `w = 1` (per month;
+  precipitation by the ratio of the totals) instead of the reference.
 - `yelmox/yelmox_GreenlandPaleo.nml`: base config on GreenlandPaleo (GRL-PAL-16KM): ERA5 +
   ORAS5 present day with the MAR - ERA5 bias over Greenland (`[bias]`), "infinite" borders
   (`[yelmo] experiment = "infinite"`, `mask_border = "dynamic"`: the border ice follows its
@@ -25,7 +27,14 @@ annotated git tag. Dates are release (tag) dates.
   `yelmox_GreenlandPaleo_spinup.nml` (15 kyr, `cb_ref`/`tf_corr` optimization),
   `yelmox_GreenlandPaleo_lgp.nml` (-130 kyr to 0, PMIP3 piControl/LGM on the glacial index
   `alpha_combined_125kyr_interp`, `ocn_fraction`, transient insolation, elsa),
-  `scripts/grl-paleo/run_spinup.sh`, `run_lgp.sh`.
+  `scripts/grl-paleo/run_spinup.sh`, `run_lgp.sh`. No optimization.
+- Greenland deglaciation after Tabone et al. (2024): `yelmox_GreenlandPaleo_lgm.nml` (cold
+  start from GLAC-1D at 21 ka, 20 kyr at constant -21 ka), `yelmox_GreenlandPaleo_deglac.nml`
+  (-21 ka to 0, elsa), `run_lgm_spinup.sh`, `run_deglac.sh`: Buizert et al. (2018)
+  temperature (axis `b18`) and Badgeley et al. (2020) precipitation (axis `b20`, `lo = ""`)
+  on ERA5 + bias, `[taper] outside = "mean"` beyond the GRL box. `clim_db.nml`: `b18_*`,
+  `b20_*` (GRL-16KM products remapped online, nearest fill), `taper_b18_b20` (ice_data, made
+  by `scripts/grl-paleo/make_taper_recon.jl`).
 - MAR v3.14 - ERA5 1981-2010 bias on GRL-PAL for `[bias]`: `scripts/grl-paleo/make_bias_mar_era5.jl`
   (difference at sea level with the `[snap]` lapse rates and `f_p`; outside the MAR coverage
   the 50 km-smoothed bias tapered to zero over 100 km), written to

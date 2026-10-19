@@ -243,7 +243,9 @@ Superseding the decisions above where they differ:
 4. B forcing: Buizert temperature (axis `b18`, lo = its 1981-2010 baseline),
    Badgeley precipitation (axis `b20`, lo = ""), constant index `one`; online
    remap from GRL-16KM with nearest fill, `[taper]` weight from the coverage
-   (ice_data, `make_taper_recon.jl`, 100 km). Ocean: `ocn_fraction` only so far.
+   (ice_data, `make_taper_recon.jl`, 100 km) with `outside = "mean"`: beyond
+   the coverage the mean anomaly of the coverage, not the reference.
+   Ocean: `ocn_fraction` only so far.
 5. Reference climate: MAR - ERA5 bias as a hand-built file in ice_data
    (`make_bias_mar_era5.jl`), not a FesmData product.
 6. Checked: Buizert (x, y, month, time) is read by varslice with the month as

@@ -139,13 +139,15 @@ read in time on the forcing clock (`extrap`: the first slice before the
 record starts, e.g. Badgeley at 20 ka during the LGM spin-up).
 
 The reconstructions are GRL-16KM products, remapped online onto GRL-PAL and
-filled from the nearest cell outside the GRL box. `[taper]` brings the
-atmosphere back to the reference there: `w = 1` in the coverage of both, a
+filled from the nearest cell outside the GRL box. `[taper]` with `outside =
+"mean"` replaces the anomaly there by the mean anomaly of the coverage (per
+month: the temperature difference and the precipitation ratio of the totals,
+recomputed at every climate update): `w = 1` in the coverage of both, a
 cosine to 0 over 100 km (hand-built file
 `ice_data/GreenlandPaleo/GRL-PAL-16KM/GRL-PAL-16KM_TAPER-Buizert2018-Badgeley2020.nc`,
 `clim_db.nml` group `taper_b18_b20`, made by
 `scripts/grl-paleo/make_taper_recon.jl`). West of it (Ellesmere, Baffin Bay)
-the climate is the present-day reference at all times.
+the climate is the present-day reference plus that mean anomaly.
 
 The ocean anomaly is `f_to = 0.25` times the mean sea-level air temperature
 anomaly (`[ocn_fraction]`); sea level from `input/sl_deglaciation.dat`;
