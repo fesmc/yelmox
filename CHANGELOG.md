@@ -35,6 +35,10 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Index window modifier (fesm-utils tsgen `win_t0`, `win_t1`, `win_taper`, `win_fac`, `win_ref`,
+  `win_above` in `[idx_<name>]`; replaces the snapclim `f_hol` rule) and the RNG state in
+  the index restart files (noisy indices continue identically after a restart). Needs fesm-utils
+  with these changes.
 - Insolation from the [insol](https://github.com/fesmc/insol) library, now a dependency
   (`.configme/manifest.toml` `insol:main`, `make insol-static`, `libinsol.a`); the vendored
   copy `libs/insol/` (and its `interp1D`, smbpal's `interp_time` now uses fesm-utils') is
