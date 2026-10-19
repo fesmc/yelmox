@@ -20,7 +20,7 @@ the domain's coupling steps (yelmox), not in the component modules.
 ## Building blocks
 
 - **Component modules are grid-agnostic.** `marshelf_update`,
-  `isos_update`, `snapclim_update`, `smbpal_update` all take/return plain
+  `isos_update`, `snapshots_update`, `smbpal_update` all take/return plain
   `(nx,ny)` arrays; the grid is the caller's choice. Moving a module onto
   another grid is a caller-side change, not a module change.
 - **`map_class` self-identifies and self-caches.** It stores `name1`, `name2`,
@@ -279,8 +279,8 @@ elevation of `grid_surface` with the backend's monthly lapse rate
 tas_s = tas - lapse*dz,   pr_s = pr*exp(-beta_p*lapse*dz),   dz = z_srf_s - z_srf_c
 ```
 
-the same elevation dependence the backend applies on its own grid (snapclim,
-snapesm, esm; none for rembo). A coarse `grid_clim` thus keeps the elevation
+the same elevation dependence the backend applies on its own grid (snapshots,
+esm; none for rembo). A coarse `grid_clim` thus keeps the elevation
 detail of the surface grid; on the same grid nothing changes.
 - `step_shelf` — sub-shelf melt on `grid_shelf`, from the climate's ocean as depth profiles or at the shelf base.
 

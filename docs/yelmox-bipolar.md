@@ -33,7 +33,7 @@ across both domains plus the OBM.
   after it (`Greenland/`, `Antarctica/`). `[ctrl] restart` is the bundle to start
   from.
 
-Climate/SMB per domain is **snapesm + chion**, as in the single-domain driver;
+Climate/SMB per domain is **snapshots + chion**, as in the single-domain driver;
 the OBM's contribution is folded into the ocean forcing — `obm_exchange` applies
 each domain's `[ocn_obm_<sfx>]` (the OBM ocean temperature into `to_ann`) before
 the marine-shelf step reads it.

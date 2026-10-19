@@ -7,7 +7,7 @@ aliases:
 Runs with **REMBOv1**, an energy/moisture-balance regional atmosphere with an
 integrated surface-mass-balance scheme, use the `yelmox` program with the REMBO
 climate backend: `[comps] climate = "rembo"`. REMBO supplies the atmosphere and
-the surface mass balance; the ocean comes from snapesm.
+the surface mass balance; the ocean comes from the snapshot backend.
 
 - **Program:** `yelmox/yelmox.f90`, backend in `libs/yelmox_climate.f90`, with the
   REMBO adapter `libs/climate_rembo.f90`.
@@ -27,7 +27,7 @@ the surface mass balance; the ocean comes from snapesm.
   smbpal and smb_simple are not available with it.
 - **Update cadence.** `[comps] dt_clim = dtt`: REMBO updates its energy balance
   and its smb on its own intervals (`dtime_emb`, `dtime_smb`).
-- **Ocean.** The snapesm `[snap]` groups (see [snapclim and snapesm](climate-snap.md))
+- **Ocean.** The `[snap]` groups of the snapshot backend (see [Snapshots](climate-snapshots.md))
   with an ocean-only reference snapshot: `snapshots = "pd"`, `ref_name = "pd"`,
   no axes, the `pd` snapshot binding the ORAS5 1981-2010 climatology
   (`oras5_1981_2010_to`, `oras5_1981_2010_so` of `input/clim_db.nml`). The
@@ -37,7 +37,7 @@ the surface mass balance; the ocean comes from snapesm.
   REMBO, not a modifier after it), maps the value `f` of its index onto REMBO's
   anomalies: the summer air temperature `dT_sum = f·f_ta`, the annual
   `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6), and the ocean
-  `dT_ocn = dT_ann·f_to`, added to the snapesm ocean.
+  `dT_ocn = dT_ann·f_to`, added to the snapshot ocean.
 - **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
 ## Output

@@ -5,7 +5,7 @@ module snapshots
     !   Indices   -> the driver's registry (kryos_forcing), read by name
     !   Wrapper   -> this module (blend + transforms + output state)
     !
-    ! See docs/climate-snap.md for its configuration.
+    ! See docs/climate-snapshots.md for its configuration.
     !
     ! Config model: the `var_defs` databases (a list of nml files, first file
     ! that has a group wins, then the par file itself for run-specific groups;
@@ -835,7 +835,7 @@ contains
             case("fraction")
                 write(*,*) "snapshots:: Error: &"//trim(group)//" blend = 'fraction' was removed: &
                            &set blend = 'const' and use the climate modifier [ocn_fraction] &
-                           &(f_to, region; see docs/climate-snap.md)."
+                           &(f_to, region; see docs/climate-snapshots.md)."
                 stop 1
             case default
                 write(*,*) "snapshots:: Error: &"//trim(group)//" blend = '"//trim(fs%blend)// &

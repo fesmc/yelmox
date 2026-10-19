@@ -9,7 +9,7 @@ ago to 10 kyr in the future, restarted from the spin-up, with the climate scaled
 by a glacial index and the sea level following a reconstruction.
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
-  (`[comps] climate = "snapesm"`, see [snapclim and snapesm](climate-snap.md)).
+  (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
 - **Config:** `yelmox/yelmox_Antarctica_paleo_spinup.nml`,
   `yelmox/yelmox_Antarctica_paleo_lgp.nml`.
 - **Scripts:** `scripts/ant-paleo/run_spinup.sh`, `scripts/ant-paleo/run_lgp.sh`.

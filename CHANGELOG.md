@@ -30,18 +30,25 @@ annotated git tag. Dates are release (tag) dates.
 - Static climate bias correction `[bias]` (optional): additive temperature and
   multiplicative precipitation fields (monthly or annual, varslice groups, online remap
   allowed) with weights `f_tas`, `f_pr`, applied to the monthly atmosphere of snapclim,
-  snapesm and esm before downscaling; written to the climate 2D file.
-- snapesm reads its snapshots on the climate grid (`snapesm_init` takes the `grid_class`),
+  snapshots and esm before downscaling; written to the climate 2D file.
+- The snapshots backend reads its snapshots on the climate grid (`snapshots_init` takes the `grid_class`),
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
-- The regional configs run on snapesm (`[comps] climate = "snapesm"`, snapclim groups
+- snapclim removed (`libs/snapclim.f90`, `[comps] climate = "snapclim"`, its tests,
+  `input/greenland_snp.nml`, `yelmox_Greenland_snapclim.nml`); the snapshot backend snapesm
+  renamed `snapshots` (`[comps] climate = "snapshots"`, `libs/snapshots.f90`,
+  `snapshots_*`; groups keep `[snap*]`, output `snap.nc`). `[snap_field_<name>] kind`
+  removed (the field name decides). `yelmox_Greenland_snapesm.nml` removed (its climate is
+  that of `yelmox_Greenland.nml`), `yelmox_Greenland_snapesm_ramp.nml` renamed
+  `yelmox_Greenland_ramp.nml`. Docs page `climate-snapshots` (was `climate-snap`, redirected).
+- The regional configs run on snapshots (`[comps] climate = "snapshots"`, snapclim groups
   removed): `yelmox_pd_Greenland`, `yelmox_pd_Antarctica`, `yelmox_Antarctica` and
   `yelmox_Antarctica_paleo_spinup` (`pd` snapshot only; spin-up with `[ocn_fraction]`
   f_to 0.40), `yelmox_Antarctica_paleo_lgp`, `yelmox_North`, `yelmox_LIS` (`pd`,
   `picontrol`, `lgm` on an axis `a`: LGP index `alpha_combined_125kyr_interp` as is,
   North/LIS `const` 1; `[ocn_fraction]` f_to 0.25), `yelmox_Greenland` (as
-  `yelmox_Greenland_snapesm`), `yelmox_Pyrenees` (`pd` + `[anom]`, index
+  the former `yelmox_Greenland_snapesm`), `yelmox_Pyrenees` (`pd` + `[anom]`, index
   `alpha_orbital_t2018` x f_ta 10 K), `yelmox_SRG` (`pd`, the legacy MAR v3.14 file as
   groups of the par file). Physical changes: Antarctic reference from FesmData RACMO2.3p2
   1981-2010 t2m/pr (was the RACMO2.3/ERA-Interim hybrid: -1.0 K, +2.5% precipitation
@@ -51,75 +58,74 @@ annotated git tag. Dates are release (tag) dates.
   included the lapse-rate cooling of the ice sheets); dropped: `f_hol` (GRL), the 80 km
   smoothing of the reference before 1 ka (`f_corr`: LGP, North, LIS; local +-4 K, means
   unchanged), the unused snapshot oceans, the SRG and Pyrenees oceans (`with_shelf =
-  False`). `yelmox_Greenland_snapclim` stays until snapclim is removed.
+  False`).
 - yelmox_bipolar: the OBM box air temperatures from one global anomaly index,
   `[obm_forcing]` (`index`, `gain`): `theta_i = theta_i_init + ampl_i × gain × index` for
   every box (the tropical box set once), vapour fluxes likewise; `climate_air_anom` and
   `libs/obm/atm2ocean.f90` removed. `obm2ism` is the climate modifier `[ocn_obm_<sfx>]`
   (`absolute`, as before, or `anomaly`: reference + box anomaly), applied by the driver;
   `[ctrl] obm2ism` removed. The OBM restart keeps the `*_init` values of the par file and
-  now holds the box air temperatures. The Bipolar par file on snapesm (north as GRL, south
+  now holds the box air temperatures. The Bipolar par file on snapshots (north as GRL, south
   present day), indices `at` and `gmt`.
 - `[snap] var_defs` is a list of files, searched in order (first that has the group; an
   error names the group and the files), then the par file itself (implicitly last, so a
   par file never names itself); also `[bias] var_defs` (default `""`: the par file only). The forcing groups need only the keys that
-  differ from `input/yelmox_defaults.nml`: `[snap_field_<name>] kind` defaults to the
-  kind of the field name, a field without axes needs no group, `[anom]`/`[ocn_fraction]`/
-  `[bias]` absent = inactive. GRL snapesm configs take PMIP3 piControl/lgm from the global
+  differ from `input/yelmox_defaults.nml`: a field without axes needs no group, `[anom]`/`[ocn_fraction]`/
+  `[bias]` absent = inactive. GRL configs take PMIP3 piControl/lgm from the global
   product (`exp`, remapped; regional MAR/ORAS5 unchanged); `input/greenland_clim.nml`
   removed.
-- snapesm, phase 3: fields optional per snapshot (key absent or `""`); the backend builds
+- snapshots, phase 3: fields optional per snapshot (key absent or `""`); the backend builds
   what the reference binds (atmosphere `tas`+`pr`+`zs` and/or ocean `to`, `so` optional),
   bindings checked at init (axis snapshots bind the fields they blend, `zs` with `tas`/`pr`,
   group counts); ocean annual (one slice, e.g. CLIMBER ocean products) or a monthly
   climatology, salinity 0 without `so`; axes with `lo = ""` (`hi` is the anomaly or ratio,
   without `zs` taken at sea level); `tas_season = "jja" | "djf"` for two-field `tas`
   (default the hemisphere's summer; PMIP3 `clim_*_tas_djf` groups added); `ref_name` must
-  name a snapshot; `[snap] f_stdev` removed; `snapesm_end` and `climate_end` (drivers).
-  rembo takes its ocean from snapesm, an ocean-only `pd` snapshot (ORAS5; the shipped
-  config had no ocean, `ocn_path = "none"`), plus `dT_ocn`; `climate = "snapesm"` needs an
+  name a snapshot; `[snap] f_stdev` removed; `snapshots_end` and `climate_end` (drivers).
+  rembo takes its ocean from snapshots, an ocean-only `pd` snapshot (ORAS5; the shipped
+  config had no ocean, `ocn_path = "none"`), plus `dT_ocn`; `climate = "snapshots"` needs an
   atmosphere.
 - Climate modifiers, phase 2: `[ocn_fraction<sfx>]` (`active`, `f_to`, `region`) after
   `[anom]`: `to_ann = to_ann_ref + f_to × mean(tsl_ann − tsl_ann_ref)` over `region`
   (`"all"` or a `[regions]` selection, resolved at init), without the lag of one climate
   update and on the sea-level anomaly (no lapse-rate cooling of the ice sheet); refused
-  for esm and rembo and with `[anom] f_to /= 0`. It replaces snapesm's `blend = "fraction"`
+  for esm and rembo and with `[anom] f_to /= 0`. It replaces the snapshot backend's `blend = "fraction"`
   (now an error; `to` with `blend = "const"`), `[snap] f_to` and the lagged `ta_ann`,
-  which changes the results of every `fraction` config (`yelmox_Greenland_snapesm*.nml`).
+  which changes the results of every `fraction` config (`yelmox_Greenland*.nml`).
   The bias correction is the last modifier, group `[bias]` (was `[climate_bias]`, same
   keys); `anom` with `f_to`/`f_so` /= 0 on a climate without ocean stops at the first
   update. Climate 2D file: `t2m_sum`, the summer mean of the applied `tas`, for every
   backend with monthly fields (esm: was the reference plus `dts`; rembo keeps REMBO's);
-  snapesm no longer writes `tsl` and `ta_sum`; `ocn_fraction_dto`.
+  snapshots no longer writes `tsl` and `ta_sum`; `ocn_fraction_dto`.
 - Climate modifiers (`libs/climate_mods.f90`): optional groups applied to the backend's
   output in a fixed order, contracts checked at init. First one `[anom<sfx>]` (`active`,
   `index`, `f_ta`, `f_to`, `f_so`; replaces `[tsforcing]`): homogeneous dTa/dTo/dSo after
-  the backend (snapesm: no longer before the elevation transform, equal up to rounding;
+  the backend (snapshots: no longer before the elevation transform, equal up to rounding;
   its fraction ocean no longer sees dTa), before `[bias]`; refused with the esm
   smb. rembo reads `[anom]` itself. The recon cold start (`init_method = "recon"`) is now
-  forced too. Removed `[tsforcing]`, the dTa/dTo/dSo arguments of snapesm and its
+  forced too. Removed `[tsforcing]`, the dTa/dTo/dSo arguments of snapshots and its
   `[snap] dTa_const/dTo_const/dSo_const`. snap.nc `tas`, `pr`, `tsl_ann` are the applied
   climate (after the modifiers).
 - Indices registry (`libs/kryos_forcing.f90`): named scalar series `[indices] names`, each a
   tsgen group `[idx_<name>]` (optional `units`, `restart_every_df`), owned by the driver,
   advanced once per step on the forcing clock `time_rel` with the ice volume as response,
   shared by the domains of `yelmox_bipolar`; kill switch and Δf restarts per index; restart
-  files `idx_<name>_restart.nc`, 1D output `idx_<name>`. snapesm axes `[snap_axis_<name>]`
+  files `idx_<name>_restart.nc`, 1D output `idx_<name>`. snapshots axes `[snap_axis_<name>]`
   (`lo`, `hi`, `index`), listed in `[snap] axes`; fields list `axes` (was `index`); climate
   output `axis_<name>` (was `idx_<name>`). `[tsforcing]` takes its value from an index
   (`index`). Removed `[tsgen]`, `[snap_idx_*]`, `[tsforcing] restart_every_df`,
   `tsgen_restart.nc` and `snapesm_idx_<name>_restart.nc`. The ramp config runs with
   `tstep_method = "rel"` (the ramp now advances on `time_rel`).
 - The climate 2D file has the annual ocean profiles `to_ann`, `so_ann` (over `depth`) for
-  every backend that has them (snapclim, snapesm, rembo); written by `climate_write_2D`
-  (were snapesm only).
+  every backend that has them (snapclim, snapshots, rembo); written by `climate_write_2D`
+  (were snapshots only).
 - Climate on a coarser grid than the surface: `tas`/`pr` are moved from the climate grid's
   surface elevation to the surface grid's with the backend's monthly lapse rate and
   precipitation sensitivity (`climate_out`: `now%z_srf`, `lapse(12)`, `now%beta_p`;
   `kryos_coupling` `remap_atm_to_surface`). Unchanged when `grid_clim = grid_surface`.
 - The hub geometry reaches `grid_clim` and `grid_surface` conservatively when the hub is
   finer (`remap_method_smooth`; was bilinear), which changes runs with a finer hub.
-- snapesm indices are coordinates: each `[snap_idx_<name>]` spans an axis `snap_lo` ->
+- snapshots indices are coordinates: each `[snap_idx_<name>]` spans an axis `snap_lo` ->
   `snap_hi` and its tsgen value is the position on it (any tsgen method, e.g. `const` for a
   steady state); a field may take several indices (`index = "at" "bt"`), whose axes are
   summed (`linear`) or multiplied (`ratio`) on the reference, as snapclim `snap_2ind`
@@ -140,7 +146,7 @@ annotated git tag. Dates are release (tag) dates.
   grid (FesmData global attribute `grid_name`; fesm-utils `fesmdata_read_field`), so a par file
   can name a coarser data grid in `obs_path`. `geothermal_init`/`sediments_init` take the Yelmo grid.
 - Greenland present-day climate MAR v3.14 1961-1990 (FesmData `SMB-MARv3.14-1961-1990`, was
-  MARv3.11-ERA): snapclim/snapesm reference climatology (`t2m`, `sf`, `rf`, `z_srf`), the esm
+  MARv3.11-ERA): snapclim/snapshots reference climatology (`t2m`, `sf`, `rf`, `z_srf`), the esm
   reference blocks (`esm_grl_*.nml`) and the yelmo pd smb/T_srf (`-annual-mean`, `T_srf` skin
   temperature). snapclim reads precipitation and temperature units from the files.
 - FesmData v2 velocities (`Velocity-Joughin2018`, `Velocity-Rignot2011`), GHF
@@ -149,15 +155,15 @@ annotated git tag. Dates are release (tag) dates.
   `TOPO-BedMachine-v6` and MAR v3.14. Unused esm `&basins` (BASINS-nasa) removed.
 - Paleo climate snapshots from FesmData `Paleoclimate-PMIP3-{piControl,lgm}-{mean,stdev}` (was
   `PMIP3_sig50km`, smoothed with 50 km) and ocean from `Ocean-ORAS5-1981-2010` (was ORAS4): snapclim,
-  snapesm (`greenland_clim.nml`) and the esm ocean reference (`esm_grl_*.nml`, monthly climatology,
+  snapshots (`greenland_clim.nml`) and the esm ocean reference (`esm_grl_*.nml`, monthly climatology,
   `fill = "nearest"`; read from `GRL-16KM` and remapped bilinearly onto the run grid, since ORAS5
   is cropped on GRL-16KM/32KM only). snapclim reads ocean fields with missing values and fills them
   (fesm-utils `fill_nearest_levels`: each level from the nearest valid cell, else from the level
   above); the ocean mask comes from the data where `ocn_names(2) = "none"` (PMIP3 `sst_ann`).
   A 2D ocean without salinity gets 0 (salinity was read into an unallocated array).
-- snapclim/snapesm snapshot keys `clim_sigma` and `ocn_sigma` [km] (optional, default 0): Gaussian
+- snapclim/snapshots snapshot keys `clim_sigma` and `ocn_sigma` [km] (optional, default 0): Gaussian
   smoothing (fesm-utils `filter_gaussian`) of the atmosphere / ocean of the snapshot at loading.
-  The PMIP3 snapshots use 50 km (as the v1 `PMIP3_sig50km` files); `snapclim_init`/`snapesm_init`
+  The PMIP3 snapshots use 50 km (as the v1 `PMIP3_sig50km` files); `snapclim_init`/`snapshots_init`
   take the grid spacing.
 - chion replaces smbpal in the PDD configurations (`yelmox_Antarctica`, `yelmox_pd_Antarctica`,
   `yelmox_North`, `yelmox_Pyrenees`, `yelmox_esm_Antarctica_nudge`, bipolar south):
@@ -217,7 +223,7 @@ annotated git tag. Dates are release (tag) dates.
 - Model time in double precision (needs fesm-utils, Yelmo, FastIsostasy and chion with
   `real(dp)` time). The drivers' step `dtt`, `[comps] dt_clim`/`dt_isos`, `[output]
   dt_cmip` and the time arguments of the kryos modules and of the climate, surface and
-  shelf components (snapclim, snapesm, esm, rembo, smbpal, chion surface, marine_shelf,
+  shelf components (snapclim, snapshots, esm, rembo, smbpal, chion surface, marine_shelf,
   OBM coupling) are `real(dp)`, as are the snapclim series time axes and snapshot times
   and the esm reference periods. Forcing values stay `wp`. In single precision the
   spacing of the time is 0.008 yr at 130 kyr.
@@ -262,11 +268,11 @@ annotated git tag. Dates are release (tag) dates.
   scripts in `scripts/ant-paleo/`. Ported from the old single-grid par files; the
   transient now runs on relative time so that
   sea level follows the record (it stayed at present day before).
-- snapesm writes its state to `snap.nc` (`[output] write_clim`): the driving
+- snapshots writes its state to `snap.nc` (`[output] write_clim`): the driving
   indices `idx_<name>`, `z_srf`, monthly `tas`/`tsl`/`pr`, `ta_sum`, `tsl_ann`
   and the ocean profiles `to_ann`/`so_ann` (before only `t2m_ann`, `pr_ann`).
-- snapesm restarts: restart bundles hold the state of each driving index
-  (`snapesm_idx_<name>_restart.nc`, with the snapesm configuration as
+- snapshots restarts: restart bundles hold the state of each driving index
+  (`snapesm_idx_<name>_restart.nc`, with the snapshots configuration as
   attributes), restored on restart; bundles without them keep the cold-start
   indices.
 - `scripts/ismip7/`: the ISMIP7 optimization spin-ups (`opt_ant.sh`, `opt_grl.sh`,
@@ -384,7 +390,7 @@ annotated git tag. Dates are release (tag) dates.
   gains `ydyn.ssa_vel_lim_method` (default `"drag"`, a smooth speed-limit drag) and
   `ssa_vel_lim_tau`; all par files take `ssa_vel_max = 10000` (was 5000) and
   `pc_eps = 0.02` (was 1.0). Ice-sheet results change.
-- The hemisphere of a domain (seasons, lapse rates in snapclim, snapesm and the
+- The hemisphere of a domain (seasons, lapse rates in snapclim, snapshots and the
   esm forcing) follows from the latitude of `grid_clim` (south when its mean is
   below 0), no longer from the domain name `Antarctica`.
 - `yelmox_rembo` is removed: REMBO runs use `yelmox` with `climate = "rembo"`
@@ -407,7 +413,7 @@ annotated git tag. Dates are release (tag) dates.
   `-e yelmox`; the `esm` alias is gone), and scripts set
   `coupling.smb_method = climate | smbpal` instead of `esm.use_smb`.
 - Output: the climate backend writes its own file, `[output] write_clim`
-  (was `write_snap`): `snap.nc` (snapclim, snapesm) or `esm.nc` (the esm fields:
+  (was `write_snap`): `snap.nc` (snapclim, snapshots) or `esm.nc` (the esm fields:
   temperature, precipitation or SMB anomalies, shelf anomalies, discharge) plus
   `esm_ts.nc` (the forcing means over ice and floating ice, before in
   `yelmo_ts_esm.nc`, now on the climate grid). CMIP/ISMIP-formatted output is a
@@ -434,7 +440,7 @@ annotated git tag. Dates are release (tag) dates.
   `kill_shelves` / `time_equil`; the fixed-topography equilibration no longer
   requires `equil_method = "opt"`. Scripts set `coupling.kill_shelves`.
 - The climate backend is chosen at runtime: `[coupling] climate = "snapclim" |
-  "snapesm"` replaces the `make CLIMATE=` switch (one `libs/yelmox_climate.f90`
+  "snapshots"` replaces the `make CLIMATE=` switch (one `libs/yelmox_climate.f90`
   holds both backends; `yelmox_snapesm.x` is gone). The driver's transient forcing
   goes to the backend (`climate_update(..., tsf)`), which applies it its own way.
   The bipolar ocean box model takes its air-temperature anomaly from
