@@ -5,7 +5,7 @@ from rendering it. Superseded where they differ by `_forcing-design.md`
 (2026-10-18).
 
 States checked: yelmox dev ed2a6b5, fesm-utils dev b8a9a3d, FesmData
-products on Levante (`/work/ba1442/fesmdata/products`, paleoclimate-v2.6.0).
+products on Levante (`/work/ba1442/fesmdata`, paleoclimate-v2.6.0).
 
 ## Goal
 
