@@ -354,8 +354,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>chion ITM (<code>nml_itm = "itm"</code>)</td>
 <td>chion PDD (<code>[pdd_chion]</code>, <code>cg05</code>)</td>
 </tr>
+<tr class="even">
+<td><code>[esm] experiment</code></td>
+<td><code>"ctrl"</code></td>
+<td><code>"ctrl"</code> (reference only) or <code>"nudgedhigh03"</code> with <code>use_proj = True</code>: the anomaly of the nudged AWI-ESM run minus its PI run, 3501–5000 (atmosphere; the ocean has no nudged files on ANT-16KM yet)</td>
+</tr>
 </tbody>
 </table>
+<p>The reference climate is the mean over <code>time_ref</code> (1990–2019) of the RACMO2.3p2 1979–2022 and ORAS5 1979–2024 monthly series. On ANT-8KM the ORAS5 reference needs about 15 GB: run with <code>--omp 32</code> or more (the memory follows the cores).</p>
 </section>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
@@ -395,7 +401,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="even">
 <td>Isostasy</td>
-<td>FastIsostasy LV-ELVA (<code>method = 3</code>), Earth structure <code>ANT-16KM_GIA_HR24.nc</code> (pd: <code>ANT-32KM_GIA_HR24.nc</code>)</td>
+<td>FastIsostasy LV-ELVA (<code>method = 3</code>), Earth structure of the isostasy grid (<code>[isos] rheology_file = ".../{grid_name}_GIA_HR24.nc"</code>: <code>ANT-32KM_GIA_HR24.nc</code>)</td>
 </tr>
 <tr class="odd">
 <td>Geothermal heat flux</td>

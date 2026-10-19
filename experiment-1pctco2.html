@@ -320,7 +320,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p>The Antarctic par file reads the Earth structure of ANT-16KM (<code>[isos] rheology_file</code>); on ANT-32KM, also pass <code>isos.rheology_file=isostasy_data/earth_structure/yelmo/ANT-32KM_GIA_HR24.nc</code>. <code>run_1pctco2_antarctica.sh</code> does not set it.</p>
+<p>The Antarctic Earth structure is that of the isostasy grid (<code>[isos] rheology_file = ".../{grid_name}_GIA_HR24.nc"</code>, <code>{grid_name}</code> = <code>grid_isos</code>).</p>
 </section>
 <section id="spin-up" class="level2">
 <h2 class="anchored" data-anchor-id="spin-up">Spin-up</h2>
