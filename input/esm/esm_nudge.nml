@@ -16,6 +16,12 @@
     experiment      = "ssp585"
 /
 
+&nudgedhigh03
+    ! The nudged AWI-ESM run (Skiba): anomaly nudgedhigh03 (proj) - orig_PI
+    ! (esm_ref), 3501-5000. Ocean: orig only on ANT-16KM so far, no anomaly.
+    experiment      = "nudgedhigh03"
+/
+
 ! =========== ATMOSPHERE ===========
 
 ! ======== Reference period ========
@@ -71,57 +77,61 @@
 
 ! ======== ESM Reference period ========
 &gcm_ts_esm_ref
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_temp2_4501to5000.nc"
-    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_temp2_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_orig_PI_temp2.ts_correct.nc"
     name        = "temp2"
     units       = "K" "K"
     scaling     = 1.0 0.0
-    time        = 1, 4501, 5000, 1, 12
+    time        = 1, 3501, 5000, 1, 12
 /
 
 &gcm_pr_esm_ref
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_aprl_aprc_4501to5000.nc"
-    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_aprl_aprc_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_orig_PI_aprl_aprc_3501to5200.nc"
     name        = "aprc"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
-    time        = 1, 4501, 5000, 1, 12
+    time        = 1, 3501, 5000, 1, 12
+/
+
+&gcm_zs_esm_ref
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_AWI_ESM_PIcontrol_surfelev.nc"
+    name        = "OROMEA"
+    units       = "m" "m"
+    scaling     = 1.0 0.0
+    time        = 0, 2000, 2000, 0, 1
 /
 
 ! ======= Historical period =======
 &gcm_ts_hist
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_temp2_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_orig_PI_temp2.ts_correct.nc"
     name        = "temp2"
     units       = "K" "K"
     scaling     = 1.0 0.0
-    time        = 1, 4501, 5000, 1, 12
+    time        = 1, 3501, 5000, 1, 12
 /
 
 &gcm_pr_hist
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_aprl_aprc_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_orig_PI_aprl_aprc_3501to5200.nc"
     name        = "aprc"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
-    time        = 1, 4501, 5000, 1, 12
+    time        = 1, 3501, 5000, 1, 12
 /
 
 ! ======== Projection period ========
 &gcm_ts_proj
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_temp2_4501to5000.nc"
-    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_temp2_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_nudgedhigh03_temp2_3501to5000.nc"
     name        = "temp2"
     units       = "K" "K"
     scaling     = 1.0 0.0
-    time        = 1, 4501, 5000, 1, 12
+    time        = 1, 3501, 5000, 1, 12
 /
 
 &gcm_pr_proj
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_nudgedhigh03_aprl_aprc_4501to5000.nc"
-    !filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/ATM/{grid_name}_orig_PI_aprl_aprc_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_nudgedhigh03_aprl_aprc_3501to5000.nc"
     name        = "aprc"
     units       = "kg m-2 s-1" "mm yr-1"
     scaling     = 31556926.25 0.0     ! CMIP standard sec_to_year
-    time        = 1, 4501, 5000, 1, 12
+    time        = 1, 3501, 5000, 1, 12
 /
 
 ! ========      OCEAN      =========
@@ -162,53 +172,53 @@
 
 ! ======== ESM Reference period ========
 &gcm_to_esm_ref
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceantemp_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_oceantemp_3501_5000_10lvls_orig_reg.nc"
     name        = "temp"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
-    time        = 1, 4501, 5000, 1, 1
+    time        = 1, 3501, 5000, 1, 1
 /
 
 &gcm_so_esm_ref
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceansalt_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_oceansalt_3501_5000_10lvls_orig_reg.nc"
     name        = "salt"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 1, 4501, 5000, 1, 1
+    time        = 1, 3501, 5000, 1, 1
 /
 
 ! ======== Historical period ========
 &gcm_to_hist
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceantemp_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_oceantemp_3501_5000_10lvls_orig_reg.nc"
     name        = "temp"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
-    time        = 1, 4501, 5000, 1, 1
+    time        = 1, 3501, 5000, 1, 1
 /
 
 &gcm_so_hist
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceansalt_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_oceansalt_3501_5000_10lvls_orig_reg.nc"
     name        = "salt"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 1, 4501, 5000, 1, 1
+    time        = 1, 3501, 5000, 1, 1
 /
 
 ! ======== Projection period ========
 &gcm_to_proj
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceantemp_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_oceantemp_3501_5000_10lvls_orig_reg.nc"
     name        = "temp"
     units       = "degrees C" "K"
     scaling     = 1.0 273.15
-    time        = 1, 4501, 5000, 1, 1
+    time        = 1, 3501, 5000, 1, 1
 /
 
 &gcm_so_proj
-    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/OCN/{grid_name}_orig_reg_oceansalt_4501to5000.nc"
+    filename    = "ice_data/{domain}/{grid_name}/Nudge_Skiba26/{grid_name}_oceansalt_3501_5000_10lvls_orig_reg.nc"
     name        = "salt"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 1, 4501, 5000, 1, 1
+    time        = 1, 3501, 5000, 1, 1
 /
 
 ! === Other fields ===

@@ -602,9 +602,9 @@
 &esm
     ! Experiment
     par_file        = "input/esm/esm_nudge.nml"
-    experiment      = "ctrl"            ! "ctrl", "1pctCO2", "lgm", etc.
-    use_esm         = True             ! use ESM snapshots?   
-    esm_name        = "UKESM"           ! esm model, if homogeneous: applied homogeneous forcing
+    experiment      = "ctrl"            ! "ctrl": the reference only; "nudgedhigh03" (with use_proj = True): + the nudged AWI-ESM anomaly
+    use_esm         = True              ! use ESM snapshots?
+    esm_name        = "AWI-ESM"         ! esm model ({gcm}; not in the nudge file names)
 
     ! Forcing switches (the smb source is [comps] surface_method)
     use_var         = False             ! include climate variability
