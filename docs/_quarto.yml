@@ -4,6 +4,8 @@ project:
   render:
     - "*.md"
     - "!README.md"
+  resources:
+    - forcing-builder/
 
 website:
   title: "YelmoX"
@@ -25,6 +27,8 @@ website:
             href: yelmox-bipolar.md
           - text: "Long runs in chunks"
             href: run-chunks.md
+          - text: "Forcing builder"
+            href: forcing-builder.md
       - text: "Climate backends"
         menu:
           - text: "Snapshots"
