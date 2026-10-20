@@ -14,6 +14,7 @@
 # (tas_anomaly / pr_ratio / TF_anomaly) on top of the MAR + ORAS5 reference
 # climatology; TIPMIP has no salinity (dso = 0) or subglacial discharge (Qd = 0).
 # See input/esm/esm_grl_tipmip.nml (ramp) and esm_grl_tipmip_gwl.nml (stabilisations).
+# Base yelmox/yelmox_esm_Greenland.nml with the TIPMIP setup tipmip_grl of params.sh.
 #
 # Run the steps in order on the cluster; let each finish before the next (they read
 # the previous step's restart bundles):
@@ -39,9 +40,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
 
+source scripts/tipmip/params.sh                    # tipmip_grl
+
 # ---- configuration ---------------------------------------------------------
 EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
-NML="yelmox/yelmox_esm_Greenland_tipmip.nml"
+NML="yelmox/yelmox_esm_Greenland.nml"
 SPINUP_YEARS=15000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=15e3)
 RAMP_YEARS=232                                     # esm-up2p0
 STAB_YEARS=50                                      # esm-up2p0-gwl*
@@ -89,7 +92,8 @@ done
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True \
+      -p "${tipmip_grl[@]}" \
+         ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True \
          esm.experiment=ctrl esm.esm_name="$GCM" \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
@@ -99,7 +103,8 @@ case "${1:-}" in
     # "==" passes the list as one vector value (a plain comma list is a runme ensemble)
     [ -n "$RST_TIMES" ] && rst=(tm_rst.method=times "tm_rst.times==$RST_TIMES")
     runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$RAMP_OUT" \
-      -p ctrl.run_step=transient esm.experiment=esm-up2p0 esm.esm_name="$GCM" \
+      -p "${tipmip_grl[@]}" \
+         ctrl.run_step=transient esm.experiment=esm-up2p0 esm.esm_name="$GCM" \
          esm.par_file=input/esm/esm_grl_tipmip.nml \
          esm.use_esm=True esm.use_hist=False esm.use_proj=True \
          domain.grid_hub="$GRID" \
@@ -111,7 +116,8 @@ case "${1:-}" in
     for row in "${STABS[@]}"; do
       read -r exp yr <<<"$row"
       runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
-        -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
+        -p "${tipmip_grl[@]}" \
+           ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.par_file=input/esm/esm_grl_tipmip_gwl.nml \
            esm.use_esm=True esm.use_hist=False esm.use_proj=True \
            domain.grid_hub="$GRID" \
