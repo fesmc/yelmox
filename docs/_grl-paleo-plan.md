@@ -254,3 +254,15 @@ Superseding the decisions above where they differ:
    the third dimension (as ERA5); the time axes come from `time = 1 x0 x1 dx`
    (oldest first, years before 1950); `extrap` reads the two bracketing records.
 
+
+## Changes (2026-10-20)
+
+After the first full runs (B never calved: `equil` kept the GLAC-1D front) and an
+audit of the parameters copied from the present-day `yelmox_Greenland.nml`, for
+A and B alike: calving `vm-m16` (floating and grounded); friction scaled with
+bed elevation (`scale_zb = 1`, `cf_ref = 0.5`, `cf_min = 1e-3`, `z0/z1 =
+-500/300`, `till_delta = 0.1`); deep-ocean melt only in the open ocean below
+2000 m; GHF Fox Maule (2005); `nz_aa = 10`; `grad_lim = 0.1`; `fmb_method = 1`;
+sea level `sealevel_rohling_450kyr.dat` for B too; B deglaciation `dt_clim =
+100`. Open: isostasy (LV-ELVA), a freezing-point floor on the glacial ocean
+temperature, sediments.
