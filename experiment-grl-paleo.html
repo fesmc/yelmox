@@ -147,6 +147,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./run-chunks.html">
  <span class="dropdown-text">Long runs in chunks</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./forcing-builder.html">
+ <span class="dropdown-text">Forcing builder</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -274,23 +278,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <p>Greenland paleo simulations on the GreenlandPaleo domain (GRL-PAL, 16 km), the Greenland domain extended 640 km to the west (Ellesmere, Devon Island, Baffin Bay). Two setups, without optimization of the basal friction or the ocean thermal forcing:</p>
 <ul>
-<li><p><strong>A. Last glacial period</strong>, as the <a href="./experiment-ant-paleo.html">Antarctic paleo</a>: a 15-kyr present-day <strong>spin-up</strong>, then a <strong>transient</strong> from 130 kyr ago to the present, restarted from the spin-up, with the climate scaled by a glacial index.</p></li>
+<li><p><strong>A. Last glacial period</strong>, as the <a href="./experiment-ant-paleo.html">Antarctic paleo</a>: a 20-kyr present-day <strong>spin-up</strong>, then a <strong>transient</strong> from 130 kyr ago to the present, restarted from the spin-up, with the climate scaled by a glacial index.</p></li>
 <li><p><strong>B. Deglaciation</strong> after Tabone et al.&nbsp;(2024): an <strong>LGM spin-up</strong> from GLAC-1D, then a <strong>transient</strong> from 21 ka to the present forced by the Greenland climate reconstructions of Buizert et al.&nbsp;(2018, temperature) and Badgeley et al.&nbsp;(2020, precipitation).</p></li>
 <li><p><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the snapshot backend (<code>[comps] climate = "snapshots"</code>, see <a href="./climate-snapshots.html">Snapshots</a>).</p></li>
 <li><p><strong>Config:</strong> <code>yelmox/yelmox_GreenlandPaleo.nml</code> (base of A and B).</p></li>
-<li><p><strong>Scripts:</strong> <code>scripts/grl-paleo/</code>: A <code>run_spinup.sh</code>, <code>run_lgp.sh</code>; B <code>run_lgm_spinup.sh</code>, <code>run_deglac.sh</code>. The forcing is set with <code>-p</code>: <code>scripts/grl-paleo/params.sh</code> (<code>grlpal_lgp</code> for A, <code>grlpal_recon</code> for B).</p></li>
+<li><p><strong>Scripts:</strong> <code>scripts/grl-paleo/</code>: <code>run_spinup.sh</code> (both setups), A <code>run_lgp.sh</code>, B <code>run_deglac.sh</code>. The forcing is set with <code>-p</code>: <code>scripts/grl-paleo/params.sh</code> (<code>grlpal_lgp</code> for A, <code>grlpal_recon</code> for B, <code>grlpal_pd</code> the reference climate only).</p></li>
 <li><p><strong>Design:</strong> <code>docs/_grl-paleo-plan.md</code>.</p></li>
 </ul>
 <section id="running" class="level2">
 <h2 class="anchored" data-anchor-id="running">Running</h2>
 <p>Run from the yelmox root; each transient needs the last restart bundle of its spin-up.</p>
 <p>A:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/grl-paleo/run_spinup.sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/grl-paleo/run_spinup.sh</span> pd 0 output/grl-paleo/spinup-pd-0ka sim.relax=True</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/grl-paleo/run_lgp.sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>B:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/grl-paleo/run_lgm_spinup.sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/grl-paleo/run_spinup.sh</span> recon <span class="at">-21e3</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">scripts/grl-paleo/run_deglac.sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>run_spinup.sh [output_path]</code> writes to <code>output/grl-paleo/spinup</code> by default, <code>run_lgm_spinup.sh [output_path]</code> to <code>output/grl-paleo/lgm</code>. <code>run_lgp.sh [spinup_path] [output_path]</code> restarts from <code>&lt;spinup_path&gt;/restart-15.000-kyr</code> and writes to <code>output/grl-paleo/lgp</code>; <code>run_deglac.sh [lgm_path] [output_path]</code> restarts from <code>&lt;lgm_path&gt;/restart-20.000-kyr</code> and writes to <code>output/grl-paleo/deglac</code> (the bundles are passed as absolute paths; the scripts stop if one is missing). All submit to the <code>shared</code> queue (2 days, 10 GB, no OpenMP). On a busy cluster, run them as chains of short jobs instead: <a href="./run-chunks.html">Long runs in chunks</a> has the commands.</p>
+<p><code>run_spinup.sh &lt;forcing&gt; &lt;time&gt; [output_path] [extra -p ...]</code> runs 20 kyr with the forcing <code>grlpal_&lt;forcing&gt;</code> (<code>pd</code>, <code>lgp</code> or <code>recon</code>) held at <code>&lt;time&gt;</code> (<code>ctrl.tstep_const</code>, yr: climate, insolation, sea level). The ice starts from the present-day topography at time 0 and from GLAC-1D at <code>&lt;time&gt;</code> otherwise; the output goes to <code>output/grl-paleo/spinup-&lt;forcing&gt;-&lt;ka&gt;ka</code> by default. Any setup can so be spun up at the present day or at the LGM, e.g.&nbsp;the steady state of B under present-day forcing: <code>run_spinup.sh recon 0</code>. <code>run_lgp.sh [spinup_path] [output_path]</code> restarts from <code>&lt;spinup_path&gt;/restart-20.000-kyr</code> (default <code>spinup-pd-0ka</code>) and writes to <code>output/grl-paleo/lgp</code>; <code>run_deglac.sh [lgm_path] [output_path]</code> restarts from <code>&lt;lgm_path&gt;/restart-20.000-kyr</code> (default <code>spinup-recon-21ka</code>) and writes to <code>output/grl-paleo/deglac</code> (the bundles are passed as absolute paths; the scripts stop if one is missing). All submit to the <code>shared</code> queue (2 days, 10 GB, no OpenMP). On a busy cluster, run them as chains of short jobs instead: <a href="./run-chunks.html">Long runs in chunks</a> has the commands.</p>
 </section>
 <section id="domain-borders" class="level2">
 <h2 class="anchored" data-anchor-id="domain-borders">Domain borders</h2>

@@ -147,6 +147,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="./run-chunks.html">
  <span class="dropdown-text">Long runs in chunks</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="./forcing-builder.html">
+ <span class="dropdown-text">Forcing builder</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -611,6 +615,7 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f an index, e.g. before the file st
 <p>A named group is read from the par file if it has it, else from the first var_defs file that does: <code>[snap] var_defs</code> for the snapshot, axis and varslice groups, <code>[indices] var_defs</code> for the index groups. The bases list <code>input/forcing_db.nml</code> there (the ESM bases in <code>[indices]</code> only). elsa reads its group from the file <code>[ytrc] elsa_nml</code> names (<code>input/forcing_db.nml</code>), selected by <code>elsa_group</code>. A listed group found nowhere stops the run.</p>
 <p>To change a library group for one run, define it in the par file (it wins), or set one of its keys with <code>-p</code> (e.g.&nbsp;<code>-p idx_a.f_min=0</code>): runme copies the whole group into the staged par file, then applies the override (<code>par_library</code> in <code>.runme/info.json</code>). <code>par_defaults</code> (<code>input/yelmo_defaults.nml</code>, <code>input/yelmox_defaults.nml</code>) lets <code>-p</code> set a key of a group the par file lacks, e.g.&nbsp;<code>-p bias.active=True</code> or <code>-p ytrc.use_elsa=True</code>. <code>-p</code> on a library group needs runme 0.5.26 or later.</p>
 <p>Scripts follow one rule: the settings that define the experiment go in commented <code>-p</code> arrays (in <code>scripts/&lt;exp&gt;/params.sh</code> when several scripts share them); run control goes in the invocation (run step, times, restart, grid, output intervals, queue).</p>
+<p>The <a href="./forcing-builder.html">forcing builder</a> resolves a base plus <code>-p</code> overrides the same way, draws the forcing the run will see and writes the <code>runme</code> command; <code>scripts/forcing-builder/explain.jl</code> does it on the command line.</p>
 </section>
 <section id="ctrl" class="level3">
 <h3 class="anchored" data-anchor-id="ctrl"><code>[ctrl]</code></h3>
