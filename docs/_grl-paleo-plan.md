@@ -263,6 +263,9 @@ A and B alike: calving `vm-m16` (floating and grounded); friction scaled with
 bed elevation (`scale_zb = 1`, `cf_ref = 0.5`, `cf_min = 1e-3`, `z0/z1 =
 -500/300`, `till_delta = 0.1`); deep-ocean melt only in the open ocean below
 2000 m; GHF Fox Maule (2005); `nz_aa = 10`; `grad_lim = 0.1`; `fmb_method = 1`;
-sea level `sealevel_rohling_450kyr.dat` for B too; B deglaciation `dt_clim =
-100`. Open: isostasy (LV-ELVA), a freezing-point floor on the glacial ocean
-temperature, sediments.
+sea level Spratt and Lisiecki (2016) for A and B (`input/sealevel_spratt2016.dat`;
+the former `sealevel_rohling_450kyr.dat` is close to the Red Sea record of Grant et
+al. (2014), only -105 m at 21 ka); B deglaciation `dt_clim =
+100`; isostasy LV-ELVA with two uniform mantle layers (as ISMIP7 GRL). Open: a
+freezing-point floor on the glacial ocean temperature, sediments, a 3D Earth
+structure (Lloyd2024 in the rheology_file layout).
