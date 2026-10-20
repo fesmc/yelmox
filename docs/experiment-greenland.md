@@ -6,13 +6,13 @@ Greenland test cases at 16 km, without optimization of the basal friction or the
 ocean thermal forcing: the present-day reference climate with the PMIP3
 piControl and LGM snapshots on a glacial index axis `at`
 (`yelmox_Greenland.nml`), the same with a homogeneous air temperature ramp as a
-functionality test at 32 km (`yelmox_Greenland_ramp.nml`), and the present-day
-reference alone (`yelmox_pd_Greenland.nml`).
+functionality test at 32 km, and the present-day reference alone (both
+`yelmox_Greenland.nml` with `-p` overrides).
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
-- **Config:** `yelmox/yelmox_Greenland.nml`, `yelmox/yelmox_Greenland_ramp.nml`,
-  `yelmox/yelmox_pd_Greenland.nml`.
+- **Config:** `yelmox/yelmox_Greenland.nml`; the ramp and present-day runs set
+  their differences with `-p` (see Running).
 
 ## Running
 
@@ -23,11 +23,17 @@ runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.n
 ```
 
 ```bash
-runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland_ramp.nml -o output/grl-ramp
+runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-ramp \
+      -p ctrl.tstep_method=rel domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM \
+         domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 tm_2D.dt=50 \
+         indices.names==at,ramp anom.active=True anom.index=ramp
 ```
 
 ```bash
-runme -rs -q compute -w 08:00:00 --omp 16 -e yelmox -n yelmox/yelmox_pd_Greenland.nml -o output/grl-pd
+runme -rs -q compute -w 08:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-pd \
+      -p ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 indices.names="" \
+         snap.snapshots=pd snap.axes="" snap_field_tas.axes="" snap_field_pr.axes="" snap_field_pr.blend=linear \
+         ocn_fraction.active=False
 ```
 
 On a busy queue, run them as chains of short jobs ([Long runs in
@@ -41,9 +47,9 @@ glacial cycle.
 - **`yelmox_Greenland.nml`:** `[ctrl]` 0 to 15 kyr, `dtt = 10` yr, the forcing
   held at present day (`tstep_method = "const"`, `tstep_const = 0`), where
   `at = 0`: the climate is the present-day reference.
-- **`yelmox_Greenland_ramp.nml`:** the same on relative time
+- **Ramp:** the same on relative time
   (`tstep_method = "rel"`), so that the ramp advances with the model time.
-- **`yelmox_pd_Greenland.nml`:** 0 to 50 kyr.
+- **Present day:** 0 to 50 kyr.
 - **All:** cold start on the present-day topography (`[sim] init_method =
   "none"`), no relaxation, no optimization (`[sim] relax = False`, `opt =
   False`; `[relax]` and `[opt]` are unused). Present-day insolation (`[orbit]
@@ -72,9 +78,10 @@ anomaly over the domain (`[ocn_fraction]`, `region = "all"`).
 
 ## Air temperature ramp
 
-`yelmox_Greenland_ramp.nml` adds the index `ramp` (`[indices] names = "at"
-"ramp"`) and applies it as a homogeneous anomaly (`[anom] active = True`,
-`index = "ramp"`, `f_ta = 1`, `f_to = 0`, `f_so = 0`):
+The ramp run adds the index `ramp` (`[indices] names = "at" "ramp"`;
+`[idx_ramp]` from `input/forcing_db.nml`) and applies it as a homogeneous
+anomaly (`[anom] active = True`, `index = "ramp"`, `f_ta = 1`, `f_to = 0`,
+`f_so = 0`):
 
 - **Index:** `[idx_ramp] method = "ramp-slope"`, `df_dt_max = 0.0025` yr⁻¹
   from `f_min = 0` to `f_max = 5`: the air temperature rises by 5 K over
@@ -83,19 +90,19 @@ anomaly over the domain (`[ocn_fraction]`, `region = "all"`).
 - **Response:** the precipitation is multiplied by exp(`f_p`·dTa); the ocean
   follows through `[ocn_fraction]`, whose sea-level anomaly includes dTa.
 
-![Forcing of yelmox_Greenland_ramp.nml at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_ramp.png)
+![Forcing of the ramp run at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_ramp.png)
 
 ## Present day
 
-`yelmox_pd_Greenland.nml` keeps the reference only (`[snap] snapshots =
-"pd"`), without indices (`[indices] names = ""`) and with `[ocn_fraction]
+The present-day run keeps the reference only (`[snap] snapshots = "pd"`),
+without indices (`[indices] names = ""`) and with `[ocn_fraction]
 active = False`. Its basin sets are `Zwally2012` only (no `NEGIS`).
 
 ## Configuration
 
 | | |
 |---|---|
-| Grids | `GRL-16KM` for every component (`yelmox_Greenland_ramp.nml`: `GRL-32KM`) |
+| Grids | `GRL-16KM` for every component (ramp: `GRL-32KM`) |
 | Topography | BedMachine v6 (`{grid_name}_TOPO-BedMachine-v6.nc`) |
 | Ice domain | `[yelmo_masks] mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"` |
 | Reference climate (`snap_pd`) | MAR v3.14 1961--1990 (temperature, snowfall + rainfall, elevation); ocean ORAS5 1981--2010 |

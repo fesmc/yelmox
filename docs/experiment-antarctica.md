@@ -7,14 +7,16 @@ ocean) with the snapshot backend: a 15-kyr **spin-up** at 32 km that optimizes
 the basal friction (`cb_ref`) and the ocean thermal-forcing correction
 (`tf_corr`), with the marine shelf on a 16 km grid (`yelmox_Antarctica.nml`, the
 base of a multigrid resolution test), and a 50-kyr **present-day** run at 32 km
-without optimization (`yelmox_pd_Antarctica.nml`). Two variants run on the ESM
-backend (`yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`).
+without optimization (the same par file with `-p` overrides). Two variants run
+on the ESM backend (`yelmox_esm_Antarctica.nml`,
+`yelmox_esm_Antarctica_nudge.nml`).
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)); the
   ESM variants with `[comps] climate = "esm"` (see [ESM forcing](climate-esm.md)).
-- **Config:** `yelmox/yelmox_Antarctica.nml`, `yelmox/yelmox_pd_Antarctica.nml`,
-  `yelmox/yelmox_esm_Antarctica.nml`, `yelmox/yelmox_esm_Antarctica_nudge.nml`.
+- **Config:** `yelmox/yelmox_Antarctica.nml` (the present-day run: `-p`, see
+  Running), `yelmox/yelmox_esm_Antarctica.nml`,
+  `yelmox/yelmox_esm_Antarctica_nudge.nml`.
 - **Scripts:** `yelmox/run_mg_resolution.sh`, `yelmox/run_mg_cfmin.sh`,
   `yelmox/run_mg_forward.sh`, all on `yelmox_Antarctica.nml`.
 
@@ -27,7 +29,9 @@ runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Antarctica.
 ```
 
 ```bash
-runme -rs -q compute -w 08:00:00 --omp 16 -e yelmox -n yelmox/yelmox_pd_Antarctica.nml -o output/ant-pd
+runme -rs -q compute -w 08:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Antarctica.nml -o output/ant-pd \
+      -p ctrl.time_end=50e3 sim.relax=False sim.opt=False domain.grid_hub=ANT-32KM domain.grid_ice="" \
+         domain.grid_shelf=ANT-32KM marine_shelf.tf_correction=True tm_2D.dt=500 tm_2Dsm.dt=500
 ```
 
 On a busy queue, run them as chains of short jobs ([Long runs in
@@ -94,8 +98,8 @@ serves `run_mg_forward.sh`, which sets it with `idx_dT.f_min = f_max`.
 
 ## Present day
 
-`yelmox_pd_Antarctica.nml`: 0 to 50 kyr, no relaxation, no optimization
-(`[sim] relax = False`, `opt = False`), every component on `ANT-32KM`. `tf_corr`
+0 to 50 kyr, no relaxation, no optimization (`[sim] relax = False`,
+`opt = False`), every component on `ANT-32KM`. `tf_corr`
 is read from a file (`[marine_shelf] tf_correction = True`: `dT_nl` of
 `{grid_name}_OCEAN_ISMIP6_J20.nc`). 2D and small 2D output every 500 yr.
 
