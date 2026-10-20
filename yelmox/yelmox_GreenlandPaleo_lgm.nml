@@ -257,45 +257,56 @@
     include_elastic = .true.        ! Include elastic deformation?
     correct_compression = .true.    ! Account for compression effects on relaxation time?
     correct_distortion = .false.    ! Account for distortion of projection?
-    method          = 2             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
+    method          = 3             ! 0: constant displacement; 1: LLRA; 2: LV-ELRA, 3: LV-ELVA
     dt_diagnostics  = 10.           ! [yr] Min. timestep to recalculate diagnostics
-    pad         = 512.              ! [km] Padding around domain (preferably chosen as a power
+    pad         = 512.             ! [km] Padding around the domain (preferably chosen as a power
                                     ! of 2 multiplied by the resolution)
+
 
     ! Rheology methods
     ! GRL-PAL SolidEarth-Lloyd2024 (3D log10_visc on "depth", no lithosphere)
-    ! does not have the layout of rheology_file (zc, lithosphere thickness).
-    mantle = "uniform"          ! Choose mantle viscosity field, options:
-                                ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
-    lithosphere = "uniform"     ! Choose lithospheric thickness field:
-                                ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
-    layering    = "equalized"   ! "parallel" or "equalized"
-    lumping     = "min"         ! "bottom", "min", "max", "mean", "logmean", "freqdomain"
-    viscosity_scaling_method = "none"  ! "scale" or "min" or "max"
+    ! does not have the layout of rheology_file (zc, lithosphere thickness):
+    ! two uniform layers as ISMIP7 GRL.
+    mantle = "uniform"        ! Choose mantle viscosity field, options:
+                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+    lithosphere = "uniform"   ! Choose lithospheric thickness field:
+                                    ! "uniform", "gaussian_plus", "gaussian_minus", "rheology_file"
+    layering    = "equalized"        ! "parallel" or "equalized"
+    lumping     = "min"             ! "bottom", "min", "max", "mean", "logmean", "freqdomain"
+    viscosity_scaling_method = "scale"  ! "scale" or "min" or "max"
     viscosity_scaling = 1.              ! Only used if viscosity_scaling_method = "scale"
-    
+
     ! Rheology parameters
-    nl          = 1             ! [1] Number of viscous layers for sub-lithospheric mantle
-    zl = 88.                    ! [km] Depth of layer boundaries. The first value is overwritten
-                                ! if a lithospheric thickness filed is provided.
-    viscosities = 1.e21         ! [Pa s] Layer viscosities. Only used if
-                                ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
-                                ! viscosity field is provided.
+    nl          = 2             ! [1] Number of viscous layers for sub-lithospheric mantle
+    dl          = 25.               ! [km] Thickness of viscous layers. Only used if layering="parallel".
+    zl          = 88.0 600.0     ! [km] Depth of layer boundaries.
+                                    ! Only used if layering="equalized". First value
+                                    ! overwritten if visc_method="rheology_file".
+    viscosities = 1e21, 2e21     ! [Pa s] Layer viscosities. Only used if
+                                    ! mantle = "uniform" or "gaussian_plus" or "gaussian_minus".
+                                    ! viscosity field is provided.
     ref_viscosity = 1.e21       ! [Pa s] Reference viscosity for scaling
-    tau = 3000.0                ! [yr] Relaxation time used for "method" = 2
+    tau = 2000.0                ! [yr] Relaxation time used for "method" = 2
+    rheo_smoothing_radius = 40.0! [km] Gaussian moothing radius for lithospheric thickness
+                                ! and mantle viscosity
     litho_thickness_scaling = 1.0   ! Scaling factor for lithospheric thickness. Only used if lithosphere = "rheology_file"
 
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
     nu              = 0.28          ! [-] Poisson ratio
-    rho_litho       = 3200.0        ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
-    r_earth         = 6.378e3       ! [km]  Earth radius, Coulon et al. (2021)
+    rho_litho       = 3200.0        ! [kg/m^3]  Optionally set to 0 ==> decouple the elastic
+                                    ! displacement from the viscous one
+    r_earth         = 6.378e3       ! [km] Earth radius, Coulon et al. (2021)
     m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
 
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "None"
+    rheology_file = "none"
+    litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
+    log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
+    stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
+
 
     ! Time stepping
     dt_method = "tsit54"    ! Time stepping method, options: "euler", "rk4", "bs32", "tsit54"

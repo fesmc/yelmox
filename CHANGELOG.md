@@ -10,7 +10,8 @@ annotated git tag. Dates are release (tag) dates.
   bed elevation (`cf_ref = 0.5`), deep-ocean melt only in the open ocean below 2000 m, GHF
   Fox Maule (2005), `nz_aa = 10`, `grad_lim = 0.1`, `fmb_method = 1`, sea level of Spratt and
   Lisiecki (2016) for A and B (`input/sealevel_spratt2016.dat`, made by
-  `scripts/grl-paleo/make_sealevel_spratt2016.jl`), B deglaciation `dt_clim = 100`.
+  `scripts/grl-paleo/make_sealevel_spratt2016.jl`), B deglaciation `dt_clim = 100`,
+  isostasy LV-ELVA with two uniform mantle layers (as ISMIP7 GRL).
 - GreenlandPaleo: needs Yelmo with outflow-only "infinite" borders (the inflow through the
   border killed the first B LGM spin-up); docs updated.
 - `{domain}`/`{grid_name}` in the isostasy `rheology_file`/`mask_file` (`grid_isos`; needs

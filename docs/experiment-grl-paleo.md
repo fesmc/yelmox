@@ -201,5 +201,5 @@ remapped from GRL-16KM at each update, which made 10 yr six times slower).
 | Deep ocean | `c_deep = -10` m/yr below 2000 m in the open ocean (`mask_deep_ocean = "zone:open_ocean"`) |
 | Geothermal heat flux | Fox Maule et al. (2005) (`[ghf] use_obs = True`) |
 | Sea level | Spratt and Lisiecki (2016), short stack, shifted to 0 at the present (`input/sealevel_spratt2016.dat`, made by `scripts/grl-paleo/make_sealevel_spratt2016.jl` from FesmData SeaLevel-Spratt2016): -128 m at 21 ka, -138 m at 24 ka (A and B) |
-| Isostasy | FastIsostasy LV-ELRA, uniform mantle (the GRL-PAL Lloyd2024 file does not have the layout of `rheology_file`) |
+| Isostasy | FastIsostasy LV-ELVA, two uniform mantle layers (88 and 600 km, 1e21 and 2e21 Pa s, as ISMIP7 GRL; the GRL-PAL Lloyd2024 file does not have the layout of `rheology_file`) |
 | Borders | "infinite" (see above) |
