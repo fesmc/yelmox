@@ -6,6 +6,10 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- `ssa_lat_bc = "all"` in every par file (SRG and ANT paleo were `"floating"`; answer-changing
+  for them); the removed option "slab" dropped from the comments. Sea level of GRL paleo:
+  the Holocene offset of Spratt and Lisiecki (2016) removed linearly over 0-10 ka (was a
+  constant shift).
 - GreenlandPaleo (A and B): calving `vm-m16` instead of `equil`, basal friction scaled with
   bed elevation (`cf_ref = 0.5`), deep-ocean melt only in the open ocean below 2000 m, GHF
   Fox Maule (2005), `nz_aa = 10`, `grad_lim = 0.1`, `fmb_method = 1`, sea level of Spratt and

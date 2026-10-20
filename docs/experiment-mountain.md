@@ -105,7 +105,7 @@ initializes the marine shelf (no data files are read).
 | Surface mass balance | chion PDD (`[chion] model = "pdd"`, `[pdd_chion] pdd_method = "cg05"`), `time_equil = 10` yr | chion ITM (`[chion] model = "itm"`, smbpal's `[itm]`), `sigma_pdd = 8.27` K, `time_equil = 100` yr |
 | Ocean, shelf melt | off | off |
 | Calving | none (`calv_flt_method = "zero"`) | `calv_flt_method = "vm-l19"` |
-| Dynamics | DIVA, `ssa_lat_bc = "all"` | DIVA, `ssa_lat_bc = "floating"` |
+| Dynamics | DIVA, `ssa_lat_bc = "all"` | DIVA, `ssa_lat_bc = "all"` |
 | Basal friction | till angle (`[ytill] is_angle = True`), `cf_ref = cf_min = 30` deg | `cf_ref = 1.002`, `cf_min = 0.01`, linear between `z0 = -300` and `z1 = 200` m |
 | Enhancement | 1 | `enh_shear = 3.093`, `enh_shlf = 0.7` |
 | Slope limits | `[ytopo] grad_lim = grad_lim_zb = 1.0` | 0.5 |
