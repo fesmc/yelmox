@@ -21,10 +21,13 @@ RUNOPTS="${RUNOPTS:--q compute -w 00:30:00 --omp 16}"
 read -r -a RUNOPTS_ARR <<< "$RUNOPTS"
 MODE="-rs"; [ "${STAGE:-0}" = 1 ] && MODE="-s"
 
-# Shared -p arrays of the paleo experiments, referenced as @<array> in the
+# Shared -p arrays of the experiments, referenced as @<array> in the
 # overrides column.
 source scripts/grl-paleo/params.sh
 source scripts/ant-paleo/params.sh
+source scripts/ismip7/params.sh
+source scripts/1pctCO2/params.sh
+source scripts/tipmip/params.sh
 
 # case | par file | timeline group | tstep_method | t0 | t1 | dt | extra overrides
 # (@name: the elements of the bash array name)
@@ -44,10 +47,10 @@ north_pd   |yelmox/yelmox_North.nml                   |ctrl      |const|0      |
 pyrenees   |yelmox/yelmox_Pyrenees.nml                |ctrl      |rel  |-21e3  |0      |1000 |
 srg_pd     |yelmox/yelmox_SRG.nml                     |ctrl      |const|1950   |10     |10   |
 ismip7_grl |yelmox/yelmox_esm_Greenland.nml           |transient |cal  |1975   |2300   |25   |ctrl.run_step=transient esm.experiment=ssp585 esm.use_esm=True esm.use_hist=True esm.use_proj=True
-ismip7_ant |yelmox/yelmox_esm_Antarctica_ismip7.nml   |transient |cal  |1975   |2300   |25   |ctrl.run_step=transient esm.experiment=ssp585 esm.use_esm=True esm.use_hist=True esm.use_proj=True
-pct_grl    |yelmox/yelmox_esm_Greenland_1pctCO2.nml   |transient |cal  |2020   |2160   |20   |ctrl.run_step=transient esm.experiment=1pctCO2 esm.use_esm=True esm.use_hist=False esm.use_proj=True
-pct_ant    |yelmox/yelmox_esm_Antarctica_1pctCO2.nml  |transient |cal  |2020   |2160   |20   |ctrl.run_step=transient esm.experiment=1pctCO2 esm.use_esm=True esm.use_hist=False esm.use_proj=True
-tipmip_grl |yelmox/yelmox_esm_Greenland_tipmip.nml    |transient |cal  |0      |230    |10   |ctrl.run_step=transient esm.experiment=esm-up2p0 esm.use_esm=True esm.use_hist=False esm.use_proj=True
+ismip7_ant |yelmox/yelmox_esm_Antarctica.nml          |transient |cal  |1975   |2300   |25   |@ismip7_ant ctrl.run_step=transient esm.experiment=ssp585 esm.use_esm=True esm.use_hist=True esm.use_proj=True
+pct_grl    |yelmox/yelmox_esm_Greenland.nml           |transient |cal  |2020   |2160   |20   |@pct_grl ctrl.run_step=transient esm.experiment=1pctCO2 esm.use_esm=True esm.use_hist=False esm.use_proj=True
+pct_ant    |yelmox/yelmox_esm_Antarctica.nml          |transient |cal  |2020   |2160   |20   |@ismip7_ant @pct_ant ctrl.run_step=transient esm.experiment=1pctCO2 esm.use_esm=True esm.use_hist=False esm.use_proj=True
+tipmip_grl |yelmox/yelmox_esm_Greenland.nml           |transient |cal  |0      |230    |10   |@tipmip_grl ctrl.run_step=transient esm.experiment=esm-up2p0 esm.use_esm=True esm.use_hist=False esm.use_proj=True
 EOF
 )
 
