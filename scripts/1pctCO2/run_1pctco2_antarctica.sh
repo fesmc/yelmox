@@ -10,7 +10,9 @@
 # atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140. The forcing is the GCM's ABSOLUTE
 # tas/pr/thetao/so, self-referenced to the run start (~1xCO2), read from the global
 # CMIP files and remapped online onto the run's grid; see input/esm/esm_ant_1pctCO2.nml.
-# The reference climatology is RACMO2.3 (atmosphere) + meltMIP OI (ocean).
+# The reference climatology is RACMO2.3 (atmosphere) + meltMIP OI (ocean). Base
+# yelmox/yelmox_esm_Antarctica.nml with the ISMIP7 setup ismip7_ant of
+# scripts/ismip7/params.sh and the 1pctCO2 setup pct_ant of params.sh.
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
@@ -27,9 +29,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
 
+source scripts/ismip7/params.sh                    # ismip7_ant
+source scripts/1pctCO2/params.sh                   # pct_ant
+
 # ---- configuration ---------------------------------------------------------
 EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
-NML="yelmox/yelmox_esm_Antarctica_1pctCO2.nml"
+NML="yelmox/yelmox_esm_Antarctica.nml"
 OUTROOT="output/1pctco2_ant"
 GCM="${GCM:-MPI-ESM1-2-LR}"
 GRID="ANT-32KM"
@@ -55,13 +60,15 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True esm.experiment=ctrl \
+      -p "${ismip7_ant[@]}" "${pct_ant[@]}" \
+         ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True esm.experiment=ctrl \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
     runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/1pctCO2_$GCM" \
-      -p ctrl.run_step=transient esm.experiment=1pctCO2 esm.esm_name="$GCM" \
+      -p "${ismip7_ant[@]}" "${pct_ant[@]}" \
+         ctrl.run_step=transient esm.experiment=1pctCO2 esm.esm_name="$GCM" \
          esm.use_esm=True esm.use_hist=False esm.use_proj=True \
          domain.grid_hub="$GRID" \
          ctrl.restart="$BUNDLE" \
