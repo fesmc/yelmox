@@ -1,7 +1,9 @@
 # Global sea level of Spratt and Lisiecki (2016) for [bsl] sl_path: the short
 # stack (sl_short, seven reconstructions, 0-430 ka, every 1 kyr on the LR04 age
-# model) from FesmData SeaLevel-Spratt2016, shifted to 0 at the present (the
-# stack is +8.5 m at 0 ka).
+# model) from FesmData SeaLevel-Spratt2016, with its Holocene offset removed:
+# the stack is +8.5 m at 0 ka, an offset that builds up after ~10 ka, so the
+# value at 0 ka is subtracted with a weight that decreases linearly from 1 at
+# 0 ka to 0 at 10 ka (unchanged before 10 ka).
 #
 # Usage (from the yelmox root, fesmdata link in place):
 #   julia --project=scripts/grl-paleo scripts/grl-paleo/make_sealevel_spratt2016.jl
@@ -27,11 +29,12 @@ i = sortperm(t)
 t, sl = t[i], sl[i]
 k0 = findfirst(==(0.0), t)
 k0 === nothing && error("no value at 0 ka in $SRC")
+const T_TAPER = 10e3   # [yr] the offset is removed linearly over the last T_TAPER years
 sl0 = sl[k0]
-sl .-= sl0
+sl .-= sl0 .* max.(0.0, 1.0 .+ t ./ T_TAPER)
 
 open(OUT, "w") do io
-    @printf(io, "# Time[yr]\tRSL[m] (Spratt and Lisiecki 2016 sl_short, LR04 ages, %+.2f m at 0 ka removed; scripts/grl-paleo/make_sealevel_spratt2016.jl)\n", sl0)
+    @printf(io, "# Time[yr]\tRSL[m] (Spratt and Lisiecki 2016 sl_short, LR04 ages, %+.2f m at 0 ka removed linearly over 0-10 ka; scripts/grl-paleo/make_sealevel_spratt2016.jl)\n", sl0)
     for (tk, sk) in zip(t, sl)
         @printf(io, "%d\t%.4f\n", round(Int, tk), sk)
     end
