@@ -122,14 +122,7 @@
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
     ! units and restart_every_df), advanced on the forcing clock time_rel.
     names  = ""       ! e.g. "at" "ramp"; "" = none
-/
-
-&idx_dT
-    ! Sensitivity anomaly for run_mg_forward.sh (with [indices] names = "dT",
-    ! [anom] index = "dT"): a constant [K], set there with f_min = f_max.
-    method = "const"
-    f_min  = 0.0
-    f_max  = 0.0
+    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
 /
 
 &anom
@@ -576,8 +569,9 @@
 
 &snap
     ! Snapshot backend (snapshots): the present-day reference only, RACMO2.3p2
-    ! 1981-2010 and the ISMIP7 ocean climatology. Databases: input/clim_db.nml;
-    ! unset keys: input/yelmox_defaults.nml.
+    ! 1981-2010 and the ISMIP7 ocean climatology. Groups: this file, then
+    ! var_defs; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
     snapshots  = "pd"
 /
 

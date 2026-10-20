@@ -85,8 +85,8 @@ initializes the marine shelf (no data files are read).
   `z_bed_sd`), a 10-yr equilibration (`[sim] init_method = "equil"`).
 - **Climate:** MAR v3.14 1960--1990 on `SRG-250M` (`[snap_pd]`), a legacy
   `ice_data` file not in FesmData; its database groups
-  (`srg_mar314_1960_1990_tas`, `_pr`, `_zs`) are in the par file itself, found
-  after `input/clim_db.nml`. `[snap] f_p = 0.096` K-1.
+  (`srg_mar314_1960_1990_tas`, `_pr`, `_zs`) are in the par file itself, which is
+  searched before the `[snap] var_defs` files. `[snap] f_p = 0.096` K-1.
 - **Relaxation outside the icefield:** `[yelmo_masks] relax = "~SanRafael:1"`,
   `relax_tau = 50` yr, with `[ytopo] topo_rel = -1`: outside basin 1 of the
   `SanRafael` set the ice relaxes to the reference thickness; inside it evolves

@@ -21,6 +21,10 @@
 
     "files" : ["git_yelmo.txt"],
 
+    "par_defaults" : ["input/yelmo_defaults.nml", "input/yelmox_defaults.nml"],
+
+    "par_library"  : ["input/forcing_db.nml"],
+
     "dir-special" :
     {
         "None" : "target_dir_name"

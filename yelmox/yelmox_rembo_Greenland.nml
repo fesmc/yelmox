@@ -120,6 +120,7 @@
     ! restart_every_df), advanced on the forcing clock time_rel; unset keys
     ! from the template [idx] of input/yelmox_defaults.nml.
     names  = ""       ! e.g. "at" "ramp"; "" = none
+    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
 /
 
 &anom
@@ -139,24 +140,6 @@
     active = False    ! Apply it?
     f_to   = 0.25     ! [1] fraction of the air temperature anomaly
     region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
-/
-
-&idx_hyst
-    ! Hysteresis template (not listed in [indices] names): add "hyst" to names
-    ! and set [anom] active = True, index = "hyst".
-    method     = "PI42"     ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
-    with_kill  = True       ! stop the run once the response equilibrates at a bound
-    dt_init    = 200.0      ! [yr]  hold forcing flat during this initial interval
-    dt_ramp    = 300.0      ! [yr]  ramp/period length (ramp-time, ramp-time-step, sin)
-    dt_conv    = -1.0       ! [yr]  convergence interval (ramp-time-step)
-    dt_ave     = 100.0      ! [yr]  averaging window for the response derivative (feedback)
-    df_sign    = 1          ! +1/-1 direction of forcing change
-    tol        = 20.0       ! [Gt/yr] target/tolerance response rate (feedback/kill; was hyster.eps)
-    df_dt_max  = 1e-4       ! [f/yr] maximum forcing rate (4/1e-4 ~ 60 kyr)
-    sigma      = 0.0        ! [f]   std. dev. of optional gaussian noise
-    f_min      = 0.0        ! [f]   lower forcing bound
-    f_max      = 4.0        ! [f]   upper forcing bound
-    f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
 /
 
 &orbit
@@ -578,7 +561,7 @@
     ! databases input/clim_db.nml), no axes; [anom] adds dT_ocn = dT_ann*f_to
     ! to it. REMBO supplies the atmosphere, so no tas, pr, zs. Unset keys:
     ! input/yelmox_defaults.nml.
-    var_defs   = "input/clim_db.nml"
+    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
     ref_name   = "pd"
     snapshots  = "pd"
 /
