@@ -104,6 +104,7 @@
 &topo
     path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    names = ""   ! variables of the file, by position in vars ("" = as vars)
     remap = "con"
 /
 
@@ -111,6 +112,9 @@
     path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
+    layers       = ""    ! layers of any file (path_<layer>, var_<layer>); "" = none
+    path_ismip7  = ""    ! layer ismip7 (scripts/ismip7: the ISMIP7 basins)
+    var_ismip7   = ""
     masks        = "APIS" "WAIS" "EAIS"
     mask_APIS    = "region:Antarctic_Peninsula"
     mask_WAIS    = "region:West_Antarctica"
@@ -680,6 +684,19 @@
 &chion
     model           = "itm"                          ! Snowpack model: "itm", "bessi" or "pdd"
     nml_itm         = "itm"                          ! ITM parameters: shared with smbpal
+    nml_pdd         = "pdd_chion"                    ! PDD parameters (chion's own group; read only for model = "pdd")
+/
+
+&pdd_chion
+    ! chion's PDD parameters: smbpal's PDD ([smbpal] mm_snow, mm_ice, sigma, firn_fac;
+    ! [itm] Pmaxfrac, H_snow_max).
+    ddf_snow            = 3.0       ! [kg m-2 K-1 d-1] Degree-day factor for snow
+    ddf_ice             = 8.0       ! [kg m-2 K-1 d-1] Degree-day factor for ice
+    refreezing_fraction = 0.6       ! [1] Refreezing capacity per unit snowpack
+    temperature_sigma   = 5.0       ! [K] Std dev of unresolved temperature variability
+    H_snow_max          = 5000.0    ! [kg m-2] Snowpack cap; the excess is converted to ice
+    pdd_method          = "cg05"    ! PDD integral: "cg05" (Calov and Greve, 2005) or "simple"
+    firn_fac            = 0.0266    ! [K (mm w.e. yr-1)-1] Firn warming per annual refreezing
 /
 
 ! ===== Ocean =====

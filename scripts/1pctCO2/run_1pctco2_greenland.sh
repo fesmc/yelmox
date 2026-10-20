@@ -10,7 +10,8 @@
 # atmospheric CO2 +1%/yr to 4xCO2 at ~yr 140. The forcing is the GCM's ABSOLUTE
 # tas/pr/thetao/so, self-referenced to the run start (~1xCO2), read from the global
 # CMIP files and remapped online onto the run's grid; see input/esm/esm_grl_1pctCO2.nml.
-# The reference climatology is MAR (atmosphere) + ORAS5 (ocean).
+# The reference climatology is MAR (atmosphere) + ORAS5 (ocean). Base
+# yelmox/yelmox_esm_Greenland.nml with the 1pctCO2 setup pct_grl of params.sh.
 #
 # Run the steps in order on the cluster; let the spin-up finish first:
 #
@@ -27,9 +28,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
 
+source scripts/1pctCO2/params.sh                   # pct_grl
+
 # ---- configuration ---------------------------------------------------------
 EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
-NML="yelmox/yelmox_esm_Greenland_1pctCO2.nml"
+NML="yelmox/yelmox_esm_Greenland.nml"
 OUTROOT="output/1pctco2_grl"
 GCM="${GCM:-MPI-ESM1-2-LR}"
 GRID="GRL-8KM"
@@ -55,13 +58,15 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True esm.experiment=ctrl \
+      -p "${pct_grl[@]}" \
+         ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True esm.experiment=ctrl \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
     runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/1pctCO2_$GCM" \
-      -p ctrl.run_step=transient esm.experiment=1pctCO2 esm.esm_name="$GCM" \
+      -p "${pct_grl[@]}" \
+         ctrl.run_step=transient esm.experiment=1pctCO2 esm.esm_name="$GCM" \
          esm.use_esm=True esm.use_hist=False esm.use_proj=True \
          domain.grid_hub="$GRID" \
          ctrl.restart="$BUNDLE" \

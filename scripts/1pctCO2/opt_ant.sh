@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# 1pctCO2 Antarctica optimization spin-up. Base yelmox/yelmox_esm_Antarctica.nml
+# with ismip7_ant (scripts/ismip7/params.sh) and pct_ant (params.sh).
+
+source "$(dirname "$0")/../ismip7/params.sh"
+source "$(dirname "$0")/params.sh"
 
 resolution=ANT-16KM
 output_path=output/1pctCO2/opt-${resolution}-l21-bedmap3
@@ -70,5 +76,5 @@ mat_params=(
 # albedo: runopts="-rs -q 48h -w 48:00:00", or -s to stage only).
 runopts="${runopts:--rs -q shared -w 2-00:00:00 -m 20G}"
 
-runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica_1pctCO2.nml -o "${output_path}" \
-      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${hyd_params[@]}" "${mat_params[@]}"
+runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica.nml -o "${output_path}" \
+      -p "${ismip7_ant[@]}" "${pct_ant[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${hyd_params[@]}" "${mat_params[@]}"
