@@ -243,7 +243,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#b.-reconstruction-forcing" id="toc-b.-reconstruction-forcing" class="nav-link" data-scroll-target="#b.-reconstruction-forcing">B. Reconstruction forcing</a></li>
   <li><a href="#b.-lgm-spin-up" id="toc-b.-lgm-spin-up" class="nav-link" data-scroll-target="#b.-lgm-spin-up">B. LGM spin-up</a></li>
   <li><a href="#b.-transient" id="toc-b.-transient" class="nav-link" data-scroll-target="#b.-transient">B. Transient</a></li>
-  <li><a href="#configuration-common-to-all" id="toc-configuration-common-to-all" class="nav-link" data-scroll-target="#configuration-common-to-all">Configuration common to all</a></li>
+  <li><a href="#configuration-common-to-all" id="toc-configuration-common-to-all" class="nav-link" data-scroll-target="#configuration-common-to-all">Configuration common to all</a>
+  <ul class="collapse">
+  <li><a href="#sea-level" id="toc-sea-level" class="nav-link" data-scroll-target="#sea-level">Sea level</a></li>
+  </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/experiment-grl-paleo.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -290,7 +293,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="domain-borders" class="level2">
 <h2 class="anchored" data-anchor-id="domain-borders">Domain borders</h2>
-<p>The west border cuts Baffin Island and the Canadian Arctic Archipelago, where Innuitian and Laurentide ice crosses it in glacial periods. The borders are “infinite” (<code>[yelmo] experiment = "infinite"</code>, <code>mask_border = "dynamic"</code>): the outermost cells take the thickness of their inner neighbours, so the border ice thickens and thins with the interior. No ice enters from outside the domain: the ice west of the border is what the local climate builds.</p>
+<p>The west border cuts Baffin Island and the Canadian Arctic Archipelago, where Innuitian and Laurentide ice crosses it in glacial periods. The borders are “infinite” (<code>[yelmo] experiment = "infinite"</code>, <code>mask_border = "dynamic"</code>): the outermost cells take the thickness of their inner neighbours, so the border ice thickens and thins with the interior. Ice flows out through the border but not in (the outflow is booked in <code>mb_resid</code>): the ice west of the border is what the local climate builds. Before Yelmo fixed this (2026-10-19), the border cells fed the interior wherever the flow pointed inwards, without limit and unbooked; in the first B LGM spin-up this inflow grew exponentially (above the domain SMB after ~8 kyr) and piled ice up to 10 km at the front in northern Baffin Bay.</p>
 <p>Prescribed border ice is the alternative (not used now): a strip of fixed and relaxation cells (<code>[yelmo_masks] border_width = N M</code>, e.g. <code>2 4</code>) whose thickness comes from an ice history (<code>[ice_bnd] active = True</code>, PaleoMIST by default), with <code>experiment = "None"</code>, <code>mask_border = "auto"</code> and <code>[ytopo] topo_rel = -1</code>.</p>
 </section>
 <section id="reference-climate" class="level2">
@@ -320,7 +323,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> -130 kyr to 0, <code>dtt = 10</code> yr, on relative time (<code>tstep_method = "rel"</code>). <code>[sim] relax = False</code>, <code>opt = False</code>.</li>
 <li><strong>Climate:</strong> snapshots <code>pd</code>, <code>picontrol</code>, <code>lgm</code> and the axis <code>a</code> (<code>[snap_axis_a]</code>): the present-day reference plus the PMIP3 LGM – piControl anomaly, scaled by the glacial index <code>[idx_a]</code> (<code>input/alpha_combined_125kyr_interp.dat</code>, as is: 0 = present day, ~0.9 at 21 ka, -0.2 in the last interglacial). The ocean anomaly is <code>f_to = 0.25</code> times the mean sea-level air temperature anomaly (<code>[ocn_fraction]</code>). Insolation varies in time (<code>[orbit] method = "clock"</code>).</li>
-<li><strong>Sea level:</strong> <code>[barysealevel] method = "file"</code>, <code>input/sealevel_rohling_450kyr.dat</code>.</li>
+<li><strong>Sea level:</strong> <code>[barysealevel] method = "file"</code>, <code>input/sealevel_spratt2016.dat</code>.</li>
 </ul>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
@@ -345,7 +348,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <p>Swapping the axes of the two fields gives the other combinations (Badgeley temperature: its annual anomaly in every month). The time-varying groups are read in time on the forcing clock (<code>extrap</code>: the first slice before the record starts, e.g.&nbsp;Badgeley at 20 ka during the LGM spin-up).</p>
 <p>The reconstructions are GRL-16KM products, remapped online onto GRL-PAL and filled from the nearest cell outside the GRL box. <code>[taper]</code> with <code>outside = "mean"</code> replaces the anomaly there by the mean anomaly of the coverage (per month: the temperature difference and the precipitation ratio of the totals, recomputed at every climate update): <code>w = 1</code> in the coverage of both, a cosine to 0 over 100 km (hand-built file <code>ice_data/GreenlandPaleo/GRL-PAL-16KM/GRL-PAL-16KM_TAPER-Buizert2018-Badgeley2020.nc</code>, <code>clim_db.nml</code> group <code>taper_b18_b20</code>, made by <code>scripts/grl-paleo/make_taper_recon.jl</code>). West of it (Ellesmere, Baffin Bay) the climate is the present-day reference plus that mean anomaly.</p>
-<p>The ocean anomaly is <code>f_to = 0.25</code> times the mean sea-level air temperature anomaly (<code>[ocn_fraction]</code>); sea level from <code>input/sl_deglaciation.dat</code>; insolation at the forcing clock (<code>[orbit] method = "clock"</code>).</p>
+<p>The ocean anomaly is <code>f_to = 0.25</code> times the mean sea-level air temperature anomaly (<code>[ocn_fraction]</code>); sea level from <code>input/sealevel_spratt2016.dat</code> (as A); insolation at the forcing clock (<code>[orbit] method = "clock"</code>). The climate is updated every 100 yr (<code>dt_clim</code>; the reconstructions are read and remapped from GRL-16KM at each update, which made 10 yr six times slower).</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grlpal_b.png" class="img-fluid figure-img"></p>
@@ -403,11 +406,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Dynamics</td>
-<td>DIVA</td>
+<td>DIVA, <code>nz_aa = 10</code>, <code>grad_lim = 0.1</code></td>
+</tr>
+<tr class="even">
+<td>Basal friction</td>
+<td>no optimization; <code>cb_ref</code> scaled linearly with bed elevation (<code>[ytill] scale_zb = 1</code>, <code>cf_ref = 0.5</code> above 300 m, <code>cf_min = 1e-3</code> below -500 m); <code>till_delta = 0.1</code>, <code>bkt_till_rate = 1e-3</code></td>
+</tr>
+<tr class="odd">
+<td>Calving</td>
+<td>level set, von Mises (<code>calv_flt_method = calv_grnd_method = "vm-m16"</code>)</td>
+</tr>
+<tr class="even">
+<td>Frontal melt</td>
+<td>proportional to the shelf melt (<code>fmb_method = 1</code>)</td>
+</tr>
+<tr class="odd">
+<td>Deep ocean</td>
+<td><code>c_deep = -10</code> m/yr below 2000 m in the open ocean (<code>mask_deep_ocean = "zone:open_ocean"</code>)</td>
+</tr>
+<tr class="even">
+<td>Geothermal heat flux</td>
+<td>Fox Maule et al.&nbsp;(2005) (<code>[ghf] use_obs = True</code>)</td>
+</tr>
+<tr class="odd">
+<td>Sea level</td>
+<td>Spratt and Lisiecki (2016), short stack, its +8.5 m at 0 ka removed linearly over 0-10 ka (<code>input/sealevel_spratt2016.dat</code>, made by <code>scripts/grl-paleo/make_sealevel_spratt2016.jl</code> from FesmData SeaLevel-Spratt2016): -120 m at 21 ka, -130 m at 24 ka (A and B)</td>
 </tr>
 <tr class="even">
 <td>Isostasy</td>
-<td>FastIsostasy LV-ELRA, uniform mantle (the GRL-PAL Lloyd2024 file does not have the layout of <code>rheology_file</code>)</td>
+<td>FastIsostasy LV-ELVA, two uniform mantle layers (88 and 600 km, 1e21 and 2e21 Pa s, as ISMIP7 GRL; the GRL-PAL Lloyd2024 file does not have the layout of <code>rheology_file</code>)</td>
 </tr>
 <tr class="odd">
 <td>Borders</td>
@@ -415,8 +442,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
+<section id="sea-level" class="level3">
+<h3 class="anchored" data-anchor-id="sea-level">Sea level</h3>
+<p>A and B use the same global sea level, <code>input/sealevel_spratt2016.dat</code>: the short stack of Spratt and Lisiecki (2016) (seven reconstructions, 0–430 ka, 1 kyr, LR04 ages), from FesmData <code>Records/SeaLevel/SeaLevel-Spratt2016</code>. The stack is +8.5 m at the present, an offset that builds up in the Holocene; it is removed with a weight that decreases linearly from 1 at 0 ka to 0 at 10 ka, so the curve is 0 at the present and the stack itself before 10 ka (-120 m at 21 ka, -130 m at 24 ka, -124 m at 135 ka). The stack covers the whole glacial cycle with an LGM close to Lambeck et al.&nbsp;(2014); its early deglaciation (22–16 ka) leads Lambeck et al.&nbsp;(2014) and the Red Sea record by 1–2 kyr. The former curves were <code>input/sealevel_rohling_450kyr.dat</code> for A, close to the Red Sea record of Grant et al.&nbsp;(2014) (-105 m at 21 ka), and <code>input/sl_deglaciation.dat</code> for B (Lambeck-like after 21 ka, -140 m held before). File made by <code>scripts/grl-paleo/make_sealevel_spratt2016.jl</code>, figure by <code>scripts/grl-paleo/plot_sealevel.jl</code>.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/grlpal_sealevel.png" class="img-fluid figure-img"></p>
+<figcaption>Global sea level: the FesmData SeaLevel products (thin), the yelmox input curves (dashed) and the curve of A and B (black), 0–150 ka, 0–35 ka and 15–30 ka.</figcaption>
+</figure>
+</div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->
