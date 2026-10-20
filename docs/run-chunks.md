@@ -74,8 +74,8 @@ final bundle of the chain, so a next stage can be chained to it with `-d` and
 ## Example: Greenland paleo
 
 The two [Greenland paleo](experiment-grl-paleo.md) setups, each a spin-up and a
-transient, in 5-kyr chunks (the A spin-up in 6, 5 and 4 kyr, so that its first
-chunk covers the relaxation until 6 kyr). All run on
+transient, in 5-kyr chunks (the A spin-up in 6, 5, 5 and 4 kyr, so that its
+first chunk covers the relaxation until 6 kyr). All run on
 `yelmox/yelmox_GreenlandPaleo.nml`, with the overrides of the
 `scripts/grl-paleo/run_*.sh` scripts less the times and the restart. Each `-p`
 takes one quoted string, so an array of `scripts/grl-paleo/params.sh` is passed
@@ -88,7 +88,7 @@ elsa="ytrc.use_elsa=True ytrc.t_dep_source=elsa ytrc.elsa_nml=input/forcing_db.n
 ```
 
 ```bash
-read jA rA < <(scripts/run_chunks.sh -p "tm_2D.dt=1000" --p-first "sim.relax=True" $par output/grl-paleo/spinup 0 6000 11000 15000)
+read jA rA < <(scripts/run_chunks.sh -p "tm_1D.dt=10 tm_2D.dt=1000" --p-first "sim.relax=True" $par output/grl-paleo/spinup-pd-0ka 0 6000 11000 16000 20000)
 ```
 
 ```bash
@@ -101,7 +101,7 @@ scripts/run_chunks.sh -d "$jA" -r "$rA" -p "${grlpal_lgp[*]}" \
 read jB rB < <(scripts/run_chunks.sh -p "${grlpal_recon[*]}" \
     -p "ctrl.tstep_const=-21e3 tm_1D.dt=10 tm_2D.dt=1000 sim.init_method=recon sim.recon_var=H_ice sim.recon_time=-21e3 sim.recon_regions=all" \
     -p "sim.recon_path=fesmdata/{domain}/{grid_name}/{grid_name}_IceHistory-GLAC1D.nc" \
-    $par output/grl-paleo/lgm 0 5000 10000 15000 20000)
+    $par output/grl-paleo/spinup-recon-21ka 0 5000 10000 15000 20000)
 ```
 
 ```bash
@@ -110,5 +110,5 @@ scripts/run_chunks.sh -d "$jB" -r "$rB" -p "${grlpal_recon[*]}" \
     --p-first "ytrc.elsa_restart=False" --p-rest "ytrc.elsa_restart=True" $par output/grl-paleo/deglac -21000 -16000 -11000 -6000 -1000 0
 ```
 
-The first command chain is 3 + 26 jobs, the second 4 + 5; all 38 are submitted
+The first command chain is 4 + 26 jobs, the second 4 + 5; all 39 are submitted
 at once.

@@ -1,19 +1,19 @@
 #!/bin/bash
 #
 # Greenland paleo transient, last glacial period (-130 kyr to 0, GRL-PAL,
-# 16 km), restarting from the spin-up bundle at 15 kyr. Climate follows the
-# glacial index input/alpha_combined_125kyr_interp.dat (index "a"); forcing
-# grlpal_lgp of params.sh. Base yelmox/yelmox_GreenlandPaleo.nml. Run from the
-# yelmox root.
+# 16 km), restarting from the spin-up bundle at 20 kyr (run_spinup.sh pd 0).
+# Climate follows the glacial index input/alpha_combined_125kyr_interp.dat
+# (index "a"); forcing grlpal_lgp of params.sh. Base
+# yelmox/yelmox_GreenlandPaleo.nml. Run from the yelmox root.
 
 source "$(dirname "$0")/params.sh"
 
-spinup_path=${1:-output/grl-paleo/spinup}
+spinup_path=${1:-output/grl-paleo/spinup-pd-0ka}
 output_path=${2:-output/grl-paleo/lgp}
 
 # Absolute path: the executable runs from inside the run dir, so a
 # repo-root-relative path would not resolve.
-restart="$(realpath -m "${spinup_path}")/restart-15.000-kyr"
+restart="$(realpath -m "${spinup_path}")/restart-20.000-kyr"
 if [ ! -d "${restart}" ]; then
     echo "run_lgp.sh: spin-up restart bundle not found: ${restart}" >&2
     exit 1
