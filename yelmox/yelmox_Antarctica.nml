@@ -575,6 +575,18 @@
     snapshots  = "pd"
 /
 
+! ---- fields (blend rule and axes; the others follow the reference) ---------
+
+&snap_field_tas
+    blend = "linear"
+    axes  = ""
+/
+
+&snap_field_pr
+    blend = "linear"
+    axes  = ""
+/
+
 ! ---- snapshots (var_defs groups per field) ---------------------------------
 
 &snap_pd
@@ -728,6 +740,25 @@
     corr_ross = "Zwally2012:12"
     corr_pine = "Zwally2012:14"
     corr_abbott = "Zwally2012:15"
+    ! one Zwally basin each, for per-basin corrections (corr_names b1 ... b18; scripts/ant-paleo)
+    corr_b1 = "Zwally2012:1"
+    corr_b2 = "Zwally2012:2"
+    corr_b3 = "Zwally2012:3"
+    corr_b4 = "Zwally2012:4"
+    corr_b5 = "Zwally2012:5"
+    corr_b6 = "Zwally2012:6"
+    corr_b7 = "Zwally2012:7"
+    corr_b8 = "Zwally2012:8"
+    corr_b9 = "Zwally2012:9"
+    corr_b10 = "Zwally2012:10"
+    corr_b11 = "Zwally2012:11"
+    corr_b12 = "Zwally2012:12"
+    corr_b13 = "Zwally2012:13"
+    corr_b14 = "Zwally2012:14"
+    corr_b15 = "Zwally2012:15"
+    corr_b16 = "Zwally2012:16"
+    corr_b17 = "Zwally2012:17"
+    corr_b18 = "Zwally2012:18"
     
     tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped climate forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
