@@ -277,8 +277,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><p><strong>A. Last glacial period</strong>, as the <a href="./experiment-ant-paleo.html">Antarctic paleo</a>: a 15-kyr present-day <strong>spin-up</strong>, then a <strong>transient</strong> from 130 kyr ago to the present, restarted from the spin-up, with the climate scaled by a glacial index.</p></li>
 <li><p><strong>B. Deglaciation</strong> after Tabone et al.&nbsp;(2024): an <strong>LGM spin-up</strong> from GLAC-1D, then a <strong>transient</strong> from 21 ka to the present forced by the Greenland climate reconstructions of Buizert et al.&nbsp;(2018, temperature) and Badgeley et al.&nbsp;(2020, precipitation).</p></li>
 <li><p><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the snapshot backend (<code>[comps] climate = "snapshots"</code>, see <a href="./climate-snapshots.html">Snapshots</a>).</p></li>
-<li><p><strong>Config:</strong> <code>yelmox/yelmox_GreenlandPaleo.nml</code> (base); A: <code>yelmox/yelmox_GreenlandPaleo_spinup.nml</code>, <code>yelmox/yelmox_GreenlandPaleo_lgp.nml</code>; B: <code>yelmox/yelmox_GreenlandPaleo_lgm.nml</code>, <code>yelmox/yelmox_GreenlandPaleo_deglac.nml</code>.</p></li>
-<li><p><strong>Scripts:</strong> <code>scripts/grl-paleo/</code>: A <code>run_spinup.sh</code>, <code>run_lgp.sh</code>; B <code>run_lgm_spinup.sh</code>, <code>run_deglac.sh</code>.</p></li>
+<li><p><strong>Config:</strong> <code>yelmox/yelmox_GreenlandPaleo.nml</code> (base of A and B).</p></li>
+<li><p><strong>Scripts:</strong> <code>scripts/grl-paleo/</code>: A <code>run_spinup.sh</code>, <code>run_lgp.sh</code>; B <code>run_lgm_spinup.sh</code>, <code>run_deglac.sh</code>. The forcing is set with <code>-p</code>: <code>scripts/grl-paleo/params.sh</code> (<code>grlpal_lgp</code> for A, <code>grlpal_recon</code> for B).</p></li>
 <li><p><strong>Design:</strong> <code>docs/_grl-paleo-plan.md</code>.</p></li>
 </ul>
 <section id="running" class="level2">
@@ -328,11 +328,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grlpal_a.png" class="img-fluid figure-img"></p>
-<figcaption>Forcing of yelmox_GreenlandPaleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
+<figcaption>Forcing of yelmox_GreenlandPaleo.nml with grlpal_lgp of scripts/grl-paleo/params.sh at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
 </figure>
 </div>
 <ul>
-<li><strong>Ice age:</strong> isochrones with elsa (<code>[ytrc] use_elsa</code>, <code>[elsa_grl_paleo]</code>): one layer every 1 kyr, coupled every 50 yr (for comparison with MacGregor et al., 2025).</li>
+<li><strong>Ice age:</strong> isochrones with elsa (<code>[ytrc] use_elsa</code>, <code>[elsa_grl_lgp]</code> of <code>input/forcing_db.nml</code>): one layer every 1 kyr, coupled every 50 yr (for comparison with MacGregor et al., 2025).</li>
 <li><strong>Output:</strong> 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.</li>
 </ul>
 </section>
@@ -352,7 +352,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grlpal_b.png" class="img-fluid figure-img"></p>
-<figcaption>Forcing of yelmox_GreenlandPaleo_deglac.nml at 21 ka and 12.5 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio. West of the GRL box: the mean anomaly of the reconstructions.</figcaption>
+<figcaption>Forcing of yelmox_GreenlandPaleo.nml with grlpal_recon of scripts/grl-paleo/params.sh at 21 ka and 12.5 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio. West of the GRL box: the mean anomaly of the reconstructions.</figcaption>
 </figure>
 </div>
 </section>
@@ -368,7 +368,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="b.-transient">B. Transient</h2>
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> -21 ka to 0, on relative time, restarted from the LGM spin-up.</li>
-<li><strong>Ice age:</strong> isochrones with elsa (<code>[elsa_grl_paleo]</code>): one layer every 500 yr.</li>
+<li><strong>Ice age:</strong> isochrones with elsa (<code>[elsa_grl_deglac]</code>): one layer every 500 yr.</li>
 <li><strong>Output:</strong> 2D every 500 yr, 1D every 10 yr, restart bundles every 7 kyr.</li>
 </ul>
 </section>

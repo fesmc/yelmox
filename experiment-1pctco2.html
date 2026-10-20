@@ -268,9 +268,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Greenland and Antarctic simulations under the idealized CMIP experiment 1pctCO2 (atmospheric CO2 rising by 1 %/yr, about 4xCO2 after 140 yr), in two steps: a present-day <strong>optimization spin-up</strong>, as for <a href="./experiment-ismip7.html">ISMIP7</a>, then the <strong>scenario</strong>, which starts from the spin-up’s restart bundle and runs 140 yr under the absolute CMIP fields of one GCM, taken relative to their own first years.</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the ESM climate backend (<code>[comps] climate = "esm"</code>, see <a href="./climate-esm.html">ESM forcing</a>).</li>
-<li><strong>Config:</strong> <code>yelmox/yelmox_esm_Greenland_1pctCO2.nml</code>, <code>yelmox/yelmox_esm_Antarctica_1pctCO2.nml</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_esm_Greenland.nml</code>, <code>yelmox/yelmox_esm_Antarctica.nml</code> (the 1pctCO2 setup: <code>-p</code>).</li>
 <li><strong>Forcing data:</strong> <code>input/esm/esm_grl_1pctCO2.nml</code>, <code>input/esm/esm_ant_1pctCO2.nml</code> (see <a href="./database-namelists.html">Database namelists</a>).</li>
-<li><strong>Scripts:</strong> <code>scripts/1pctCO2/</code> – workflows <code>run_1pctco2_greenland.sh</code>, <code>run_1pctco2_antarctica.sh</code>; tuned Antarctic spin-up <code>opt_ant.sh</code>.</li>
+<li><strong>Scripts:</strong> <code>scripts/1pctCO2/</code> – workflows <code>run_1pctco2_greenland.sh</code>, <code>run_1pctco2_antarctica.sh</code>; tuned Antarctic spin-up <code>opt_ant.sh</code>. The setup is <code>scripts/1pctCO2/params.sh</code> (<code>pct_grl</code>; Antarctica <code>pct_ant</code> after <code>ismip7_ant</code> of <code>scripts/ismip7/params.sh</code>).</li>
 </ul>
 <section id="running" class="level2">
 <h2 class="anchored" data-anchor-id="running">Running</h2>
@@ -325,7 +325,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="spin-up" class="level2">
 <h2 class="anchored" data-anchor-id="spin-up">Spin-up</h2>
 <p>The spin-up passes <code>ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True esm.experiment=ctrl</code>. It is the ISMIP7 spin-up (same <code>[spinup]</code>, <code>[relax]</code> and <code>[opt]</code> groups) except for the surface mass balance, which chion computes from the reference climate (<code>[comps] surface_method = "chion"</code>; ISMIP7 takes the ESM’s own smb). In the spin-up the backend applies the reference climatology only.</p>
-<p><code>opt_ant.sh</code> is a tuned 20-kyr Antarctic optimization spin-up on ANT-16KM with <code>yelmox_esm_Antarctica_1pctCO2.nml</code>: <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>), a short relaxation (<code>relax.time1/2 = 100</code>), the ocean extrapolated into the shelves (<code>marine_shelf.extrap_shlf=True</code>), equilibrium calving, DIVA, shelf enhancement 0.5. Output in <code>output/1pctCO2/opt-ANT-16KM-l21-bedmap3</code>.</p>
+<p><code>opt_ant.sh</code> is a tuned 20-kyr Antarctic optimization spin-up on ANT-16KM with <code>yelmox_esm_Antarctica.nml</code>, <code>ismip7_ant</code> and <code>pct_ant</code>: <code>cb_ref</code> started from the till friction of the bed (<code>opt.cf_init=-1</code>), a short relaxation (<code>relax.time1/2 = 100</code>), the ocean extrapolated into the shelves (<code>marine_shelf.extrap_shlf=True</code>), equilibrium calving, DIVA, shelf enhancement 0.5. Output in <code>output/1pctCO2/opt-ANT-16KM-l21-bedmap3</code>.</p>
 </section>
 <section id="scenario" class="level2">
 <h2 class="anchored" data-anchor-id="scenario">Scenario</h2>

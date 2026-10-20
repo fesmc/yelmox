@@ -269,9 +269,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Greenland simulations for TIPMIP, in three steps: a present-day <strong>optimization spin-up</strong>, as for <a href="./experiment-ismip7.html">ISMIP7</a>; the <strong>ramp</strong> esm-up2p0 (232 yr), which starts from the spin-up’s restart bundle; and the <strong>stabilisations</strong> esm-up2p0-gwl2p0 and esm-up2p0-gwl4p0 (50 yr each), which start from the ramp’s restart bundles at the years where their forcing branches off. The forcing is the TIPMIP anomalies relative to the GCM’s piControl, added to the present-day reference climatology.</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the ESM climate backend (<code>[comps] climate = "esm"</code>, see <a href="./climate-esm.html">ESM forcing</a>).</li>
-<li><strong>Config:</strong> <code>yelmox/yelmox_esm_Greenland_tipmip.nml</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_esm_Greenland.nml</code> (the TIPMIP setup: <code>-p</code>).</li>
 <li><strong>Forcing data:</strong> <code>input/esm/esm_grl_tipmip.nml</code> (ramp), <code>input/esm/esm_grl_tipmip_gwl.nml</code> (stabilisations) (see <a href="./database-namelists.html">Database namelists</a>).</li>
-<li><strong>Scripts:</strong> <code>scripts/tipmip/run_tipmip_greenland.sh</code>.</li>
+<li><strong>Scripts:</strong> <code>scripts/tipmip/run_tipmip_greenland.sh</code>, with the setup <code>scripts/tipmip/params.sh</code> (<code>tipmip_grl</code>).</li>
 </ul>
 <section id="running" class="level2">
 <h2 class="anchored" data-anchor-id="running">Running</h2>

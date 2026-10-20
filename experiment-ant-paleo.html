@@ -267,8 +267,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>An Antarctic simulation of the last glacial period at 32 km, in two steps: a 15-kyr present-day <strong>spin-up</strong> that optimizes the basal friction (<code>cb_ref</code>) and the ocean thermal-forcing correction (<code>tf_corr</code>), then a <strong>transient</strong> from 130 kyr ago to 10 kyr in the future, restarted from the spin-up, with the climate scaled by a glacial index and the sea level following a reconstruction.</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the snapshot backend (<code>[comps] climate = "snapshots"</code>, see <a href="./climate-snapshots.html">Snapshots</a>).</li>
-<li><strong>Config:</strong> <code>yelmox/yelmox_Antarctica_paleo_spinup.nml</code>, <code>yelmox/yelmox_Antarctica_paleo_lgp.nml</code>.</li>
-<li><strong>Scripts:</strong> <code>scripts/ant-paleo/run_spinup.sh</code>, <code>scripts/ant-paleo/run_lgp.sh</code>. Ported from the old single-grid par files.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_Antarctica.nml</code> (base).</li>
+<li><strong>Scripts:</strong> <code>scripts/ant-paleo/run_spinup.sh</code>, <code>scripts/ant-paleo/run_lgp.sh</code>. The 32 km setup and the forcing are set with <code>-p</code>: <code>scripts/ant-paleo/params.sh</code> (<code>antpal_physics</code>, <code>antpal_lgp</code>). Ported from the old single-grid par files.</li>
 </ul>
 <section id="running" class="level2">
 <h2 class="anchored" data-anchor-id="running">Running</h2>
@@ -298,7 +298,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/ant_paleo.png" class="img-fluid figure-img"></p>
-<figcaption>Forcing of yelmox_Antarctica_paleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
+<figcaption>Forcing of yelmox_Antarctica.nml with antpal_physics and antpal_lgp of scripts/ant-paleo/params.sh at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
 </figure>
 </div>
 </section>

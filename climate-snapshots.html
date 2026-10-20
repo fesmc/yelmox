@@ -292,15 +292,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <section id="database" class="level3">
 <h3 class="anchored" data-anchor-id="database">Database</h3>
-<p>The snapshots bind varslice groups (see <a href="./database-namelists.html">Database namelists</a>) by name, from the files listed in <code>[snap] var_defs</code>, searched in order (first file that has the group), then from the par file itself (searched implicitly last, so it never has to name itself). The shared database <code>input/clim_db.nml</code> holds one group per product field; a par file can add run-specific groups:</p>
+<p>The snapshots bind varslice groups (see <a href="./database-namelists.html">Database namelists</a>) by name, from the par file itself if it has the group (searched implicitly first, so it never has to name itself and its groups win), else from the files listed in <code>[snap] var_defs</code>, searched in order (first file that has the group). The snapshot groups <code>[snap_&lt;name&gt;]</code> and the axis groups <code>[snap_axis_&lt;name&gt;]</code> are looked up the same way, and the index groups <code>[idx_&lt;name&gt;]</code> through <code>[indices] var_defs</code> (default none). The shared database <code>input/clim_db.nml</code> holds one group per product field; a par file can add run-specific groups:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    var_defs <span class="kw">=</span> <span class="st">"input/clim_db.nml"</span>   <span class="co">! the default</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>my_tas                              <span class="co">! in the par file: found after clim_db.nml</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>my_tas                              <span class="co">! in the par file: found before clim_db.nml</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    filename <span class="kw">=</span> <span class="st">"ice_data/..."</span></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    ...</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>A group missing from every file (and the par file) stops the run, naming the group and the files. The paths of the database take, besides <code>{domain}</code> and <code>{grid_name}</code>, two keywords:</p>
+<p>A group missing from the par file and every var_defs file stops the run, naming the group and the files. The paths of the database take, besides <code>{domain}</code> and <code>{grid_name}</code>, two keywords:</p>
 <ul>
 <li><code>{grid_global}</code>: the global grid of the paleoclimate products, <code>[snap] grid_global</code> (default <code>GLOBAL-1DEG</code>);</li>
 <li><code>{exp}</code>: the experiment of the snapshot, its <code>exp</code>, so one group serves every experiment of a product family.</li>
@@ -431,7 +431,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tbody>
 </table>
 <p>An axis with <code>lo = ""</code> adds its <code>hi</code> snapshot as the anomaly itself: <code>ref + a_k hi_k</code> (<code>linear</code>) or <code>ref (1 + a_k (hi_k - 1))</code> (<code>ratio</code>), e.g.&nbsp;a reconstructed temperature anomaly or precipitation ratio (Badgeley et al., 2020) without a zero snapshot. Such a snapshot binds no <code>zs</code>: its fields are taken as given, so they must be <strong>sea-level</strong> anomalies or ratios (there is no elevation correction of their own). If it binds <code>zs</code>, it is reduced to sea level like any other snapshot.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_axis_b20                <span class="co">! yelmox_GreenlandPaleo_deglac.nml</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_axis_b20                <span class="co">! input/forcing_db.nml</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    lo    <span class="kw">=</span> <span class="st">""</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    hi    <span class="kw">=</span> <span class="st">"b20"</span>             <span class="co">! snapshot binding tas (anomaly) and pr (ratio), no zs</span></span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span> <span class="kw">=</span> <span class="st">"one"</span>             <span class="co">! a const index, f = 1</span></span>

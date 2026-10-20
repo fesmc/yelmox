@@ -266,25 +266,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>Greenland test cases at 16 km, without optimization of the basal friction or the ocean thermal forcing: the present-day reference climate with the PMIP3 piControl and LGM snapshots on a glacial index axis <code>at</code> (<code>yelmox_Greenland.nml</code>), the same with a homogeneous air temperature ramp as a functionality test at 32 km (<code>yelmox_Greenland_ramp.nml</code>), and the present-day reference alone (<code>yelmox_pd_Greenland.nml</code>).</p>
+<p>Greenland test cases at 16 km, without optimization of the basal friction or the ocean thermal forcing: the present-day reference climate with the PMIP3 piControl and LGM snapshots on a glacial index axis <code>at</code> (<code>yelmox_Greenland.nml</code>), the same with a homogeneous air temperature ramp as a functionality test at 32 km, and the present-day reference alone (both <code>yelmox_Greenland.nml</code> with <code>-p</code> overrides).</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>) with the snapshot backend (<code>[comps] climate = "snapshots"</code>, see <a href="./climate-snapshots.html">Snapshots</a>).</li>
-<li><strong>Config:</strong> <code>yelmox/yelmox_Greenland.nml</code>, <code>yelmox/yelmox_Greenland_ramp.nml</code>, <code>yelmox/yelmox_pd_Greenland.nml</code>.</li>
+<li><strong>Config:</strong> <code>yelmox/yelmox_Greenland.nml</code>; the ramp and present-day runs set their differences with <code>-p</code> (see Running).</li>
 </ul>
 <section id="running" class="level2">
 <h2 class="anchored" data-anchor-id="running">Running</h2>
 <p>Run from the yelmox root:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 02:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_Greenland.nml <span class="at">-o</span> output/grl</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 02:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_Greenland_ramp.nml <span class="at">-o</span> output/grl-ramp</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 08:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_pd_Greenland.nml <span class="at">-o</span> output/grl-pd</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 02:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_Greenland.nml <span class="at">-o</span> output/grl-ramp <span class="dt">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>      <span class="at">-p</span> ctrl.tstep_method=rel domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>         domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 tm_2D.dt=50 <span class="dt">\</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         indices.names==at,ramp anom.active=True anom.index=ramp</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 08:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_Greenland.nml <span class="at">-o</span> output/grl-pd <span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>      <span class="at">-p</span> ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 indices.names=<span class="st">""</span> <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>         snap.snapshots=pd snap.axes=<span class="st">""</span> snap_field_tas.axes=<span class="st">""</span> snap_field_pr.axes=<span class="st">""</span> snap_field_pr.blend=linear <span class="dt">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>         ocn_fraction.active=False</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>On a busy queue, run them as chains of short jobs (<a href="./run-chunks.html">Long runs in chunks</a>). The forcing time of <code>yelmox_Greenland.nml</code> is set with <code>-p</code>: e.g. <code>ctrl.tstep_const=-21e3</code> holds the climate of 21 ka, <code>ctrl.tstep_method=rel ctrl.time_init=-130e3 ctrl.time_end=0</code> follows the index through the last glacial cycle.</p>
 </section>
 <section id="timeline" class="level2">
 <h2 class="anchored" data-anchor-id="timeline">Timeline</h2>
 <ul>
 <li><strong><code>yelmox_Greenland.nml</code>:</strong> <code>[ctrl]</code> 0 to 15 kyr, <code>dtt = 10</code> yr, the forcing held at present day (<code>tstep_method = "const"</code>, <code>tstep_const = 0</code>), where <code>at = 0</code>: the climate is the present-day reference.</li>
-<li><strong><code>yelmox_Greenland_ramp.nml</code>:</strong> the same on relative time (<code>tstep_method = "rel"</code>), so that the ramp advances with the model time.</li>
-<li><strong><code>yelmox_pd_Greenland.nml</code>:</strong> 0 to 50 kyr.</li>
+<li><strong>Ramp:</strong> the same on relative time (<code>tstep_method = "rel"</code>), so that the ramp advances with the model time.</li>
+<li><strong>Present day:</strong> 0 to 50 kyr.</li>
 <li><strong>All:</strong> cold start on the present-day topography (<code>[sim] init_method = "none"</code>), no relaxation, no optimization (<code>[sim] relax = False</code>, <code>opt = False</code>; <code>[relax]</code> and <code>[opt]</code> are unused). Present-day insolation (<code>[orbit] method = "time"</code>, <code>time = 0</code>); the sea level follows the model’s own ice-volume change (<code>[barysealevel] method = "fastiso"</code>).</li>
 <li><strong>Output:</strong> 1D every year; 2D every 200 yr (ramp: 50 yr; pd: 500 yr), small 2D every 50 yr (pd: 500 yr).</li>
 </ul>
@@ -302,7 +308,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="air-temperature-ramp" class="level2">
 <h2 class="anchored" data-anchor-id="air-temperature-ramp">Air temperature ramp</h2>
-<p><code>yelmox_Greenland_ramp.nml</code> adds the index <code>ramp</code> (<code>[indices] names = "at" "ramp"</code>) and applies it as a homogeneous anomaly (<code>[anom] active = True</code>, <code>index = "ramp"</code>, <code>f_ta = 1</code>, <code>f_to = 0</code>, <code>f_so = 0</code>):</p>
+<p>The ramp run adds the index <code>ramp</code> (<code>[indices] names = "at" "ramp"</code>; <code>[idx_ramp]</code> from <code>input/forcing_db.nml</code>) and applies it as a homogeneous anomaly (<code>[anom] active = True</code>, <code>index = "ramp"</code>, <code>f_ta = 1</code>, <code>f_to = 0</code>, <code>f_so = 0</code>):</p>
 <ul>
 <li><strong>Index:</strong> <code>[idx_ramp] method = "ramp-slope"</code>, <code>df_dt_max = 0.0025</code> yr⁻¹ from <code>f_min = 0</code> to <code>f_max = 5</code>: the air temperature rises by 5 K over 2000 yr and stays there; white noise of <code>sigma = 0.3</code> on the index; <code>with_kill = False</code>.</li>
 <li><strong>Response:</strong> the precipitation is multiplied by exp(<code>f_p</code>·dTa); the ocean follows through <code>[ocn_fraction]</code>, whose sea-level anomaly includes dTa.</li>
@@ -310,13 +316,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grl_ramp.png" class="img-fluid figure-img"></p>
-<figcaption>Forcing of yelmox_Greenland_ramp.nml at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
+<figcaption>Forcing of the ramp run at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
 </figure>
 </div>
 </section>
 <section id="present-day" class="level2">
 <h2 class="anchored" data-anchor-id="present-day">Present day</h2>
-<p><code>yelmox_pd_Greenland.nml</code> keeps the reference only (<code>[snap] snapshots = "pd"</code>), without indices (<code>[indices] names = ""</code>) and with <code>[ocn_fraction] active = False</code>. Its basin sets are <code>Zwally2012</code> only (no <code>NEGIS</code>).</p>
+<p>The present-day run keeps the reference only (<code>[snap] snapshots = "pd"</code>), without indices (<code>[indices] names = ""</code>) and with <code>[ocn_fraction] active = False</code>. Its basin sets are <code>Zwally2012</code> only (no <code>NEGIS</code>).</p>
 </section>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
@@ -328,7 +334,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td>Grids</td>
-<td><code>GRL-16KM</code> for every component (<code>yelmox_Greenland_ramp.nml</code>: <code>GRL-32KM</code>)</td>
+<td><code>GRL-16KM</code> for every component (ramp: <code>GRL-32KM</code>)</td>
 </tr>
 <tr class="even">
 <td>Topography</td>

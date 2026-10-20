@@ -249,6 +249,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#prescribed-ice-ice_bnd" id="toc-prescribed-ice-ice_bnd" class="nav-link" data-scroll-target="#prescribed-ice-ice_bnd">Prescribed ice (<code>[ice_bnd]</code>)</a></li>
   <li><a href="#configuration" id="toc-configuration" class="nav-link" data-scroll-target="#configuration">Configuration</a>
   <ul class="collapse">
+  <li><a href="#forcing-library" id="toc-forcing-library" class="nav-link" data-scroll-target="#forcing-library">Forcing library</a></li>
   <li><a href="#ctrl" id="toc-ctrl" class="nav-link" data-scroll-target="#ctrl"><code>[ctrl]</code></a></li>
   <li><a href="#comps" id="toc-comps" class="nav-link" data-scroll-target="#comps"><code>[comps]</code></a></li>
   <li><a href="#sim" id="toc-sim" class="nav-link" data-scroll-target="#sim"><code>[sim]</code></a></li>
@@ -313,7 +314,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Program:</strong> <code>yelmox/yelmox.f90</code> (thin driver) + <code>libs/kryos*.f90</code> (domain, coupling, startup, output).</li>
 <li><strong>Build:</strong> <code>make yelmox</code> (<code>make yelmox rembo=1</code> to link REMBO).</li>
-<li><strong>Configs:</strong> <code>yelmox/yelmox_&lt;domain&gt;.nml</code> (Antarctica, Greenland, North, LIS, Pyrenees, SRG, plus <code>pd_</code> present-day and paleo variants), <code>yelmox_esm_*.nml</code> (<a href="./climate-esm.html">ESM forcing</a>), <code>yelmox_rembo_Greenland.nml</code> (<a href="./climate-rembo.html">REMBO</a>), <code>yelmox_Greenland_ramp.nml</code> (an air temperature ramp: <code>[anom]</code> on a <code>ramp-slope</code> index).</li>
+<li><strong>Configs:</strong> one base par file per domain and climate backend, <code>yelmox/yelmox_&lt;base&gt;.nml</code>: Greenland, GreenlandPaleo, Antarctica, North, LIS, Pyrenees, SRG, esm_Greenland and esm_Antarctica (<a href="./climate-esm.html">ESM forcing</a>), rembo_Greenland (<a href="./climate-rembo.html">REMBO</a>). An experiment is a <code>-p</code> list on a base, in its scripts in <code>scripts/&lt;exp&gt;/</code> (arrays shared by several scripts in <code>params.sh</code>); see <a href="#forcing-library">Forcing library</a>.</li>
 <li><strong>Experiments:</strong> <a href="./experiment-greenland.html">Greenland</a>, <a href="./experiment-antarctica.html">Antarctica</a>, <a href="./experiment-ismip7.html">ISMIP7 projections</a>, <a href="./experiment-1pctco2.html">1pctCO2</a>, <a href="./experiment-tipmip.html">TIPMIP</a>, <a href="./experiment-ant-paleo.html">Antarctic paleo</a>, <a href="./experiment-grl-paleo.html">Greenland paleo</a>, <a href="./experiment-laurentide.html">Laurentide</a>, <a href="./experiment-mountain.html">Mountain glaciers</a>.</li>
 </ul>
 <section id="components" class="level2">
@@ -410,27 +411,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="indices-and-the-homogeneous-anomaly-indices-anom">Indices and the homogeneous anomaly (<code>[indices]</code>, <code>[anom]</code>)</h2>
 <p><strong>Indices</strong> are named scalar series, each a <code>tsgen</code> time-series generator (the modern replacement for the legacy <code>hyster</code> module). They are <strong>driver-owned</strong>: the program holds one registry (<code>indices_class</code>, <code>idx</code>, libs/kryos_forcing.f90), advances every index once per step on the forcing clock <code>time_rel</code>, and passes it to <code>step_climate</code> (and the cold start); consumers read an index by name (the snapshots axes, <code>[anom]</code>). Multi-domain drivers share one registry.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>indices</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    names <span class="kw">=</span> <span class="st">"ramp"</span>            <span class="co">! "" = no indices</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>idx_ramp                     <span class="co">! a tsgen group (unset keys: template [idx])</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    method    <span class="kw">=</span> <span class="st">"ramp-time"</span>   <span class="co">! const | ramp-slope | ramp-time | ramp-time-step | sin | series | exp | PI42 | ...</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    f_min     <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    f_max     <span class="kw">=</span> <span class="fl">5.0</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    dt_ramp   <span class="kw">=</span> <span class="fl">200.0</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">! ... (see the [idx] template of input/yelmox_defaults.nml)</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">! units = "K" (label of idx_&lt;name&gt; in the 1D output, default "1"),</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">! restart_every_df = 0.5 (a restart bundle each |Δf|, default 0 = off)</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>anom</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    active <span class="kw">=</span> True     <span class="co">! a homogeneous anomaly from one index</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span>  <span class="kw">=</span> <span class="st">"ramp"</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    f_ta   <span class="kw">=</span> <span class="fl">1.0</span>      <span class="co">! dTa = f * f_ta   (air temperature [K])</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    f_to   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dTo = f * f_to   (ocean temperature [K])</span></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    f_so   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dSo = f * f_so   (ocean salinity [psu])</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Time-driven methods (<code>ramp-*</code>, <code>sin</code>, <code>const</code>, <code>series</code>) are analytic or tabulated; feedback methods (<code>exp</code>, PI/PID controllers) modulate the forcing rate from the model response — the response variable passed to <code>tsgen</code> is total ice volume (Gt). The run stops when any index trips its kill switch (<code>with_kill</code>), and writes a restart bundle <code>restart-&lt;n&gt;</code> each time an index moves by more than its <code>restart_every_df</code>. Each index restarts from <code>idx_&lt;name&gt;_restart.nc</code> in the bundle, and is written to the 1D output as <code>idx_&lt;name&gt;</code> (plus <code>idx_&lt;name&gt;_df_dt</code>).</p>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    names    <span class="kw">=</span> <span class="st">"ramp"</span>         <span class="co">! "" = no indices</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    var_defs <span class="kw">=</span> <span class="st">""</span>             <span class="co">! files with [idx_&lt;name&gt;] groups, searched in order after this file</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>idx_ramp                     <span class="co">! a tsgen group (unset keys: template [idx])</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    method    <span class="kw">=</span> <span class="st">"ramp-time"</span>   <span class="co">! const | ramp-slope | ramp-time | ramp-time-step | sin | series | exp | PI42 | ...</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    f_min     <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    f_max     <span class="kw">=</span> <span class="fl">5.0</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    dt_ramp   <span class="kw">=</span> <span class="fl">200.0</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">! ... (see the [idx] template of input/yelmox_defaults.nml)</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">! units = "K" (label of idx_&lt;name&gt; in the 1D output, default "1"),</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">! restart_every_df = 0.5 (a restart bundle each |Δf|, default 0 = off)</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>anom</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    active <span class="kw">=</span> True     <span class="co">! a homogeneous anomaly from one index</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span>  <span class="kw">=</span> <span class="st">"ramp"</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    f_ta   <span class="kw">=</span> <span class="fl">1.0</span>      <span class="co">! dTa = f * f_ta   (air temperature [K])</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    f_to   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dTo = f * f_to   (ocean temperature [K])</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    f_so   <span class="kw">=</span> <span class="fl">0.0</span>      <span class="co">! dSo = f * f_so   (ocean salinity [psu])</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Time-driven methods (<code>ramp-*</code>, <code>sin</code>, <code>const</code>, <code>series</code>) are analytic or tabulated; feedback methods (<code>exp</code>, PI/PID controllers) modulate the forcing rate from the model response — the response variable passed to <code>tsgen</code> is total ice volume (Gt). The run stops when any index trips its kill switch (<code>with_kill</code>), and writes a restart bundle <code>restart-&lt;n&gt;</code> each time an index moves by more than its <code>restart_every_df</code>. Each index restarts from <code>idx_&lt;name&gt;_restart.nc</code> in the bundle, and is written to the 1D output as <code>idx_&lt;name&gt;</code> (plus <code>idx_&lt;name&gt;_df_dt</code>). Each <code>[idx_&lt;name&gt;]</code> is read from the par file if it has the group, else from the first of the <code>[indices] var_defs</code> files that does (default none), the lookup of the snapshot groups (see <a href="./climate-snapshots.html#database">Database</a>).</p>
 <p><code>[anom]</code> is a climate modifier (libs/climate_mods.f90): applied to the backend’s output after the backend, before <code>[ocn_fraction]</code>, <code>[ocn_obm]</code>, <code>[taper]</code> and <code>[bias]</code>, on the climate grid. Air temperature + <code>dTa</code>, precipitation × exp(β·<code>dTa</code>) (β the backend’s precipitation sensitivity), ocean profiles + <code>dTo</code>/<code>dSo</code> (esm: at the shelf base). The group is optional (inactive without it) and takes the domain suffix (<code>anom&lt;sfx&gt;</code>). Checked at init: the index must be in the registry, and a backend that supplies the smb (esm with <code>surface_method = "climate"</code>) refuses it. rembo reads <code>[anom]</code> itself, as an input of REMBO (see <a href="./climate-rembo.html">REMBO</a>).</p>
 </section>
 <section id="ocean-anomaly-from-the-atmosphere-ocn_fraction" class="level2">
@@ -471,11 +473,11 @@ pr  = w*pr + (1 - w)*pr_ref*f(m)</code></pre>
 </ul>
 <pre><code>&amp;taper
     active   = True
-    var_defs = ""         ! files with the group below, searched in order, then this file
+    var_defs = ""         ! files with the group below, searched in order after this file
     weight   = "taper_w"  ! var_defs group of w [1]: one 2D field (time = 0 0 0 0 1)
     outside  = "ref"      ! ref | mean: where w &lt; 1, towards the reference (plus the mean anomaly of the cells with w = 1)
 /</code></pre>
-<p>The weight is a varslice group on the climate grid or remapped online (<code>remap</code>, <code>grid_src</code>); values outside [0, 1] (or missing) stop the run. It is written to the climate’s 2D file (<code>taper_w</code>). <code>input/clim_db.nml</code> holds <code>taper_b18_b20</code>, the weight of the Greenland reconstructions on GreenlandPaleo (1 in their coverage, 0 beyond 100 km; <code>outside = "mean"</code> in <code>yelmox_GreenlandPaleo_lgm.nml</code> and <code>yelmox_GreenlandPaleo_deglac.nml</code>).</p>
+<p>The weight is a varslice group on the climate grid or remapped online (<code>remap</code>, <code>grid_src</code>); values outside [0, 1] (or missing) stop the run. It is written to the climate’s 2D file (<code>taper_w</code>). <code>input/clim_db.nml</code> holds <code>taper_b18_b20</code>, the weight of the Greenland reconstructions on GreenlandPaleo (1 in their coverage, 0 beyond 100 km; <code>outside = "mean"</code> in <code>grlpal_recon</code> of <code>scripts/grl-paleo/params.sh</code>).</p>
 </section>
 <section id="climate-bias-correction-bias" class="level2">
 <h2 class="anchored" data-anchor-id="climate-bias-correction-bias">Climate bias correction (<code>[bias]</code>)</h2>
@@ -484,7 +486,7 @@ pr  = w*pr + (1 - w)*pr_ref*f(m)</code></pre>
 <p>The annual means follow (temperature additively, precipitation by the ratio of the annual totals); the reference climate and the ocean are unchanged. The group is optional; without it, or with <code>active = False</code>, nothing changes.</p>
 <pre><code>&amp;bias
     active   = True
-    var_defs = ""             ! files with the groups below, searched in order, then this file
+    var_defs = ""             ! files with the groups below, searched in order after this file
     dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
     fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
     f_tas    = 1.0            ! weight of dtas
@@ -512,7 +514,7 @@ pr  = w*pr + (1 - w)*pr_ref*f(m)</code></pre>
 scaled:  H_ice_ref = f * H_ice(slice_time)  (f an index, e.g. before the file starts)</code></pre>
 <pre><code>&amp;ice_bnd
     active     = True
-    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order, then this file
+    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order after this file
     method     = "file"               ! file | scaled
     H_ice      = "paleomist_H_ice"    ! var_defs group of the ice thickness [m]
     index      = ""                   ! scaled: the index f ([indices] names)
@@ -603,6 +605,13 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f an index, e.g. before the file st
 <span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>    scale_glacial_smb <span class="kw">=</span> False</span>
 <span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>    lim_pd_ice        <span class="kw">=</span> False</span>
 <span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="forcing-library" class="level3">
+<h3 class="anchored" data-anchor-id="forcing-library">Forcing library</h3>
+<p><code>input/forcing_db.nml</code> holds the named forcing groups that several par files share: snapshots <code>[snap_&lt;name&gt;]</code> (PMIP3 <code>picontrol</code>, <code>lgm</code>; the Greenland reconstructions <code>b18_base</code>, <code>b18</code>, <code>b20</code>), axes <code>[snap_axis_&lt;name&gt;]</code> (<code>a</code>, <code>at</code>, <code>b18</code>, <code>b20</code>), indices <code>[idx_&lt;name&gt;]</code> (<code>a</code>, <code>at</code>, <code>one</code>, <code>ramp</code>, <code>orb</code>, <code>hyst</code>, <code>dT</code>) and elsa layer settings (<code>elsa_grl_lgp</code>, <code>elsa_grl_deglac</code>, <code>elsa_ant_paleo</code>). <code>[snap_pd]</code>, <code>[snap]</code>, <code>[snap_field_*]</code> and <code>[indices]</code> stay in the par file.</p>
+<p>A named group is read from the par file if it has it, else from the first var_defs file that does: <code>[snap] var_defs</code> for the snapshot, axis and varslice groups, <code>[indices] var_defs</code> for the index groups. The bases list <code>input/forcing_db.nml</code> there (the ESM bases in <code>[indices]</code> only). elsa reads its group from the file <code>[ytrc] elsa_nml</code> names (<code>input/forcing_db.nml</code>), selected by <code>elsa_group</code>. A listed group found nowhere stops the run.</p>
+<p>To change a library group for one run, define it in the par file (it wins), or set one of its keys with <code>-p</code> (e.g.&nbsp;<code>-p idx_a.f_min=0</code>): runme copies the whole group into the staged par file, then applies the override (<code>par_library</code> in <code>.runme/info.json</code>). <code>par_defaults</code> (<code>input/yelmo_defaults.nml</code>, <code>input/yelmox_defaults.nml</code>) lets <code>-p</code> set a key of a group the par file lacks, e.g.&nbsp;<code>-p bias.active=True</code> or <code>-p ytrc.use_elsa=True</code>. <code>-p</code> on a library group needs runme 0.5.26 or later.</p>
+<p>Scripts follow one rule: the settings that define the experiment go in commented <code>-p</code> arrays (in <code>scripts/&lt;exp&gt;/params.sh</code> when several scripts share them); run control goes in the invocation (run step, times, restart, grid, output intervals, queue).</p>
+</section>
 <section id="ctrl" class="level3">
 <h3 class="anchored" data-anchor-id="ctrl"><code>[ctrl]</code></h3>
 <table class="caption-top table">
