@@ -34,7 +34,7 @@ fi
 ref="grlpal_${forcing}[@]"
 forcing_params=("${!ref}")
 
-ka=$(awk -v t="${time}" 'BEGIN { printf "%g", -t/1000 }')
+ka=$(awk -v t="${time}" 'BEGIN { printf "%g", (t == 0) ? 0 : -t/1000 }')
 output_path=${1:-output/grl-paleo/spinup-${forcing}-${ka}ka}
 [ $# -gt 0 ] && shift
 
@@ -48,7 +48,7 @@ run_params=(
 
 # Cold start from the GLAC-1D ice at <time> (the present-day topography at 0).
 init_params=()
-if [ "${ka}" != "0" ]; then
+if [ "${ka}" != "0" ]; then        # "0" for any form of zero (0, 0.0, -0)
     init_params=(
         "sim.init_method=recon"     # ice from recon_path where recon_regions
         "sim.recon_path=fesmdata/{domain}/{grid_name}/{grid_name}_IceHistory-GLAC1D.nc"
