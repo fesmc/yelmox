@@ -66,11 +66,12 @@ Innuitian and Laurentide ice crosses it in glacial periods. The borders are
 "infinite" (`[yelmo] experiment = "infinite"`, `mask_border = "dynamic"`): the
 outermost cells take the thickness of their inner neighbours, so the border ice
 thickens and thins with the interior. Ice flows out through the border but not
-in (the outflow is booked in `mb_resid`): the ice west of the border is what the
-local climate builds. Before Yelmo fixed this (2026-10-19), the border cells fed
-the interior wherever the flow pointed inwards, without limit and unbooked; in
-the first B LGM spin-up this inflow grew exponentially (above the domain SMB
-after ~8 kyr) and piled ice up to 10 km at the front in northern Baffin Bay.
+in: the ice west of the border is what the local climate builds. The reset of
+the border cells is booked in `mb_border`; the domain totals in `yelmo_ts.nc`
+leave these cells out, and `mb_border_tot` is their total (the outflow).
+Before Yelmo fixed this (2026-10-19), the border cells fed the interior wherever
+the flow pointed inwards, without limit and unbooked; in the first B LGM spin-up
+this inflow grew exponentially (above the domain SMB after ~8 kyr) and piled ice up to 10 km at the front in northern Baffin Bay.
 
 Prescribed border ice is the alternative (not used now): a
 strip of fixed and relaxation cells (`[yelmo_masks] border_width = N M`, e.g.
@@ -197,7 +198,7 @@ remapped from GRL-16KM at each update, which made 10 yr six times slower).
 | Shelf melt | `bmb_method = "lin"`, `tf_method = 1` |
 | Dynamics | DIVA, `nz_aa = 10`, `grad_lim = 0.1` |
 | Basal friction | no optimization; `cb_ref` scaled linearly with bed elevation (`[ytill] scale_zb = 1`, `cf_ref = 0.5` above 300 m, `cf_min = 1e-3` below -500 m); `till_delta = 0.1`, `bkt_till_rate = 1e-3` |
-| Calving | level set, von Mises (`calv_flt_method = calv_grnd_method = "vm-m16"`) |
+| Calving | level set, von Mises (`calv_flt_method = calv_grnd_method = "vm-m16"`, Morlighem et al. 2016) |
 | Frontal melt | proportional to the shelf melt (`fmb_method = 1`) |
 | Deep ocean | `c_deep = -10` m/yr below 2000 m in the open ocean (`mask_deep_ocean = "zone:open_ocean"`) |
 | Geothermal heat flux | Fox Maule et al. (2005) (`[ghf] use_obs = True`) |

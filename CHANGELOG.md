@@ -32,6 +32,9 @@ annotated git tag. Dates are release (tag) dates.
   isostasy LV-ELVA with two uniform mantle layers (as ISMIP7 GRL).
 - GreenlandPaleo: needs Yelmo with outflow-only "infinite" borders (the inflow through the
   border killed the first B LGM spin-up); docs updated.
+- `input/yelmo-variables-ytopo.md`: `mb_border` (Yelmo dev c2cb8c3e: the reset of outflow-border
+  cells, booked apart from `mb_resid`; region totals without these cells, `mb_border_tot`
+  their total). GreenlandPaleo docs updated.
 - `{domain}`/`{grid_name}` in the isostasy `rheology_file`/`mask_file` (`grid_isos`; needs
   FastIsostasy `isos_init(..., domain, grid_name)`), the `smb_simple` target mask
   (`grid_surface`) and the bipolar hydro masks (each domain's `grid_ice`); the Antarctic,
