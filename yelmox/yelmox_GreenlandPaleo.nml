@@ -38,6 +38,10 @@
     ! Conditions of this simulation: cold-start ice state (init_*),
     ! relaxation, optimization, regional modifications.
     init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    recon_path              = ""        ! recon*: ice reconstruction file ({domain}, {grid_name} = grid_ice)
+    recon_var               = ""        ! recon*: its ice-thickness variable
+    recon_time              = 0.0       ! [yr] recon*: model time of the state (nearest slice of recon_path)
+    recon_regions           = ""        ! recon: where its ice is imposed
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
     init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
@@ -629,6 +633,20 @@
     snapshots  = "pd"
     f_p        = 0.06
 /
+
+! ---- fields (blend rule and axes; the others follow the reference) ---------
+
+&snap_field_tas
+    blend = "linear"
+    axes  = ""
+/
+
+&snap_field_pr
+    blend = "linear"
+    axes  = ""
+/
+
+! ---- snapshots (var_defs groups per field) ----------------------------------
 
 &snap_pd
     tas = "era5_1981_2010_tas"
