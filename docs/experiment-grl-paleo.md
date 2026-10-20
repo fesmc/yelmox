@@ -203,3 +203,22 @@ remapped from GRL-16KM at each update, which made 10 yr six times slower).
 | Sea level | Spratt and Lisiecki (2016), short stack, its +8.5 m at 0 ka removed linearly over 0-10 ka (`input/sealevel_spratt2016.dat`, made by `scripts/grl-paleo/make_sealevel_spratt2016.jl` from FesmData SeaLevel-Spratt2016): -120 m at 21 ka, -130 m at 24 ka (A and B) |
 | Isostasy | FastIsostasy LV-ELVA, two uniform mantle layers (88 and 600 km, 1e21 and 2e21 Pa s, as ISMIP7 GRL; the GRL-PAL Lloyd2024 file does not have the layout of `rheology_file`) |
 | Borders | "infinite" (see above) |
+
+### Sea level
+
+A and B use the same global sea level, `input/sealevel_spratt2016.dat`: the
+short stack of Spratt and Lisiecki (2016) (seven reconstructions, 0--430 ka,
+1 kyr, LR04 ages), from FesmData `Records/SeaLevel/SeaLevel-Spratt2016`. The
+stack is +8.5 m at the present, an offset that builds up in the Holocene; it is
+removed with a weight that decreases linearly from 1 at 0 ka to 0 at 10 ka, so
+the curve is 0 at the present and the stack itself before 10 ka (-120 m at
+21 ka, -130 m at 24 ka, -124 m at 135 ka). The stack covers the whole glacial
+cycle with an LGM close to Lambeck et al. (2014); its early deglaciation
+(22--16 ka) leads Lambeck et al. (2014) and the Red Sea record by 1--2 kyr.
+The former curves were `input/sealevel_rohling_450kyr.dat` for A, close to the
+Red Sea record of Grant et al. (2014) (-105 m at 21 ka), and
+`input/sl_deglaciation.dat` for B (Lambeck-like after 21 ka, -140 m held
+before). File made by `scripts/grl-paleo/make_sealevel_spratt2016.jl`, figure
+by `scripts/grl-paleo/plot_sealevel.jl`.
+
+![Global sea level: the FesmData SeaLevel products (thin), the yelmox input curves (dashed) and the curve of A and B (black), 0--150 ka, 0--35 ka and 15--30 ka.](figures/grlpal_sealevel.png)
