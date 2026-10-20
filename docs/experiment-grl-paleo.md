@@ -161,8 +161,10 @@ cosine to 0 over 100 km (hand-built file
 the climate is the present-day reference plus that mean anomaly.
 
 The ocean anomaly is `f_to = 0.25` times the mean sea-level air temperature
-anomaly (`[ocn_fraction]`); sea level from `input/sl_deglaciation.dat`;
-insolation at the forcing clock (`[orbit] method = "clock"`).
+anomaly (`[ocn_fraction]`); sea level from `input/sealevel_rohling_450kyr.dat`
+(as A); insolation at the forcing clock (`[orbit] method = "clock"`). The
+climate is updated every 100 yr (`dt_clim`; the reconstructions are read and
+remapped from GRL-16KM at each update, which made 10 yr six times slower).
 
 ![Forcing of yelmox_GreenlandPaleo_deglac.nml at 21 ka and 12.5 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio. West of the GRL box: the mean anomaly of the reconstructions.](figures/grlpal_b.png)
 
@@ -192,6 +194,12 @@ insolation at the forcing clock (`[orbit] method = "clock"`).
 | Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows `[ocn_fraction]`) |
 | Surface mass balance | chion (`[comps] surface_method = "chion"`) |
 | Shelf melt | `bmb_method = "lin"`, `tf_method = 1` |
-| Dynamics | DIVA |
+| Dynamics | DIVA, `nz_aa = 10`, `grad_lim = 0.1` |
+| Basal friction | no optimization; `cb_ref` scaled linearly with bed elevation (`[ytill] scale_zb = 1`, `cf_ref = 0.5` above 300 m, `cf_min = 1e-3` below -500 m); `till_delta = 0.1`, `bkt_till_rate = 1e-3` |
+| Calving | level set, von Mises (`calv_flt_method = calv_grnd_method = "vm-m16"`) |
+| Frontal melt | proportional to the shelf melt (`fmb_method = 1`) |
+| Deep ocean | `c_deep = -10` m/yr below 2000 m in the open ocean (`mask_deep_ocean = "zone:open_ocean"`) |
+| Geothermal heat flux | Fox Maule et al. (2005) (`[ghf] use_obs = True`) |
+| Sea level | `input/sealevel_rohling_450kyr.dat` (A and B) |
 | Isostasy | FastIsostasy LV-ELRA, uniform mantle (the GRL-PAL Lloyd2024 file does not have the layout of `rheology_file`) |
 | Borders | "infinite" (see above) |

@@ -316,7 +316,7 @@
                             ! "fastiso": BSL = sum of contributions from fastiso domains
                             ! "mixed": combine "file" and "fastiso"
     bsl_init    = 0.0       ! [m] BSL relative to present day
-    sl_path     = "input/sl_deglaciation.dat"   ! Input time series filename
+    sl_path     = "input/sealevel_rohling_450kyr.dat" ! Input time series filename
     sl_name     = "none"    ! Variable name in netcdf file, if relevant
     A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
     A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc" ! Path to ocean surface file
@@ -331,7 +331,7 @@
 /
 
 &ghf
-    use_obs   = False 
+    use_obs   = True
     obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-FoxMaule2005.nc"
     obs_name  = "ghf"
     obs_err_name = "None"
@@ -365,7 +365,7 @@
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 6                 ! Vertical resolution in ice
+    nz_aa           = 10                ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
     dt_min          = 0.01              ! [a] Minimum timestep 
     cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
@@ -381,7 +381,7 @@
 
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
-    grad_lim            = 0.05              ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
+    grad_lim            = 0.1               ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
     grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
     front_subgrid       = "marine"          ! Subgrid ice fronts: "none" (binary f_ice), "floating", "marine" (floating + marine-grounded)
     front_H_eff_min     = 50.0              ! [m] Minimum effective thickness of front cells (front_subgrid)
@@ -411,7 +411,7 @@
     dmb_m_r             = 1.0               ! [-]   Discharge resolution scaling exponent
 
     ! === frontal mass melt ===
-    fmb_method          = 0                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
+    fmb_method          = 1                 ! 0: prescribe boundary field fmb_shlf; 1: calculate proportional fmb~bmb_shlf.
     fmb_scale           = 1.0               ! Scaling of fmb ~ scale*bmb, scale=10 suggested by Pollard and DeConto (2016)
 /
 
@@ -421,8 +421,8 @@
     lsf_method          = "snap"            ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
     dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
     lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations. redist mode only.
-    calv_flt_method     = "equil"           ! "zero", "simple", "flux", "vm-l19", "kill"
-    calv_grnd_method    = "equil"           ! "zero", "stress-b12"
+    calv_flt_method     = "vm-m16"          ! use_lsf=T: "zero"/"none","equil","threshold","vm-m16","exp1"-"exp5"
+    calv_grnd_method    = "vm-m16"          ! use_lsf=T: "zero"/"none","equil","threshold","vm-m16","ismip7"
     
     ! === numeric noise === 
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
@@ -482,17 +482,17 @@
 
 &ytill
     method          = 1                 ! -1: set externally; 1: calculate cb_ref online  
-    scale_zb        = 0                 ! 0: none, 1: lin, 2: exp : scaling with elevation
+    scale_zb        = 1                 ! 0: none, 1: lin, 2: exp : scaling with elevation
     scale_sed       = 0                 ! 0: none, 1: min(cb_zb,cb_sed), 2: cb_zb*(lambda_sed*f_sed), 3: 2 but no lower limit
     is_angle        = False             ! cb_ref is a till strength angle?
     n_sd            = 10                ! Number of samples over z_bed_sd field
     f_sed           = 1.0               ! Scaling reduction for thick sediments 
     sed_min         = 5.0               ! [m] Sediment thickness for no reduction in friction
     sed_max         = 15.0              ! [m] Sediment thickness for maximum reduction in friction
-    z0              = -300.0            ! [m] Bedrock rel. to sea level, lower limit
-    z1              =  200.0            ! [m] Bedrock rel. to sea level, upper limit
-    cf_min          =  0.01             ! [-- or deg] Minimum value of cf
-    cf_ref          =  0.8              ! [-- or deg] Reference/const/max value of cf
+    z0              = -500.0            ! [m] Bedrock rel. to sea level, lower limit
+    z1              =  300.0            ! [m] Bedrock rel. to sea level, upper limit
+    cf_min          =  0.001            ! [-- or deg] Minimum value of cf
+    cf_ref          =  0.5              ! [-- or deg] Reference/const/max value of cf
 /
 
 &yhyd
@@ -514,7 +514,7 @@
     marine_p        = 0.0
     marine_rho_sw   = 1028.0
     till_N0         = 1000.0 ! legacy yneff.N0
-    till_delta      = 0.04   ! legacy yneff.delta
+    till_delta      = 0.1    ! legacy yneff.delta
     till_e0         = 0.69   ! legacy yneff.e0
     till_Cc         = 0.12   ! legacy yneff.Cc
     two_value_delta = 0.02
@@ -845,7 +845,7 @@
                                     ! Useful to account for moving ice fronts and/or filling mv in datasets
     basins          = "Zwally2012.group"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
-    mask_deep_ocean = "~region:Greenland | zone:open_ocean"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_deep_ocean = "zone:open_ocean"                      ! mask_ocn_ref: deep ocean (c_deep), over ocean
     mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
     corr_method     = "none"  ! none, tf or bmb: corrections by region
     corr_names      = ""
@@ -859,7 +859,7 @@
     
     ! Deep ocean bmb 
     c_deep          = -10.0         ! [m/yr] Melt rate in deep ocean, should be negative but not huge
-    depth_deep      =  500.0        ! [m] Depth at which deep ocean is assumed
+    depth_deep      =  2000.0       ! [m] Depth at which deep ocean is assumed
     depth_const     =    0.0        ! [m] Constant shelf depth for interp_depthconst
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
     depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
