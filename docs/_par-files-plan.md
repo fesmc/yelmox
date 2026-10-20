@@ -1,7 +1,7 @@
 # Par files: bases plus -p, forcing library
 
-Status: implemented 2026-10-20 (branch par-files), Levante verification
-pending. The leading `_` keeps quarto from rendering it.
+Status: implemented and verified 2026-10-20 (branch par-files). The leading
+`_` keeps quarto from rendering it.
 
 States checked: yelmox dev 6ec65b4.
 
@@ -153,6 +153,15 @@ Deleted (15):
   current figures' data exactly. Compare the NetCDF fields, not the figures.
 - Staged-only runs of the ISMIP7 ANT, 1pctCO2 and TIPMIP workflows, to
   inspect the staged files. Plus one short real spin-up step for ISMIP7 ANT.
+
+Results (Levante, install yelmox-forcing, runme 0.5.26). The 18 docs-figures
+cases are bit-identical between dev 6ec65b4 and par-files f198e9b: every NetCDF
+file and restart bundle, every variable. The staged ISMIP7, 1pctCO2, TIPMIP,
+nudge and opt workflows pass `check_par_nml` and match the dev staging up to
+inert keys. Short real runs finished clean: the ant-paleo and grl-paleo
+spin-ups (200 yr), the ISMIP7 ANT spin-up (100 yr, ANT-16KM) and grl-paleo lgp
+(1 kyr from the existing spin-up bundle). They read `idx_a`, `snap_picontrol`,
+`snap_lgm`, `snap_axis_a` and `elsa_grl_lgp` from `input/forcing_db.nml`.
 
 ## Order
 
