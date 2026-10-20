@@ -316,7 +316,7 @@
                             ! "fastiso": BSL = sum of contributions from fastiso domains
                             ! "mixed": combine "file" and "fastiso"
     bsl_init    = 0.0       ! [m] BSL relative to present day
-    sl_path     = "input/sealevel_rohling_450kyr.dat" ! Input time series filename
+    sl_path     = "input/sealevel_spratt2016.dat" ! Input time series filename (Spratt and Lisiecki, 2016)
     sl_name     = "none"    ! Variable name in netcdf file, if relevant
     A_ocean_pd  = 3.625e14  ! [m^2] Ocean surface as in Goelzer et al. (2020)
     A_ocean_path = "isostasy_data/tools/ocean_surface/OceanSurfaceETOPO2022.nc" ! Path to ocean surface file
