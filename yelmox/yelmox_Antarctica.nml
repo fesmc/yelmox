@@ -734,13 +734,9 @@
     mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
     mask_pico_deep  = "region:Antarctica & zone:shelf_break_buffer"  ! pico: bmb averaged with c_deep there
     corr_method     = "tf"  ! none, tf or bmb: corrections by region
-    corr_names      = "ronne" "ross" "pine" "abbott"
+    corr_names      = "b1" "b12" "b14" "b15"
     corr_values     = 0.3 0.3 -1.5 0.0
-    corr_ronne = "Zwally2012:1"
-    corr_ross = "Zwally2012:12"
-    corr_pine = "Zwally2012:14"
-    corr_abbott = "Zwally2012:15"
-    ! one Zwally basin each, for per-basin corrections (corr_names b1 ... b18; scripts/ant-paleo)
+    ! corr_b<k>: Zwally2012 basin k (1 Ronne, 12 Ross, 14 Pine Island, 15 Abbott)
     corr_b1 = "Zwally2012:1"
     corr_b2 = "Zwally2012:2"
     corr_b3 = "Zwally2012:3"

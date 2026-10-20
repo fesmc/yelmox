@@ -84,8 +84,9 @@ the Yelmo grid; the hub and the marine shelf on the shelf grid.
   observations until 6 kyr (`[sim] relax = True`, `[relax] topo_rel = 4`,
   `tau1 = 100` yr until 2 kyr, then towards `tau2 = 2000` yr).
 - **Basin corrections:** `[marine_shelf] corr_method = "tf"`, `corr_names =
-  "ronne" "ross" "pine" "abbott"`, `corr_values = 0.3 0.3 -1.5 0.0` on the
-  `Zwally2012` basins 1, 12, 14 and 15.
+  "b1" "b12" "b14" "b15"`, `corr_values = 0.3 0.3 -1.5 0.0` on the
+  `Zwally2012` basins 1 (Ronne), 12 (Ross), 14 (Pine Island) and 15 (Abbott);
+  `corr_b<k>` selects basin k.
 - **Output:** 1D every year, 2D every 200 yr, small 2D every 50 yr.
 
 ## Climate
