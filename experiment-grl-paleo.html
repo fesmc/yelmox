@@ -294,7 +294,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="domain-borders" class="level2">
 <h2 class="anchored" data-anchor-id="domain-borders">Domain borders</h2>
-<p>The west border cuts Baffin Island and the Canadian Arctic Archipelago, where Innuitian and Laurentide ice crosses it in glacial periods. The borders are “infinite” (<code>[yelmo] experiment = "infinite"</code>, <code>mask_border = "dynamic"</code>): the outermost cells take the thickness of their inner neighbours, so the border ice thickens and thins with the interior. Ice flows out through the border but not in (the outflow is booked in <code>mb_resid</code>): the ice west of the border is what the local climate builds. Before Yelmo fixed this (2026-10-19), the border cells fed the interior wherever the flow pointed inwards, without limit and unbooked; in the first B LGM spin-up this inflow grew exponentially (above the domain SMB after ~8 kyr) and piled ice up to 10 km at the front in northern Baffin Bay.</p>
+<p>The west border cuts Baffin Island and the Canadian Arctic Archipelago, where Innuitian and Laurentide ice crosses it in glacial periods. The borders are “infinite” (<code>[yelmo] experiment = "infinite"</code>, <code>mask_border = "dynamic"</code>): the outermost cells take the thickness of their inner neighbours, so the border ice thickens and thins with the interior. Ice flows out through the border but not in: the ice west of the border is what the local climate builds. The reset of the border cells is booked in <code>mb_border</code>; the domain totals in <code>yelmo_ts.nc</code> leave these cells out, and <code>mb_border_tot</code> is their total (the outflow). Before Yelmo fixed this (2026-10-19), the border cells fed the interior wherever the flow pointed inwards, without limit and unbooked; in the first B LGM spin-up this inflow grew exponentially (above the domain SMB after ~8 kyr) and piled ice up to 10 km at the front in northern Baffin Bay.</p>
 <p>Prescribed border ice is the alternative (not used now): a strip of fixed and relaxation cells (<code>[yelmo_masks] border_width = N M</code>, e.g. <code>2 4</code>) whose thickness comes from an ice history (<code>[ice_bnd] active = True</code>, PaleoMIST by default), with <code>experiment = "None"</code>, <code>mask_border = "auto"</code> and <code>[ytopo] topo_rel = -1</code>.</p>
 </section>
 <section id="reference-climate" class="level2">
@@ -415,7 +415,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>Calving</td>
-<td>level set, von Mises (<code>calv_flt_method = calv_grnd_method = "vm-m16"</code>)</td>
+<td>level set, von Mises (<code>calv_flt_method = calv_grnd_method = "vm-m16"</code>, Morlighem et al.&nbsp;2016)</td>
 </tr>
 <tr class="even">
 <td>Frontal melt</td>
