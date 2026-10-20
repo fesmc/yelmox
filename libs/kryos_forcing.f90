@@ -2,8 +2,9 @@ module kryos_forcing
     ! Driver-owned forcing: the indices registry.
     !
     ! Indices: named scalar series ([indices] names = "a" "b"), each a tsgen
-    ! group [idx_<name>], advanced once per step on the forcing clock with the
-    ! response variable (ice volume) and read by name by their consumers (the
+    ! group [idx_<name>] (from the par file, else the first of the [indices]
+    ! var_defs files that has it), advanced once per step on the forcing clock
+    ! with the response variable (ice volume) and read by name by their consumers (the
     ! snapshots axes, the climate modifiers). One registry per run, held by the
     ! driver like bsl -- deliberately NOT part of kryos_domain, so every domain
     ! of a multi-domain driver reads the same indices. The registry also holds the
@@ -12,7 +13,7 @@ module kryos_forcing
     ! folders restart-<n>); each index restarts from idx_<name>_restart.nc.
 
     use nml,          only : nml_read, nml_validate
-    use yelmox_nml,   only : def_file => yelmox_defaults_file
+    use yelmox_nml,   only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
     use ncio,         only : nc_open, nc_close, nc_write, nc_time_index
     use precision,    only : wp, dp
     use tsgen,        only : tsgen_class, tsgen_init, tsgen_update, &
@@ -48,7 +49,9 @@ contains
 
     subroutine indices_init(idx, path_par, time)
         ! Read [indices] names and initialise each index from its tsgen group
-        ! [idx_<name>] at `time` (the forcing clock). Per index, besides the
+        ! [idx_<name>] at `time` (the forcing clock). The group is read from the
+        ! par file if it has it, else from the first of the [indices] var_defs
+        ! files that does (var_defs_find). Per index, besides the
         ! tsgen keys: restart_every_df and units. Unset keys from the defaults
         ! file (the template idx for [idx_<name>]). An absent [indices] group or
         ! empty names give an empty registry. On a restart run the caller then
@@ -58,11 +61,14 @@ contains
         real(dp),            intent(in)    :: time
 
         character(len=64)  :: names(IDX_MAX)
+        character(len=256) :: var_defs(VAR_DEFS_MAX)
         character(len=128) :: group
+        character(len=512) :: gfile      ! the file holding the group
         integer :: k, n
 
         call nml_validate(path_par, def_file, "indices")
-        call nml_read(path_par, "indices", "names", names, init=.true., defaults_file=def_file)
+        call nml_read(path_par, "indices", "names",    names,    init=.true., defaults_file=def_file)
+        call nml_read(path_par, "indices", "var_defs", var_defs, init=.true., defaults_file=def_file)
         n = count(len_trim(names) > 0)
 
         if (allocated(idx%idx)) deallocate(idx%idx)
@@ -77,14 +83,15 @@ contains
                 error stop 1
             end if
             group = "idx_"//trim(ix%name)
+            gfile = var_defs_find(var_defs, path_par, trim(group), "&indices names")
 
-            call nml_validate(path_par, def_file, trim(group), defaults_group="idx")
-            call nml_read(path_par, trim(group), "units", ix%units, init=.true., &
+            call nml_validate(trim(gfile), def_file, trim(group), defaults_group="idx")
+            call nml_read(trim(gfile), trim(group), "units", ix%units, init=.true., &
                           defaults_file=def_file, defaults_group="idx")
-            call nml_read(path_par, trim(group), "restart_every_df", ix%restart_every_df, &
+            call nml_read(trim(gfile), trim(group), "restart_every_df", ix%restart_every_df, &
                           defaults_file=def_file, defaults_group="idx")
 
-            call tsgen_init(ix%tsg, path_par, time, group=trim(group), &
+            call tsgen_init(ix%tsg, trim(gfile), time, group=trim(group), &
                             defaults_file=def_file, defaults_group="idx")
             ix%f_last_restart = ix%tsg%f_now
 

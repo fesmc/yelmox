@@ -90,7 +90,8 @@ it to `step_climate` (and the cold start); consumers read an index by name
 
 ```fortran
 &indices
-    names = "ramp"            ! "" = no indices
+    names    = "ramp"         ! "" = no indices
+    var_defs = ""             ! files with [idx_<name>] groups, searched in order after this file
 /
 
 &idx_ramp                     ! a tsgen group (unset keys: template [idx])
@@ -119,7 +120,10 @@ total ice volume (Gt). The run stops when any index trips its kill switch
 (`with_kill`), and writes a restart bundle `restart-<n>` each time an index
 moves by more than its `restart_every_df`. Each index restarts from
 `idx_<name>_restart.nc` in the bundle, and is written to the 1D output as
-`idx_<name>` (plus `idx_<name>_df_dt`).
+`idx_<name>` (plus `idx_<name>_df_dt`). Each `[idx_<name>]` is read from the
+par file if it has the group, else from the first of the `[indices] var_defs`
+files that does (default none), the lookup of the snapshot groups (see
+[Database](climate-snapshots.md#database)).
 
 `[anom]` is a climate modifier (libs/climate_mods.f90): applied to the
 backend's output after the backend, before `[ocn_fraction]`, `[ocn_obm]`,
@@ -221,7 +225,7 @@ without a reference atmosphere (rembo).
 ```
 &taper
     active   = True
-    var_defs = ""         ! files with the group below, searched in order, then this file
+    var_defs = ""         ! files with the group below, searched in order after this file
     weight   = "taper_w"  ! var_defs group of w [1]: one 2D field (time = 0 0 0 0 1)
     outside  = "ref"      ! ref | mean: where w < 1, towards the reference (plus the mean anomaly of the cells with w = 1)
 /
@@ -250,7 +254,7 @@ group is optional; without it, or with `active = False`, nothing changes.
 ```
 &bias
     active   = True
-    var_defs = ""             ! files with the groups below, searched in order, then this file
+    var_defs = ""             ! files with the groups below, searched in order after this file
     dtas     = "bias_dtas"    ! var_defs group: temperature correction [K]; "" = none
     fpr      = "bias_fpr"     ! var_defs group: precipitation factor [1]; "" = none
     f_tas    = 1.0            ! weight of dtas
@@ -309,7 +313,7 @@ thickness of an ice history into `H_ice_ref` in these cells, each step before
 ```
 &ice_bnd
     active     = True
-    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order, then this file
+    var_defs   = "input/clim_db.nml"  ! files with the group, searched in order after this file
     method     = "file"               ! file | scaled
     H_ice      = "paleomist_H_ice"    ! var_defs group of the ice thickness [m]
     index      = ""                   ! scaled: the index f ([indices] names)

@@ -7,10 +7,12 @@ module snapshots
     !
     ! See docs/climate-snapshots.md for its configuration.
     !
-    ! Config model: the `var_defs` databases (a list of nml files, first file
-    ! that has a group wins, then the par file itself for run-specific groups;
-    ! the shared input/clim_db.nml by default) define varslice groups (permanent per-file variable
-    ! metadata); each climate-state group &<group>_<snapshot> names the group(s)
+    ! Config model: the `var_defs` databases (a list of nml files; the shared
+    ! input/clim_db.nml by default) define varslice groups (permanent per-file
+    ! variable metadata). A group is taken from the par file if it has it, else
+    ! from the first database that does (var_defs_find); the snapshot groups
+    ! &<group>_<snapshot> and the axis groups &<group>_axis_<name> are looked
+    ! up the same way. Each climate-state group &<group>_<snapshot> names the group(s)
     ! supplying each field (1 = monthly, 2 = [ann, season] -> synthesized). Their
     ! paths take the keywords {grid_global} ([snap] grid_global, the global grid
     ! of the paleoclimate products) and {exp} (the snapshot's exp), besides
@@ -132,8 +134,8 @@ module snapshots
     type snapshots_param_class
         character(len=256) :: domain
         character(len=256) :: grid_name
-        character(len=256) :: var_defs(VAR_DEFS_MAX) ! varslice databases, searched in order
-        character(len=512) :: par_file      ! the par file, searched after var_defs
+        character(len=256) :: var_defs(VAR_DEFS_MAX) ! databases, searched in order after the par file
+        character(len=512) :: par_file      ! the par file, searched first
         character(len=64)  :: grid_global   ! global grid of the paleoclimate products ({grid_global})
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
         integer            :: nx, ny
@@ -564,7 +566,10 @@ contains
         ! (&<group>_<name>), and the axes (&<group>_axis_<name>: lo, hi, index),
         ! whose indices must be in the registry idx. Keys not set take the
         ! defaults of input/yelmox_defaults.nml, the named groups those of the
-        ! templates snap_field, snap_snapshot and snap_axis.
+        ! templates snap_field, snap_snapshot and snap_axis. The snapshot and
+        ! axis groups are read from the par file if it has them, else from the
+        ! first var_defs file that does; [snap] and the field groups from the
+        ! par file only.
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
@@ -575,7 +580,8 @@ contains
 
         character(len=64) :: names(SNP_MAX)
         character(len=64) :: lo, hi
-        character(len=256):: agroup
+        character(len=256):: agroup, sgroup
+        character(len=512):: gfile        ! the file holding sgroup / agroup
         integer           :: i, j
 
         sc%par%group     = group
@@ -619,8 +625,10 @@ contains
         if (allocated(sc%snap)) deallocate(sc%snap)
         allocate(sc%snap(sc%par%n_snap))
         do i = 1, sc%par%n_snap
-            call read_snapshot_spec(sc%snap(i)%spec, filename, &
-                                    trim(group)//"_"//trim(names(i)), &
+            sgroup = trim(group)//"_"//trim(names(i))
+            gfile  = var_defs_find(sc%par%var_defs, filename, trim(sgroup), &
+                                   "&"//trim(group)//" snapshots")
+            call read_snapshot_spec(sc%snap(i)%spec, trim(gfile), trim(sgroup), &
                                     trim(names(i)), sc%par%ref_name, sc%registry, sc%par%south)
         end do
         sc%par%iref = snapshot_position(sc, sc%par%ref_name, "ref_name of &"//trim(group))
@@ -633,13 +641,15 @@ contains
         allocate(sc%axis(sc%par%n_axis))
         do i = 1, sc%par%n_axis
             agroup = trim(group)//"_axis_"//trim(names(i))
+            gfile  = var_defs_find(sc%par%var_defs, filename, trim(agroup), &
+                                   "&"//trim(group)//" axes")
             sc%axis(i)%name = trim(names(i))
-            call nml_validate(filename, def_file, trim(agroup), defaults_group="snap_axis")
-            call nml_read(filename, trim(agroup), "lo",    lo,               init=.TRUE., &
+            call nml_validate(trim(gfile), def_file, trim(agroup), defaults_group="snap_axis")
+            call nml_read(trim(gfile), trim(agroup), "lo",    lo,               init=.TRUE., &
                           defaults_file=def_file, defaults_group="snap_axis")
-            call nml_read(filename, trim(agroup), "hi",    hi,               init=.TRUE., &
+            call nml_read(trim(gfile), trim(agroup), "hi",    hi,               init=.TRUE., &
                           defaults_file=def_file, defaults_group="snap_axis")
-            call nml_read(filename, trim(agroup), "index", sc%axis(i)%index, init=.TRUE., &
+            call nml_read(trim(gfile), trim(agroup), "index", sc%axis(i)%index, init=.TRUE., &
                           defaults_file=def_file, defaults_group="snap_axis")
             sc%axis(i)%lo = 0
             if (len_trim(lo) > 0) sc%axis(i)%lo = snapshot_position(sc, lo, "lo of &"//trim(agroup))
@@ -920,8 +930,8 @@ contains
 
     subroutine snapshots_load_snapshots(sc, time, grid)
         ! For each snapshot, load the var_defs groups of every field it binds
-        ! (each from the first database of var_defs that has it, else the par
-        ! file, with the path
+        ! (each from the par file if it has it, else the first database of
+        ! var_defs that does, with the path
         ! keywords {grid_global} and the snapshot's {exp}), prime them to
         ! `time`, reduce the snapshot to its sea-level state, and set the
         ! reference.

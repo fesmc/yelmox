@@ -66,23 +66,27 @@ the reference), `fields = "tas" "pr" "to" "so" "zs"`, `grid_global =
 ### Database
 
 The snapshots bind varslice groups (see [Database namelists](database-namelists.md))
-by name, from the files listed in `[snap] var_defs`, searched in order (first
-file that has the group), then from the par file itself (searched implicitly
-last, so it never has to name itself). The shared database `input/clim_db.nml`
-holds one group per product field; a par file can add run-specific groups:
+by name, from the par file itself if it has the group (searched implicitly
+first, so it never has to name itself and its groups win), else from the
+files listed in `[snap] var_defs`, searched in order (first file that has the
+group). The snapshot groups `[snap_<name>]` and the axis groups
+`[snap_axis_<name>]` are looked up the same way, and the index groups
+`[idx_<name>]` through `[indices] var_defs` (default none). The shared
+database `input/clim_db.nml` holds one group per product field; a par file can
+add run-specific groups:
 
 ```fortran
 &snap
     var_defs = "input/clim_db.nml"   ! the default
 /
-&my_tas                              ! in the par file: found after clim_db.nml
+&my_tas                              ! in the par file: found before clim_db.nml
     filename = "ice_data/..."
     ...
 /
 ```
 
-A group missing from every file (and the par file) stops the run, naming the
-group and the files.
+A group missing from the par file and every var_defs file stops the run,
+naming the group and the files.
 The paths of the database take, besides `{domain}` and `{grid_name}`, two
 keywords:
 

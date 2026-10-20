@@ -14,10 +14,14 @@ script reproduces that check offline, with more:
      group of the defaults file (`nml_validate` would stop the run).
   2. duplicate: a group or key defined twice in one file. `nml_read` takes the
      first occurrence, so later copies are silently ignored.
-  3. var_defs: a snapshot (or an active [bias], [taper] or [ice_bnd]) binds a varslice group that
-     neither its var_defs files nor the par file itself (searched implicitly
-     last) holds, or a var_defs file is missing. Bound groups in the par file
-     are not reported by --dead.
+  3. var_defs: a snapshot (or an active [bias], [taper] or [ice_bnd]) binds a
+     varslice group that neither the par file itself (searched implicitly
+     first) nor its var_defs files hold, or a var_defs file is missing. Bound
+     groups in the par file are not reported by --dead. The snapshot and axis
+     groups [snap<sfx>_<s>], [snap<sfx>_axis_<a>] and the index groups
+     [idx_<name>] are looked up the same way, through [snap<sfx>] var_defs and
+     [indices] var_defs: a listed group found in neither is an error, one
+     found in a var_defs file is checked there (item 1).
   4. dead (only with --dead): keys in the other groups (ctrl, smbpal, isos,
      ...) whose name appears nowhere in the Fortran sources as a string
      literal, so no `nml_read` can read them. The match is by key name
@@ -30,7 +34,8 @@ The yelmo groups of a file are found from its control blocks: `&yelmo<sfx>`
 for every `&domain<sfx>` group (kryos `domain_init` reads `yelmo` plus the
 domain's group suffix), plus `&yelmo` itself. The `nml_*` keys of a control
 block name its component groups (`nml_ytopo = "ytopo"`, ...), falling back to
-the defaults. Files without a control block are skipped.
+the defaults. Files without a control block are skipped, except library
+files (see below).
 
 The yelmox forcing groups, with <sfx> the same domain suffixes, and their
 group in yelmox_defaults.nml:
@@ -42,9 +47,16 @@ group in yelmox_defaults.nml:
   [snap<sfx>_<s>] -> snap_snapshot (s in snapshots),
   [snap<sfx>_axis_<a>] -> snap_axis (a in axes); unset lists from the defaults.
 
+A library file has no control block and holds only named groups
+(snap_*, snap_axis_*, idx_*, elsa_*), shared by par files through their
+var_defs lists. Each group is checked against its template by prefix:
+snap_axis_* -> snap_axis, snap_* -> snap_snapshot, idx_* -> idx; elsa_*
+groups (read by elsa) are skipped. Duplicates are reported as in item 2.
+
 Usage:
     scripts/check_par_nml.py                  # all yelmox/*.nml, yelmox_bipolar/*.nml
     scripts/check_par_nml.py yelmox/yelmox_Greenland.nml [...]
+    scripts/check_par_nml.py input/forcing_db.nml   # a library file
     scripts/check_par_nml.py --dead           # also report dead keys
 
 Exits non-zero if any error is found, so it can be used as a test / CI check.
@@ -64,6 +76,11 @@ PAR_GLOBS = ["yelmox/*.nml", "yelmox_bipolar/*.nml"]
 SRC_DIRS = ["libs", "yelmox", "yelmox_bipolar", "fesm-utils", "FastIsostasy",
             "rembo1", "yelmo", "chion"]
 SKIP_DIRS = {".git", ".claude", "output", "logs", "tmp"}
+
+# Group prefixes of a library file -> template group of yelmox_defaults.nml
+# (None: not checked here). First match wins, so snap_axis_ before snap_.
+LIBRARY_PREFIX = [("snap_axis_", "snap_axis"), ("snap_", "snap_snapshot"),
+                  ("idx_", "idx"), ("elsa_", None)]
 
 # nml_* key of the control block -> group of the defaults file it maps to.
 NML_KEY = {
@@ -170,14 +187,20 @@ def domain_suffixes(groups):
 
 def yelmox_groups(groups, ydefaults):
     """User group -> template group of yelmox_defaults.nml for the forcing
-    groups of a file, and the snapshot-backend groups that are not read."""
-    out, stale = {}, []
+    groups of a file, the snapshot-backend groups that are not read, and the
+    named groups looked up through a var_defs list -> the group holding that
+    list ([snap<sfx>] for snapshots and axes, [indices] for indices)."""
+    out, stale, owner = {}, [], {}
     for g in ("indices", "obm_forcing"):
         if g in groups:
             out[g] = g
     for g in groups:
         if g.startswith("idx_"):
             out[g] = "idx"
+    if "indices" in groups:
+        for n in listval(groups["indices"].get("names", ydefaults["indices"].get("names", ""))):
+            out.setdefault("idx_" + n, "idx")
+            owner["idx_" + n] = "indices"
     for sfx in domain_suffixes(groups):
         for base in ("anom", "ocn_fraction", "ocn_obm", "taper", "bias", "orbit", "ice_bnd"):
             if base + sfx in groups:
@@ -194,15 +217,17 @@ def yelmox_groups(groups, ydefaults):
             out[snap + "_field_" + f] = "snap_field"
         for a in names("axes"):
             out[snap + "_axis_" + a] = "snap_axis"
+            owner[snap + "_axis_" + a] = snap
         for s_ in names("snapshots"):
             out.setdefault(snap + "_" + s_, "snap_snapshot")
+            owner.setdefault(snap + "_" + s_, snap)
         stale += [g for g in groups if g.startswith(snap + "_") and g not in out]
-    return out, stale
+    return out, stale, owner
 
 
 def var_defs_files(path, listed, label, errors):
-    """The var_defs files of a group, then the par file itself (searched
-    implicitly last); a listed file that is missing is an error."""
+    """The par file itself (searched implicitly first), then the var_defs
+    files of a group in order; a listed file that is missing is an error."""
     files = []
     for f in listed:
         # Relative to the run folder: the repo links (input, ...).
@@ -212,38 +237,66 @@ def var_defs_files(path, listed, label, errors):
             errors.append("&%s: var_defs file not found: %s" % (label, f))
         else:
             files.append(found)
-    return files + [path]
+    return [path] + files
 
 
-def var_defs_errors(path, groups, ygroups, ydefaults):
+def library_groups(path, cache):
+    """Group name -> keys (first copies) of a var_defs file, parsed once."""
+    if path not in cache:
+        cache[path] = first_copies(parse_par(path)[0])[0]
+    return cache[path]
+
+
+def resolve_named(path, groups, ygroups, owner, vd_files, cache):
+    """Where each forcing group of a file is read from, as group -> (file,
+    keys): the par file for its own groups; a group looked up through a
+    var_defs list (owner) from the par file, else the first var_defs file
+    that holds it. Also returns the errors for looked-up groups found in
+    none."""
+    out, errors = {}, []
+    for name in ygroups:
+        if name in groups:
+            out[name] = (path, groups[name])
+            continue
+        if name not in owner:
+            continue
+        files = vd_files[owner[name]]
+        found = next((f for f in files[1:] if name in library_groups(f, cache)), None)
+        if found is None:
+            errors.append("&%s (from &%s): group in neither the par file nor the var_defs files"
+                          % (name, owner[name]))
+        else:
+            out[name] = (found, library_groups(found, cache)[name])
+    return out, errors
+
+
+def var_defs_errors(path, groups, ygroups, ydefaults, vd_files, resolved, cache):
     """Bindings of the snapshots (and [bias] dtas/fpr, [taper] weight, [ice_bnd]
-    H_ice) to varslice groups that
-    neither the var_defs files nor the par file hold. Also returns the bound
-    groups found in the par file itself (read by varslice, not dead)."""
+    H_ice) to varslice groups that neither the par file nor the var_defs files
+    hold. Also returns the bound groups found in the par file itself (read by
+    varslice, not dead)."""
     errors, local = [], set()
 
     def check(label, files, refs):
         db = set()
-        for f in files[:-1]:
-            db |= {name for name, _ in parse_par(f)[0]}
+        for f in files[1:]:
+            db |= set(library_groups(f, cache))
         for key, ref in refs:
-            if ref in db:
-                continue
             if ref in groups:
                 local.add(ref)
-            else:
-                errors.append("&%s %s: group %s in none of the var_defs files nor the par file"
+            elif ref not in db:
+                errors.append("&%s %s: group %s in neither the par file nor the var_defs files"
                               % (label, key, ref))
 
     for snap, tmpl in ygroups.items():
         if tmpl == "snap":
-            files = var_defs_files(path, listval(groups[snap].get(
-                "var_defs", ydefaults["snap"]["var_defs"])), snap, errors)
+            files = vd_files[snap]
             for name, t in ygroups.items():
-                if t != "snap_snapshot" or not name.startswith(snap + "_") or name not in groups:
+                if t != "snap_snapshot" or not name.startswith(snap + "_") or name not in resolved:
                     continue
+                keys = resolved[name][1]
                 check(name, files, [(key, ref) for key in ("tas", "pr", "zs", "to", "so")
-                                    for ref in listval(groups[name].get(key, ""))])
+                                    for ref in listval(keys.get(key, ""))])
         elif tmpl in ("bias", "taper", "ice_bnd"):
             g = groups[snap]
             if scalar(g.get("active", ydefaults[tmpl]["active"])).lower() not in (
@@ -275,11 +328,34 @@ def source_literals():
     return lits
 
 
+def library_template(name):
+    """Template group of a library group (by prefix), None if not checked,
+    False if the prefix is not one of a library."""
+    return next((t for p, t in LIBRARY_PREFIX if name.startswith(p)), False)
+
+
+def check_library(groups, errors, ydefaults):
+    """Return (errors, dead) for a library file: each group against its
+    template by prefix."""
+    for name, params in groups.items():
+        tmpl = library_template(name)
+        if not tmpl:
+            continue
+        unknown = [k for k in params if k not in ydefaults[tmpl]]
+        if unknown:
+            errors.append("&%s: unknown key(s) (not in &%s of yelmox defaults): %s"
+                          % (name, tmpl, ", ".join(unknown)))
+    return errors, []
+
+
 def check_file(path, defaults, ydefaults, lits):
-    """Return (errors, dead) for one par file, or None if it has no yelmo group."""
+    """Return (errors, dead) for one par file or library file, or None if it
+    is neither."""
     raw, errors = parse_par(path)
     groups, dup = first_copies(raw)
     if not control_blocks(groups):
+        if groups and all(library_template(g) is not False for g in groups):
+            return check_library(groups, errors + dup, ydefaults)
         return None
     errors += dup
 
@@ -290,13 +366,29 @@ def check_file(path, defaults, ydefaults, lits):
             errors.append("&%s: unknown key(s) (not in &%s of defaults): %s"
                           % (name, def_group, ", ".join(unknown)))
 
-    xgroups, stale = yelmox_groups(groups, ydefaults)
+    xgroups, stale, owner = yelmox_groups(groups, ydefaults)
+    # The var_defs lists: of every [snap<sfx>], and of [indices] when it lists
+    # indices (the par file first, then the listed files).
+    cache = {}
+    vd_files = {}
+    for g in [g for g, t in xgroups.items() if t == "snap"] + sorted(set(owner.values())):
+        if g not in vd_files:
+            tmpl = "indices" if g == "indices" else "snap"
+            vd_files[g] = var_defs_files(path, listval(groups[g].get(
+                "var_defs", ydefaults[tmpl]["var_defs"])), g, errors)
+    resolved, rs_errors = resolve_named(path, groups, xgroups, owner, vd_files, cache)
+    errors += rs_errors
     for name, def_group in xgroups.items():
-        unknown = [k for k in groups.get(name, {}) if k not in ydefaults[def_group]]
+        if name not in resolved:
+            continue
+        src, params = resolved[name]
+        unknown = [k for k in params if k not in ydefaults[def_group]]
         if unknown:
-            errors.append("&%s: unknown key(s) (not in &%s of yelmox defaults): %s"
-                          % (name, def_group, ", ".join(unknown)))
-    vd_errors, local = var_defs_errors(path, groups, xgroups, ydefaults)
+            where = "" if src == path else " (in %s)" % os.path.relpath(src, REPO)
+            errors.append("&%s%s: unknown key(s) (not in &%s of yelmox defaults): %s"
+                          % (name, where, def_group, ", ".join(unknown)))
+    vd_errors, local = var_defs_errors(path, groups, xgroups, ydefaults, vd_files,
+                                       resolved, cache)
     errors += vd_errors
 
     dead = []
