@@ -117,8 +117,8 @@ module climate_mods
     end type ocn_obm_class
 
     ! [taper<sfx>]: the atmosphere towards the reference with a weight field w
-    ! in [0, 1] (one 2D field), read from a var_defs group (a list of
-    ! databases, then the par file) on the climate grid (online remap
+    ! in [0, 1] (one 2D field), read from a var_defs group (the par file,
+    ! then a list of databases) on the climate grid (online remap
     ! allowed): now = ref + w*(now - ref); w = 1 keeps the climate, w = 0 is
     ! the reference (outside = "ref") or the reference plus the mean anomaly
     ! of the cells with w = 1 (outside = "mean").
@@ -133,7 +133,7 @@ module climate_mods
 
     ! [bias<sfx>]: an additive temperature field and a precipitation factor
     ! field, monthly (12) or annual (1 field, all months), read from var_defs
-    ! groups (a list of databases, then the par file) on the climate grid
+    ! groups (the par file, then a list of databases) on the climate grid
     ! (online remap allowed), each with a weight:
     !   tas = tas + f_tas*dtas,   pr = pr*(1 + f_pr*(fpr - 1))
     type bias_class

@@ -119,6 +119,7 @@
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
     ! units and restart_every_df), advanced on the forcing clock time_rel.
     names  = ""       ! e.g. "at" "ramp"; "" = none
+    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
 /
 
 &anom
@@ -555,8 +556,9 @@
 
 &snap
     ! Snapshot backend (snapshots): the present-day reference only, MAR v3.14
-    ! 1960-1990 (groups below; no ocean: with_shelf = False). Databases:
-    ! input/clim_db.nml, then this file; unset keys: input/yelmox_defaults.nml.
+    ! 1960-1990 (groups below; no ocean: with_shelf = False). Groups: this
+    ! file, then var_defs; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
     snapshots  = "pd"
     f_p        = 0.096
 /
@@ -569,7 +571,7 @@
     zs  = "srg_mar314_1960_1990_zs"
 /
 
-! ---- run-specific database groups (found in this par file, after var_defs) --
+! ---- run-specific database groups (the par file is searched first) ---------
 ! MAR v3.14 1960-1990 on the 250 m grid (legacy ice_data, not in FesmData), monthly.
 
 &srg_mar314_1960_1990_tas

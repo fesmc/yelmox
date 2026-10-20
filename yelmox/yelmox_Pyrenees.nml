@@ -120,15 +120,7 @@
     ! restart_every_df), advanced on the forcing clock time_rel; unset keys
     ! from the template [idx] of input/yelmox_defaults.nml.
     names  = "orb"
-/
-
-&idx_orb
-    ! Orbital index: alpha_orbital_t2018 (1 at present, 0 at 21 ka) normalised
-    ! to 0 at present and 1 at 21 ka; scaled by [anom] f_ta.
-    method      = "series"
-    series_file = "input/alpha_orbital_t2018.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
+    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
 /
 
 &anom
@@ -529,7 +521,8 @@
     ! Snapshot backend (snapshots): the present-day reference only, ERA5
     ! 1981-2010 (no ocean: with_shelf = False); the anomaly from [anom]
     ! (alpha_orbital_t2018 x 10 K).
-    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    ! Groups: this file, then var_defs; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
     snapshots  = "pd"
 /
 

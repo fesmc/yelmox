@@ -1,5 +1,8 @@
 # Retiring snapclim: snapesm + tsgen for all snapshot climates
 
+Note (2026-10-20): the variant par files named here became `-p` arrays in
+scripts (`docs/_par-files-plan.md`).
+
 Status: design draft (2026-10-17), not started. The leading `_` keeps quarto
 from rendering it. Superseded where they differ by `_forcing-design.md`
 (2026-10-18).

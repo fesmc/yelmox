@@ -122,14 +122,7 @@
     ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
     ! units and restart_every_df), advanced on the forcing clock time_rel.
     names  = ""       ! e.g. "at" "ramp"; "" = none
-/
-
-&idx_dT
-    ! Sensitivity anomaly for run_mg_forward.sh (with [indices] names = "dT",
-    ! [anom] index = "dT"): a constant [K], set there with f_min = f_max.
-    method = "const"
-    f_min  = 0.0
-    f_max  = 0.0
+    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
 /
 
 &anom
@@ -576,9 +569,22 @@
 
 &snap
     ! Snapshot backend (snapshots): the present-day reference only, RACMO2.3p2
-    ! 1981-2010 and the ISMIP7 ocean climatology. Databases: input/clim_db.nml;
-    ! unset keys: input/yelmox_defaults.nml.
+    ! 1981-2010 and the ISMIP7 ocean climatology. Groups: this file, then
+    ! var_defs; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
     snapshots  = "pd"
+/
+
+! ---- fields (blend rule and axes; the others follow the reference) ---------
+
+&snap_field_tas
+    blend = "linear"
+    axes  = ""
+/
+
+&snap_field_pr
+    blend = "linear"
+    axes  = ""
 /
 
 ! ---- snapshots (var_defs groups per field) ---------------------------------
@@ -728,12 +734,27 @@
     mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
     mask_pico_deep  = "region:Antarctica & zone:shelf_break_buffer"  ! pico: bmb averaged with c_deep there
     corr_method     = "tf"  ! none, tf or bmb: corrections by region
-    corr_names      = "ronne" "ross" "pine" "abbott"
+    corr_names      = "b1" "b12" "b14" "b15"
     corr_values     = 0.3 0.3 -1.5 0.0
-    corr_ronne = "Zwally2012:1"
-    corr_ross = "Zwally2012:12"
-    corr_pine = "Zwally2012:14"
-    corr_abbott = "Zwally2012:15"
+    ! corr_b<k>: Zwally2012 basin k (1 Ronne, 12 Ross, 14 Pine Island, 15 Abbott)
+    corr_b1 = "Zwally2012:1"
+    corr_b2 = "Zwally2012:2"
+    corr_b3 = "Zwally2012:3"
+    corr_b4 = "Zwally2012:4"
+    corr_b5 = "Zwally2012:5"
+    corr_b6 = "Zwally2012:6"
+    corr_b7 = "Zwally2012:7"
+    corr_b8 = "Zwally2012:8"
+    corr_b9 = "Zwally2012:9"
+    corr_b10 = "Zwally2012:10"
+    corr_b11 = "Zwally2012:11"
+    corr_b12 = "Zwally2012:12"
+    corr_b13 = "Zwally2012:13"
+    corr_b14 = "Zwally2012:14"
+    corr_b15 = "Zwally2012:15"
+    corr_b16 = "Zwally2012:16"
+    corr_b17 = "Zwally2012:17"
+    corr_b18 = "Zwally2012:18"
     
     tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped climate forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"

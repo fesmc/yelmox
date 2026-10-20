@@ -10,10 +10,11 @@ by a glacial index and the sea level following a reconstruction.
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
-- **Config:** `yelmox/yelmox_Antarctica_paleo_spinup.nml`,
-  `yelmox/yelmox_Antarctica_paleo_lgp.nml`.
+- **Config:** `yelmox/yelmox_Antarctica.nml` (base).
 - **Scripts:** `scripts/ant-paleo/run_spinup.sh`, `scripts/ant-paleo/run_lgp.sh`.
-  Ported from the old single-grid par files.
+  The 32 km setup and the forcing are set with `-p`:
+  `scripts/ant-paleo/params.sh` (`antpal_physics`, `antpal_lgp`). Ported from
+  the old single-grid par files.
 
 ## Running
 
@@ -72,7 +73,7 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   layer every 1 kyr, coupled every 50 yr.
 - **Output:** 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.
 
-![Forcing of yelmox_Antarctica_paleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/ant_paleo.png)
+![Forcing of yelmox_Antarctica.nml with antpal_physics and antpal_lgp of scripts/ant-paleo/params.sh at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/ant_paleo.png)
 
 ## Configuration common to both
 

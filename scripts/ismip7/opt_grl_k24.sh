@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # ISMIP7 Greenland optimization spin-up with the K24 hydrology setting N_eff
-# (yelmox_esm_Greenland_k24.nml); otherwise identical to opt_grl.sh, whose notes follow.
+# (k24_params, on yelmox_esm_Greenland.nml); otherwise identical to opt_grl.sh, whose notes follow.
 # Same as legacy/opt_grl.sh: all its
 # overrides are valid for the current yelmox (climate = esm). opt.cf_init=-1 starts
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
@@ -69,9 +69,17 @@ mat_params=(
     "ymat.enh_shlf=0.5"
 )
 
+# K24 basal hydrology: its water transport sets N_eff (the bucket N closure is not used).
+k24_params=(
+    "yhyd.method_transport=1"       # 0=NONE 1=K24
+    "yhyd.k24_sliding_law=4"        # 4 = Yelmo tau_b: frictional heat enters the K24 water source, consistent with q_T (0 = none: its source then sees -Q_b/L at cold bases)
+    "yhyd.k24_N_ub_coupled=True"    # re-evaluate N from u_b inside the DIVA iteration (needs yelmo#13); False = N once per step (2-step N/velocity cycle)
+)
+
 # Submits to the queue by default; set runopts to change that (other queues, e.g. on
 # albedo: runopts="-rs -q 48h -w 48:00:00", or -s to stage only).
 runopts="${runopts:--rs -q shared -w 2-00:00:00 -m 20G}"
 
-runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland_k24.nml -o "${output_path}" \
-      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"
+runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
+      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}" \
+         "${k24_params[@]}"

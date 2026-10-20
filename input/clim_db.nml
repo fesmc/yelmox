@@ -3,13 +3,14 @@
 ! backend (snapshots) and the climate modifiers, and the ice histories of the
 ! prescribed ice ([ice_bnd]).
 !
-! One group per product field. A par file lists the databases to search,
-! first file that has a group wins, then the par file itself (searched
-! implicitly last: it can hold run-specific groups without naming itself):
+! One group per product field. A group is read from the par file if it has
+! it (searched implicitly first: it can hold run-specific groups, or redefine
+! a database group, without naming itself), else from the first of the
+! databases the par file lists that does:
 !     &snap
-!         var_defs = "input/clim_db.nml"
-! A snapshot binds groups by name: &snap_lgm  exp = "lgm"
-! tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja".
+!         var_defs = "input/clim_db.nml" "input/forcing_db.nml"
+! A snapshot (in the par file or input/forcing_db.nml) binds groups by name:
+! &snap_lgm  exp = "lgm"  tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja".
 !
 ! Path keywords:
 !   {domain}, {grid_name}  the domain ([domain] name) and the climate grid

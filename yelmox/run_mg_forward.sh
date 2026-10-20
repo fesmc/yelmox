@@ -7,8 +7,9 @@
 # forcings:
 #   - ctrl  : present-day climate held fixed (dT = 0);
 #   - warm  : uniform +2 K atmosphere and +2 K ocean anomaly (dT = +2, f_to = 1).
-# The anomaly is [anom] driven by the constant index dT ([idx_dT] of the par
-# file): dTa = dT, dTo = f_to*dT.
+# The anomaly is [anom] driven by the constant index dT ([idx_dT] of
+# input/forcing_db.nml, copied into the staged par file by runme on -p):
+# dTa = dT, dTo = f_to*dT.
 #
 # Only the three Yelmo-32KM spin-ups finished within the wall-clock limit, so
 # the projections branch from those (marine_shelf grid = 8 / 16 / 32 KM). This

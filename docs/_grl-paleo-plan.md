@@ -1,5 +1,8 @@
 # Greenland paleo: glacial cycles and a Tabone et al. (2024) deglaciation
 
+Note (2026-10-20): the variant par files named here became `-p` arrays in
+scripts (`docs/_par-files-plan.md`).
+
 Status: design summary (2026-10-17); A and B set up 2026-10-19 (see
 "Changes (2026-10-19)" at the end and `experiment-grl-paleo.md`). The leading `_` keeps
 quarto from rendering it. Input for the unified design, `_forcing-design.md`

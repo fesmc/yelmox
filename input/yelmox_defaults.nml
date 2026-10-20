@@ -30,6 +30,7 @@
 
 &indices
     names            = ""            ! the indices, each a group [idx_<name>]; "" = none
+    var_defs         = ""            ! files with [idx_<name>] groups, searched in order after the par file
 /
 
 &idx
@@ -72,7 +73,7 @@
 ! ===== Snapshot backend (snapshots) =====
 
 &snap
-    var_defs    = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
+    var_defs    = "input/clim_db.nml"  ! files of varslice, snapshot and axis groups, searched in order after the par file
     grid_global = "GLOBAL-1DEG"     ! global grid of the paleoclimate products ({grid_global})
     combine     = "anomaly"         ! anomaly | absolute
     ref_name    = "pd"              ! the reference snapshot
@@ -135,14 +136,14 @@
     ! The atmosphere towards the reference with a weight w in [0, 1] (static, on
     ! the climate grid): now = ref + w*(now - ref) for tas, pr and their annual means.
     active   = False    ! apply it?
-    var_defs = ""       ! varslice databases of the weight, searched in order, then the par file itself
+    var_defs = ""       ! varslice databases of the weight, searched in order after the par file
     weight   = ""       ! group of the weight w [1] (one 2D field)
     outside  = "ref"    ! where w < 1, towards: ref (the reference) or mean (ref + the mean anomaly of the cells with w = 1)
 /
 
 &bias
     active   = False    ! apply it?
-    var_defs = ""       ! varslice databases of dtas/fpr, searched in order, then the par file itself
+    var_defs = ""       ! varslice databases of dtas/fpr, searched in order after the par file
     dtas     = ""       ! group of the temperature correction [K] (1 or 12 slices); "" = none
     fpr      = ""       ! group of the precipitation factor [1] (1 or 12 slices); "" = none
     f_tas    = 1.0      ! weight of dtas
@@ -169,7 +170,7 @@
     ! (tau_relax > 0) cells, e.g. the strip of yelmo_masks.border_width, from
     ! an ice history at the forcing time; the interior keeps its H_ice_ref.
     active     = False                ! apply it?
-    var_defs   = "input/clim_db.nml"  ! varslice databases, searched in order, then the par file itself
+    var_defs   = "input/clim_db.nml"  ! varslice databases, searched in order after the par file
     method     = "file"               ! file: H_ice at the forcing time (clamped to the file's range);
                                       ! scaled: H = f*H_ice(slice_time), f an index
     H_ice      = "paleomist_H_ice"    ! group of the ice thickness [m] (on the ice grid, or remap)

@@ -10,14 +10,17 @@ run under the ESM forcing (historical + projection) to 2300.
 
 - **Program:** `yelmox` (`make yelmox`) with the ESM climate backend
   (`[comps] climate = "esm"`, see [ESM forcing](climate-esm.md)).
-- **Config:** `yelmox/yelmox_esm_Greenland.nml`, `yelmox/yelmox_esm_Antarctica_ismip7.nml`.
+- **Config:** `yelmox/yelmox_esm_Greenland.nml`, `yelmox/yelmox_esm_Antarctica.nml`
+  (the ISMIP7 setup: `-p`).
 - **Forcing data:** `input/esm/esm_grl_ismip7.nml`, `input/esm/esm_ant_ismip7.nml`
   (see [Database namelists](database-namelists.md)).
 - **Scripts:** `scripts/ismip7/` -- workflows `run_ismip7_greenland.sh`,
   `run_ismip7_antarctica.sh`; tuned spin-ups `opt_grl.sh`, `opt_grl_ismip.sh`,
-  `opt_grl_k24.sh`, `opt_ant.sh`.
+  `opt_grl_k24.sh`, `opt_ant.sh`. The Antarctic ISMIP7 setup is
+  `scripts/ismip7/params.sh` (`ismip7_ant`).
 
-The par files on their own run the optimization spin-up without relaxation
+The par files on their own (Antarctica: with `ismip7_ant`) run the
+optimization spin-up without relaxation
 (`[ctrl] run_step = "spinup"`, `[sim] opt = True`, `relax = False`, `[spinup]
 time_end` = 15 kyr for Greenland, 20 kyr for Antarctica); the scripts set the
 run phase, the relaxation and the run length. [1pctCO2](experiment-1pctco2.md)
@@ -78,15 +81,14 @@ workflow script to its last restart bundle.
 
 ## Greenland with K24 hydrology
 
-`yelmox/yelmox_esm_Greenland_k24.nml` is `yelmox_esm_Greenland.nml` with the
-K24 subglacial hydrology of FastHydrology: `[yhyd] method_transport = 1`, so
-K24 sets the effective pressure `N_eff` (the bucket closure `bkt_N_closure` is
-not used), with `k24_sliding_law = 4` (the frictional heat of Yelmo's basal
-stress enters the K24 water source), `k24_N_ub_coupled = True` (`N_eff`
-re-evaluated from the basal velocity inside the DIVA iteration) and the
-physical water viscosity `k24_water_viscosity = 1.8e-3` Pa s.
-`opt_grl_k24.sh` is `opt_grl.sh` with this par file, written to
-`output/ismip7/GRL-8KM/opt-l21-grimp-k24`:
+`opt_grl_k24.sh` is `opt_grl.sh` with the K24 subglacial hydrology of
+FastHydrology, its array `k24_params` on `yelmox_esm_Greenland.nml`:
+`[yhyd] method_transport = 1`, so K24 sets the effective pressure `N_eff` (the
+bucket closure `bkt_N_closure` is not used), with `k24_sliding_law = 4` (the
+frictional heat of Yelmo's basal stress enters the K24 water source) and
+`k24_N_ub_coupled = True` (`N_eff` re-evaluated from the basal velocity inside
+the DIVA iteration). The physical water viscosity `k24_water_viscosity =
+1.8e-3` Pa s is the base's. Output in `output/ismip7/GRL-8KM/opt-l21-grimp-k24`:
 
 ```bash
 scripts/ismip7/opt_grl_k24.sh

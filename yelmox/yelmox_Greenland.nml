@@ -118,15 +118,7 @@
     ! restart_every_df), advanced on the forcing clock time_rel; unset keys
     ! from the template [idx] of input/yelmox_defaults.nml.
     names  = "at"
-/
-
-&idx_at
-    ! Glacial index: the orbital series normalised to 0 at present (piControl)
-    ! and 1 at 21 ka (LGM); the position on the snapshots axis "at".
-    method      = "series"
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
+    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
 /
 
 &anom
@@ -577,7 +569,8 @@
     ! Snapshot backend (snapshots): present day (MAR v3.14 1961-1990, ORAS5) and
     ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
     ! "at". The ocean follows the reference, its anomaly from [ocn_fraction].
-    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
+    ! Groups: this file, then var_defs; unset keys: input/yelmox_defaults.nml.
+    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
     snapshots  = "pd" "picontrol" "lgm"
     axes       = "at"
     f_p        = 0.06
@@ -595,7 +588,7 @@
 /
 
 ! ---- snapshots (var_defs groups per field; {exp} of the paths) -------------
-! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
+! picontrol, lgm and the axis "at": input/forcing_db.nml.
 
 &snap_pd
     tas = "mar314_1961_1990_tas"
@@ -603,33 +596,6 @@
     zs  = "mar314_1961_1990_zs"
     to  = "oras5_1981_2010_to"
     so  = "oras5_1981_2010_so"
-/
-
-&snap_picontrol
-    exp        = "piControl"
-    monthly    = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
-    pr  = "pmip3_mean_pr_ann"
-    zs  = "pmip3_mean_zs"
-/
-
-&snap_lgm
-    exp        = "lgm"
-    monthly    = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
-    pr  = "pmip3_mean_pr_ann"
-    zs  = "pmip3_mean_zs"
-/
-
-! ---- axes (two snapshots and the index giving the position on them) --------
-! The value of the index is the position on the axis lo -> hi (0 -> 1).
-
-&snap_axis_at
-    lo    = "picontrol"
-    hi    = "lgm"
-    index = "at"
 /
 
 ! ===== Surface =====

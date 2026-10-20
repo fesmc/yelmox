@@ -17,11 +17,10 @@ thermal forcing:
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
-- **Config:** `yelmox/yelmox_GreenlandPaleo.nml` (base); A:
-  `yelmox/yelmox_GreenlandPaleo_spinup.nml`, `yelmox/yelmox_GreenlandPaleo_lgp.nml`;
-  B: `yelmox/yelmox_GreenlandPaleo_lgm.nml`, `yelmox/yelmox_GreenlandPaleo_deglac.nml`.
+- **Config:** `yelmox/yelmox_GreenlandPaleo.nml` (base of A and B).
 - **Scripts:** `scripts/grl-paleo/`: A `run_spinup.sh`, `run_lgp.sh`; B
-  `run_lgm_spinup.sh`, `run_deglac.sh`.
+  `run_lgm_spinup.sh`, `run_deglac.sh`. The forcing is set with `-p`:
+  `scripts/grl-paleo/params.sh` (`grlpal_lgp` for A, `grlpal_recon` for B).
 - **Design:** `docs/_grl-paleo-plan.md`.
 
 ## Running
@@ -124,10 +123,10 @@ rates and `f_p` are written as attributes: remake the file when `[snap] lapse` o
   in time (`[orbit] method = "clock"`).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_spratt2016.dat`.
 
-![Forcing of yelmox_GreenlandPaleo_lgp.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grlpal_a.png)
+![Forcing of yelmox_GreenlandPaleo.nml with grlpal_lgp of scripts/grl-paleo/params.sh at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grlpal_a.png)
 
-- **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_grl_paleo]`): one
-  layer every 1 kyr, coupled every 50 yr (for comparison with MacGregor et al., 2025).
+- **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_grl_lgp]` of
+  `input/forcing_db.nml`): one layer every 1 kyr, coupled every 50 yr (for comparison with MacGregor et al., 2025).
 - **Output:** 2D every 1 kyr, 1D every 100 yr, restart bundles every 25 kyr.
 
 ## B. Reconstruction forcing
@@ -166,7 +165,7 @@ anomaly (`[ocn_fraction]`); sea level from `input/sealevel_spratt2016.dat`
 climate is updated every 100 yr (`dt_clim`; the reconstructions are read and
 remapped from GRL-16KM at each update, which made 10 yr six times slower).
 
-![Forcing of yelmox_GreenlandPaleo_deglac.nml at 21 ka and 12.5 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio. West of the GRL box: the mean anomaly of the reconstructions.](figures/grlpal_b.png)
+![Forcing of yelmox_GreenlandPaleo.nml with grlpal_recon of scripts/grl-paleo/params.sh at 21 ka and 12.5 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio. West of the GRL box: the mean anomaly of the reconstructions.](figures/grlpal_b.png)
 
 ## B. LGM spin-up
 
@@ -181,7 +180,7 @@ remapped from GRL-16KM at each update, which made 10 yr six times slower).
 
 - **Timeline:** `[ctrl]` -21 ka to 0, on relative time, restarted from the LGM
   spin-up.
-- **Ice age:** isochrones with elsa (`[elsa_grl_paleo]`): one layer every 500 yr.
+- **Ice age:** isochrones with elsa (`[elsa_grl_deglac]`): one layer every 500 yr.
 - **Output:** 2D every 500 yr, 1D every 10 yr, restart bundles every 7 kyr.
 
 ## Configuration common to all

@@ -6,6 +6,20 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- `input/forcing_db.nml`: one library of the named forcing groups that par files share:
+  snapshots `snap_picontrol`, `snap_lgm`, `snap_b18_base`, `snap_b18`, `snap_b20`; axes
+  `snap_axis_a`, `_at`, `_b18`, `_b20`; indices `idx_a`, `idx_at`, `idx_one`, `idx_ramp`,
+  `idx_orb`, `idx_hyst`, `idx_dT`; elsa `elsa_grl_lgp`, `elsa_grl_deglac`, `elsa_ant_paleo`
+  (`[ytrc] elsa_nml`, `elsa_group`). The bases list it in `[snap] var_defs` and the new key
+  `[indices] var_defs` (default `""`) and keep only `snap_pd` and the per-run selection
+  (`[snap]`, `[snap_field_*]`, `[indices]`). `scripts/check_par_nml.py` follows the library
+  and checks its groups. Docs: `yelmox.md` (Forcing library).
+- `.runme/info.json`: `par_defaults` (`input/yelmo_defaults.nml`, `input/yelmox_defaults.nml`),
+  so `-p` can set a key of a group the par file lacks (e.g. `-p bias.active=True`), and
+  `par_library` (`input/forcing_db.nml`): `-p` on a key of a library group (e.g.
+  `-p idx_a.f_min=0`) copies the whole group into the staged par file, then applies the
+  override. Needs runme >= 0.5.26 for `-p` on library groups and for new groups in runs
+  that stage two par files.
 - `ssa_lat_bc = "all"` in every par file (SRG and ANT paleo were `"floating"`; answer-changing
   for them); the removed option "slab" dropped from the comments. Sea level of GRL paleo:
   the Holocene offset of Spratt and Lisiecki (2016) removed linearly over 0-10 ka (was a
@@ -100,6 +114,22 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Par files: `yelmox/` holds one base per domain and climate backend (Greenland,
+  GreenlandPaleo, Antarctica, North, LIS, Pyrenees, SRG, esm_Greenland, esm_Antarctica,
+  rembo_Greenland) plus the REMBO file `rembo_Greenland.nml`. An experiment is a `-p` list in its scripts:
+  experiment-defining settings in commented arrays (`scripts/<exp>/params.sh` when shared),
+  run control in the invocation. The bases gain inert keys that the arrays set
+  (GreenlandPaleo `[sim] recon_*`; Antarctica `[marine_shelf] corr_b1` .. `corr_b18`, its
+  corrections now named `b1 b12 b14 b15`; esm_Antarctica `[topo] names`, `[regions] layers`,
+  `path_ismip7`, `var_ismip7`, `[chion] nml_pdd`, `[pdd_chion]`; GreenlandPaleo and
+  Antarctica `[snap_field_tas]`, `[snap_field_pr]` at the template defaults).
+- Named forcing groups: one lookup rule, the par file first, then the var_defs files in
+  order (was: the var_defs files first, then the par file, for varslice groups; snapshot,
+  axis and index groups from the par file only). A par file that defines a group now wins
+  over the databases. Breaking for external par files: a snapshot, axis or index group
+  listed in `[snap]` or `[indices]` and defined nowhere stops the run, naming the group and
+  the files; add `input/forcing_db.nml` to `[snap] var_defs` and `[indices] var_defs` to use
+  the library.
 - Snapshots: one monthly lapse rate both ways. The inflation of the blended sea-level
   fields to the model surface (`snapshots_transform`, also the surface hosts' monthly lapse
   rates) used the seasonal cosine at phase `m*30-15`, the sea-level reduction of a snapshot
@@ -711,6 +741,9 @@ annotated git tag. Dates are release (tag) dates.
   `yhyd.bkt_N_closure`/`marine_p`).
 
 ### Fixed
+- `scripts/docs-figures/run.sh`: the climate-only overrides come after the case's, so they
+  win (`ant_paleo` sets `ctrl.dtt = 5` through `antpal_physics`; the climate-only `dtt`
+  now holds).
 - `maps/grid_SRG-250M.txt` is the FesmData v2 SRG-250M grid (208 x 120, as the product
   regenerated on 2026-10-16, which now shares the grid of the legacy `ice_data` SRG inputs);
   it held a stale 257 x 129 description. `yelmox_SRG.nml` runs every component on
@@ -834,6 +867,19 @@ annotated git tag. Dates are release (tag) dates.
   memory (differing between builds). Results are unchanged.
 
 ### Removed
+- 15 variant par files, replaced by `-p` lists on the bases:
+  `yelmox_GreenlandPaleo_spinup`, `_lgp`, `_lgm`, `_deglac` (GreenlandPaleo base;
+  `scripts/grl-paleo/run_*.sh`, arrays `grlpal_lgp`, `grlpal_recon` of `params.sh`);
+  `yelmox_Antarctica_paleo_spinup`, `_lgp` (Antarctica base; `scripts/ant-paleo/run_*.sh`,
+  `antpal_physics`, `antpal_lgp`); `yelmox_pd_Greenland`, `yelmox_pd_Antarctica`,
+  `yelmox_Greenland_ramp` (one-line commands in `docs/experiment-greenland.md` and
+  `experiment-antarctica.md`); `yelmox_esm_Antarctica_ismip7` (`ismip7_ant` of
+  `scripts/ismip7/params.sh`); `yelmox_esm_Greenland_k24` (`k24_params` of
+  `scripts/ismip7/opt_grl_k24.sh`); `yelmox_esm_Greenland_1pctCO2`,
+  `yelmox_esm_Antarctica_1pctCO2` (`pct_grl`; `ismip7_ant` + `pct_ant` of
+  `scripts/1pctCO2/params.sh`); `yelmox_esm_Greenland_tipmip` (`tipmip_grl` of
+  `scripts/tipmip/params.sh`); `yelmox_esm_Antarctica_nudge` (`nudge_ant` of the new
+  `scripts/nudge/run_nudge_antarctica.sh`). The docs-figures case tables use the bases.
 - `libs/ismip6.f90` (module `ismip6`, unused since the `yelmox_ismip6` and
   `yelmox_nahosmip` flavors were retired).
 - `libs/hyster.f90` (module `hyster`, unused since tsgen replaced it) and the dead

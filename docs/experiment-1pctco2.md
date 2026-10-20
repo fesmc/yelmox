@@ -11,12 +11,14 @@ first years.
 
 - **Program:** `yelmox` (`make yelmox`) with the ESM climate backend
   (`[comps] climate = "esm"`, see [ESM forcing](climate-esm.md)).
-- **Config:** `yelmox/yelmox_esm_Greenland_1pctCO2.nml`,
-  `yelmox/yelmox_esm_Antarctica_1pctCO2.nml`.
+- **Config:** `yelmox/yelmox_esm_Greenland.nml`, `yelmox/yelmox_esm_Antarctica.nml`
+  (the 1pctCO2 setup: `-p`).
 - **Forcing data:** `input/esm/esm_grl_1pctCO2.nml`, `input/esm/esm_ant_1pctCO2.nml`
   (see [Database namelists](database-namelists.md)).
 - **Scripts:** `scripts/1pctCO2/` -- workflows `run_1pctco2_greenland.sh`,
-  `run_1pctco2_antarctica.sh`; tuned Antarctic spin-up `opt_ant.sh`.
+  `run_1pctco2_antarctica.sh`; tuned Antarctic spin-up `opt_ant.sh`. The setup is
+  `scripts/1pctCO2/params.sh` (`pct_grl`; Antarctica `pct_ant` after `ismip7_ant`
+  of `scripts/ismip7/params.sh`).
 
 ## Running
 
@@ -56,8 +58,9 @@ takes the ESM's own smb). In the spin-up the backend applies the reference
 climatology only.
 
 `opt_ant.sh` is a tuned 20-kyr Antarctic optimization spin-up on ANT-16KM with
-`yelmox_esm_Antarctica_1pctCO2.nml`: `cb_ref` started from the till friction of
-the bed (`opt.cf_init=-1`), a short relaxation (`relax.time1/2 = 100`), the
+`yelmox_esm_Antarctica.nml`, `ismip7_ant` and `pct_ant`: `cb_ref` started from
+the till friction of the bed (`opt.cf_init=-1`), a short relaxation
+(`relax.time1/2 = 100`), the
 ocean extrapolated into the shelves (`marine_shelf.extrap_shlf=True`),
 equilibrium calving, DIVA, shelf enhancement 0.5. Output in
 `output/1pctCO2/opt-ANT-16KM-l21-bedmap3`.
