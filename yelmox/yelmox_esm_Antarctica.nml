@@ -104,6 +104,7 @@
 &topo
     path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    names = ""   ! variables of the file, by position in vars ("" = as vars)
     remap = "con"
 /
 
@@ -111,6 +112,9 @@
     path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
     path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
     basin_sets   = "Zwally2012"
+    layers       = ""    ! layers of any file (path_<layer>, var_<layer>); "" = none
+    path_ismip7  = ""    ! layer ismip7 (scripts/ismip7: the ISMIP7 basins)
+    var_ismip7   = ""
     masks        = "APIS" "WAIS" "EAIS"
     mask_APIS    = "region:Antarctic_Peninsula"
     mask_WAIS    = "region:West_Antarctica"

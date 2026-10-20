@@ -6,10 +6,11 @@
 #                      (sim.opt=True) -> writes a restart bundle
 #   Step 2  scenarios  ssp585, branched off that bundle
 #
-# The ice sheet + isostasy are ACTIVE (comps.with_ice_sheet/with_isostasy=True in
-# yelmox_esm_Antarctica_ismip7.nml). The spin-up optimizes basal friction + thermal
-# forcing to present day (&opt cf/tf_time_end=20e3), and the scenarios evolve the ice
-# sheet under ISMIP7 climate/ocean forcing.
+# Base yelmox/yelmox_esm_Antarctica.nml with the ISMIP7 setup ismip7_ant of
+# params.sh. The ice sheet + isostasy are ACTIVE (comps.with_ice_sheet/with_isostasy=True).
+# The spin-up optimizes basal friction + thermal forcing to present day (&opt
+# cf/tf_time_end=20e3), and the scenarios evolve the ice sheet under ISMIP7
+# climate/ocean forcing.
 #
 # Run the steps in order on the cluster; let the spin-up finish before launching
 # the scenarios (they read its restart bundle):
@@ -29,9 +30,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1               # repo root
 
+source scripts/ismip7/params.sh                    # ismip7_ant
+
 # ---- configuration ---------------------------------------------------------
 EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
-NML="yelmox/yelmox_esm_Antarctica_ismip7.nml"
+NML="yelmox/yelmox_esm_Antarctica.nml"
 OUTROOT="output/ismip7_ant"
 GCM="CESM2-WACCM"
 GRID="ANT-16KM"
@@ -60,14 +63,16 @@ BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1
 case "${1:-}" in
   spinup)
     runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
-      -p ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True \
+      -p "${ismip7_ant[@]}" \
+         ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True \
          domain.grid_hub="$GRID" \
          spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
     ;;
   scenarios)
     for exp in "${SCENARIOS[@]}"; do
       runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
-        -p ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
+        -p "${ismip7_ant[@]}" \
+           ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
            esm.use_esm=True esm.use_hist=True esm.use_proj=True \
            domain.grid_hub="$GRID" \
            ctrl.restart="$BUNDLE" \

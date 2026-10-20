@@ -2,6 +2,9 @@
 #
 # ISMIP7 Antarctica optimization spin-up (climate = esm). opt.cf_init=-1 starts
 # cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
+# Base yelmox/yelmox_esm_Antarctica.nml with the ISMIP7 setup ismip7_ant of params.sh.
+
+source "$(dirname "$0")/params.sh"
 
 resolution=ANT-16KM
 output_path=output/ismip7/${resolution}/opt-l21-bedmap3
@@ -70,5 +73,5 @@ mat_params=(
 # albedo: runopts="-rs -q 48h -w 48:00:00", or -s to stage only).
 runopts="${runopts:--rs -q shared -w 2-00:00:00 -m 20G}"
 
-runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica_ismip7.nml -o "${output_path}" \
-      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"
+runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Antarctica.nml -o "${output_path}" \
+      -p "${ismip7_ant[@]}" "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}"
