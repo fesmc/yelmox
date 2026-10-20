@@ -32,6 +32,11 @@ annotated git tag. Dates are release (tag) dates.
   isostasy LV-ELVA with two uniform mantle layers (as ISMIP7 GRL).
 - GreenlandPaleo: needs Yelmo with outflow-only "infinite" borders (the inflow through the
   border killed the first B LGM spin-up); docs updated.
+- GreenlandPaleo: one spin-up script `scripts/grl-paleo/run_spinup.sh <forcing> <time>` for
+  A and B (`run_lgm_spinup.sh` removed): forcing `pd`, `lgp` or `recon` (`grlpal_pd` added
+  to `params.sh`) held at any time, 20 kyr, ice from the present-day topography at 0 and
+  from GLAC-1D otherwise, extra `-p` values passed through. The A spin-up is now 20 kyr
+  (was 15); default paths `output/grl-paleo/spinup-<forcing>-<ka>ka`.
 - `input/yelmo-variables-ytopo.md`: `mb_border` (Yelmo dev c2cb8c3e: the reset of outflow-border
   cells, booked apart from `mb_resid`; region totals without these cells, `mb_border_tot`
   their total). GreenlandPaleo docs updated.

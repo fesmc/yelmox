@@ -8,7 +8,7 @@ Bay). Two setups, without optimization of the basal friction or the ocean
 thermal forcing:
 
 - **A. Last glacial period**, as the [Antarctic paleo](experiment-ant-paleo.md):
-  a 15-kyr present-day **spin-up**, then a **transient** from 130 kyr ago to the
+  a 20-kyr present-day **spin-up**, then a **transient** from 130 kyr ago to the
   present, restarted from the spin-up, with the climate scaled by a glacial index.
 - **B. Deglaciation** after Tabone et al. (2024): an **LGM spin-up** from GLAC-1D,
   then a **transient** from 21 ka to the present forced by the Greenland
@@ -18,9 +18,10 @@ thermal forcing:
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
 - **Config:** `yelmox/yelmox_GreenlandPaleo.nml` (base of A and B).
-- **Scripts:** `scripts/grl-paleo/`: A `run_spinup.sh`, `run_lgp.sh`; B
-  `run_lgm_spinup.sh`, `run_deglac.sh`. The forcing is set with `-p`:
-  `scripts/grl-paleo/params.sh` (`grlpal_lgp` for A, `grlpal_recon` for B).
+- **Scripts:** `scripts/grl-paleo/`: `run_spinup.sh` (both setups), A
+  `run_lgp.sh`, B `run_deglac.sh`. The forcing is set with `-p`:
+  `scripts/grl-paleo/params.sh` (`grlpal_lgp` for A, `grlpal_recon` for B,
+  `grlpal_pd` the reference climate only).
 - **Design:** `docs/_grl-paleo-plan.md`.
 
 ## Running
@@ -31,7 +32,7 @@ spin-up.
 A:
 
 ```bash
-scripts/grl-paleo/run_spinup.sh
+scripts/grl-paleo/run_spinup.sh pd 0 output/grl-paleo/spinup-pd-0ka sim.relax=True
 ```
 
 ```bash
@@ -41,19 +42,24 @@ scripts/grl-paleo/run_lgp.sh
 B:
 
 ```bash
-scripts/grl-paleo/run_lgm_spinup.sh
+scripts/grl-paleo/run_spinup.sh recon -21e3
 ```
 
 ```bash
 scripts/grl-paleo/run_deglac.sh
 ```
 
-`run_spinup.sh [output_path]` writes to `output/grl-paleo/spinup` by default,
-`run_lgm_spinup.sh [output_path]` to `output/grl-paleo/lgm`.
+`run_spinup.sh <forcing> <time> [output_path] [extra -p ...]` runs 20 kyr with
+the forcing `grlpal_<forcing>` (`pd`, `lgp` or `recon`) held at `<time>`
+(`ctrl.tstep_const`, yr: climate, insolation, sea level). The ice starts from
+the present-day topography at time 0 and from GLAC-1D at `<time>` otherwise;
+the output goes to `output/grl-paleo/spinup-<forcing>-<ka>ka` by default. Any
+setup can so be spun up at the present day or at the LGM, e.g. the steady state
+of B under present-day forcing: `run_spinup.sh recon 0`.
 `run_lgp.sh [spinup_path] [output_path]` restarts from
-`<spinup_path>/restart-15.000-kyr` and writes to `output/grl-paleo/lgp`;
-`run_deglac.sh [lgm_path] [output_path]` restarts from
-`<lgm_path>/restart-20.000-kyr` and writes to `output/grl-paleo/deglac` (the
+`<spinup_path>/restart-20.000-kyr` (default `spinup-pd-0ka`) and writes to
+`output/grl-paleo/lgp`; `run_deglac.sh [lgm_path] [output_path]` restarts from
+`<lgm_path>/restart-20.000-kyr` (default `spinup-recon-21ka`) and writes to `output/grl-paleo/deglac` (the
 bundles are passed as absolute paths; the scripts stop if one is missing). All
 submit to the `shared` queue (2 days, 10 GB, no OpenMP). On a busy cluster, run
 them as chains of short jobs instead: [Long runs in chunks](run-chunks.md) has

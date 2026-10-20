@@ -1,14 +1,14 @@
 #!/bin/bash
 #
 # Greenland deglaciation after Tabone et al. (2024), -21 ka to 0 (GRL-PAL,
-# 16 km), restarting from the LGM spin-up bundle at 20 kyr: the reconstructions
-# in time (forcing grlpal_recon of params.sh), transient insolation, sea level
-# from file, elsa isochrones. Base yelmox/yelmox_GreenlandPaleo.nml. Run from
-# the yelmox root.
+# 16 km), restarting from the LGM spin-up bundle at 20 kyr (run_spinup.sh recon
+# -21e3): the reconstructions in time (forcing grlpal_recon of params.sh),
+# transient insolation, sea level from file, elsa isochrones. Base
+# yelmox/yelmox_GreenlandPaleo.nml. Run from the yelmox root.
 
 source "$(dirname "$0")/params.sh"
 
-lgm_path=${1:-output/grl-paleo/lgm}
+lgm_path=${1:-output/grl-paleo/spinup-recon-21ka}
 output_path=${2:-output/grl-paleo/deglac}
 
 # Absolute path: the executable runs from inside the run dir, so a

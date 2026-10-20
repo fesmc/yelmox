@@ -1,10 +1,14 @@
 # Greenland paleo forcing on the base yelmox/yelmox_GreenlandPaleo.nml, as runme
 # -p arrays. Sourced by the run_*.sh scripts of this folder and by
 # scripts/docs-figures/run.sh. The named groups (idx_*, snap_*, snap_axis_*) come
-# from input/forcing_db.nml.
+# from input/forcing_db.nml. run_spinup.sh takes any of them by name
+# (grlpal_<forcing>).
 
-# A: last glacial period (run_lgp.sh). PMIP3 piControl and LGM blended by the
-# glacial index input/alpha_combined_125kyr_interp.dat.
+# Reference climate only (the present-day snapshot of the base par file).
+grlpal_pd=()
+
+# A: last glacial period (run_lgp.sh; run_spinup.sh lgp). PMIP3 piControl and
+# LGM blended by the glacial index input/alpha_combined_125kyr_interp.dat.
 grlpal_lgp=(
     "indices.names==a"                  # glacial index [idx_a] (series)
     "snap.snapshots==pd,picontrol,lgm"  # present day plus PMIP3 piControl and LGM
@@ -16,7 +20,7 @@ grlpal_lgp=(
     "orbit.method=clock"                # transient insolation (orbit at the forcing clock)
 )
 
-# B: deglaciation after Tabone et al. (2024) (run_lgm_spinup.sh, run_deglac.sh).
+# B: deglaciation after Tabone et al. (2024) (run_spinup.sh recon, run_deglac.sh).
 # Anomalies of the Greenland reconstructions on the present-day reference:
 # temperature of Buizert et al. (2018, axis b18: reconstruction - its 1981-2010
 # baseline), precipitation of Badgeley et al. (2020, axis b20: the fraction
