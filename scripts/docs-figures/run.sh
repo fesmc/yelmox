@@ -21,16 +21,22 @@ RUNOPTS="${RUNOPTS:--q compute -w 00:30:00 --omp 16}"
 read -r -a RUNOPTS_ARR <<< "$RUNOPTS"
 MODE="-rs"; [ "${STAGE:-0}" = 1 ] && MODE="-s"
 
+# Shared -p arrays of the paleo experiments, referenced as @<array> in the
+# overrides column.
+source scripts/grl-paleo/params.sh
+source scripts/ant-paleo/params.sh
+
 # case | par file | timeline group | tstep_method | t0 | t1 | dt | extra overrides
+# (@name: the elements of the bash array name)
 # (rel: time relative to 1950; cal: calendar years; const: the forcing at t0)
 CASES=$(cat <<'EOF'
 grl_snap   |yelmox/yelmox_Greenland.nml               |ctrl      |rel  |-130e3 |0      |1000 |
-grl_ramp   |yelmox/yelmox_Greenland_ramp.nml          |ctrl      |rel  |0      |2000   |500  |
+grl_ramp   |yelmox/yelmox_Greenland.nml               |ctrl      |rel  |0      |2000   |500  |domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 indices.names==at,ramp anom.active=True anom.index=ramp
 ant_pd     |yelmox/yelmox_Antarctica.nml              |ctrl      |const|0      |10     |10   |
-ant_paleo  |yelmox/yelmox_Antarctica_paleo_lgp.nml    |ctrl      |rel  |-130e3 |0      |1000 |ytill.method=1
+ant_paleo  |yelmox/yelmox_Antarctica.nml              |ctrl      |rel  |-130e3 |0      |1000 |@antpal_physics @antpal_lgp sim.relax=False sim.opt=False ytill.method=1
 grlpal_pd  |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |const|0      |10     |10   |
-grlpal_a   |yelmox/yelmox_GreenlandPaleo_lgp.nml      |ctrl      |rel  |-130e3 |0      |1000 |
-grlpal_b   |yelmox/yelmox_GreenlandPaleo_deglac.nml   |ctrl      |rel  |-21e3  |0      |500  |
+grlpal_a   |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |rel  |-130e3 |0      |1000 |@grlpal_lgp
+grlpal_b   |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |rel  |-21e3  |0      |500  |@grlpal_recon
 lis_lgm    |yelmox/yelmox_LIS.nml                     |ctrl      |const|-21e3  |10     |10   |
 lis_pd     |yelmox/yelmox_LIS.nml                     |ctrl      |const|0      |10     |10   |idx_a.f_min=0
 north_lgm  |yelmox/yelmox_North.nml                   |ctrl      |const|-21e3  |10     |10   |
@@ -63,8 +69,13 @@ while IFS='|' read -r name par g ts t0 t1 dt extra; do
         rel)   o+=("$g.tstep_method=rel" "$g.time_init=$t0" "$g.time_end=$t1") ;;
         cal)   o+=("$g.tstep_method=cal" "$g.time_init=$t0" "$g.time_end=$t1") ;;
     esac
-    read -r -a ex <<< "$extra"
+    read -r -a toks <<< "$extra"
+    ex=()
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        if [[ $tok == @* ]]; then ref="${tok#@}[@]"; ex+=("${!ref}"); else ex+=("$tok"); fi
+    done
     echo ">> $name: $par -> $OUT/$name"
+    # The case's overrides first, the climate-only ones last: they win.
     runme $MODE "${RUNOPTS_ARR[@]}" --jobname "docfig-$name" -e yelmox -n "$par" \
-        -o "$OUT/$name" -p "${o[@]}" ${ex[@]+"${ex[@]}"} > /dev/null
+        -o "$OUT/$name" -p ${ex[@]+"${ex[@]}"} "${o[@]}" > /dev/null
 done <<< "$CASES"
