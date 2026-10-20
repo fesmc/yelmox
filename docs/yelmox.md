@@ -19,11 +19,12 @@ through the sea level and an ocean box model.
 
 - **Program:** `yelmox/yelmox.f90` (thin driver) + `libs/kryos*.f90` (domain, coupling, startup, output).
 - **Build:** `make yelmox` (`make yelmox rembo=1` to link REMBO).
-- **Configs:** `yelmox/yelmox_<domain>.nml` (Antarctica, Greenland, North, LIS,
-  Pyrenees, SRG, plus `pd_` present-day and paleo variants), `yelmox_esm_*.nml`
-  ([ESM forcing](climate-esm.md)), `yelmox_rembo_Greenland.nml`
-  ([REMBO](climate-rembo.md)), `yelmox_Greenland_ramp.nml` (an air temperature
-  ramp: `[anom]` on a `ramp-slope` index).
+- **Configs:** one base par file per domain and climate backend,
+  `yelmox/yelmox_<base>.nml`: Greenland, GreenlandPaleo, Antarctica, North, LIS,
+  Pyrenees, SRG, esm_Greenland and esm_Antarctica ([ESM forcing](climate-esm.md)),
+  rembo_Greenland ([REMBO](climate-rembo.md)). An experiment is a `-p` list on a
+  base, in its scripts in `scripts/<exp>/` (arrays shared by several scripts in
+  `params.sh`); see [Forcing library](#forcing-library).
 - **Experiments:** [Greenland](experiment-greenland.md),
   [Antarctica](experiment-antarctica.md), [ISMIP7 projections](experiment-ismip7.md),
   [1pctCO2](experiment-1pctco2.md), [TIPMIP](experiment-tipmip.md),
@@ -235,8 +236,8 @@ The weight is a varslice group on the climate grid or remapped online
 (`remap`, `grid_src`); values outside [0, 1] (or missing) stop the run. It is
 written to the climate's 2D file (`taper_w`). `input/clim_db.nml` holds
 `taper_b18_b20`, the weight of the Greenland reconstructions on GreenlandPaleo
-(1 in their coverage, 0 beyond 100 km; `outside = "mean"` in
-`yelmox_GreenlandPaleo_lgm.nml` and `yelmox_GreenlandPaleo_deglac.nml`).
+(1 in their coverage, 0 beyond 100 km; `outside = "mean"` in `grlpal_recon`
+of `scripts/grl-paleo/params.sh`).
 
 ## Climate bias correction (`[bias]`)
 
@@ -409,6 +410,36 @@ A minimal skeleton:
     lim_pd_ice        = False
 /
 ```
+
+### Forcing library
+
+`input/forcing_db.nml` holds the named forcing groups that several par files
+share: snapshots `[snap_<name>]` (PMIP3 `picontrol`, `lgm`; the Greenland
+reconstructions `b18_base`, `b18`, `b20`), axes `[snap_axis_<name>]` (`a`,
+`at`, `b18`, `b20`), indices `[idx_<name>]` (`a`, `at`, `one`, `ramp`, `orb`,
+`hyst`, `dT`) and elsa layer settings (`elsa_grl_lgp`, `elsa_grl_deglac`,
+`elsa_ant_paleo`). `[snap_pd]`, `[snap]`, `[snap_field_*]` and `[indices]` stay
+in the par file.
+
+A named group is read from the par file if it has it, else from the first
+var_defs file that does: `[snap] var_defs` for the snapshot, axis and varslice
+groups, `[indices] var_defs` for the index groups. The bases list
+`input/forcing_db.nml` there (the ESM bases in `[indices]` only). elsa reads its group from the file `[ytrc]
+elsa_nml` names (`input/forcing_db.nml`), selected by `elsa_group`. A listed
+group found nowhere stops the run.
+
+To change a library group for one run, define it in the par file (it wins), or
+set one of its keys with `-p` (e.g. `-p idx_a.f_min=0`): runme copies the whole
+group into the staged par file, then applies the override (`par_library` in
+`.runme/info.json`). `par_defaults` (`input/yelmo_defaults.nml`,
+`input/yelmox_defaults.nml`) lets `-p` set a key of a group the par file lacks,
+e.g. `-p bias.active=True` or `-p ytrc.use_elsa=True`. `-p` on a library group
+needs runme 0.5.26 or later.
+
+Scripts follow one rule: the settings that define the experiment go in
+commented `-p` arrays (in `scripts/<exp>/params.sh` when several scripts share
+them); run control goes in the invocation (run step, times, restart, grid,
+output intervals, queue).
 
 ### `[ctrl]`
 

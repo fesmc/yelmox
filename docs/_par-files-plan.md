@@ -1,7 +1,7 @@
 # Par files: bases plus -p, forcing library
 
-Status: plan (2026-10-20), not started. The leading `_` keeps quarto from
-rendering it.
+Status: implemented 2026-10-20 (branch par-files), Levante verification
+pending. The leading `_` keeps quarto from rendering it.
 
 States checked: yelmox dev 6ec65b4.
 
@@ -78,11 +78,11 @@ Deleted (15):
 ## Fortran
 
 - New library file `input/forcing_db.nml`:
-  - `snap_<name>`: picontrol, lgm, the Antarctic PMIP3 pair with suffix
-    `_ant`, b18_base, b18, b20.
+  - `snap_<name>`: picontrol, lgm, b18_base, b18, b20. No `_ant` pair: the
+    ant-paleo script overrides the two `tas` bindings with `-p`.
   - `snap_axis_<name>`: a, at, b18, b20.
   - `idx_<name>`: a, at, one, ramp, orb, hyst, dT.
-  - `elsa_<name>`: grl_paleo, ant_paleo.
+  - `elsa_<name>`: elsa_grl_lgp, elsa_grl_deglac, elsa_ant_paleo.
 
   `snap_pd` stays in each base as the domain's reference. `[snap]`,
   `[snap_field_*]` and `[indices]` stay in the base, since they are the

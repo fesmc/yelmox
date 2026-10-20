@@ -213,7 +213,7 @@ no elevation correction of their own). If it binds `zs`, it is reduced to sea
 level like any other snapshot.
 
 ```fortran
-&snap_axis_b20                ! yelmox_GreenlandPaleo_deglac.nml
+&snap_axis_b20                ! input/forcing_db.nml
     lo    = ""
     hi    = "b20"             ! snapshot binding tas (anomaly) and pr (ratio), no zs
     index = "one"             ! a const index, f = 1

@@ -11,10 +11,12 @@ surface (lapse rate, precipitation scaling), plus ESM anomalies over historical 
 projection periods, optional climate variability and subglacial discharge.
 
 - **Program:** `yelmox/yelmox.f90` (`make yelmox`), backend in `libs/yelmox_climate.f90`.
-- **Config:** `yelmox/yelmox_esm_*.nml`: ISMIP7 (`yelmox_esm_Greenland.nml`,
-  `yelmox_esm_Greenland_k24.nml`, `yelmox_esm_Antarctica_ismip7.nml`), 1pctCO2
-  (`yelmox_esm_*_1pctCO2.nml`), TIPMIP (`yelmox_esm_Greenland_tipmip.nml`), and
-  `yelmox_esm_Antarctica.nml`, `yelmox_esm_Antarctica_nudge.nml`.
+- **Config:** `yelmox/yelmox_esm_Greenland.nml`, `yelmox/yelmox_esm_Antarctica.nml`.
+  The experiments set their setup with `-p` arrays: ISMIP7 Antarctica
+  `ismip7_ant` (`scripts/ismip7/params.sh`), Greenland K24 `k24_params`
+  (`scripts/ismip7/opt_grl_k24.sh`), 1pctCO2 `pct_grl`, `pct_ant`
+  (`scripts/1pctCO2/params.sh`), TIPMIP `tipmip_grl` (`scripts/tipmip/params.sh`),
+  nudge `nudge_ant` (`scripts/nudge/run_nudge_antarctica.sh`).
 - **Forcing data:** `input/esm/esm_*.nml` (`[esm] par_file`).
 - **Scripts:** `scripts/ismip7/` (spin-ups `opt_*.sh`, workflows `run_ismip7_*.sh`;
   see [ISMIP7 projections](experiment-ismip7.md)), `scripts/1pctCO2/` (see
