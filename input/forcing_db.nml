@@ -26,6 +26,8 @@
 ! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
 
 ! ---- PMIP3 piControl and LGM, global ensemble means (summer: JJA) ----------
+! Antarctica (summer: DJF): -p snap_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf
+! and the same for snap_lgm (scripts/ant-paleo/params.sh).
 
 &snap_picontrol
     exp        = "piControl"
@@ -41,26 +43,6 @@
     monthly    = False
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
     tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
-    pr  = "pmip3_mean_pr_ann"
-    zs  = "pmip3_mean_zs"
-/
-
-! ---- PMIP3 piControl and LGM, Antarctica (summer: DJF) ---------------------
-
-&snap_picontrol_ant
-    exp        = "piControl"
-    monthly    = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_djf"
-    pr  = "pmip3_mean_pr_ann"
-    zs  = "pmip3_mean_zs"
-/
-
-&snap_lgm_ant
-    exp        = "lgm"
-    monthly    = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_djf"
     pr  = "pmip3_mean_pr_ann"
     zs  = "pmip3_mean_zs"
 /
@@ -100,12 +82,6 @@
     index = "at"
 /
 
-&snap_axis_a_ant
-    lo    = "picontrol_ant"
-    hi    = "lgm_ant"
-    index = "a"
-/
-
 &snap_axis_b18
     lo    = "b18_base"
     hi    = "b18"
@@ -126,12 +102,6 @@
     ! normalised).
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
-/
-
-&idx_a_lgm
-    ! Glacial index, constant 1 (LGM): the position on the snapshots axis "a".
-    method = "const"
-    f_min  = 1.0
 /
 
 &idx_at
