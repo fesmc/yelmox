@@ -12,11 +12,12 @@ to the present-day reference climatology.
 
 - **Program:** `yelmox` (`make yelmox`) with the ESM climate backend
   (`[comps] climate = "esm"`, see [ESM forcing](climate-esm.md)).
-- **Config:** `yelmox/yelmox_esm_Greenland_tipmip.nml`.
+- **Config:** `yelmox/yelmox_esm_Greenland.nml` (the TIPMIP setup: `-p`).
 - **Forcing data:** `input/esm/esm_grl_tipmip.nml` (ramp),
   `input/esm/esm_grl_tipmip_gwl.nml` (stabilisations)
   (see [Database namelists](database-namelists.md)).
-- **Scripts:** `scripts/tipmip/run_tipmip_greenland.sh`.
+- **Scripts:** `scripts/tipmip/run_tipmip_greenland.sh`, with the setup
+  `scripts/tipmip/params.sh` (`tipmip_grl`).
 
 ## Running
 

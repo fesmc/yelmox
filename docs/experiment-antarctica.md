@@ -8,17 +8,18 @@ the basal friction (`cb_ref`) and the ocean thermal-forcing correction
 (`tf_corr`), with the marine shelf on a 16 km grid (`yelmox_Antarctica.nml`, the
 base of a multigrid resolution test), and a 50-kyr **present-day** run at 32 km
 without optimization (the same par file with `-p` overrides). Two variants run
-on the ESM backend (`yelmox_esm_Antarctica.nml`,
-`yelmox_esm_Antarctica_nudge.nml`).
+on the ESM backend (`yelmox_esm_Antarctica.nml`, alone and with the nudge setup
+of `scripts/nudge/run_nudge_antarctica.sh`).
 
 - **Program:** `yelmox` (`make yelmox`) with the snapshot backend
   (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)); the
   ESM variants with `[comps] climate = "esm"` (see [ESM forcing](climate-esm.md)).
 - **Config:** `yelmox/yelmox_Antarctica.nml` (the present-day run: `-p`, see
-  Running), `yelmox/yelmox_esm_Antarctica.nml`,
-  `yelmox/yelmox_esm_Antarctica_nudge.nml`.
+  Running), `yelmox/yelmox_esm_Antarctica.nml` (the nudge variant: `-p`).
 - **Scripts:** `yelmox/run_mg_resolution.sh`, `yelmox/run_mg_cfmin.sh`,
-  `yelmox/run_mg_forward.sh`, all on `yelmox_Antarctica.nml`.
+  `yelmox/run_mg_forward.sh`, all on `yelmox_Antarctica.nml`;
+  `scripts/nudge/run_nudge_antarctica.sh` (`nudge_ant`) on
+  `yelmox_esm_Antarctica.nml`.
 
 ## Running
 
@@ -92,8 +93,10 @@ the Yelmo grid; the hub and the marine shelf on the shelf grid.
 ## Climate
 
 Present day only (`[snap] snapshots = "pd"`), without indices (`[indices]
-names = ""`), `[anom]` or `[ocn_fraction]`. `[idx_dT]` (`method = "const"`, 0)
-serves `run_mg_forward.sh`, which sets it with `idx_dT.f_min = f_max`.
+names = ""`), `[anom]` or `[ocn_fraction]`. `run_mg_forward.sh` adds the
+constant index `[idx_dT]` (`method = "const"`, 0) of `input/forcing_db.nml`:
+it sets `idx_dT.f_min` and `f_max` with `-p`, so runme copies the group into
+the staged par file.
 
 ![Present-day reference climate of yelmox_Antarctica.nml: annual and summer air temperature, annual precipitation.](figures/ant_pd.png)
 
@@ -107,13 +110,13 @@ is read from a file (`[marine_shelf] tf_correction = True`: `dT_nl` of
 ## ESM variants
 
 Two phases in calendar years (`[ctrl] calendar = True`, `calendar_ref = 2000`):
-`[spinup]` (the par files' `run_step`), 0 to 20 kyr with the forcing held at
+`[spinup]` (the par file's `run_step`), 0 to 20 kyr with the forcing held at
 2020 (`tstep_const`) and the reference climatology only, `cb_ref` and `tf_corr`
 optimized until 20 kyr; and `[transient]`, on calendar time with `dtt = 1` yr. Both read the reference RACMO2.3p2 (ERA5-forced,
 1990--2019, detrended) and ORAS5 1990--2019 (detrended), with `[esm] experiment
 = "ctrl"`.
 
-| | `yelmox_esm_Antarctica.nml` | `yelmox_esm_Antarctica_nudge.nml` |
+| | `yelmox_esm_Antarctica.nml` | nudge (`nudge_ant`) |
 |---|---|---|
 | Grids | `ANT-8KM` for every component | `ANT-16KM` for every component |
 | `[esm] par_file` | `input/esm/esm_ant.nml` (ISMIP6-2300) | `input/esm/esm_nudge.nml` (`Nudge_Skiba26`, years 4501--5000) |
@@ -121,6 +124,10 @@ optimized until 20 kyr; and `[transient]`, on calendar time with `dtt = 1` yr. B
 | `[transient]` | 1020 to 3500 | 4501 to 5000 |
 | Surface mass balance | chion ITM (`nml_itm = "itm"`) | chion PDD (`[pdd_chion]`, `cg05`) |
 | `[esm] experiment` | `"ctrl"` | `"ctrl"` (reference only) or `"nudgedhigh03"` with `use_proj = True`: the anomaly of the nudged AWI-ESM run minus its PI run, 3501--5000 (atmosphere; the ocean has no nudged files on ANT-16KM yet) |
+
+The nudge variant runs in two steps, from the yelmox root:
+`scripts/nudge/run_nudge_antarctica.sh spinup`, then `scenarios` (`ctrl` and
+`nudgedhigh03`, from the spin-up's last restart bundle; `STAGE=1` stages only).
 
 The reference climate is the mean over `time_ref` (1990--2019) of the RACMO2.3p2
 1979--2022 and ORAS5 1979--2024 monthly series. On ANT-8KM the ORAS5 reference
