@@ -26,7 +26,9 @@ thermal forcing:
 ## Running
 
 Run from the yelmox root; each transient needs the last restart bundle of its
-spin-up. A:
+spin-up.
+
+A:
 
 ```bash
 scripts/grl-paleo/run_spinup.sh
