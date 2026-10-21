@@ -4,7 +4,8 @@
 # control and forcing groups of the base par files (yelmox/yelmox_*.nml), the
 # climate database groups (input/clim_db.nml, for display) and the scalar
 # series files of input/ (downsampled), so the page can draw every tsgen
-# series and the sea level.
+# series and the sea level, and the cases of the docs figures as presets
+# (scripts/docs-figures/run.sh --list).
 #
 # Usage (from the repository root):
 #   julia --project=scripts/forcing-builder scripts/forcing-builder/export.jl [OUT.json]
@@ -119,6 +120,17 @@ function main()
         end
     end
 
+    # presets: the cases of the docs figures (scripts/docs-figures/run.sh --list),
+    # each a base and the -p overrides of the experiment and its timeline
+    presets = Any[]
+    for line in eachline(`bash $(joinpath(ROOT, "scripts", "docs-figures", "run.sh")) --list`)
+        cols = split(line, '\t')
+        length(cols) >= 2 || continue
+        base = replace(basename(cols[2]), ".nml" => "")
+        haskey(bases, base) || (@warn "preset $(cols[1]): base $base not exported"; continue)
+        push!(presets, Dict("name" => cols[1], "base" => base, "p" => String.(cols[3:end])))
+    end
+
     commit = try
         strip(read(`git -C $ROOT rev-parse --short HEAD`, String))
     catch
@@ -133,12 +145,13 @@ function main()
         "bases" => bases,
         "climdb" => climdb,
         "series" => series,
+        "presets" => presets,
     )
     mkpath(dirname(OUT))
     open(OUT, "w") do io
         JSON.print(io, data)
     end
-    println("wrote $OUT ($(round(filesize(OUT)/1024)) kB): $(length(bases)) bases, $(length(cfg.library)) library groups, $(length(series)) series")
+    println("wrote $OUT ($(round(filesize(OUT)/1024)) kB): $(length(bases)) bases, $(length(cfg.library)) library groups, $(length(series)) series, $(length(presets)) presets")
 end
 
 main()

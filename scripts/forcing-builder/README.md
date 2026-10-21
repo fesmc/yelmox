@@ -16,12 +16,13 @@ Files:
   value (`.runme/info.json` `par_defaults`, `par_library`).
 - `export.jl`: writes `docs/forcing-builder/forcing.json` (schema, library,
   the run-control and forcing groups of the bases, the climate database groups,
-  the scalar series of `input/` downsampled).
+  the scalar series of `input/` downsampled, and the cases of the docs figures
+  as presets, from `scripts/docs-figures/run.sh --list`).
 - `explain.jl`: the same resolution on the command line (the forcing time,
   the series, the terms with their equations and snapshots, the transforms,
   the orbit, the sea level), with a CairoMakie figure.
 
-## Export (after changing a par file, the library, the defaults or a series)
+## Export (after changing a par file, the library, the defaults, a series or a docs-figures case)
 
 ```bash
 julia --project=scripts/forcing-builder -e 'using Pkg; Pkg.instantiate()'
