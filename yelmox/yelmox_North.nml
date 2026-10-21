@@ -11,6 +11,7 @@
     time_end        = 100e3               ! [yr] Ending time
     dtt             = 10.0              ! [yr] Main loop timestep
     restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
+    write_lossless  = False             ! write all output lossless (ignore per-field precision), e.g. for bit-for-bit comparisons
 /
 
 &comps

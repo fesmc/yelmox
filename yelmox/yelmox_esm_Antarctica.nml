@@ -5,6 +5,7 @@
     calendar        = True              ! timeline in calendar years (tstep_const = calendar time)
     calendar_ref    = 2000.0            ! [yr CE] calendar reference
     restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
+    write_lossless  = False             ! write all output lossless (ignore per-field precision), e.g. for bit-for-bit comparisons
 /
 
 &spinup

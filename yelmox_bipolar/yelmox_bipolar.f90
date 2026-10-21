@@ -29,6 +29,7 @@ program yelmox_bipolar
     ! yelmox_bipolar/obm_coupling.f90. See docs/multigrid.md.
 
     use nml
+    use ncio,         only : nc_set_lossless
     use timestepping
     use timeout
     use precision,    only : dp
@@ -64,6 +65,7 @@ program yelmox_bipolar
     type(indices_class) :: idx                ! shared, driver-owned series ([forcing] series)
     real(wp)           :: fvar                ! response variable of the series: ice volume [Gt]
     character(len=512) :: restart             ! run restart bundle ([ctrl]), or "None"
+    logical            :: write_lossless      ! write all output lossless ([ctrl])
 
     ! Two explicit hemispheric domains (bipolar: never more than north + south).
     type(kryos_domain)   :: dom_north, dom_south
@@ -99,6 +101,10 @@ program yelmox_bipolar
     ! Which hemispheres are active ([ctrl]).
     call nml_read(path_par, "ctrl", "active_north", active_north)
     call nml_read(path_par, "ctrl", "active_south", active_south)
+
+    ! Output precision ([ctrl]): lossless ignores the precision of each field.
+    call nml_read(path_par, "ctrl", "write_lossless", write_lossless)
+    call nc_set_lossless(write_lossless)
 
     ! Ocean coupling control ([ctrl] switches, [obm_forcing], nautilus
     ! hysteresis parameters); checked by obm_coupling_init below.

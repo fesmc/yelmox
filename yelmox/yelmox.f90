@@ -8,6 +8,7 @@ program yelmox
     ! in yelmox_bipolar/. See docs/multigrid.md and libs/kryos*.f90.
 
     use nml
+    use ncio,      only : nc_set_lossless
     use timestepping
     use timeout
     use precision, only : dp
@@ -50,6 +51,9 @@ program yelmox
     ! Restart bundle folder to start from ([ctrl]); "None" = cold start.
     character(len=512) :: restart
 
+    ! Write all output lossless ([ctrl]), ignoring the precision of each field.
+    logical            :: write_lossless
+
     ! Series ([forcing] series, one group [series_<name>] each: tsgen, or
     ! derived and set by the model), owned by the driver and advanced once per
     ! step on the forcing time time_rel; read by name by the climate (the
@@ -74,6 +78,8 @@ program yelmox
     call nml_read(path_par, "ctrl", "calendar",     calendar)
     call nml_read(path_par, "ctrl", "calendar_ref", calendar_ref)
     call nml_read(path_par, "ctrl", "restart",      restart)
+    call nml_read(path_par, "ctrl", "write_lossless", write_lossless)
+    call nc_set_lossless(write_lossless)
     call tstep_init(ts, path_par, trim(run_step), dtt, time_ref=calendar_ref, cal=calendar)
 
     ! Single-domain runs write to the run dir.

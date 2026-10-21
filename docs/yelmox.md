@@ -393,6 +393,7 @@ A minimal skeleton:
     calendar        = False
     calendar_ref    = 1950.0
     restart         = "None"            ! restart bundle folder, or "None" for a cold start
+    write_lossless  = False             ! all output lossless (ignore per-field precision)
     tstep_method    = "const"
     tstep_const     = 0.0
     time_init       = 0.0
@@ -468,6 +469,7 @@ command; `scripts/forcing-builder/explain.jl` does it on the command line.
 | `run_step` | group name | the group holding the timeline: `"ctrl"` for `[ctrl]` itself, or a phase group such as `[spinup]` or `[transient]`, so one par file can hold several run phases |
 | `calendar`, `calendar_ref` | bool, [yr CE] | timeline in calendar years, against the reference year `calendar_ref` (ESM runs) |
 | `restart` | folder, `"None"` | the restart bundle to start from; `"None"` = cold start |
+| `write_lossless` | bool | write all output lossless, ignoring the per-field precision (e.g. for bit-for-bit comparisons of runs) |
 
 The timeline group holds `tstep_method` (`"const"`: the time advances and the
 forcing time stays at `tstep_const`; `"rel"`: the forcing follows the time, e.g.
@@ -568,6 +570,14 @@ Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 | `write_clim` | the backend's file: `snap.nc` (snapshots), `esm.nc` + `esm_ts.nc`, `rembo.nc` + `rembo_ts.nc` |
 | `write_htopo` | `htopo.nc` (the hub) |
 | `write_cmip`, `dt_cmip` | `yelmo_cmip.nc`, `yelmo_ts_cmip.nc`, every `dt_cmip` years (marine-shelf fields need `grid_shelf = grid_ice`) |
+
+The 2D fields are written at a fixed precision (ncio bit rounding, attributes
+`precision_abs`/`precision_rel`), so that they compress well: 1e-3 m for
+elevations, 1e-3 K for temperatures, 1e-3 m/yr (or 1e-4 relative) for
+velocities, 1e-4 m/yr for mass balance rates, 1e-4 for fractions, 1e-4 relative
+for stresses, precipitation and the other fields; masks, time series, restarts
+and the static fields are lossless. `[ctrl] write_lossless = True` writes
+everything lossless.
 
 ## Also built from this driver
 

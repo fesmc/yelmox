@@ -156,7 +156,8 @@ contains
             call nc_write(filename, "bias_dtas_ann_now", b%f_tas*sum(b%dtas, dim=3)/12.0_wp, &
                           dim1="xc", dim2="yc", dim3="time", start=[1,1,n], &
                           count=[size(b%dtas,1),size(b%dtas,2),1], ncid=ncid, units="K", &
-                          long_name="Bias correction of the air temperature at the forcing time (ann)")
+                          long_name="Bias correction of the air temperature at the forcing time (ann)", &
+                          prec_abs=1e-3_wp)
             end associate
         end if
 
