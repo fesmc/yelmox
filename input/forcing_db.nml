@@ -1,35 +1,35 @@
 ! =====================================================================
 ! forcing_db.nml — shared library of named forcing groups: snapshots
-! [snap_<name>], snapshot axes [snap_axis_<name>], indices [idx_<name>] and
-! elsa layer settings [elsa_<name>].
+! [snapshot_<name>], series [series_<name>], terms [term_<name>] and elsa
+! layer settings [elsa_<name>]. The forcing as terms: docs/_forcing-terms.md.
 !
 ! Lookup: a named group is read from the par file if it has it, else from the
-! first var_defs file that does. A par file uses this library by listing it
-! and selecting groups by name ([snap] snapshots and axes, [indices] names):
-!     &snap     var_defs = "input/clim_db.nml" "input/forcing_db.nml"
-!     &indices  var_defs = "input/forcing_db.nml"
+! first [forcing] var_defs file that does (this file is in the default list).
+! A par file uses the library by selecting groups by name:
+!     &forcing  reference = "pd"  series = "glacial" "dTo"  terms = "glacial" "ocean"
 ! elsa groups are read by yelmo straight from the file [ytrc] elsa_nml names,
 ! selected by [ytrc] elsa_group:
 !     &ytrc     elsa_nml = "input/forcing_db.nml"  elsa_group = "elsa_grl_lgp"
 !
 ! Override: define the group in the par file (it wins over this file), or set
-! a key with runme -p (e.g. -p idx_a.f_min=0): runme copies the whole group
-! from this file into the staged par file, then applies the override
+! a key with runme -p (e.g. -p series_glacial.f_min=1): runme copies the whole
+! group from this file into the staged par file, then applies the override
 ! (par_library in .runme/info.json).
 !
-! snap_pd and [snap_field_*] stay in the par files (domain-specific), as do
-! [snap] and [indices] (the per-run selection). Unset keys: the templates
-! snap_snapshot, snap_axis and idx of input/yelmox_defaults.nml.
+! The present-day snapshot_pd stays in each par file (domain-specific), as do
+! [forcing] (the per-run selection) and [snapshots] (the backend's rules).
+! Unset keys: the templates snapshot, series and term of
+! input/yelmox_defaults.nml.
 ! =====================================================================
 
 ! ===== Snapshots (var_defs groups of input/clim_db.nml per field; {exp} of the paths) =====
 ! A field a snapshot does not bind is left out (picontrol, lgm: no ocean).
 
 ! ---- PMIP3 piControl and LGM, global ensemble means (summer: JJA) ----------
-! Antarctica (summer: DJF): -p snap_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf
-! and the same for snap_lgm (scripts/ant-paleo/params.sh).
+! Antarctica (summer: DJF): -p snapshot_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf
+! and the same for snapshot_lgm (scripts/ant-paleo/params.sh).
 
-&snap_picontrol
+&snapshot_picontrol
     exp        = "piControl"
     monthly    = False
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
@@ -38,7 +38,7 @@
     zs  = "pmip3_mean_zs"
 /
 
-&snap_lgm
+&snapshot_lgm
     exp        = "lgm"
     monthly    = False
     clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
@@ -49,79 +49,66 @@
 
 ! ---- Greenland reconstructions: Buizert et al. (2018), Badgeley et al. (2020)
 
-&snap_b18_base
+&snapshot_b18_base
     tas = "b18_1981_2010_tas"
     pr  = "b18_1981_2010_pr"
     zs  = "b18_1981_2010_zs"
 /
 
-&snap_b18
+&snapshot_b18
     tas = "b18_tas"
     pr  = "b18_pr"
     zs  = "b18_zs"
 /
 
-&snap_b20
+&snapshot_b20
     monthly = False     ! annual: the same anomaly in every month
     tas = "b20_tas_anom" "b20_tas_anom"
     pr  = "b20_pr_frac"  ! or b20_pr_frac_low, b20_pr_frac_high
 /
 
-! ===== Axes (two snapshots and the index giving the position on them) =====
-! The value of the index is the position on the axis lo -> hi (0 -> 1).
+! ===== Series (tsgen groups, or derived; units and restart_every_df optional) =====
 
-&snap_axis_a
-    lo    = "picontrol"
-    hi    = "lgm"
-    index = "a"
-/
-
-&snap_axis_at
-    lo    = "picontrol"
-    hi    = "lgm"
-    index = "at"
-/
-
-&snap_axis_b18
-    lo    = "b18_base"
-    hi    = "b18"
-    index = "one"
-/
-
-&snap_axis_b20
-    lo    = ""
-    hi    = "b20"
-    index = "one"
-/
-
-! ===== Indices (tsgen groups; units and restart_every_df optional) =====
-
-&idx_a
+&series_glacial
     ! Glacial index (alpha_combined_125kyr_interp: 0 at present, ~0.9 at
-    ! 21 ka), the position on the snapshots axis "a", used as is (not
-    ! normalised).
+    ! 21 ka), used as is (not normalised): the weight of the LGM anomaly
+    ! (term_glacial).
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
 /
 
-&idx_at
-    ! Glacial index: the orbital series normalised to 0 at present (piControl)
-    ! and 1 at 21 ka (LGM); the position on the snapshots axis "at".
+&series_orbital
+    ! Orbital index: alpha_orbital_r2020 normalised to 0 at present (piControl)
+    ! and 1 at 21 ka (LGM): the weight of the LGM anomaly (term_orbital).
     method      = "series"
     series_file = "input/alpha_orbital_r2020.dat"
     norm_t0     = 0.0
     norm_t1     = -21e3
 /
 
-&idx_one
-    ! Constant 1: the full anomaly of the reconstructions (axes b18, b20).
-    method = "const"
-    f_min  = 1.0
-    f_max  = 1.0
+&series_orbital_t2018
+    ! Orbital index: alpha_orbital_t2018 (1 at present, 0 at 21 ka) normalised
+    ! to 0 at present and 1 at 21 ka (Pyrenees: a uniform cooling, f_ta = -10 K).
+    method      = "series"
+    series_file = "input/alpha_orbital_t2018.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
 /
 
-&idx_ramp
-    ! Functionality test: ramp + noise, the [anom] anomaly.
+&series_dTo
+    ! The ocean temperature anomaly from the atmosphere: 0.25 times the mean
+    ! sea-level air temperature anomaly of the climate update over the
+    ! climate grid [K] (derived, set by the climate); added to the ocean
+    ! profiles by term_ocean.
+    method = "derived"
+    from   = "air_anomaly"
+    factor = 0.25
+    region = "all"
+    units  = "K"
+/
+
+&series_ramp
+    ! Functionality test: ramp + noise, a uniform anomaly (term_ramp).
     method     = "ramp-slope"  ! constant-rate ramp (df_dt_max), clamped to [f_min,f_max]
     with_kill  = False      ! stop the run once the response equilibrates at a bound
     dt_init    = 0.0        ! [yr]  hold forcing flat during this initial interval
@@ -135,20 +122,11 @@
     f_min      = 0.0        ! [f]   lower forcing bound
     f_max      = 5.0        ! [f]   upper forcing bound (dTa caps at 5 K)
     f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+    units      = "K"
 /
 
-&idx_orb
-    ! Orbital index: alpha_orbital_t2018 (1 at present, 0 at 21 ka) normalised
-    ! to 0 at present and 1 at 21 ka; scaled by [anom] f_ta.
-    method      = "series"
-    series_file = "input/alpha_orbital_t2018.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
-/
-
-&idx_hyst
-    ! Hysteresis: add "hyst" to [indices] names and set [anom] active = True,
-    ! index = "hyst".
+&series_hyst
+    ! Hysteresis: series "hyst" with the uniform term_hyst.
     method     = "PI42"     ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
     with_kill  = True       ! stop the run once the response equilibrates at a bound
     dt_init    = 200.0      ! [yr]  hold forcing flat during this initial interval
@@ -162,14 +140,79 @@
     f_min      = 0.0        ! [f]   lower forcing bound
     f_max      = 4.0        ! [f]   upper forcing bound
     f_conv     = 0.0        ! [f]   hold value after convergence (ramp-time-step)
+    units      = "K"
 /
 
-&idx_dT
-    ! Sensitivity anomaly for run_mg_forward.sh (with [indices] names = "dT",
-    ! [anom] index = "dT"): a constant [K], set there with f_min = f_max.
+&series_dT
+    ! Sensitivity anomaly for run_mg_forward.sh (series "dT", term_dT): a
+    ! constant [K], set there with f_min = f_max.
     method = "const"
     f_min  = 0.0
     f_max  = 0.0
+    units  = "K"
+/
+
+! ===== Terms (series x pattern on explicit fields) =====
+
+&term_glacial
+    ! The LGM anomaly (PMIP3 lgm - piControl) weighted by the glacial index:
+    ! tas + glacial*(lgm - picontrol), pr * (1 + glacial*(lgm/picontrol - 1)).
+    series = "glacial"
+    snap0  = "picontrol"
+    snap1  = "lgm"
+    fields = "tas" "pr"
+/
+
+&term_orbital
+    ! The LGM anomaly weighted by the orbital index (0 at present, 1 at 21 ka).
+    series = "orbital"
+    snap0  = "picontrol"
+    snap1  = "lgm"
+    fields = "tas" "pr"
+/
+
+&term_b18
+    ! The Buizert et al. (2018) temperature reconstruction in time, as its
+    ! anomaly to its own 1981-2010 baseline, in full (no series).
+    snap0  = "b18_base"
+    snap1  = "b18"
+    fields = "tas"
+/
+
+&term_b20
+    ! The Badgeley et al. (2020) precipitation ratio in time, in full.
+    snap0  = ""
+    snap1  = "b20"
+    fields = "pr"
+/
+
+&term_ocean
+    ! The ocean temperature profiles plus the derived anomaly series_dTo
+    ! (0.25 x the mean sea-level air temperature anomaly).
+    series  = "dTo"
+    pattern = "uniform"
+    fields  = "to"
+/
+
+&term_ramp
+    ! A uniform anomaly from series_ramp: tas + f, pr * exp(beta_p*f).
+    series  = "ramp"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+/
+
+&term_hyst
+    ! A uniform anomaly from the hysteresis series.
+    series  = "hyst"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+/
+
+&term_dT
+    ! A uniform anomaly of series_dT [K].
+    series  = "dT"
+    pattern = "uniform"
+    fields  = "tas" "pr"
 /
 
 ! ===== elsa (Lagrangian isochrone layers; read by yelmo, see the header) =====

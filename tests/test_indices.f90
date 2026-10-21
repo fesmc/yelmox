@@ -1,7 +1,7 @@
 program test_indices
-    ! Checks the indices registry (libs/kryos_forcing.f90): a tsgen index and
-    ! a derived one from a small par file. The tsgen index advances with the
-    ! forcing time and restarts from its file; the derived index starts at 0,
+    ! Checks the series registry (libs/kryos_forcing.f90): a tsgen series and
+    ! a derived one from a small par file. The tsgen series advances with the
+    ! forcing time and restarts from its file; the derived series starts at 0,
     ! is set by its producer (indices_set), is not advanced by indices_update,
     ! has no restart file, and both are written to a 1D file.
     !
@@ -28,17 +28,17 @@ program test_indices
     call execute_command_line("mkdir -p "//tmp)
 
     open(newunit=u, file=par, status="replace", action="write")
-    write(u,'(a)') "&indices"
-    write(u,'(a)') "    names = ""c"" ""dto"""
+    write(u,'(a)') "&forcing"
+    write(u,'(a)') "    series = ""c"" ""dto"""
     write(u,'(a)') "/"
-    write(u,'(a)') "&idx_c"
+    write(u,'(a)') "&series_c"
     write(u,'(a)') "    method    = ""ramp-slope"""
     write(u,'(a)') "    f_min     = 0.0"
     write(u,'(a)') "    f_max     = 5.0"
     write(u,'(a)') "    df_dt_max = 0.01"
     write(u,'(a)') "    restart_every_df = 0.5"
     write(u,'(a)') "/"
-    write(u,'(a)') "&idx_dto"
+    write(u,'(a)') "&series_dto"
     write(u,'(a)') "    method = ""derived"""
     write(u,'(a)') "    from   = ""air_anomaly"""
     write(u,'(a)') "    factor = 0.25"
@@ -78,9 +78,9 @@ program test_indices
 
     ! Restart files: c has one, dto has none; the read restores c.
     call indices_restart_write(idx, tmp, 150.0_dp)
-    inquire(file=tmp//"/idx_c_restart.nc", exist=found)
-    call check(found, "idx_c_restart.nc written", nfail)
-    inquire(file=tmp//"/idx_dto_restart.nc", exist=found)
+    inquire(file=tmp//"/series_c_restart.nc", exist=found)
+    call check(found, "series_c_restart.nc written", nfail)
+    inquire(file=tmp//"/series_dto_restart.nc", exist=found)
     call check(.not. found, "no restart file for the derived index", nfail)
 
     call indices_init(idx, par, 0.0_dp)
@@ -92,8 +92,8 @@ program test_indices
     call nc_create(tmp//"/ts.nc")
     call nc_write_dim(tmp//"/ts.nc", "time", x=0.0_dp, dx=1.0_dp, nx=1, unlimited=.true.)
     call indices_write_step(idx, tmp//"/ts.nc", 150.0_dp)
-    call check(nc_has(tmp//"/ts.nc", "idx_c") .and. nc_has(tmp//"/ts.nc", "idx_dto") .and. &
-               nc_has(tmp//"/ts.nc", "idx_c_df_dt") .and. .not. nc_has(tmp//"/ts.nc", "idx_dto_df_dt"), &
+    call check(nc_has(tmp//"/ts.nc", "series_c") .and. nc_has(tmp//"/ts.nc", "series_dto") .and. &
+               nc_has(tmp//"/ts.nc", "series_c_df_dt") .and. .not. nc_has(tmp//"/ts.nc", "series_dto_df_dt"), &
                "1D output variables", nfail)
 
     call execute_command_line("rm -rf "//tmp)

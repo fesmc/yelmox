@@ -1,7 +1,7 @@
 ! Bipolar (multi-domain) control file for yelmox_bipolar.
 !
 ! One file, original yelmox_bipolar convention: each domain's instance
-! groups carry a domain suffix (yelmo_south, comps_north, snap_south, ...),
+! groups carry a domain suffix (yelmo_south, comps_north, forcing_north, snapshots_south, ...),
 ! while [ctrl], [barysealevel] and the yelmo physics groups (ydyn, ytopo,
 ! ymat, ytherm, ytill, ycalv, yhyd) are SHARED (no suffix). Distinct group
 ! names also let 'runme -p group.name=val' target one domain unambiguously.
@@ -37,7 +37,7 @@
     hydro_mask_south = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"
 
     atm2obm          = False            ! Global air temperature anomaly ([obm_forcing]) -> OBM box air temperatures?
-                                        ! OBM ocean temperature -> ice sheet: per domain, [ocn_obm_<sfx>] active
+                                        ! OBM ocean temperature -> ice sheet: a series derived from a box (from = obm_north/obm_south)
 /
 
 ! ===== Output timing =====
@@ -87,29 +87,21 @@
 
 ! ===== Forcing =====
 
-&indices
-    ! Indices: named scalar series shared by both domains and the OBM, read by
-    ! name (snapshots axes, [anom_<sfx>], [obm_forcing]). Each is a tsgen group
-    ! [idx_<name>] (method, series_file, ...; units, restart_every_df),
-    ! advanced on the forcing clock time_rel; unset keys from the template
-    ! [idx] of input/yelmox_defaults.nml.
-    names  = "at" "gmt"
+&forcing
+    ! The forcing (docs/_forcing-terms.md): the scalar series, shared by both
+    ! domains and the OBM, on the forcing time time_rel; each a group
+    ! [series_<name>] (this file, then the var_defs files: input/forcing_db.nml).
+    ! The reference snapshot and the terms of each domain: [forcing_north],
+    ! [forcing_south].
+    series = "orbital" "gmt" "dTo"
 /
 
-&idx_at
-    ! Glacial index (north): the orbital series normalised to 0 at present
-    ! (piControl) and 1 at 21 ka (LGM); the position on the snapshots axis "at".
-    method      = "series"
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
-/
 
-&idx_gmt
+&series_gmt
     ! Global mean air temperature anomaly [K]: the OBM forcing ([obm_forcing])
-    ! and, with the regional gains, the homogeneous anomaly of each domain
-    ! ([anom_north], [anom_south]). Zero here (present day). A series
-    ! instead, e.g.:
+    ! and, with the regional gains, the uniform anomaly of each domain
+    ! ([term_regional_north], [term_regional_south]). Zero here (present day).
+    ! A series instead, e.g.:
     !   method = "series", series_file = "input/<gmt series>.dat"
     method      = "const"
     f_min       = 0.0
@@ -118,9 +110,9 @@
 
 &obm_forcing
     ! [ctrl] atm2obm: the OBM box air temperatures theta_i = theta_i_init +
-    ! ampl_i * gain * index (ampl_i: [nautilus] thermal_ampl_north/tropics/
+    ! ampl_i * gain * f (ampl_i: [nautilus] thermal_ampl_north/tropics/
     ! south, Zickfeld et al., 2004) and the vapour fluxes.
-    index = "gmt"     ! global mean air temperature anomaly [K] ([indices] names)
+    index = "gmt"     ! global mean air temperature anomaly [K] ([forcing] series)
     gain  = 1.0       ! [1] dT_glob = gain * index
 /
 
@@ -675,46 +667,33 @@
 
 ! ===== Climate =====
 
-&anom_south
-    ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)). Here the
-    ! regional air temperature anomaly from the global one, f_ta = the OBM's
-    ! [nautilus] thermal_ampl_south (zero while gmt = 0).
-    active = True     ! Apply it?
-    index  = "gmt"    ! the index driving the anomalies ([indices] names)
-    f_ta   = 0.86     ! [K]   dTa = f * f_ta  (air temperature)
-    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+&forcing_south
+    ! The forcing of the southern domain: the reference snapshot and the terms.
+    ! regional_south: the global anomaly gmt times the OBM's southern
+    ! amplification. The OBM southern box into the ocean instead: a series
+    ! derived from it (method = "derived", from = "obm_south") with a replace
+    ! or uniform term on to.
+    reference = "pd_ant"
+    terms     = "regional_south"
 /
 
-&ocn_fraction_south
-    ! Ocean temperature anomaly as a fraction of the mean sea-level air
-    ! temperature anomaly over a region, applied after [anom_south]: to_ann =
-    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = False    ! Apply it?
-    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
-    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+&term_regional_south
+    ! Uniform anomaly from the global one, f_ta = [nautilus] thermal_ampl_south
+    ! (zero while gmt = 0).
+    series  = "gmt"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+    f_ta    = 0.86    ! [K]
 /
 
-&ocn_obm_south
-    ! Ocean temperature from the OBM southern box (ts), at every depth, set by
-    ! the driver after the climate step (exclusive with [ocn_fraction_south]).
-    active = False      ! Apply it? (needs [ctrl] active_obm)
-    mode   = "absolute" ! absolute: to = box; anomaly: to = to_ref + (box - box_init)
-/
-
-&snap_south
-    ! Snapshot backend (snapshots): present day only (RACMO2.3p2 1981-2010, 2 m
-    ! air temperature; ISMIP7 ocean).
-    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
-    var_defs   = "input/clim_db.nml"
-    ref_name   = "pd"
-    snapshots  = "pd"
+&snapshots_south
+    ! Snapshot backend of the south: present day only (RACMO2.3p2 1981-2010,
+    ! 2 m air temperature; ISMIP7 ocean), [snapshot_pd_ant].
     lapse      = 0.0080 0.0065
     f_p        = 0.05
 /
 
-&snap_south_pd
+&snapshot_pd_ant
     tas = "racmo23p2_1981_2010_tas"
     pr  = "racmo23p2_1981_2010_pr"
     zs  = "racmo23p2_1981_2010_zs"
@@ -1188,86 +1167,40 @@
 
 ! ===== Climate =====
 
-&anom_north
-    ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)). Here the
-    ! regional air temperature anomaly from the global one, f_ta = the OBM's
-    ! [nautilus] thermal_ampl_north (zero while gmt = 0).
-    active = True     ! Apply it?
-    index  = "gmt"    ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.07     ! [K]   dTa = f * f_ta  (air temperature)
-    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+&forcing_north
+    ! The forcing of the northern domain: the reference snapshot and the terms.
+    ! orbital: PMIP3 lgm - picontrol weighted by the orbital index (library);
+    ! regional_north: the global anomaly gmt times the OBM's northern
+    ! amplification; ocean: the profiles plus 0.25 x the mean sea-level air
+    ! anomaly (series dTo, derived). The OBM northern box into the ocean
+    ! instead of `ocean`: a series derived from it (from = "obm_north") with
+    ! a replace or uniform term on to.
+    reference = "pd_grl"
+    terms     = "orbital" "regional_north" "ocean"
 /
 
-&ocn_fraction_north
-    ! Ocean temperature anomaly as a fraction of the mean sea-level air
-    ! temperature anomaly over a region, applied after [anom_north]: to_ann =
-    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = True     ! Apply it?
-    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
-    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+&term_regional_north
+    ! Uniform anomaly from the global one, f_ta = [nautilus] thermal_ampl_north
+    ! (zero while gmt = 0).
+    series  = "gmt"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+    f_ta    = 1.07    ! [K]
 /
 
-&ocn_obm_north
-    ! Ocean temperature from the OBM northern box (tn), at every depth, set by
-    ! the driver after the climate step (exclusive with [ocn_fraction_north]).
-    active = False      ! Apply it? (needs [ctrl] active_obm)
-    mode   = "absolute" ! absolute: to = box; anomaly: to = to_ref + (box - box_init)
-/
-
-&snap_north
-    ! Snapshot backend (snapshots): present day (MAR v3.14 1961-1990, ORAS5) and
-    ! PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
-    ! "at". The ocean follows the reference, its anomaly from [ocn_fraction_north].
-    ! Databases: input/clim_db.nml; unset keys: input/yelmox_defaults.nml.
-    var_defs   = "input/clim_db.nml"
-    ref_name   = "pd"
-    snapshots  = "pd" "picontrol" "lgm"
-    axes       = "at"
+&snapshots_north
+    ! Snapshot backend of the north: present day (MAR v3.14 1961-1990, ORAS5;
+    ! [snapshot_pd_grl]) and PMIP3 piControl and LGM (library) on the term orbital.
     lapse      = 0.0080 0.0065
     f_p        = 0.06
 /
 
-&snap_north_field_tas
-    axes  = "at"
-/
-
-&snap_north_field_pr
-    blend = "ratio"
-    axes  = "at"
-/
-
-&snap_north_pd
+&snapshot_pd_grl
     tas = "mar314_1961_1990_tas"
     pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
     zs  = "mar314_1961_1990_zs"
     to  = "oras5_1981_2010_to"
     so  = "oras5_1981_2010_so"
-/
-
-&snap_north_picontrol
-    exp        = "piControl"
-    monthly    = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
-    pr  = "pmip3_mean_pr_ann"
-    zs  = "pmip3_mean_zs"
-/
-
-&snap_north_lgm
-    exp        = "lgm"
-    monthly    = False
-    clim_sigma = 50.0             ! [km] smoothing of the PMIP3 fields
-    tas = "pmip3_mean_tas_ann" "pmip3_mean_tas_jja"
-    pr  = "pmip3_mean_pr_ann"
-    zs  = "pmip3_mean_zs"
-/
-
-&snap_north_axis_at
-    lo    = "picontrol"
-    hi    = "lgm"
-    index = "at"
 /
 
 &orbit_north

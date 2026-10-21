@@ -9,11 +9,13 @@ module yelmox_climate
     !
     ! Presents one interface (climate_init / climate_update) over the backends,
     ! filling a `climate_out_class`; the domain and its coupling read only that.
-    ! The driver's indices registry is read by snapshots (its axes) and by the
-    ! climate modifiers (climate_mods: anom, ocn_fraction, taper, bias), applied to
-    ! `climate_out` after the backend in a fixed order, each checked at init
-    ! against what the backend supplies; rembo reads [anom] itself
-    ! (rembo_update).
+    ! The forcing of a domain is its terms (climate_terms, [forcing<sfx>]):
+    ! the snapshot terms are read by the snapshot backend, the uniform and
+    ! replace terms applied to `climate_out` after it, around the derived
+    ! series the climate sets (the mean sea-level air anomaly); then the
+    ! transforms (climate_mods: taper, bias). Every term and transform is
+    ! checked at init against what the backend supplies. rembo takes the
+    ! uniform tas terms as its input (rembo_update).
 
     use precision,     only : wp, dp
     use nml,           only : nml_read
@@ -28,11 +30,16 @@ module yelmox_climate
                               esm_forcing_update, esm_variability_update, &
                               esm_lapse_monthly
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
-    use kryos_forcing, only : indices_class, indices_value
-    use climate_mods,  only : climate_caps_class, climate_mods_class, climate_mods_init, &
+    use kryos_forcing, only : indices_class, indices_value, indices_set, indices_is_derived, &
+                              indices_derived, derived_spec
+    use climate_terms, only : climate_caps_class, terms_class, terms_init, terms_check, &
+                              terms_save_ocean, terms_apply_atm, terms_apply_ocn, &
+                              terms_uniform_dT, terms_write_step
+    use climate_mods,  only : climate_mods_class, climate_mods_init, &
                               climate_mods_apply, climate_mods_write_init, climate_mods_write_step
     use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_restart_write
-    use regions,       only : regions_class, regions_basin_ids
+    use regions,       only : regions_class, regions_basin_ids, regions_select
+    use yelmox_nml,    only : VAR_DEFS_MAX, forcing_var_defs, def_file => yelmox_defaults_file
 
     implicit none
 
@@ -51,13 +58,21 @@ module yelmox_climate
     end type esm_ctl_class
 
     ! State of the rembo backend beyond the climate products: REMBO's summer
-    ! air temperature and the anomalies applied from [anom].
+    ! air temperature and the anomaly it takes from the uniform tas terms.
     type rembo_state_class
         real(wp), allocatable :: ta_sum(:,:)     ! [K] near-surface air temperature (summer)
         real(wp) :: dT_sum = 0.0_wp              ! [K] summer air temperature anomaly
         real(wp) :: dT_ann = 0.0_wp              ! [K] annual air temperature anomaly
-        real(wp) :: dT_ocn = 0.0_wp              ! [K] ocean temperature anomaly
     end type rembo_state_class
+
+    ! A derived series this domain computes: the mean sea-level air anomaly
+    ! of its climate update over a region (factor * mean(tsl_ann - ref)).
+    type derived_air_class
+        character(len=64)    :: name
+        real(wp)             :: factor
+        logical, allocatable :: mask(:,:)
+        integer              :: n
+    end type derived_air_class
 
     type yelmox_climate_class
         character(len=16)       :: method = ""   ! snapshots | esm | rembo
@@ -67,13 +82,17 @@ module yelmox_climate
         type(esm_forcing_class) :: esm
         type(esm_ctl_class)     :: esm_ctl
         type(rembo_state_class) :: rembo
-        type(climate_mods_class):: mods          ! modifiers after the backend
+        character(len=64)       :: reference     ! the reference snapshot ([forcing<sfx>] reference)
+        type(terms_class)       :: terms         ! the terms ([forcing<sfx>] terms)
+        type(derived_air_class), allocatable :: dair(:)   ! the air_anomaly series it sets
+        type(climate_mods_class):: mods          ! the transforms after the terms
         real(wp), allocatable   :: basins(:,:)   ! basin ids on the climate grid (esm: [esm] basins)
     end type yelmox_climate_class
 
     public :: yelmox_climate_class
     public :: climate_init
     public :: climate_update
+    public :: climate_apply_ocean, climate_uses_derived
     public :: climate_end
     public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     public :: climate_restart_write
@@ -88,8 +107,8 @@ contains
     subroutine climate_init(cl, method, filename, domain, grid, time, reg, &
                             south, sfx, timeline_group, smb_direct, idx)
         ! south: the domain lies in the southern hemisphere (seasons, lapse rates).
-        ! idx: the driver's indices registry (snapshots and the modifiers check the
-        ! indices they name against it).
+        ! idx: the driver's series registry (the terms check the series they
+        ! name against it).
         ! smb_direct: the surface mass balance is taken from the climate
         ! ([comps] surface_method = "climate"); the esm backend supplies it, and
         ! the rembo backend supplies nothing else (annual fields only).
@@ -105,8 +124,10 @@ contains
         logical,          intent(in) :: smb_direct
         type(indices_class), intent(in) :: idx
 
-        integer :: nx, ny
+        integer :: nx, ny, k, n
         type(climate_caps_class) :: caps
+        type(derived_spec)       :: drv
+        character(len=256)       :: var_defs(VAR_DEFS_MAX)
 
         nx        = grid%G%nx
         ny        = grid%G%ny
@@ -114,6 +135,12 @@ contains
         cl%method    = trim(method)
         cl%grid_name = trim(grid%name)
         cl%south     = south
+
+        ! The forcing of the domain: its reference snapshot and its terms.
+        call nml_read(filename, "forcing"//trim(sfx), "reference", cl%reference, init=.true., &
+                      defaults_file=def_file, defaults_group="forcing")
+        var_defs = forcing_var_defs(filename)
+        call terms_init(cl%terms, filename, sfx, var_defs, idx)
 
         if (smb_direct .and. trim(cl%method) /= "esm" .and. trim(cl%method) /= "rembo") then
             write(*,*) "climate_init:: error: surface_method = climate needs a climate that supplies &
@@ -134,12 +161,12 @@ contains
         select case(trim(cl%method))
             case("snapshots")
                 call snapshots_init(cl%snapshots, filename, domain, grid, time, &
-                                  south, idx, group="snap"//trim(sfx))
+                                  south, idx, cl%terms, "snapshots"//trim(sfx), cl%reference)
                 ! The surface reads the atmosphere; an ocean-only reference
                 ! serves the rembo ocean only.
                 if (.not. cl%snapshots%par%with_atm) then
                     write(*,*) "climate_init:: error: climate = snapshots needs an atmosphere: &
-                               &the reference snapshot ([snap"//trim(sfx)//"] ref_name) binds &
+                               &the reference snapshot ([forcing"//trim(sfx)//"] reference) binds &
                                &no tas/pr."
                     error stop 1
                 end if
@@ -153,11 +180,12 @@ contains
                 ! REMBO for the atmosphere and smb, snapshots for the ocean: an
                 ! ocean-only reference snapshot (to, optionally so).
                 call snapshots_init(cl%snapshots, filename, domain, grid, time, &
-                                  south, idx, group="snap"//trim(sfx))
+                                  south, idx, cl%terms, "snapshots"//trim(sfx), cl%reference)
                 if (cl%snapshots%par%with_atm .or. .not. cl%snapshots%par%with_ocn) then
                     write(*,*) "climate_init:: error: climate = rembo takes the ocean only from &
-                               &[snap"//trim(sfx)//"]: the reference snapshot must bind to &
-                               &(and optionally so), not tas/pr (REMBO supplies the atmosphere)."
+                               &the snapshots: the reference snapshot ([forcing"//trim(sfx)// &
+                               "] reference) must bind to (and optionally so), not tas/pr &
+                               &(REMBO supplies the atmosphere)."
                     error stop 1
                 end if
                 call rembo_clim_init(time, nx, ny)
@@ -172,20 +200,71 @@ contains
                 error stop 1
         end select
 
-        ! The modifiers, checked against the backend.
-        call climate_mods_init(cl%mods, filename, sfx, idx, caps, domain, grid, reg)
+        ! The terms' contracts against the backend, and the derived air
+        ! anomaly series this domain computes (one per term using one), their
+        ! region resolved on the climate grid.
+        call terms_check(cl%terms, caps)
+        n = 0
+        do k = 1, cl%terms%n
+            if (is_air_anomaly(cl%terms%term(k)%series)) n = n + 1
+        end do
+        if (allocated(cl%dair)) deallocate(cl%dair)
+        allocate(cl%dair(n))
+        n = 0
+        do k = 1, cl%terms%n
+            associate(t => cl%terms%term(k))
+            if (.not. is_air_anomaly(t%series)) cycle
+            if (any(cl%dair(1:n)%name == t%series)) cycle
+            if (.not. caps%has_tsl_ann) then
+                write(*,*) "climate_init:: error: ["//trim(t%group)//"] series "//trim(t%series)// &
+                           " is derived from the mean sea-level air anomaly, which climate = "// &
+                           trim(caps%name)//" does not supply (no tsl_ann)."
+                error stop 1
+            end if
+            n = n + 1
+            drv = indices_derived(idx, t%series)
+            cl%dair(n)%name   = t%series
+            cl%dair(n)%factor = drv%factor
+            cl%dair(n)%mask   = regions_select(reg, trim(drv%region))
+            cl%dair(n)%n      = count(cl%dair(n)%mask)
+            if (cl%dair(n)%n == 0) then
+                write(*,*) "climate_init:: error: [series_"//trim(t%series)//"] region = '"// &
+                           trim(drv%region)//"' selects no cell of the climate grid."
+                error stop 1
+            end if
+            write(*,*) "climate_init:: series "//trim(t%series)//" = ", drv%factor, &
+                       " x the mean sea-level air anomaly over '"//trim(drv%region)//"' (", &
+                       cl%dair(n)%n, " of ", size(cl%dair(n)%mask), " cells), set by this climate"
+            end associate
+        end do
+        if (allocated(cl%dair)) cl%dair = cl%dair(1:n)
+
+        ! The transforms, checked against the backend.
+        call climate_mods_init(cl%mods, filename, sfx, caps, domain, grid, time)
+
+    contains
+
+        logical function is_air_anomaly(name)
+            character(len=*), intent(in) :: name
+            is_air_anomaly = .false.
+            if (len_trim(name) == 0) return
+            if (.not. indices_is_derived(idx, name)) return
+            drv = indices_derived(idx, name)
+            is_air_anomaly = trim(drv%from) == "air_anomaly"
+        end function is_air_anomaly
 
     end subroutine climate_init
 
     subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
                               domain, dx, dtt, mshlf, idx, init)
         ! Update the backend on the climate grid and fill `out`, then its
-        ! elevation dependence and the modifiers (climate_mods). The geometry
-        ! is the domain's, on the climate grid, with its present-day surface
-        ! (z_srf_ref); the marine shelf lends its parameters
-        ! to the esm ocean, which is interpolated to the shelf base here. idx is
-        ! the driver's indices registry, advanced to the forcing time; snapshots
-        ! (its axes), the modifiers and rembo ([anom]) read it.
+        ! elevation dependence, the uniform terms on the atmosphere, the
+        ! derived air-anomaly series, the ocean terms and the transforms. The
+        ! geometry is the domain's, on the climate grid, with its present-day
+        ! surface (z_srf_ref); the marine shelf lends its parameters to the esm
+        ! ocean, which is interpolated to the shelf base here. idx is the
+        ! driver's series registry, advanced to the forcing time; the terms
+        ! read it and the derived series of this domain are set in it.
         !
         ! snapshots and rembo are evaluated at the forcing time time_rel
         ! (with tstep_method = "const", time is the elapsed time and time_rel the
@@ -198,12 +277,13 @@ contains
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
         real(dp),         intent(in) :: dtt              ! [yr] time step of the run
-        type(marshelf_class),  intent(in) :: mshlf
-        type(indices_class),   intent(in) :: idx
+        type(marshelf_class),  intent(in)    :: mshlf
+        type(indices_class),   intent(inout) :: idx
         logical,               intent(in), optional :: init
 
         logical  :: is_init
         real(dp) :: time
+        integer  :: k
 
         is_init = .false.
         if (present(init)) is_init = init
@@ -227,8 +307,8 @@ contains
 
         ! The elevation dependence of the atmosphere, to move it to another surface
         ! (kryos_coupling): its surface z_srf, the monthly lapse rate and the
-        ! precipitation sensitivity, as the backend applies them (anom reads
-        ! beta_p). rembo: none.
+        ! precipitation sensitivity, as the backend applies them (the uniform
+        ! terms read beta_p). rembo: none.
         out%now%z_srf = z_srf
         if (.not. allocated(out%now%beta_p)) allocate(out%now%beta_p(size(z_srf,1),size(z_srf,2)))
         select case(trim(cl%method))
@@ -243,9 +323,47 @@ contains
                 out%now%beta_p  = 0.0_wp
         end select
 
-        call climate_mods_apply(cl%mods, out, idx)
+        ! The terms: the backend's ocean kept as the base of the ocean terms;
+        ! the uniform terms on the atmosphere (rembo took them as its input);
+        ! the derived air anomaly of this update; the ocean terms; then the
+        ! transforms.
+        call terms_save_ocean(cl%terms, out)
+        if (.not. cl%mods%caps%anom_input) call terms_apply_atm(cl%terms, out, idx)
+        do k = 1, size(cl%dair)
+            call indices_set(idx, cl%dair(k)%name, cl%dair(k)%factor * &
+                 sum(out%now%tsl_ann - out%ref%tsl_ann, mask=cl%dair(k)%mask) / real(cl%dair(k)%n, wp))
+        end do
+        call terms_apply_ocn(cl%terms, out, idx)
+        call climate_mods_apply(cl%mods, out, time)
 
     end subroutine climate_update
+
+    subroutine climate_apply_ocean(cl, out, idx)
+        ! Re-apply the ocean terms on the backend's ocean of the last update
+        ! (idempotent): for a driver that sets a derived series after the
+        ! climate update (the bipolar bridge, the OBM box temperatures). The
+        ! transforms do not touch the ocean, so nothing else is redone.
+        type(yelmox_climate_class), intent(inout) :: cl
+        type(climate_out_class),    intent(inout) :: out
+        type(indices_class),        intent(in)    :: idx
+        call terms_apply_ocn(cl%terms, out, idx)
+    end subroutine climate_apply_ocean
+
+    logical function climate_uses_derived(cl, idx, from) result(uses)
+        ! Does any term of this climate use a series derived `from` (e.g.
+        ! obm_north)?
+        type(yelmox_climate_class), intent(in) :: cl
+        type(indices_class),        intent(in) :: idx
+        character(len=*),           intent(in) :: from
+        type(derived_spec) :: drv
+        integer :: k
+        uses = .false.
+        do k = 1, cl%terms%n
+            if (.not. cl%terms%term(k)%derived) cycle
+            drv = indices_derived(idx, cl%terms%term(k)%series)
+            if (trim(drv%from) == trim(from)) uses = .true.
+        end do
+    end function climate_uses_derived
 
     subroutine snapshots_state_copy(dst, src)
         ! The fields of a snapshots state that climate_out carries, those it built:
@@ -377,6 +495,7 @@ contains
         end select
 
         call climate_mods_write_step(cl%mods, filename, ncid, n)
+        call terms_write_step(cl%terms, filename, ncid, n)
 
     contains
 
@@ -525,7 +644,6 @@ contains
 
             call write1D("dT_sum",   cl%rembo%dT_sum, "K",     "Summer air temperature anomaly")
             call write1D("dT_ann",   cl%rembo%dT_ann, "K",     "Annual air temperature anomaly")
-            call write1D("dT_ocn",   cl%rembo%dT_ocn, "K",     "Ocean temperature anomaly")
             call write1D("smb_mean", smb_tot,         "Gt/yr", "Surface mass balance over the ice sheet")
             call write1D("aar",      aar,             "1",     "Accumulation area ratio")
 
@@ -732,7 +850,7 @@ contains
         ! itself (climate_mods skips anom for rembo). The index f maps onto
         ! REMBO's anomalies: the summer air temperature dT_sum = f*f_ta, the
         ! annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6), and the ocean
-        ! dT_ocn = dT_ann*f_to, added to the snapshots ocean; f_so is unused.
+        ! Its ocean comes from the snapshots and the ocean terms (climate_update).
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
         type(tstep_class),          intent(in)    :: ts
@@ -748,15 +866,9 @@ contains
         nx = size(z_srf,1)
         ny = size(z_srf,2)
 
-        if (cl%mods%anom%active) then
-            cl%rembo%dT_sum = indices_value(idx, cl%mods%anom%index) * cl%mods%anom%f_ta
-            cl%rembo%dT_ann = 1.3_wp * cl%rembo%dT_sum
-            cl%rembo%dT_ocn = cl%rembo%dT_ann * cl%mods%anom%f_to
-        else
-            cl%rembo%dT_sum = 0.0_wp
-            cl%rembo%dT_ann = 0.0_wp
-            cl%rembo%dT_ocn = 0.0_wp
-        end if
+        ! The summer anomaly REMBO takes as its input: the uniform terms on tas.
+        cl%rembo%dT_sum = terms_uniform_dT(cl%terms, idx, "tas")
+        cl%rembo%dT_ann = 1.3_wp * cl%rembo%dT_sum
 
         ! Atmosphere and surface mass balance, at the current surface.
         if (.not. allocated(out%now%ta_ann)) then
@@ -768,11 +880,11 @@ contains
                                out%now%smb, out%now%tsrf)
         out%has_smb = .true.
 
-        ! Ocean (depth profiles) from snapshots (ocean only), plus dT_ocn.
+        ! Ocean (depth profiles) from snapshots (ocean only); its terms are
+        ! applied by climate_update.
         call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, idx=idx, dx=dx)
         call snapshots_state_copy(out%now, cl%snapshots%now)
         call snapshots_state_copy(out%ref, cl%snapshots%ref)
-        out%now%to_ann = out%now%to_ann + cl%rembo%dT_ocn
 
     end subroutine rembo_update
 

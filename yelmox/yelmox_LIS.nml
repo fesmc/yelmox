@@ -116,40 +116,26 @@
 
 ! ===== Forcing =====
 
-&indices
-    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
-    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
-    ! from the template [idx] of input/yelmox_defaults.nml.
-    names  = "a"
-    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
+&forcing
+    ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
+    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! file, then the var_defs files (input/forcing_db.nml: the shared library;
+    ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
+    reference = "pd"
+    series    = "glacial" "dTo"
+    terms     = "glacial" "ocean"
+    ! glacial: PMIP3 lgm - picontrol weighted by the glacial index (constant 1 here);
+    ! ocean: the profiles plus 0.25 x the mean sea-level air anomaly (series dTo).
 /
 
-&idx_a
-    ! Glacial index, constant 1 (LGM): the position on the snapshots axis "a".
-    ! Overrides [idx_a] of input/forcing_db.nml (the alpha series).
+&series_glacial
+    ! Glacial index, constant 1 (LGM): overrides [series_glacial] of
+    ! input/forcing_db.nml (the alpha_combined series) for the steady state.
     method = "const"
     f_min  = 1.0
 /
 
-&anom
-    ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = False    ! Apply it?
-    index  = ""       ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
-    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
-/
-
-&ocn_fraction
-    ! Ocean temperature anomaly as a fraction of the mean sea-level air
-    ! temperature anomaly over a region, applied after [anom]: to_ann =
-    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = True     ! Apply it?
-    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
-    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
-/
 
 &orbit
     ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
@@ -532,31 +518,15 @@
 
 ! ===== Climate =====
 
-&snap
-    ! Snapshot backend (snapshots): present day (ERA5 1981-2010, ORAS5 1981-2010)
-    ! and PMIP3 piControl and LGM (global ensemble means, remapped) on the axis
-    ! "a". The ocean follows the reference, its anomaly from [ocn_fraction].
-    ! Groups: this file, then var_defs; unset keys: input/yelmox_defaults.nml.
-    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
-    snapshots  = "pd" "picontrol" "lgm"
-    axes       = "a"
+&snapshots
+    ! Snapshot backend: the fixed rules of the composition (lapse rates Gamma,
+    ! precipitation sensitivity beta_p = f_p); the snapshots of the run are the
+    ! reference and the snap0/snap1 of the terms ([forcing]).
 /
 
-! ---- fields (blend rule and axes; the others follow the reference) ---------
 
-&snap_field_tas
-    axes  = "a"
-/
-
-&snap_field_pr
-    blend = "ratio"
-    axes  = "a"
-/
-
-! ---- snapshots (var_defs groups per field; {exp} of the paths) -------------
-! picontrol, lgm and the axis "a": input/forcing_db.nml.
-
-&snap_pd
+&snapshot_pd
+    ! Present day (the reference): fields of input/clim_db.nml.
     tas = "era5_1981_2010_tas"
     pr  = "era5_1981_2010_pr"
     zs  = "era5_1981_2010_zs"

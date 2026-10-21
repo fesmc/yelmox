@@ -1,0 +1,463 @@
+module climate_terms
+    ! The terms of the climate forcing (docs/_forcing-terms.md): each term is
+    ! one series of the driver's registry (kryos_forcing) times one pattern,
+    ! added to the reference climate on an explicit list of fields:
+    !   snapshots -- the difference of two snapshots, snap1 - snap0 (or snap1
+    !                itself without snap0), applied by the snapshot backend
+    !                at sea level (snapshots.f90 reads these terms);
+    !   uniform   -- a constant pattern: tas + f_ta*f (and pr * exp(beta_p*
+    !                f_ta*f)), to + f_to*f, so + f_so*f, applied here;
+    !   replace   -- the field takes the value of the series at every depth
+    !                in place of the reference (to, so); the other terms on
+    !                the field add to it.
+    ! The terms are the list [forcing<sfx>] terms, each a group [term_<name>]
+    ! read from the par file, else the first of the [forcing] var_defs files
+    ! that has it; unset keys from the template term of
+    ! input/yelmox_defaults.nml.
+    !
+    ! Order within a climate update (yelmox_climate): the backend (with the
+    ! snapshot terms) -> the uniform terms on the atmosphere (terms_apply_atm)
+    ! -> the derived series (indices_set by the climate, from the composed
+    ! atmosphere) -> the ocean terms (terms_apply_ocn) -> taper -> bias. The
+    ! ocean application is idempotent: it rebuilds the ocean from a copy of
+    ! the backend's (terms_save_ocean, after the backend), so a driver that
+    ! sets a derived series later in the step (the bipolar bridge, the OBM
+    ! box temperatures) re-applies it.
+    !
+    ! Contracts, checked at init (terms_check) against what the backend
+    ! supplies (climate_caps_class), an error naming the term:
+    !   - a snapshots pattern needs the snapshot backend (snapshots, or the
+    !     rembo ocean); its fields are bound by snap0, snap1 and the reference
+    !     (checked by the backend);
+    !   - a uniform term on tas or pr is refused when the backend supplies the
+    !     surface mass balance (esm with its smb), which a post-hoc anomaly
+    !     cannot reach; rembo takes the uniform tas terms as its input
+    !     (dT_sum, terms_uniform_dT) and refuses pr;
+    !   - a derived series is computed after the atmosphere, so its term may
+    !     touch to and so only;
+    !   - a replace term: to or so only, one per field, ocean profiles (not
+    !     the esm ocean at the shelf base);
+    !   - a term on to or so with a climate without any ocean stops at the
+    !     first update (the fields are known only then).
+
+    use precision,     only : wp
+    use nml,           only : nml_read, nml_validate
+    use ncio,          only : nc_write
+    use climate_out,   only : climate_out_class
+    use kryos_forcing, only : indices_class, indices_value, indices_has, indices_is_derived
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
+
+    implicit none
+
+    private
+
+    integer, parameter :: TERMS_MAX = 32   ! max entries of [forcing] terms
+    integer, parameter :: FLD_MAX   = 4    ! tas, pr, to, so
+
+    ! What a backend supplies, for the contracts (set by climate_init).
+    type climate_caps_class
+        character(len=16) :: name = ""           ! the backend, for messages
+        logical :: has_smb       = .false.       ! supplies the surface mass balance
+        logical :: has_ocn_shelf = .false.       ! ocean at the shelf base (else profiles)
+        logical :: has_tsl_ann   = .false.       ! sea-level air temperature (now and ref)
+        logical :: monthly       = .true.        ! monthly air temperature and precipitation
+        logical :: anom_input    = .false.       ! takes the uniform tas terms as an input (rembo)
+        logical :: has_ref_atm   = .true.        ! a reference atmosphere (ref%tas, ...)
+    end type climate_caps_class
+
+    ! One term: series x pattern on a list of fields.
+    type term_class
+        character(len=64) :: name    = ""
+        character(len=64) :: group   = ""
+        character(len=64) :: series  = ""          ! "" = the constant 1
+        character(len=16) :: pattern = "snapshots" ! snapshots | uniform | replace
+        character(len=64) :: snap0   = ""          ! snapshots: the snapshot at index 0 ("" = none)
+        character(len=64) :: snap1   = ""          ! snapshots: the snapshot at index 1
+        character(len=8)  :: fields(FLD_MAX) = ""
+        logical  :: on_tas = .false., on_pr = .false., on_to = .false., on_so = .false.
+        real(wp) :: f_ta = 1.0_wp                  ! [K]   uniform: tas + f_ta*f (pr * exp(beta_p*f_ta*f))
+        real(wp) :: f_to = 1.0_wp                  ! [K]   uniform: to + f_to*f
+        real(wp) :: f_so = 1.0_wp                  ! [psu] uniform: so + f_so*f
+        logical  :: derived = .false.              ! the series is derived (set by the model)
+        real(wp) :: f = 0.0_wp                     ! the series value at the last application
+    end type term_class
+
+    type terms_class
+        character(len=64) :: group = ""                ! forcing<sfx>
+        type(term_class), allocatable :: term(:)
+        integer :: n = 0
+        ! The backend's ocean of the last update (terms_apply_ocn is idempotent).
+        logical :: ocn_saved = .false.
+        real(wp), allocatable :: to_base(:,:,:), so_base(:,:,:)
+        real(wp), allocatable :: T_base(:,:), S_base(:,:), dT_base(:,:), dS_base(:,:)
+    end type terms_class
+
+    public :: climate_caps_class, term_class, terms_class
+    public :: terms_init, terms_check, terms_save_ocean, terms_apply_atm, terms_apply_ocn
+    public :: terms_uniform_dT, terms_has_pattern, terms_write_step, series_label
+
+contains
+
+    subroutine terms_init(terms, filename, sfx, var_defs, idx)
+        ! Read [forcing<sfx>] terms and each [term_<name>]; resolve the series
+        ! against the registry; the backend-dependent contracts follow in
+        ! terms_check once the backend is initialised.
+        type(terms_class),   intent(inout) :: terms
+        character(len=*),    intent(in)    :: filename, sfx
+        character(len=*),    intent(in)    :: var_defs(:)
+        type(indices_class), intent(in)    :: idx
+
+        character(len=64)  :: names(TERMS_MAX)
+        character(len=512) :: gfile
+        integer :: k, j
+
+        terms%group = "forcing"//trim(sfx)
+        call nml_validate(filename, def_file, trim(terms%group), defaults_group="forcing")
+        call nml_read(filename, trim(terms%group), "terms", names, init=.true., &
+                      defaults_file=def_file, defaults_group="forcing")
+        terms%n = count(len_trim(names) > 0)
+        if (allocated(terms%term)) deallocate(terms%term)
+        allocate(terms%term(terms%n))
+
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            t%name = trim(names(k))
+            if (any(names(1:k-1) == names(k))) call term_error(t, "listed twice in ["// &
+                                                                 trim(terms%group)//"] terms.")
+            t%group = "term_"//trim(t%name)
+            gfile = var_defs_find(var_defs, filename, trim(t%group), "&"//trim(terms%group)//" terms")
+            call nml_validate(trim(gfile), def_file, trim(t%group), defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "series",  t%series,  init=.true., &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "pattern", t%pattern, init=.true., &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "snap0",   t%snap0,   init=.true., &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "snap1",   t%snap1,   init=.true., &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "fields",  t%fields,  init=.true., &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "f_ta",    t%f_ta, &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "f_to",    t%f_to, &
+                          defaults_file=def_file, defaults_group="term")
+            call nml_read(trim(gfile), trim(t%group), "f_so",    t%f_so, &
+                          defaults_file=def_file, defaults_group="term")
+
+            select case(trim(t%pattern))
+                case("snapshots", "uniform", "replace")
+                case default
+                    call term_error(t, "pattern = '"//trim(t%pattern)// &
+                                       "'; must be snapshots, uniform or replace.")
+            end select
+
+            if (count(len_trim(t%fields) > 0) == 0) call term_error(t, "fields is empty.")
+            do j = 1, FLD_MAX
+                select case(trim(t%fields(j)))
+                    case("")
+                    case("tas"); t%on_tas = .true.
+                    case("pr");  t%on_pr  = .true.
+                    case("to");  t%on_to  = .true.
+                    case("so");  t%on_so  = .true.
+                    case default
+                        call term_error(t, "field '"//trim(t%fields(j))//"'; must be tas, pr, to or so.")
+                end select
+            end do
+
+            if (len_trim(t%series) > 0) then
+                if (.not. indices_has(idx, t%series)) &
+                    call term_error(t, "series = '"//trim(t%series)//"' is not in [forcing] series.")
+                t%derived = indices_is_derived(idx, t%series)
+            end if
+
+            if (trim(t%pattern) == "snapshots") then
+                if (len_trim(t%snap1) == 0) call term_error(t, "pattern snapshots needs snap1.")
+            else
+                if (len_trim(t%snap0) > 0 .or. len_trim(t%snap1) > 0) &
+                    call term_error(t, "snap0/snap1 belong to the snapshots pattern.")
+            end if
+            if (trim(t%pattern) == "replace" .and. (t%on_tas .or. t%on_pr)) &
+                call term_error(t, "pattern replace is for the ocean (to, so) only.")
+            if (t%derived .and. (t%on_tas .or. t%on_pr)) &
+                call term_error(t, "its series "//trim(t%series)//" is derived (computed after &
+                                   &the atmosphere), so it can only drive to or so.")
+            if (len_trim(t%series) == 0 .and. trim(t%pattern) /= "snapshots") &
+                call term_error(t, "a "//trim(t%pattern)//" term needs a series.")
+
+            write(*,*) "terms_init:: "//trim(t%group)//": "//trim(t%pattern)// &
+                       ", series "//trim(series_label(t%series))//", fields "//trim(fields_list(t))
+            end associate
+        end do
+
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) /= "replace") cycle
+            do j = 1, k-1
+                if (trim(terms%term(j)%pattern) /= "replace") cycle
+                if ((t%on_to .and. terms%term(j)%on_to) .or. (t%on_so .and. terms%term(j)%on_so)) &
+                    call term_error(t, "a second replace term on the same field as "// &
+                                       trim(terms%term(j)%group)//".")
+            end do
+            end associate
+        end do
+
+    end subroutine terms_init
+
+    subroutine terms_check(terms, caps)
+        ! The contracts that depend on the backend (see the header).
+        type(terms_class),        intent(in) :: terms
+        type(climate_caps_class), intent(in) :: caps
+        integer :: k
+
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            select case(trim(t%pattern))
+                case("snapshots")
+                    if (trim(caps%name) /= "snapshots" .and. trim(caps%name) /= "rembo") &
+                        call term_error(t, "pattern snapshots needs the snapshot backend; climate = "// &
+                                           trim(caps%name)//" reads no snapshots.")
+                case("uniform")
+                    if ((t%on_tas .or. t%on_pr) .and. caps%has_smb .and. .not. caps%anom_input) &
+                        call term_error(t, "a uniform term on tas/pr needs a climate that does not &
+                                           &supply the surface mass balance (an air anomaly cannot &
+                                           &reach it); climate = "//trim(caps%name)//" supplies it &
+                                           &(esm: use the esm smb anomalies or surface_method /= climate).")
+                    if (t%on_pr .and. caps%anom_input) &
+                        call term_error(t, "climate = "//trim(caps%name)//" takes the uniform &
+                                           &terms on tas as its input and computes its own &
+                                           &precipitation: list tas, not pr.")
+                case("replace")
+                    if (caps%has_ocn_shelf) &
+                        call term_error(t, "pattern replace needs ocean profiles; climate = "// &
+                                           trim(caps%name)//" has the ocean at the shelf base.")
+            end select
+            end associate
+        end do
+
+    end subroutine terms_check
+
+    logical function terms_has_pattern(terms, pattern) result(has)
+        ! Does any term have this pattern?
+        type(terms_class), intent(in) :: terms
+        character(len=*),  intent(in) :: pattern
+        integer :: k
+        has = .false.
+        do k = 1, terms%n
+            if (trim(terms%term(k)%pattern) == trim(pattern)) has = .true.
+        end do
+    end function terms_has_pattern
+
+    ! ===== application ======================================================
+
+    subroutine terms_apply_atm(terms, out, idx)
+        ! The uniform terms on the atmosphere: tas, ta_ann, tsl_ann + f_ta*f;
+        ! pr, pr_ann * exp(beta_p*f_ta*f) (beta_p: the backend's sensitivity).
+        type(terms_class),       intent(inout) :: terms
+        type(climate_out_class), intent(inout) :: out
+        type(indices_class),     intent(in)    :: idx
+
+        real(wp) :: f, dTa
+        integer  :: k, m
+
+        do k = 1, terms%n
+            associate(t => terms%term(k), now => out%now)
+            if (trim(t%pattern) /= "uniform") cycle
+            if (.not. (t%on_tas .or. t%on_pr)) cycle
+            f   = indices_value(idx, t%series)
+            t%f = f
+            dTa = t%f_ta*f
+            if (t%on_tas) then
+                now%tas    = now%tas + dTa
+                now%ta_ann = now%ta_ann + dTa
+                if (allocated(now%tsl_ann)) now%tsl_ann = now%tsl_ann + dTa
+            end if
+            if (t%on_pr) then
+                do m = 1, size(now%pr, 3)
+                    now%pr(:,:,m) = now%pr(:,:,m) * exp(now%beta_p*dTa)
+                end do
+                if (allocated(now%pr_ann)) now%pr_ann = now%pr_ann * exp(now%beta_p*dTa)
+            end if
+            end associate
+        end do
+
+    end subroutine terms_apply_atm
+
+    subroutine terms_save_ocean(terms, out)
+        ! Keep the backend's ocean of this update (profiles, or at the shelf
+        ! base), the base the ocean terms are applied to.
+        type(terms_class),       intent(inout) :: terms
+        type(climate_out_class), intent(in)    :: out
+
+        terms%ocn_saved = .true.
+        if (out%has_ocn_shelf) then
+            terms%T_base  = out%now%T_shlf
+            terms%S_base  = out%now%S_shlf
+            terms%dT_base = out%now%dT_shlf
+            terms%dS_base = out%now%dS_shlf
+        else
+            if (allocated(out%now%to_ann)) terms%to_base = out%now%to_ann
+            if (allocated(out%now%so_ann)) terms%so_base = out%now%so_ann
+        end if
+
+    end subroutine terms_save_ocean
+
+    subroutine terms_apply_ocn(terms, out, idx)
+        ! The ocean terms on the saved base: a replace term sets the field to
+        ! its series at every depth, the uniform ones add f_to*f / f_so*f; the
+        ! profiles to_ann/so_ann, or at the shelf base T_shlf/S_shlf and
+        ! dT_shlf/dS_shlf. Idempotent (see the header).
+        type(terms_class),       intent(inout) :: terms
+        type(climate_out_class), intent(inout) :: out
+        type(indices_class),     intent(in)    :: idx
+
+        real(wp) :: f
+        logical  :: any_ocn
+        integer  :: k
+
+        any_ocn = .false.
+        do k = 1, terms%n
+            if (trim(terms%term(k)%pattern) == "snapshots") cycle
+            if (terms%term(k)%on_to .or. terms%term(k)%on_so) any_ocn = .true.
+        end do
+        if (.not. any_ocn) return
+
+        if (.not. terms%ocn_saved) then
+            write(*,*) "terms_apply_ocn:: error: no saved ocean (terms_save_ocean first)."
+            error stop 1
+        end if
+        if (.not. (out%has_ocn_shelf .or. allocated(terms%to_base) .or. allocated(terms%so_base))) then
+            write(*,*) "terms_apply_ocn:: error: ["//trim(terms%group)//"] has a term on to or so, &
+                       &but the climate has no ocean (neither profiles nor at the shelf base)."
+            error stop 1
+        end if
+
+        ! The base.
+        if (out%has_ocn_shelf) then
+            out%now%T_shlf  = terms%T_base
+            out%now%S_shlf  = terms%S_base
+            out%now%dT_shlf = terms%dT_base
+            out%now%dS_shlf = terms%dS_base
+        else
+            if (allocated(terms%to_base)) out%now%to_ann = terms%to_base
+            if (allocated(terms%so_base)) out%now%so_ann = terms%so_base
+        end if
+
+        ! Replace terms first (profiles only, checked at init).
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) /= "replace") cycle
+            f   = indices_value(idx, t%series)
+            t%f = f
+            if (t%on_to) call need(allocated(out%now%to_ann), t, "to")
+            if (t%on_so) call need(allocated(out%now%so_ann), t, "so")
+            if (t%on_to) out%now%to_ann = f
+            if (t%on_so) out%now%so_ann = f
+            end associate
+        end do
+
+        ! Then the uniform ones.
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) /= "uniform") cycle
+            if (.not. (t%on_to .or. t%on_so)) cycle
+            f   = indices_value(idx, t%series)
+            t%f = f
+            if (out%has_ocn_shelf) then
+                if (t%on_to) then
+                    out%now%T_shlf  = out%now%T_shlf  + t%f_to*f
+                    out%now%dT_shlf = out%now%dT_shlf + t%f_to*f
+                end if
+                if (t%on_so) then
+                    out%now%S_shlf  = out%now%S_shlf  + t%f_so*f
+                    out%now%dS_shlf = out%now%dS_shlf + t%f_so*f
+                end if
+            else
+                if (t%on_to) call need(allocated(out%now%to_ann), t, "to")
+                if (t%on_so) call need(allocated(out%now%so_ann), t, "so")
+                if (t%on_to) out%now%to_ann = out%now%to_ann + t%f_to*f
+                if (t%on_so) out%now%so_ann = out%now%so_ann + t%f_so*f
+            end if
+            end associate
+        end do
+
+    contains
+
+        subroutine need(ok, t, field)
+            logical,          intent(in) :: ok
+            type(term_class), intent(in) :: t
+            character(len=*), intent(in) :: field
+            if (.not. ok) call term_error(t, "lists "//field//", but the climate has no "// &
+                                             field//" profiles.")
+        end subroutine need
+
+    end subroutine terms_apply_ocn
+
+    real(wp) function terms_uniform_dT(terms, idx, field) result(dT)
+        ! The sum of gain*series over the uniform terms on `field` (tas: f_ta,
+        ! to: f_to, so: f_so): the anomaly a backend takes as its input (rembo
+        ! dT_sum from tas).
+        type(terms_class),   intent(in) :: terms
+        type(indices_class), intent(in) :: idx
+        character(len=*),    intent(in) :: field
+        integer :: k
+        dT = 0.0_wp
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) /= "uniform") cycle
+            select case(trim(field))
+                case("tas"); if (t%on_tas) dT = dT + t%f_ta*indices_value(idx, t%series)
+                case("to");  if (t%on_to)  dT = dT + t%f_to*indices_value(idx, t%series)
+                case("so");  if (t%on_so)  dT = dT + t%f_so*indices_value(idx, t%series)
+            end select
+            end associate
+        end do
+    end function terms_uniform_dT
+
+    subroutine terms_write_step(terms, filename, ncid, n)
+        ! Record n of the uniform and replace terms into an open 2D output
+        ! file: the series value applied, term_<name> (the snapshot terms are
+        ! written by the backend).
+        type(terms_class), intent(in) :: terms
+        character(len=*),  intent(in) :: filename
+        integer,           intent(in) :: ncid, n
+        integer :: k
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) == "snapshots") cycle
+            call nc_write(filename, "term_"//trim(t%name), t%f, dim1="time", &
+                          start=[n], count=[1], ncid=ncid, units="1", &
+                          long_name="Series "//trim(t%series)//" of the "//trim(t%pattern)// &
+                                    " term "//trim(t%name))
+            end associate
+        end do
+    end subroutine terms_write_step
+
+    ! ===== helpers ==========================================================
+
+    function fields_list(t) result(s)
+        type(term_class), intent(in) :: t
+        character(len=48) :: s
+        integer :: j
+        s = ""
+        do j = 1, FLD_MAX
+            if (len_trim(t%fields(j)) > 0) s = trim(s)//" "//trim(t%fields(j))
+        end do
+        s = adjustl(s)
+    end function fields_list
+
+    function series_label(name) result(s)
+        ! The series name, or "1" for none.
+        character(len=*), intent(in) :: name
+        character(len=64) :: s
+        s = "1"
+        if (len_trim(name) > 0) s = name
+    end function series_label
+
+    subroutine term_error(t, msg)
+        type(term_class), intent(in) :: t
+        character(len=*), intent(in) :: msg
+        write(*,*) "climate_terms:: error: ["//trim(t%group)//"] "//trim(msg)
+        error stop 1
+    end subroutine term_error
+
+end module climate_terms

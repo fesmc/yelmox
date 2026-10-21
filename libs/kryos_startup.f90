@@ -81,7 +81,7 @@ contains
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
         character(len=*),  intent(in)    :: restart
-        type(indices_class), intent(in)  :: idx
+        type(indices_class), intent(inout) :: idx
         logical, intent(in), optional    :: restore_bsl
 
         logical :: do_bsl, surface_restored
@@ -109,7 +109,7 @@ contains
         type(kryos_domain),      intent(inout)        :: dom
         type(bsl_class),       intent(inout)        :: bsl
         real(dp),              intent(in)           :: time
-        type(indices_class),   intent(in)           :: idx
+        type(indices_class),   intent(inout)        :: idx
         character(len=*),      intent(in), optional :: fldr
 
         character(len=1024) :: bundle
@@ -136,7 +136,7 @@ contains
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
-        type(indices_class), intent(in)  :: idx
+        type(indices_class), intent(inout) :: idx
 
         ! Sea level + isostasy reference state (isostasy runs on grid_isos)
         call domain_init_isostasy(dom, ts, bsl)
@@ -252,7 +252,7 @@ contains
         ! the indices registry, for the climate refresh of recon.
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
-        type(indices_class), intent(in)   :: idx
+        type(indices_class), intent(inout) :: idx
 
         if (dom%ctl%init_kill_shelves) then
             where (dom%yelmo%dta%pd%mask_bed == mask_bed_ocean) dom%yelmo%bnd%mask_ice = MASK_ICE_NONE
@@ -284,7 +284,7 @@ contains
         ! and (via the hub) the climate/smb, and stabilize the dynamic fields.
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
-        type(indices_class), intent(in)   :: idx
+        type(indices_class), intent(inout) :: idx
 
         integer  :: nx, ny, k
         real(wp) :: beta_min_save

@@ -114,33 +114,27 @@
 
 ! ===== Forcing =====
 
-&indices
-    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; units,
-    ! restart_every_df), advanced on the forcing clock time_rel; unset keys
-    ! from the template [idx] of input/yelmox_defaults.nml.
-    names  = "orb"
-    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
+&forcing
+    ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
+    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! file, then the var_defs files (input/forcing_db.nml: the shared library;
+    ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
+    reference = "pd"
+    series    = "orbital_t2018"
+    terms     = "cooling"
 /
 
-&anom
-    ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = True     ! Apply it?
-    index  = "orb"    ! the index driving the anomalies ([indices] names)
-    f_ta   = -10.0    ! [K]   dTa = f * f_ta  (air temperature): -10 K at 21 ka
-    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
+&term_cooling
+    ! A uniform anomaly: -10 K at 21 ka, scaled by the orbital index
+    ! (series_orbital_t2018, 0 at present, 1 at 21 ka): tas - 10*f,
+    ! pr * exp(-beta_p*10*f).
+    series  = "orbital_t2018"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+    f_ta    = -10.0           ! [K]
 /
 
-&ocn_fraction
-    ! Ocean temperature anomaly as a fraction of the mean sea-level air
-    ! temperature anomaly over a region, applied after [anom]: to_ann =
-    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = False    ! Apply it?
-    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
-    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
-/
 
 &orbit
     ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
@@ -517,18 +511,15 @@
 
 ! ===== Climate =====
 
-&snap
-    ! Snapshot backend (snapshots): the present-day reference only, ERA5
-    ! 1981-2010 (no ocean: with_shelf = False); the anomaly from [anom]
-    ! (alpha_orbital_t2018 x 10 K).
-    ! Groups: this file, then var_defs; unset keys: input/yelmox_defaults.nml.
-    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
-    snapshots  = "pd"
+&snapshots
+    ! Snapshot backend: the fixed rules of the composition (lapse rates Gamma,
+    ! precipitation sensitivity beta_p = f_p); the snapshots of the run are the
+    ! reference and the snap0/snap1 of the terms ([forcing]).
 /
 
-! ---- snapshots (var_defs groups per field) ---------------------------------
 
-&snap_pd
+&snapshot_pd
+    ! Present day (the reference; no ocean: with_shelf = False).
     tas = "era5_1981_2010_tas"
     pr  = "era5_1981_2010_pr"
     zs  = "era5_1981_2010_zs"

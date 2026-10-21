@@ -144,7 +144,7 @@ program yelmox_bipolar
 
         ! The domains' ocean from the box (ocn_obm<sfx>) and their shelf
         ! forcing, so the first record and the first step see it.
-        call obm_ocean_init(oc, obox, dom_north, dom_south, active_north, active_south, ts, &
+        call obm_ocean_init(oc, obox, idx, dom_north, dom_south, active_north, active_south, ts, &
                             cold_start=(trim(restart) == "None"))
     end if
 

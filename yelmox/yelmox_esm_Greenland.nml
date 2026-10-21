@@ -148,32 +148,19 @@
 
 ! ===== Forcing =====
 
-&indices
-    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
-    ! units and restart_every_df), advanced on the forcing clock time_rel.
-    names  = ""       ! e.g. "at" "ramp"; "" = none
-    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
+&forcing
+    ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
+    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! file, then the var_defs files (input/forcing_db.nml: the shared library;
+    ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
+    reference = "pd"
+    series    = ""
+    terms     = ""
+    ! The esm backend supplies the climate; uniform terms on tas/pr are refused with its
+    ! smb (surface_method = "climate"), ocean terms apply at the shelf base.
 /
 
-&anom
-    ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = False    ! Apply it? (refused with the esm smb, surface_method = "climate")
-    index  = ""       ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
-    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
-/
-
-&ocn_fraction
-    ! Ocean temperature anomaly as a fraction of the mean sea-level air
-    ! temperature anomaly over a region, applied after [anom]: to_ann =
-    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = False    ! Apply it?
-    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
-    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
-/
 
 &orbit
     ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,

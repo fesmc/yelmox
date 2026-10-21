@@ -15,12 +15,13 @@ module obm_coupling
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
     !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
     !              to_ann (marine-shelf forcing), through the climate modifier
-    !              ocn_obm<sfx> of each domain (climate_mods), applied here
+    !              the series derived from the boxes (obm_north, obm_south) and the
+    !              domains' ocean terms on them (climate_terms), applied here
     !
     ! The module owns its whole configuration (obm_coupling_ctl: exchange
     ! switches, the atmospheric forcing, freshwater-flux masks, nautilus
     ! hysteresis forcing), loaded by obm_ctl_load from [ctrl] and
-    ! [obm_forcing]. The switch of obm2ism is per domain, ocn_obm<sfx>.active.
+    ! [obm_forcing]. obm2ism is on when a series is derived from a box.
     ! The driver calls obm_ctl_load, then obm_coupling_init once the indices
     ! and the domains are initialized, obm_ocean_init once the box model is
     ! initialized (cold start or restart), then obm_exchange once per step
@@ -33,8 +34,9 @@ module obm_coupling
     use timestepping,  only : tstep_class
     use kryos,         only : kryos_domain
     use kryos_coupling, only : step_shelf
-    use kryos_forcing, only : indices_class, indices_has, indices_value
-    use climate_mods,  only : climate_mod_ocn_obm
+    use kryos_forcing, only : indices_class, indices_has, indices_value, indices_uses_derived, &
+                              indices_set_obm
+    use yelmox_climate, only : climate_apply_ocean, climate_uses_derived
     use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
@@ -44,7 +46,7 @@ module obm_coupling
     private
 
     type obm_coupling_ctl
-        ! Which exchanges are active ([ctrl]; obm2ism: ocn_obm<sfx> of each domain).
+        ! Which exchanges are active ([ctrl]; obm2ism: a series derived from a box).
         logical :: active_obm = .false.
         logical :: ism2obm    = .false.
         logical :: atm2obm    = .false.
@@ -127,13 +129,14 @@ contains
 
         logical :: obm2ism
 
-        obm2ism = .false.
-        if (active_north) obm2ism = dom_north%cl%mods%ocn_obm%active
-        if (active_south) obm2ism = obm2ism .or. dom_south%cl%mods%ocn_obm%active
+        ! obm2ism: a series derived from a box (obm_north, obm_south), used by
+        ! the ocean terms of a domain.
+        obm2ism = indices_uses_derived(idx, "obm_north") .or. indices_uses_derived(idx, "obm_south")
 
         if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%ism2obm .or. obm2ism)) then
-            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and ocn_obm<sfx> need &
-                       &the ocean box model ([ctrl] active_obm = True)."
+            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and the series derived &
+                       &from the boxes (obm_north, obm_south) need the ocean box model &
+                       &([ctrl] active_obm = True)."
             error stop 1
         end if
         if (oc%atm2obm .and. .not. indices_has(idx, oc%forcing_index)) then
@@ -168,30 +171,35 @@ contains
         end if
     end subroutine obm_coupling_init
 
-    subroutine obm_ocean_init(oc, obm, dom_north, dom_south, active_north, active_south, ts, &
+    subroutine obm_ocean_init(oc, obm, idx, dom_north, dom_south, active_north, active_south, ts, &
                               cold_start)
         ! The domains' ocean from the box model at the start of the run (cold
-        ! start or restart), as after every exchange (ocn_obm<sfx>). On a cold
-        ! start also their shelf forcing from it: the domains' startup ran their
-        ! shelf step on the backend's ocean, so the first record and the first
-        ! step would otherwise miss the box. A restart restored the shelf state
-        ! the run held, computed from the box.
+        ! start or restart), as after every exchange: the series derived from
+        ! the boxes set, the ocean terms re-applied. On a cold start also their
+        ! shelf forcing from it: the domains' startup ran their shelf step on
+        ! the backend's ocean, so the first record and the first step would
+        ! otherwise miss the box. A restart restored the shelf state the run
+        ! held, computed from the box.
         type(obm_coupling_ctl), intent(in)    :: oc
         type(obm_class),        intent(in)    :: obm
+        type(indices_class),    intent(inout) :: idx
         type(kryos_domain),     intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         type(tstep_class),      intent(in)    :: ts
         logical,                intent(in)    :: cold_start
 
+        call coupling_obm2ism(obm, oc%obm_name, idx)
         if (active_north) then
-            if (dom_north%cl%mods%ocn_obm%active) then
-                call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
+            if (climate_uses_derived(dom_north%cl, idx, "obm_north") .or. &
+                climate_uses_derived(dom_north%cl, idx, "obm_south")) then
+                call climate_apply_ocean(dom_north%cl, dom_north%clim, idx)
                 if (cold_start) call step_shelf(dom_north, ts)
             end if
         end if
         if (active_south) then
-            if (dom_south%cl%mods%ocn_obm%active) then
-                call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
+            if (climate_uses_derived(dom_south%cl, idx, "obm_north") .or. &
+                climate_uses_derived(dom_south%cl, idx, "obm_south")) then
+                call climate_apply_ocean(dom_south%cl, dom_south%clim, idx)
                 if (cold_start) call step_shelf(dom_south, ts)
             end if
         end if
@@ -207,7 +215,7 @@ contains
         ! this step.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(obm_class),        intent(inout) :: obm
-        type(indices_class),    intent(in)    :: idx
+        type(indices_class),    intent(inout) :: idx
         type(kryos_domain),     intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         real(dp),               intent(in)    :: time, time_init, dtt
@@ -227,15 +235,11 @@ contains
                     oc%hyster_positive_branch_time, oc%hyster_rate, &
                     oc%hyster_forcing, oc%hyster_forcing_method)
 
-        ! obm2ism: per domain, its ocn_obm<sfx> switch.
-        if (active_north) then
-            if (dom_north%cl%mods%ocn_obm%active) &
-                call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
-        end if
-        if (active_south) then
-            if (dom_south%cl%mods%ocn_obm%active) &
-                call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
-        end if
+        ! obm2ism: the series derived from the boxes, then the ocean terms of
+        ! each domain re-applied (idempotent; a no-op without ocean terms).
+        call coupling_obm2ism(obm, oc%obm_name, idx)
+        if (active_north) call climate_apply_ocean(dom_north%cl, dom_north%clim, idx)
+        if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, idx)
     end subroutine obm_exchange
 
     subroutine coupling_atm2obm(obm, dT_glob)
@@ -287,30 +291,21 @@ contains
         end select
     end subroutine coupling_ism2obm
 
-    subroutine coupling_obm2ism(dom, obm, obm_name, hemisphere)
-        ! OBM -> ice sheet: the box-model ocean temperature of the hemisphere
-        ! (northern box tn / southern box ts) and its initial value, in K, to
-        ! the domain's climate modifier ocn_obm, which sets the ocean
-        ! temperature to_ann that marine_shelf then reads as its ocean forcing.
-        type(kryos_domain), intent(inout) :: dom
-        type(obm_class),    intent(in)    :: obm
-        character(len=*),   intent(in)    :: obm_name
-        character(len=*),   intent(in)    :: hemisphere
+    subroutine coupling_obm2ism(obm, obm_name, idx)
+        ! OBM -> ice sheets: the box-model ocean temperatures of the
+        ! hemispheres (northern box tn, southern box ts) and their initial
+        ! values, in K, into the series derived from them (obm_north,
+        ! obm_south: the temperature, or its anomaly), which the ocean terms of
+        ! the domains read (climate_apply_ocean) to set the ocean temperature
+        ! that marine_shelf then reads as its forcing.
+        type(obm_class),     intent(in)    :: obm
+        character(len=*),    intent(in)    :: obm_name
+        type(indices_class), intent(inout) :: idx
 
-        real(wp) :: t_box, t_box_init
-
-        select case(trim(hemisphere))
-            case("north")
-                t_box      = obm%tn
-                t_box_init = obm%par%tn_init
-            case("south")
-                t_box      = obm%ts
-                t_box_init = obm%par%ts_init
-        end select
-
-        call climate_mod_ocn_obm(dom%cl%mods, dom%clim, &
-                                 obm_temperature_kelvin(t_box, obm_name), &
-                                 obm_temperature_kelvin(t_box_init, obm_name))
+        call indices_set_obm(idx, "obm_north", obm_temperature_kelvin(obm%tn, obm_name), &
+                                               obm_temperature_kelvin(obm%par%tn_init, obm_name))
+        call indices_set_obm(idx, "obm_south", obm_temperature_kelvin(obm%ts, obm_name), &
+                                               obm_temperature_kelvin(obm%par%ts_init, obm_name))
     end subroutine coupling_obm2ism
 
     subroutine update_bipolar_hyster_forcing(t, t0, obm, dt, branch_time_thr, &
