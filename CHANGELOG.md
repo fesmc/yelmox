@@ -6,6 +6,14 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- Output precision: the 2D/3D fields of the yelmox writers (`isos.nc`, `mshlf.nc`, the
+  surface file, the climate file, `yelmo_cmip.nc`) are written with a fixed precision per
+  field (ncio `nc_write` `prec_abs`/`prec_rel`, bit rounding for compression): 1e-3 m
+  elevations, 1e-3 K temperatures, velocities 1e-3 m/yr or 1e-4 relative, 1e-4 m/yr mass
+  balance (0.1 mm w.e./yr), 1e-4 fractions, 1e-4 relative otherwise; masks, time series,
+  restarts and static fields lossless. New `[ctrl] write_lossless` (all output lossless,
+  via `nc_set_lossless`, e.g. for bit-for-bit comparisons). Needs fesm-utils with
+  `nc_set_lossless`.
 - The forcing as terms (`docs/_forcing-terms.md`; docs `yelmox.md`, `climate-snapshots.md`):
   the climate at the forcing time is a reference snapshot plus terms, each a scalar series
   times a pattern. `[forcing]`: `reference`, `series`, `terms`, one `var_defs` list for every

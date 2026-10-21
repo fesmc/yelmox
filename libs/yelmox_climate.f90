@@ -447,35 +447,45 @@ contains
         character(len=*),           intent(in) :: filename
         integer,                    intent(in) :: ncid, n
 
-        call write2D("t2m_ann", out%now%ta_ann, "K", "Near-surface air temperature (ann)")
+        call write2D("t2m_ann", out%now%ta_ann, "K", "Near-surface air temperature (ann)", &
+                     prec_abs=1e-3_wp)
         if (allocated(out%now%tas)) &
             call write2D("t2m_sum", summer_mean(out%now%tas, cl%south), "K", &
-                         "Near-surface air temperature (sum)")
+                         "Near-surface air temperature (sum)", prec_abs=1e-3_wp)
         if (allocated(out%now%pr_ann)) &
-            call write2D("pr_ann", out%now%pr_ann, "mm/a", "Precipitation (ann)")
+            call write2D("pr_ann", out%now%pr_ann, "mm/a", "Precipitation (ann)", &
+                         prec_rel=1e-4_wp)
         if (out%has_smb) then
             ! The climate's own surface fields (with surface_method = "climate",
             ! those landed on Yelmo).
-            call write2D("smb_ann",  1e-3_wp*out%now%smb, "m/a water equiv.", "Surface mass balance (ann)")
-            call write2D("tsrf_ann", out%now%tsrf, "K", "Surface temperature (ann)")
+            call write2D("smb_ann",  1e-3_wp*out%now%smb, "m/a water equiv.", "Surface mass balance (ann)", &
+                         prec_abs=1e-4_wp)
+            call write2D("tsrf_ann", out%now%tsrf, "K", "Surface temperature (ann)", &
+                         prec_abs=1e-3_wp)
         end if
         if (allocated(out%now%to_ann)) &
-            call write3D("to_ann", out%now%to_ann, "depth", "K", "Ocean temperature (ann)")
+            call write3D("to_ann", out%now%to_ann, "depth", "K", "Ocean temperature (ann)", &
+                         prec_abs=1e-3_wp)
         if (allocated(out%now%so_ann)) &
-            call write3D("so_ann", out%now%so_ann, "depth", "PSU", "Ocean salinity (ann)")
+            call write3D("so_ann", out%now%so_ann, "depth", "PSU", "Ocean salinity (ann)", &
+                         prec_rel=1e-4_wp)
 
         select case(trim(cl%method))
             case("snapshots")
                 ! The monthly atmosphere, then the backend's own state (the axes).
-                call write3D("tas",     out%now%tas,     "month", "K",    "Near-surface air temperature")
-                call write3D("pr",      out%now%pr,      "month", "mm/d", "Precipitation")
-                call write2D("tsl_ann", out%now%tsl_ann, "K", "Sea-level air temperature (ann)")
+                call write3D("tas",     out%now%tas,     "month", "K",    "Near-surface air temperature", &
+                             prec_abs=1e-3_wp)
+                call write3D("pr",      out%now%pr,      "month", "mm/d", "Precipitation", &
+                             prec_rel=1e-4_wp)
+                call write2D("tsl_ann", out%now%tsl_ann, "K", "Sea-level air temperature (ann)", &
+                             prec_abs=1e-3_wp)
                 call snapshots_write_step(cl%snapshots, filename, ncid, n)
             case("esm")
                 call write_esm()
             case("rembo")
                 ! Annual fields only: REMBO's own summer temperature.
-                call write2D("t2m_sum", cl%rembo%ta_sum, "K", "Near-surface air temperature (sum)")
+                call write2D("t2m_sum", cl%rembo%ta_sum, "K", "Near-surface air temperature (sum)", &
+                             prec_abs=1e-3_wp)
         end select
 
         call climate_mods_write_step(cl%mods, filename, ncid, n)
@@ -486,37 +496,45 @@ contains
         subroutine write_esm()
 
             associate(esm => cl%esm)
-            call write2D("dts_ann", sum(esm%dts, dim=3)/12.0_wp, "K", "Surface air temperature anomaly")
+            call write2D("dts_ann", sum(esm%dts, dim=3)/12.0_wp, "K", "Surface air temperature anomaly", &
+                         prec_abs=1e-3_wp)
             if (cl%esm_ctl%use_smb) then
-                call write2D("smb_ref_ann", 1e-3_wp*esm%smb_ann, "m/a water equiv.", "Reference SMB (ann)")
+                call write2D("smb_ref_ann", 1e-3_wp*esm%smb_ann, "m/a water equiv.", "Reference SMB (ann)", &
+                             prec_abs=1e-4_wp)
                 call write2D("dsmb_ann", 1e-3_wp*sum(esm%dsmb, dim=3)/12.0_wp, "m/a water equiv.", &
-                             "SMB anomaly (ann)")
-                call write2D("dsmbdz",   1e-3_wp*esm%dsmbdz, "m/a m-1 water equiv.", "SMB lapse rate")
+                             "SMB anomaly (ann)", prec_abs=1e-4_wp)
+                call write2D("dsmbdz",   1e-3_wp*esm%dsmbdz, "m/a m-1 water equiv.", "SMB lapse rate", &
+                             prec_rel=1e-4_wp)
             else
-                call write2D("dpr_ann", sum(esm%dpr, dim=3)/12.0_wp, "%", "Precipitation anomaly (ann)")
+                call write2D("dpr_ann", sum(esm%dpr, dim=3)/12.0_wp, "%", "Precipitation anomaly (ann)", &
+                             prec_rel=1e-4_wp)
             end if
-            call write2D("dto",    esm%dto,    "K",    "Shelf temperature anomaly")
-            call write2D("dso",    esm%dso,    "PSU",  "Shelf salinity anomaly")
-            call write2D("Qd_ann", esm%Qd_ann, "m3/s", "Subglacial discharge (ann)")
-            call write2D("Qd_sum", esm%Qd_sum, "m3/s", "Subglacial discharge (sum)")
+            call write2D("dto",    esm%dto,    "K",    "Shelf temperature anomaly", prec_abs=1e-3_wp)
+            call write2D("dso",    esm%dso,    "PSU",  "Shelf salinity anomaly",    prec_rel=1e-4_wp)
+            call write2D("Qd_ann", esm%Qd_ann, "m3/s", "Subglacial discharge (ann)", prec_rel=1e-4_wp)
+            call write2D("Qd_sum", esm%Qd_sum, "m3/s", "Subglacial discharge (sum)", prec_rel=1e-4_wp)
             end associate
 
         end subroutine write_esm
 
-        subroutine write2D(vnm, var, units, long_name)
+        ! prec_abs/prec_rel: precision of the written values (ncio bit
+        ! rounding), absent for lossless.
+        subroutine write2D(vnm, var, units, long_name, prec_abs, prec_rel)
             character(len=*), intent(in) :: vnm, units, long_name
             real(wp),         intent(in) :: var(:,:)
+            real(wp),         intent(in), optional :: prec_abs, prec_rel
             call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3="time", &
                           start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
-                          units=units, long_name=long_name)
+                          units=units, long_name=long_name, prec_abs=prec_abs, prec_rel=prec_rel)
         end subroutine write2D
 
-        subroutine write3D(vnm, var, dim3, units, long_name)
+        subroutine write3D(vnm, var, dim3, units, long_name, prec_abs, prec_rel)
             character(len=*), intent(in) :: vnm, dim3, units, long_name
             real(wp),         intent(in) :: var(:,:,:)
+            real(wp),         intent(in), optional :: prec_abs, prec_rel
             call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3=dim3, dim4="time", &
                           start=[1,1,1,n], count=[size(var,1),size(var,2),size(var,3),1], &
-                          ncid=ncid, units=units, long_name=long_name)
+                          ncid=ncid, units=units, long_name=long_name, prec_abs=prec_abs, prec_rel=prec_rel)
         end subroutine write3D
 
     end subroutine climate_write_2D

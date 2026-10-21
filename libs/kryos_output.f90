@@ -232,13 +232,16 @@ contains
         call nc_write_dim(filename, "time", x=time, dx=1.0_dp, nx=1, units="year", unlimited=.TRUE.)
     end subroutine io_dims_init
 
-    subroutine io_var2D(filename, vnm, var, n, ncid, units, long_name)
+    subroutine io_var2D(filename, vnm, var, n, ncid, units, long_name, prec_abs, prec_rel)
+        ! prec_abs/prec_rel: precision of the written values (ncio bit
+        ! rounding), absent for lossless.
         character(len=*), intent(in) :: filename, vnm, units, long_name
         real(wp),         intent(in) :: var(:,:)
         integer,          intent(in) :: n, ncid
+        real(wp),         intent(in), optional :: prec_abs, prec_rel
         call nc_write(filename, vnm, var, dim1="xc", dim2="yc", dim3="time", &
                       start=[1,1,n], count=[size(var,1),size(var,2),1], ncid=ncid, &
-                      units=units, long_name=long_name)
+                      units=units, long_name=long_name, prec_abs=prec_abs, prec_rel=prec_rel)
     end subroutine io_var2D
 
     subroutine io_ts(filename, vnm, val, n, ncid, units, long_name)
@@ -257,10 +260,14 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "z_bed", isos%out%z_bed, n, ncid, "m", "Bedrock elevation")
-        call io_var2D(filename, "z_ss",  isos%out%z_ss,  n, ncid, "m", "Sea-surface height")
-        call io_var2D(filename, "w",     isos%out%w,     n, ncid, "m", "Viscous displacement")
-        call io_var2D(filename, "we",    isos%out%we,    n, ncid, "m", "Elastic displacement")
+        call io_var2D(filename, "z_bed", isos%out%z_bed, n, ncid, "m", "Bedrock elevation", &
+                      prec_abs=1e-3_wp)
+        call io_var2D(filename, "z_ss",  isos%out%z_ss,  n, ncid, "m", "Sea-surface height", &
+                      prec_abs=1e-3_wp)
+        call io_var2D(filename, "w",     isos%out%w,     n, ncid, "m", "Viscous displacement", &
+                      prec_abs=1e-3_wp)
+        call io_var2D(filename, "we",    isos%out%we,    n, ncid, "m", "Elastic displacement", &
+                      prec_abs=1e-3_wp)
         call nc_close(ncid)
     end subroutine isos_write_step
 
@@ -272,9 +279,12 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "bmb_shlf", mshlf%now%bmb_shlf, n, ncid, "m/yr", "Shelf basal mass balance")
-        call io_var2D(filename, "T_shlf",   mshlf%now%T_shlf,   n, ncid, "K", "Shelf temperature")
-        call io_var2D(filename, "tf_shlf",  mshlf%now%tf_shlf,  n, ncid, "K", "Thermal forcing")
+        call io_var2D(filename, "bmb_shlf", mshlf%now%bmb_shlf, n, ncid, "m/yr", "Shelf basal mass balance", &
+                      prec_abs=1e-4_wp)
+        call io_var2D(filename, "T_shlf",   mshlf%now%T_shlf,   n, ncid, "K", "Shelf temperature", &
+                      prec_abs=1e-3_wp)
+        call io_var2D(filename, "tf_shlf",  mshlf%now%tf_shlf,  n, ncid, "K", "Thermal forcing", &
+                      prec_abs=1e-3_wp)
         call nc_close(ncid)
     end subroutine mshlf_write_step
 
@@ -286,8 +296,10 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "mm w.e./yr", "Surface mass balance")
-        call io_var2D(filename, "tsrf", smb%ann%tsrf, n, ncid, "K", "Surface temperature")
+        call io_var2D(filename, "smb",  smb%ann%smb,  n, ncid, "mm w.e./yr", "Surface mass balance", &
+                      prec_abs=0.1_wp)
+        call io_var2D(filename, "tsrf", smb%ann%tsrf, n, ncid, "K", "Surface temperature", &
+                      prec_abs=1e-3_wp)
         call nc_close(ncid)
     end subroutine smb_write_step
 
@@ -299,8 +311,10 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "smb",  real(smbs%smb, wp),   n, ncid, "mm w.e./yr", "Surface mass balance")
-        call io_var2D(filename, "tsrf", real(smbs%t_srf, wp), n, ncid, "K", "Surface temperature")
+        call io_var2D(filename, "smb",  real(smbs%smb, wp),   n, ncid, "mm w.e./yr", "Surface mass balance", &
+                      prec_abs=0.1_wp)
+        call io_var2D(filename, "tsrf", real(smbs%t_srf, wp), n, ncid, "K", "Surface temperature", &
+                      prec_abs=1e-3_wp)
         call nc_close(ncid)
     end subroutine smb_simple_write_step
 
@@ -313,18 +327,30 @@ contains
         call nc_open(filename, ncid, writable=.TRUE.)
         n = nc_time_index(filename, "time", time, ncid)
         call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
-        call io_var2D(filename, "smb",    sc%ann%smb,    n, ncid, "mm w.e./yr", "Surface mass balance (sf+rf-runoff-subl)")
-        call io_var2D(filename, "tsrf",   sc%ann%tsrf,   n, ncid, "K", "Surface temperature")
-        call io_var2D(filename, "melt",   sc%ann%melt,   n, ncid, "mm w.e./yr", "Melt")
-        call io_var2D(filename, "runoff", sc%ann%runoff, n, ncid, "mm w.e./yr", "Runoff")
-        call io_var2D(filename, "refrz",  sc%ann%refrz,  n, ncid, "mm w.e./yr", "Refreezing")
-        call io_var2D(filename, "pr",     sc%ann%pr,     n, ncid, "mm w.e./yr", "Precipitation")
-        call io_var2D(filename, "sf",     sc%ann%sf,     n, ncid, "mm w.e./yr", "Snowfall")
-        call io_var2D(filename, "t2m",    sc%ann%t2m,    n, ncid, "K", "Near-surface air temperature")
-        call io_var2D(filename, "S",      sc%ann%S,      n, ncid, "W m-2", "TOA insolation")
-        call io_var2D(filename, "PDDs",   sc%ann%PDDs,   n, ncid, "K d", "Positive degree days")
-        call io_var2D(filename, "alb_s",  sc%ann%alb_s,  n, ncid, "1", "Surface albedo")
-        call io_var2D(filename, "H_snow", sc%ann%H_snow, n, ncid, "mm w.e.", "Snowpack thickness (end of year)")
+        call io_var2D(filename, "smb",    sc%ann%smb,    n, ncid, "mm w.e./yr", "Surface mass balance (sf+rf-runoff-subl)", &
+                      prec_abs=0.1_wp)
+        call io_var2D(filename, "tsrf",   sc%ann%tsrf,   n, ncid, "K", "Surface temperature", &
+                      prec_abs=1e-3_wp)
+        call io_var2D(filename, "melt",   sc%ann%melt,   n, ncid, "mm w.e./yr", "Melt", &
+                      prec_abs=0.1_wp)
+        call io_var2D(filename, "runoff", sc%ann%runoff, n, ncid, "mm w.e./yr", "Runoff", &
+                      prec_abs=0.1_wp)
+        call io_var2D(filename, "refrz",  sc%ann%refrz,  n, ncid, "mm w.e./yr", "Refreezing", &
+                      prec_abs=0.1_wp)
+        call io_var2D(filename, "pr",     sc%ann%pr,     n, ncid, "mm w.e./yr", "Precipitation", &
+                      prec_rel=1e-4_wp)
+        call io_var2D(filename, "sf",     sc%ann%sf,     n, ncid, "mm w.e./yr", "Snowfall", &
+                      prec_rel=1e-4_wp)
+        call io_var2D(filename, "t2m",    sc%ann%t2m,    n, ncid, "K", "Near-surface air temperature", &
+                      prec_abs=1e-3_wp)
+        call io_var2D(filename, "S",      sc%ann%S,      n, ncid, "W m-2", "TOA insolation", &
+                      prec_rel=1e-4_wp)
+        call io_var2D(filename, "PDDs",   sc%ann%PDDs,   n, ncid, "K d", "Positive degree days", &
+                      prec_rel=1e-4_wp)
+        call io_var2D(filename, "alb_s",  sc%ann%alb_s,  n, ncid, "1", "Surface albedo", &
+                      prec_abs=1e-4_wp)
+        call io_var2D(filename, "H_snow", sc%ann%H_snow, n, ncid, "mm w.e.", "Snowpack thickness (end of year)", &
+                      prec_abs=0.1_wp)
         call io_var2D(filename, "mask",   sc%ann%mask,   n, ncid, "1", "chion active (z_srf > z_sl)")
         call nc_close(ncid)
     end subroutine surface_chion_write_step

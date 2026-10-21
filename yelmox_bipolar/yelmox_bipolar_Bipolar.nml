@@ -24,6 +24,7 @@
     active_north    = True              ! Run the Northern-Hemisphere domain?
     active_south    = True              ! Run the Southern-Hemisphere domain?
     restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
+    write_lossless  = False             ! write all output lossless (ignore per-field precision), e.g. for bit-for-bit comparisons
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
     active_obm       = False            ! Run the shared ocean box model?
