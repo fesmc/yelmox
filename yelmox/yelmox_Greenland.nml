@@ -119,10 +119,20 @@
     ! file, then the var_defs files (input/forcing_db.nml: the shared library;
     ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
     reference = "pd"
-    series    = "orbital" "dTo"
-    terms     = "orbital" "ocean"
-    ! orbital: PMIP3 lgm - picontrol weighted by the orbital index (0 at present, 1 at 21 ka);
+    series    = "alpha" "dTo"
+    terms     = "lgm" "ocean"
+    ! lgm: PMIP3 lgm - picontrol weighted by alpha (0 at present, 1 at 21 ka);
     ! ocean: the profiles plus 0.25 x the mean sea-level air anomaly (series dTo).
+/
+
+&series_alpha
+    ! alpha of this setup: the orbital record alpha_orbital_r2020 normalised to
+    ! 0 at present (piControl) and 1 at 21 ka (LGM), the weight of the LGM
+    ! anomaly (term_lgm).
+    method      = "series"
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
 /
 
 

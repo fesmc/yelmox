@@ -10,8 +10,8 @@ grlpal_pd=()
 # A: last glacial period (run_lgp.sh; run_spinup.sh lgp). PMIP3 piControl and
 # LGM blended by the glacial index input/alpha_combined_125kyr_interp.dat.
 grlpal_lgp=(
-    "forcing.series==glacial,dTo"       # the glacial index [series_glacial]; dTo: 0.25 x the mean air anomaly
-    "forcing.terms==glacial,ocean"      # glacial: lgm - picontrol (PMIP3) weighted by the index, on tas and pr;
+    "forcing.series==alpha,dTo"         # alpha: the glacial index ([series_alpha] of the base par file); dTo: 0.25 x the mean air anomaly
+    "forcing.terms==lgm,ocean"          # lgm: lgm - picontrol (PMIP3) weighted by alpha, on tas and pr;
                                         # ocean: the profiles plus dTo
     "orbit.method=forcing_time"                # transient insolation (orbit at the forcing time)
 )

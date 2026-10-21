@@ -38,16 +38,16 @@ source scripts/tipmip/params.sh
 # (rel: time relative to 1950; cal: calendar years; const: the forcing at t0)
 CASES=$(cat <<'EOF'
 grl_snap   |yelmox/yelmox_Greenland.nml               |ctrl      |rel  |-130e3 |0      |1000 |
-grl_ramp   |yelmox/yelmox_Greenland.nml               |ctrl      |rel  |0      |2000   |500  |domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 forcing.series==orbital,dTo,ramp forcing.terms==orbital,ocean,ramp
+grl_ramp   |yelmox/yelmox_Greenland.nml               |ctrl      |rel  |0      |2000   |500  |domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 forcing.series==alpha,dTo,ramp forcing.terms==lgm,ocean,ramp
 ant_pd     |yelmox/yelmox_Antarctica.nml              |ctrl      |const|0      |10     |10   |
 ant_paleo  |yelmox/yelmox_Antarctica.nml              |ctrl      |rel  |-130e3 |0      |1000 |@antpal_physics @antpal_lgp sim.relax=False sim.opt=False ytill.method=1
 grlpal_pd  |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |const|0      |10     |10   |
 grlpal_a   |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |rel  |-130e3 |0      |1000 |@grlpal_lgp
 grlpal_b   |yelmox/yelmox_GreenlandPaleo.nml          |ctrl      |rel  |-21e3  |0      |500  |@grlpal_recon
 lis_lgm    |yelmox/yelmox_LIS.nml                     |ctrl      |const|-21e3  |10     |10   |
-lis_pd     |yelmox/yelmox_LIS.nml                     |ctrl      |const|0      |10     |10   |series_glacial.f_min=0
+lis_pd     |yelmox/yelmox_LIS.nml                     |ctrl      |const|0      |10     |10   |series_alpha.f_min=0
 north_lgm  |yelmox/yelmox_North.nml                   |ctrl      |const|-21e3  |10     |10   |
-north_pd   |yelmox/yelmox_North.nml                   |ctrl      |const|0      |10     |10   |series_glacial.f_min=0
+north_pd   |yelmox/yelmox_North.nml                   |ctrl      |const|0      |10     |10   |series_alpha.f_min=0
 pyrenees   |yelmox/yelmox_Pyrenees.nml                |ctrl      |rel  |-21e3  |0      |1000 |
 srg_pd     |yelmox/yelmox_SRG.nml                     |ctrl      |const|1950   |10     |10   |
 ismip7_grl |yelmox/yelmox_esm_Greenland.nml           |transient |cal  |1975   |2300   |25   |ctrl.run_step=transient esm.experiment=ssp585 esm.use_esm=True esm.use_hist=True esm.use_proj=True

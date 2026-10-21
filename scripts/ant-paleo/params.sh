@@ -60,8 +60,8 @@ antpal_physics=(
 # the glacial index input/alpha_combined_125kyr_interp.dat; Antarctic summer
 # (DJF) as the second temperature of the PMIP3 snapshots.
 antpal_lgp=(
-    "forcing.series==glacial,dTo"       # the glacial index [series_glacial]; dTo as in antpal_physics
-    "forcing.terms==glacial,ocean"      # glacial: lgm - picontrol (PMIP3) weighted by the index, on tas and pr
+    "forcing.series==alpha,dTo"         # alpha: the glacial index ([series_alpha] of the base par file); dTo as in antpal_physics
+    "forcing.terms==lgm,ocean"          # lgm: lgm - picontrol (PMIP3) weighted by alpha, on tas and pr
     "snapshot_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"   # summer: DJF
     "snapshot_lgm.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"         # summer: DJF
     "orbit.method=forcing_time"                # transient insolation (orbit at the forcing time)

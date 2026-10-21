@@ -104,8 +104,8 @@ One global series drives the box model and, with regional gains, the domains
 - **Series** (`[forcing] series`, `[series_<name>]`) are shared by both
   domains and the OBM: advanced once per step, written to each domain's 1D
   file, restarted from the run bundle (`series_<name>_restart.nc`), with the
-  kill switch and `restart_every_df` bundles as in `yelmox`. Here `orbital`
-  (the orbital index of the north's term `orbital`), `gmt` (global mean air
+  kill switch and `restart_every_df` bundles as in `yelmox`. Here `alpha`
+  (the orbital record r2020, normalised, of the north's term `lgm`), `gmt` (global mean air
   temperature anomaly [K], `const` 0; a file series instead for a transient)
   and `dTo` (derived, the north's ocean anomaly). The reference and the
   terms of each domain are `[forcing_north]` and `[forcing_south]`.
@@ -116,7 +116,7 @@ One global series drives the box model and, with regional gains, the domains
   must be in the registry (checked at init).
 - **Domains**: the uniform terms `regional_north`/`regional_south` on `gmt`
   with `f_ta` the regional amplification (north 1.07, south 0.86): explicit in
-  the par file, zero while `gmt` = 0. North: `pd_grl` plus the term `orbital`
+  the par file, zero while `gmt` = 0. North: `pd_grl` plus the term `lgm`
   (picontrol -> lgm) and the term `ocean` (the derived series `dTo`); south:
   `pd_ant` only.
 - **`obm2ism`**: per domain, a series derived from the box
@@ -129,7 +129,7 @@ One global series drives the box model and, with regional gains, the domains
   terms after both climate steps. At the start the box model is initialized
   (cold start or restart) and the series set before the domains, so their
   startup climate, shelf and ice state already see the box. It needs `active_obm`; the series replace `dTo`
-  (`forcing_north.terms==orbital,regional_north,obm_north`, see
+  (`forcing_north.terms==lgm,regional_north,obm_north`, see
   `run_tests.sh`).
 - **`ism2obm`**: freshwater flux of each domain into the boxes (`fn`, `fs`),
   per hemisphere with `[ctrl] couple_fwf_north`/`couple_fwf_south`, from the

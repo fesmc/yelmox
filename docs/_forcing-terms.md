@@ -174,7 +174,7 @@ since the library has no domain suffix.
 &forcing
     reference = "pd"
     series    = "alpha" "dTo"
-    terms     = "glacial" "ocean"
+    terms     = "lgm" "ocean"
     var_defs  = "input/forcing_db.nml" "input/clim_db.nml"
 /
 
@@ -191,7 +191,7 @@ since the library has no domain suffix.
     units  = "K"
 /
 
-&term_glacial
+&term_lgm
     series = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"
@@ -211,15 +211,15 @@ GRL paleo A reads: T = T_pd + α (T_lgm − T_pic), P = P_pd [1 + α (P_lgm/P_pi
 | Case | series | terms |
 |---|---|---|
 | GRL paleo B | `dTo` | `buizert` (1, b18_base → b18(τ), tas); `badgeley` (1, "" → b20(τ), pr); `ocean` |
-| LIS, Banderas 2018 | `alpha` const 0.87, `beta` const 0.48 (or NGRIP), `dTo` | `orbital` (α, picontrol → lgm), `millennial` (β, lgmweak → lgmstrong), `ocean` |
+| LIS, Banderas 2018 | `alpha` const 0.87, `beta` const 0.48 (or NGRIP), `dTo` | `lgm` (α, picontrol → lgm), `millennial` (β, lgmweak → lgmstrong), `ocean` |
 | ANT paleo | as GRL A on `pd` (ANT) | |
-| Pyrenees | `gamma` orbital, normalised 0 at 0, 1 at −21 ka | `cooling` (γ, uniform, tas pr, f_ta = −10) |
+| Pyrenees | `alpha` (t2018 orbital record, normalised 0 at 0, 1 at −21 ka) | `uniform` (α, uniform, tas pr, f_ta = −10) |
 | Hysteresis | `gamma` ramp or PI42 | `warming` (γ, uniform, tas pr to, f_to = 0.25) |
-| Bipolar north | `alpha`, `gmt` [K], `tn` derived obm_north | `glacial` (α), `regional` (gmt, uniform, f_ta = 1.07), `ocean` (tn, replace, to) |
+| Bipolar north | `alpha` (r2020 orbital record, normalised), `gmt` [K], `tn` derived obm_north | `lgm` (α), `regional` (gmt, uniform, f_ta = 1.07), `ocean` (tn, replace, to) |
 | Present day | none | none |
 
 A term is one group in the library or the par file; an experiment adds or
-removes terms with `-p forcing.terms==glacial,ocean`, which is where the
+removes terms with `-p forcing.terms==lgm,ocean`, which is where the
 par-files plan's `-p` arrays shrink to.
 
 ## 5. From today's groups
@@ -240,14 +240,19 @@ par-files plan's `-p` arrays shrink to.
 | `idx_one` | gone (`series = ""`) |
 | bipolar `snap_north_pd`, `snap_north_axis_at`, ... | `[forcing_north]` selecting library snapshots by content name (`pd_grl`, `pd_ant`); `[snapshots_north]` |
 
-Library names are descriptive: `series_glacial` (alpha_combined, as is),
-`series_orbital` (r2020, normalised 0 at 0, 1 at 21 ka), `series_orbital_t2018`,
-`series_dTo` (derived, 0.25), `series_ramp`, `series_hyst`, `series_dT`,
-`series_obm_north/south`; terms `term_glacial`, `term_orbital` (the LGM
-anomaly on those series), `term_b18`, `term_b20`, `term_ocean`,
-`term_ramp`, `term_hyst`, `term_dT`, `term_obm_north/south`. A par file
-redefines a library group to change it for its run (LIS, North:
-`series_glacial` constant 1 for the LGM steady state).
+Series are named by their symbol in the equation (`alpha`, `beta`, `gamma`,
+...), never by an interpretation of the record; which record a symbol loads
+is the setup's, in its par file: `[series_alpha]` is `alpha_combined_125kyr`
+(as is) in the paleo bases, `alpha_orbital_r2020` (normalised 0 at 0, 1 at
+21 ka) in `yelmox_Greenland.nml` and the bipolar north, `alpha_orbital_t2018`
+(normalised) in `yelmox_Pyrenees.nml`, the constant 1 in LIS and North. The
+library keeps a default `series_alpha` (combined) for a par file without one,
+and the physical or shaped series `series_dTo` (derived, 0.25),
+`series_ramp`, `series_hyst`, `series_dT`, `series_obm_north/south`. Terms
+are named by what they add: `term_lgm` (lgm − picontrol on α), `term_b18`,
+`term_b20`, `term_ocean`, `term_ramp`, `term_hyst`, `term_dT`,
+`term_obm_north/south`. A par file redefines a library group to change it for
+its run.
 
 The `-p` arrays of the experiments shrink to `forcing.series==...` and
 `forcing.terms==...` plus the transforms (scripts/grl-paleo/params.sh,
