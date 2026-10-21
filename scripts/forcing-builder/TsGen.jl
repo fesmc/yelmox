@@ -1,6 +1,7 @@
-# TsGen.jl — the index methods of fesm-utils tsgen (src/tsgen.f90) as pure
-# functions, to tabulate an index [idx_<name>] on the forcing clock without
-# running the model. Same formulas as docs/forcing-builder (app.js).
+# TsGen.jl — the series methods of fesm-utils tsgen (src/tsgen.f90) as pure
+# functions, to tabulate a series [series_<name>] on the forcing time without
+# running the model (a derived series is set by the model: not here). Same
+# formulas as docs/forcing-builder (app.js).
 #
 # Open-loop methods (eval_open), with tau = max(0, t_elapsed - dt_init) and
 # f_start = f_min (df_sign > 0) or f_max:
@@ -14,7 +15,7 @@
 module TsGen
 
 export Series, load_series, interp, series_mean, normalize, eval_open,
-       apply_window, index_series, is_feedback, is_open_loop
+       apply_window, tabulate, is_feedback, is_open_loop
 
 struct Series
     time::Vector{Float64}
@@ -105,7 +106,7 @@ end
 
 getpar(par, key, default) = haskey(par, key) ? par[key] : default
 
-"The open-loop value at the elapsed time since the index was initialised."
+"The open-loop value at the elapsed time since the series was initialised."
 function eval_open(par::AbstractDict, t_elapsed::Real)
     method = getpar(par, "method", "const")
     dt_init = getpar(par, "dt_init", 0.0)
@@ -153,12 +154,12 @@ function apply_window(par::AbstractDict, t::Real, f::Real)
 end
 
 """
-The index on the forcing clock: `times` the forcing times of the run and
+The series on the forcing time: `times` the forcing times of the run and
 `t_init` the forcing time at initialisation (the elapsed time of the open-loop
 methods counts from it). `ser` is the loaded (normalised) series for "series".
 Returns the mean value (no noise), windowed.
 """
-function index_series(par::AbstractDict, times::AbstractVector, t_init::Real; ser::Union{Series,Nothing}=nothing)
+function tabulate(par::AbstractDict, times::AbstractVector, t_init::Real; ser::Union{Series,Nothing}=nothing)
     method = getpar(par, "method", "const")
     out = similar(collect(Float64, times))
     for (i, t) in enumerate(times)

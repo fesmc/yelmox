@@ -4,80 +4,79 @@ aliases:
   - climate-snap.html
 ---
 
-The snapshot backend `snapshots` builds the climate from a reference state plus
-climate **snapshots** (e.g. present day, pre-industrial, LGM), blended in time
-by scalar **indices** (e.g. a glacial index), as one blend model over any number
-of snapshots, fields and axes, on the fesm-utils `varslice` reader and `tsgen`
-series. It supplies the atmosphere (monthly `tas`, `pr`, lapse-rate corrected to
-the current surface) and the ocean as depth profiles (`to_ann`, `so_ann`), which
-the marine shelf interpolates to the shelf base. It runs on `grid_clim`, reads
-the `[snap]` groups and also supplies the ocean of the rembo climate (an
-ocean-only reference snapshot).
+The snapshot backend `snapshots` builds the climate from a reference
+**snapshot** (e.g. present day) plus the **terms** of `[forcing]`: each a
+scalar **series** on the forcing time (e.g. a glacial index) times a pattern,
+the difference of two snapshots (e.g. LGM minus pre-industrial) or a uniform
+anomaly (see [yelmox](yelmox.md#forcing)),
+on the fesm-utils `varslice` reader and `tsgen` series. It supplies the
+atmosphere (monthly `tas`, `pr`, lapse-rate corrected to the current surface)
+and the ocean as depth profiles (`to_ann`, `so_ann`), which the marine shelf
+interpolates to the shelf base. It runs on `grid_clim`, reads `[snapshots]`
+and the `[snapshot_<name>]` groups, and also supplies the ocean of the rembo
+climate (an ocean-only reference snapshot).
 
 - **Program:** `yelmox` (`make yelmox`), backend in `libs/snapshots.f90`, behind
   `libs/yelmox_climate.f90`.
 - **Select:** `[comps] climate = "snapshots"`.
 - **Output:** with `[output] write_clim`, `snap.nc`, the climate as applied
-  (after the climate modifiers): the annual air temperature and its summer
-  mean (`t2m_ann`, `t2m_sum`), the annual precipitation, the ocean profiles
-  (`to_ann`, `so_ann` on `depth`), the position on each axis (`axis_<name>`),
-  the surface elevation, the monthly atmosphere (`tas`, `pr`), `tsl_ann` and
-  the diagnostics of the active climate modifiers.
+  (after the transforms): the annual air temperature and its summer mean
+  (`t2m_ann`, `t2m_sum`), the annual precipitation, the ocean profiles
+  (`to_ann`, `so_ann` on `depth`), the value of each term's series
+  (`term_<name>`), the surface elevation, the monthly atmosphere (`tas`,
+  `pr`), `tsl_ann` and the diagnostics of the active transforms.
 
-The climate modifiers `[anom]`, `[ocn_fraction]`, `[taper]` and `[bias]` (see
-[yelmox](yelmox.md)) apply after the backend, in this order; `[ocn_obm]` is
-applied by `yelmox_bipolar`.
+The transforms `[taper]` and `[bias]` (see [yelmox](yelmox.md)) apply after
+the terms, in this order.
 
 ## Configuration
 
-Example: `yelmox/yelmox_Greenland.nml`, present day and PMIP3 piControl and LGM
-on one axis; its ocean anomaly comes from `[ocn_fraction]`.
+Example: `yelmox/yelmox_Greenland.nml`, present day plus the PMIP3 LGM minus
+piControl anomaly weighted by the orbital index, the ocean plus a quarter of
+the mean air temperature anomaly (the derived series `dTo`):
 
 ```fortran
-&snap
-    var_defs  = "input/clim_db.nml"   ! databases of the input files (default)
-    ref_name  = "pd"                  ! the reference snapshot (default)
-    snapshots = "pd" "picontrol" "lgm"
-    axes      = "at"
+&forcing
+    reference = "pd"                  ! [snapshot_pd], in the par file
+    series    = "orbital" "dTo"       ! [series_orbital], [series_dTo] (library)
+    terms     = "orbital" "ocean"     ! [term_orbital]: picontrol -> lgm on tas, pr; [term_ocean]: dTo on to
+/
+
+&snapshots
     lapse     = 0.0080 0.0065         ! [K m-1] annual, summer (default)
     f_p       = 0.06                  ! [K-1] precipitation scaling (default 0.05)
 /
 ```
 
-Every key of the `[snap*]` groups has a default in `input/yelmox_defaults.nml`
-(see [Defaults](#defaults)): `combine = "anomaly"` (snapshots as anomalies from
-the reference), `fields = "tas" "pr" "to" "so" "zs"`, `grid_global =
-"GLOBAL-1DEG"`, ... Three kinds of group follow:
+The snapshots of the run are the reference and the `snap0`/`snap1` of its
+terms (no list): `pd`, `picontrol` and `lgm` here. Every key of `[snapshots]`
+and `[snapshot_<name>]` has a default in `input/yelmox_defaults.nml` (see
+[Defaults](#defaults)): `combine = "anomaly"` (snapshots as anomalies from the
+reference), `fields = "tas" "pr" "to" "so" "zs"` (the fields a snapshot may
+bind), `grid_global = "GLOBAL-1DEG"`, ... Two kinds of group:
 
-- **Fields**, `[snap_field_<name>]`: `blend` (`linear`, `ratio`, `const`;
-  default `linear`) and the `axes`, one or more names (default `""` = none).
-  The field name (`tas`, `pr`, `to`, `so`, `zs`) decides what the field is. A
-  field without axes follows the reference: its group can be left out.
-- **Snapshots**, `[snap_<name>]`: `exp` (the experiment, `{exp}` in the
+- **Rules**, `[snapshots]`: the lapse rates `lapse` (annual, summer) and the
+  precipitation sensitivity `f_p` (β_p), used in the sea-level reduction of
+  the snapshots, the uniform terms and the move to the model surface.
+- **Snapshots**, `[snapshot_<name>]`: `exp` (the experiment, `{exp}` in the
   database paths), `monthly` (default `True`), `clim_sigma`/`ocn_sigma` ([km]
   Gaussian smoothing of the atmosphere and the ocean at loading, the land mask
   following the smoothed elevation; default 0), `tas_season` and, per field,
   the database group(s) holding it (see [Database](#database)).
-- **Axes**, `[snap_axis_<name>]`: two snapshots `lo` -> `hi` and the `index`
-  giving the position on the axis: 0 at `lo`, 1 at `hi`. The index is a
-  driver-owned `[idx_<name>]` (a `tsgen` generator of any method: `const`,
-  ramps, `series`, ...; see [yelmox](yelmox.md)), listed in `[indices]`.
 
 ### Database
 
 The snapshots bind varslice groups (see [Database namelists](database-namelists.md))
 by name, from the par file itself if it has the group (searched implicitly
 first, so it never has to name itself and its groups win), else from the
-files listed in `[snap] var_defs`, searched in order (first file that has the
-group). The snapshot groups `[snap_<name>]` and the axis groups
-`[snap_axis_<name>]` are looked up the same way, and the index groups
-`[idx_<name>]` through `[indices] var_defs` (default none). The shared
-database `input/clim_db.nml` holds one group per product field; a par file can
-add run-specific groups:
+files listed in `[forcing] var_defs`, searched in order (first file that has
+the group). The snapshot groups `[snapshot_<name>]`, the series and the terms
+are looked up the same way. The shared database `input/clim_db.nml` holds one
+group per product field; a par file can add run-specific groups:
 
 ```fortran
-&snap
-    var_defs = "input/clim_db.nml"   ! the default
+&forcing
+    var_defs = "input/clim_db.nml" "input/forcing_db.nml"   ! the default
 /
 &my_tas                              ! in the par file: found before clim_db.nml
     filename = "ice_data/..."
@@ -90,7 +89,7 @@ naming the group and the files.
 The paths of the database take, besides `{domain}` and `{grid_name}`, two
 keywords:
 
-- `{grid_global}`: the global grid of the paleoclimate products, `[snap]
+- `{grid_global}`: the global grid of the paleoclimate products, `[snapshots]
   grid_global` (default `GLOBAL-1DEG`);
 - `{exp}`: the experiment of the snapshot, its `exp`, so one group serves every
   experiment of a product family.
@@ -109,7 +108,7 @@ remapped online onto the climate grid (`remap = "bilin"`, the map cached in
 | `Paleoclimate-PMIP3-{exp}-mean` | lgm, midHolocene, piControl | `pmip3_mean_{tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
 | `Paleoclimate-PMIP4-{exp}-mean` | lgm, midHolocene, piControl | `pmip4_mean_{tas_mon,pr_mon,tas_ann,tas_jja,tas_djf,pr_ann,zs}` |
 | `Paleoclimate-CLIMBER3a-{exp}`, `-ocean` | present, lgm_1p7weak, lgm_1p7strong | `c3a_{tas_ann,tas_jja,pr_ann,zs}`, `c3a_to` |
-| `Paleoclimate-CLIMBERX-Willeit2025-{exp}`, `-ocean` | piControl, interstadial, stadial, heinrich | `cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}`, `cx_{tas_mon_anom,pr_mon_anom}` (anomalies to piControl, for `lo = ""` axes; `pr_mon_anom` is a difference in mm d-1, not a ratio), `cx_{to,so}` |
+| `Paleoclimate-CLIMBERX-Willeit2025-{exp}`, `-ocean` | piControl, interstadial, stadial, heinrich | `cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}`, `cx_{tas_mon_anom,pr_mon_anom}` (anomalies to piControl, for terms without `snap0`; `pr_mon_anom` is a difference in mm d-1, not a ratio), `cx_{to,so}` |
 
 The Greenland reconstructions are regional products on GRL-16KM, remapped
 online (`grid_src = "GRL-16KM"`) and filled from the nearest cell outside
@@ -119,21 +118,21 @@ their box (`fill = "nearest"`, e.g. on GRL-PAL):
 |---|---|---|
 | `Paleoclimate-Buizert2018` | monthly, every 10 yr, -22005 to 55 yr (22005 BP to 2005 CE) | `b18_{tas,pr}` (time-varying), `b18_zs` (static) |
 | `Paleoclimate-Buizert2018-1981-2010` | none (its 1981-2010 baseline) | `b18_1981_2010_{tas,pr,zs}` |
-| `Paleoclimate-Badgeley2020` | annual, every 50 yr, 20 ka to 0 | `b20_tas_anom` [K], `b20_pr_frac`, `b20_pr_frac_low`, `b20_pr_frac_high` (anomaly and ratios relative to 1850-2000 CE, for `lo = ""` axes) |
+| `Paleoclimate-Badgeley2020` | annual, every 50 yr, 20 ka to 0 | `b20_tas_anom` [K], `b20_pr_frac`, `b20_pr_frac_low`, `b20_pr_frac_high` (anomaly and ratios relative to 1850-2000 CE, for terms without `snap0`) |
 
-The database also holds the groups of the climate modifiers (`[bias]`:
+The database also holds the groups of the transforms (`[bias]`:
 `bias_mar_era5_1981_2010_{dtas,fpr}`; `[taper]`: `taper_b18_b20`) and the ice
 histories of `[ice_bnd]` (`paleomist_H_ice`, `glac1d_H_ice`).
 
 **Time-varying groups.** A group with a time axis (`time = 1 x0 x1 dx nsub`)
-is sliced at the forcing clock `time_rel` at the start and at every climate
+is sliced at the forcing time `time_rel` at the start and at every climate
 update: linear interpolation between the two bracketing records, the first or
 last record outside the axis (varslice `extrap`). Its snapshot is then reduced
 to sea level again (and the reference reset, if it is the reference). A group
 without a time axis (`time = 0 ...`) is read once at the start.
 
 ```fortran
-&snap_pd
+&snapshot_pd
     tas = "mar314_1961_1990_tas"
     pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
     zs  = "mar314_1961_1990_zs"
@@ -141,7 +140,7 @@ without a time axis (`time = 0 ...`) is read once at the start.
     so  = "oras5_1981_2010_so"
 /
 
-&snap_lgm
+&snapshot_lgm
     exp        = "lgm"
     monthly    = False
     clim_sigma = 50.0
@@ -153,29 +152,29 @@ without a time axis (`time = 0 ...`) is read once at the start.
 
 ### Defaults
 
-`input/yelmox_defaults.nml` declares every key of the `[snap*]` groups, the
-indices and the climate modifiers, with its default. The named groups fall
-back to a template group: `[snap_field_<name>]` to `[snap_field]`,
-`[snap_<name>]` (a snapshot) to `[snap_snapshot]`, `[snap_axis_<name>]` to
-`[snap_axis]`, `[snap]` to `[snap]`, with the domain suffix of a multi-domain
-driver (`[snap_north_field_tas]` to `[snap_field]`). A par file lists only what
-differs; a key the defaults file does not declare stops the run
-(`nml_validate`), and `scripts/check_par_nml.py` reports it offline.
+`input/yelmox_defaults.nml` declares every key of `[snapshots]` and
+`[snapshot_<name>]`, of the forcing (`[forcing]`, the series, the terms) and
+of the transforms, with its default. The named groups fall back to a template
+group: `[snapshot_<name>]` to `[snapshot]`, `[snapshots<sfx>]` to
+`[snapshots]` with the domain suffix of a multi-domain driver
+(`[snapshots_north]`). A par file lists only what differs; a key the defaults
+file does not declare stops the run (`nml_validate`), and
+`scripts/check_par_nml.py` reports it offline.
 
-### Fields and blending
+### Fields and composition
 
 **Fields are optional per snapshot.** A snapshot binds the fields it names
 (a key absent or `""` binds nothing). The backend builds what the reference
-snapshot (`ref_name`) binds: the atmosphere (`tas` and `pr`, with the
-elevation `zs`) and/or the ocean (`to`, optionally `so`). An ocean-only
+snapshot (`[forcing] reference`) binds: the atmosphere (`tas` and `pr`, with
+the elevation `zs`) and/or the ocean (`to`, optionally `so`). An ocean-only
 reference serves the ocean of the rembo climate; `climate = "snapshots"`
 needs the atmosphere. Checked at start-up, with an error naming the group:
 
-- every snapshot of an axis of a `linear`/`ratio` field binds that field, and
-  no snapshot binds a field the reference does not;
+- every snapshot of a term binds the fields the term lists, and no snapshot
+  binds a field the reference does not;
 - a snapshot with `tas` or `pr` binds `zs` (the sea-level reduction), except
-  the `hi` of a `lo = ""` axis (below); `pr` with `zs` needs `tas`; `so` needs
-  `to`; the reference binds `tas` and `pr` together;
+  the `snap1` of a term without `snap0` (below); `pr` with `zs` needs `tas`;
+  `so` needs `to`; the reference binds `tas` and `pr` together;
 - the number of groups: `tas` one (`monthly = True`) or two (annual mean and one
   season); `pr` one or two summed (monthly, e.g. snowfall + rainfall) or one
   (annual); every other field one.
@@ -195,17 +194,16 @@ averaged to the annual mean; an annual field (one slice: no time axis, e.g.
 the CLIMBER ocean products, or one record) is taken as is. Without `so`, the
 salinity is 0.
 
-Each axis of a field adds to the reference snapshot, with weight `a_k` (the
-index value):
+**Composition.** Each term with the `snapshots` pattern adds to the reference
+with the weight `a_k`, the value of its series; the rule is fixed by field:
 
-| blend | now |
+| field | now |
 |---|---|
-| `linear` | `ref + sum_k a_k (hi_k - lo_k)` |
-| `ratio` | `ref * prod_k (1 + a_k (hi_k/lo_k - 1))` |
-| `const` | `ref` |
+| `tas`, `to`, `so` | `ref + sum_k a_k (snap1_k - snap0_k)` |
+| `pr` | `ref * prod_k (1 + a_k (snap1_k/snap0_k - 1))` |
 
-An axis with `lo = ""` adds its `hi` snapshot as the anomaly itself:
-`ref + a_k hi_k` (`linear`) or `ref (1 + a_k (hi_k - 1))` (`ratio`), e.g. a
+A term with `snap0 = ""` adds its `snap1` snapshot as the anomaly itself:
+`ref + a_k snap1_k` (`tas`) or `ref (1 + a_k (snap1_k - 1))` (`pr`), e.g. a
 reconstructed temperature anomaly or precipitation ratio (Badgeley et al.,
 2020) without a zero snapshot. Such a snapshot binds no `zs`: its fields are
 taken as given, so they must be **sea-level** anomalies or ratios (there is
@@ -213,64 +211,68 @@ no elevation correction of their own). If it binds `zs`, it is reduced to sea
 level like any other snapshot.
 
 ```fortran
-&snap_axis_b20                ! input/forcing_db.nml
-    lo    = ""
-    hi    = "b20"             ! snapshot binding tas (anomaly) and pr (ratio), no zs
-    index = "one"             ! a const index, f = 1
+&term_b20                     ! input/forcing_db.nml
+    snap0  = ""
+    snap1  = "b20"            ! snapshot binding tas (anomaly) and pr (ratio), no zs
+    fields = "pr"             ! series = "": the constant 1
 /
 ```
 
-Two axes give the orbital + millennial decomposition of Banderas et al. (2018), e.g. `at` on
-`picontrol` -> `lgm` and `bt` on `lgm_weak` -> `lgm_strong`. Several axes or
-fields may share one index:
+Two terms give the orbital + millennial decomposition of Banderas et al.
+(2018), e.g. `orbital` on `picontrol` -> `lgm` and `millennial` on
+`lgm_weak` -> `lgm_strong`, each on its own series; several terms may share
+one series:
 
 ```fortran
-&indices
-    names = "at" "bt"
+&forcing
+    reference = "pd"
+    series    = "alpha" "beta"
+    terms     = "orbital" "millennial"
 /
 
-&idx_at
+&series_alpha
     method      = "series"
     series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0             ! [yr] index 0 here
-    norm_t1     = -21e3           ! [yr] index 1 here (or a window, e.g. -23e3, -19e3)
+    norm_t0     = 0.0             ! [yr] series 0 here
+    norm_t1     = -21e3           ! [yr] series 1 here (or a window, e.g. -23e3 -19e3: the mean)
 /
 
-&idx_bt
+&series_beta
     method      = "series"
     series_file = "input/beta_ngrip_millennial.dat"
 /
 
-&snap_axis_at
-    lo    = "picontrol"
-    hi    = "lgm"
-    index = "at"
+&term_orbital
+    series = "alpha"
+    snap0  = "picontrol"
+    snap1  = "lgm"
+    fields = "tas" "pr"
 /
 
-&snap_axis_bt
-    lo    = "lgm_weak"
-    hi    = "lgm_strong"
-    index = "bt"
-/
-
-&snap_field_tas
-    axes  = "at" "bt"             ! blend = "linear" (default)
+&term_millennial
+    series = "beta"
+    snap0  = "lgm_weak"
+    snap1  = "lgm_strong"
+    fields = "tas" "pr"
 /
 ```
 
-Turning a proxy series into an index is done by tsgen (`norm_t0`/`norm_t1`, see
-the fesm-utils tsgen docs); a steady state is a `const` index (`df_dt_max = 0`,
-value `f_min`), independent of the model time.
+Turning a proxy series into an index is done by tsgen (`norm_t0`/`norm_t1`,
+see the fesm-utils tsgen docs); a steady state is a `const` series
+(`df_dt_max = 0`, value `f_min`), independent of the model time.
 
-**The ocean anomaly from the atmosphere** is the climate modifier
-`[ocn_fraction]` (see [yelmox](yelmox.md)): the field `to` without axes (or
-`blend = "const"`) stays at the reference, and the modifier adds `f_to` times
-the mean sea-level air temperature anomaly of the same update, without lag and
-without the lapse-rate cooling of the ice sheet. `blend = "fraction"` stops the
-run.
+**Uniform terms** (`pattern = "uniform"`) add `f_ta a` to `tas` (and multiply
+`pr` by exp(β_p f_ta a)), `f_to a` to `to` and `f_so a` to `so` on the fields
+they list. **The ocean anomaly from the atmosphere** is a derived series
+(`method = "derived"`, `from = "air_anomaly"`: `factor` times the mean
+sea-level air temperature anomaly of the same update over `region`, without
+lag and without the lapse-rate cooling of the ice sheet) with a uniform term
+on `to`, the library `series_dTo` + `term_ocean`; `to` without terms stays at
+the reference. The ocean terms are applied after the atmosphere (a derived
+series may drive ocean fields only).
 
-The backend holds no state of its own: the indices restart with the driver
-(`idx_<name>_restart.nc`). The climate output carries the position on each
-axis, `axis_<name>`.
+The backend holds no state of its own: the series restart with the driver
+(`series_<name>_restart.nc`). The climate output carries the value of each
+term's series, `term_<name>`.
 
 The transient forcing is added on top in every configuration.

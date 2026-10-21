@@ -40,7 +40,7 @@ Each component runs on its own grid (`[domain]`, see
 In the Pyrenees the climate is computed on the 2 km surface and moved to the
 250 m surface for the surface model: monthly `tas` and `pr` interpolated
 (bilinear) and corrected for the elevation difference with the lapse rates of
-`[snap] lapse` and the precipitation scaling `f_p`. The geothermal heat flux is
+`[snapshots] lapse` and the precipitation scaling `f_p`. The geothermal heat flux is
 read on `PYR-2KM` and remapped onto the Yelmo grid.
 
 Settings that keep the 250 m runs cheap: 6 vertical levels in the ice
@@ -56,16 +56,17 @@ Pyrenees on 2 km.
 - **Initial state:** cold start from the present-day topography
   (`TOPO-GLO90-GEBCO2026`), a 10-yr equilibration with constant boundaries
   (`[sim] init_method = "equil"`, `init_equil_time = 10`).
-- **Climate:** the reference only (`[snap] snapshots = "pd"`, ERA5 1981--2010:
-  `tas`, `pr`, `zs`) plus `[anom]` on the index `orb` (`[idx_orb] method =
-  "series"`, `input/alpha_orbital_t2018.dat`, 1 at present and 0 at 21 ka,
-  normalised with `norm_t0 = 0`, `norm_t1 = -21e3` to 0 at present and 1 at
-  21 ka): `dTa = f_ta * f` with `f_ta = -10` K, the precipitation times
-  `exp(f_p dTa)` (`f_p = 0.05` K-1, the default). The air temperature is the
-  ERA5 reference at present and 10 K below it at 21 ka (+1.4 to -11.1 K over
-  the run). No ocean anomaly (`f_to = 0`, `[ocn_fraction]` inactive).
-- **Orbit:** present day (`[orbit] method = "time"`, `time = 0`); the PDD takes
-  no insolation.
+- **Climate:** the reference (`snapshot_pd`, ERA5 1981--2010: `tas`, `pr`,
+  `zs`) plus the uniform term `cooling` (`[term_cooling]` on `tas` and `pr`,
+  `f_ta = -10` K) on the series `orbital_t2018` (`[series_orbital_t2018]
+  method = "series"`, `input/alpha_orbital_t2018.dat`, 1 at present and 0 at
+  21 ka, normalised with `norm_t0 = 0`, `norm_t1 = -21e3` to 0 at present and
+  1 at 21 ka): `dTa = f_ta * f`, the precipitation times `exp(f_p dTa)`
+  (`f_p = 0.05` K-1, the default). The air temperature is the ERA5 reference
+  at present and 10 K below it at 21 ka (+1.4 to -11.1 K over the run). No
+  ocean.
+- **Orbit:** present day (`[orbit] method = "fixed_time"`, `time = 0`); the
+  PDD takes no insolation.
 - **Sea level:** the model's own ice (`[barysealevel] method = "fastiso"`).
 - **Output:** 1D every 10 yr, 2D every 1 kyr, small 2D and restart bundles every
   10 kyr.
@@ -78,15 +79,15 @@ initializes the marine shelf (no data files are read).
 ## SRG
 
 - **Timeline:** `[ctrl]` 0 to 200 yr, `dtt = 5` yr, constant forcing time
-  (`tstep_method = "const"`). No indices (`[indices] names = ""`), `[anom]`
-  inactive, present-day orbit and constant sea level (`[barysealevel] method =
-  "const"`): the climate is the reference throughout.
+  (`tstep_method = "const"`). No series or terms (`[forcing] series = ""`,
+  `terms = ""`), present-day orbit and constant sea level (`[barysealevel]
+  method = "const"`): the climate is the reference throughout.
 - **Initial state:** present-day topography (`TOPO-GLO90-GEBCO2026`, with
   `z_bed_sd`), a 10-yr equilibration (`[sim] init_method = "equil"`).
-- **Climate:** MAR v3.14 1960--1990 on `SRG-250M` (`[snap_pd]`), a legacy
+- **Climate:** MAR v3.14 1960--1990 on `SRG-250M` (`[snapshot_pd]`), a legacy
   `ice_data` file not in FesmData; its database groups
   (`srg_mar314_1960_1990_tas`, `_pr`, `_zs`) are in the par file itself, which is
-  searched before the `[snap] var_defs` files. `[snap] f_p = 0.096` K-1.
+  searched before the `[forcing] var_defs` files. `[snapshots] f_p = 0.096` K-1.
 - **Relaxation outside the icefield:** `[yelmo_masks] relax = "~SanRafael:1"`,
   `relax_tau = 50` yr, with `[ytopo] topo_rel = -1`: outside basin 1 of the
   `SanRafael` set the ice relaxes to the reference thickness; inside it evolves
@@ -101,7 +102,7 @@ initializes the marine shelf (no data files are read).
 | | Pyrenees | SRG |
 |---|---|---|
 | Topography | GLO90 + GEBCO 2026 (`TOPO-GLO90-GEBCO2026`, FesmData) | same, with `z_bed_sd` |
-| Reference climate (`snap_pd`) | ERA5 1981--2010 (`PYR-2KM`) | MAR v3.14 1960--1990 (`SRG-250M`, ice_data) |
+| Reference climate (`snapshot_pd`) | ERA5 1981--2010 (`PYR-2KM`) | MAR v3.14 1960--1990 (`SRG-250M`, ice_data) |
 | Surface mass balance | chion PDD (`[chion] model = "pdd"`, `[pdd_chion] pdd_method = "cg05"`), `time_equil = 10` yr | chion ITM (`[chion] model = "itm"`, smbpal's `[itm]`), `sigma_pdd = 8.27` K, `time_equil = 100` yr |
 | Ocean, shelf melt | off | off |
 | Calving | none (`calv_flt_method = "zero"`) | `calv_flt_method = "vm-l19"` |

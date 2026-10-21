@@ -158,7 +158,7 @@ dimension, or the reader stops with an error — a useful check that `x0`, `x1`,
 
   and the same namelist serves every GCM/experiment combination — you select the
   concrete values in the driver's `[esm]` configuration, not here. snapshots
-  supplies `{grid_global}` (`[snap] grid_global`) and `{exp}` (the snapshot's
+  supplies `{grid_global}` (`[snapshots] grid_global`) and `{exp}` (the snapshot's
   `exp`) for its database `input/clim_db.nml` (see
   [Snapshots](climate-snapshots.md)).
 

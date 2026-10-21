@@ -117,38 +117,24 @@
 
 ! ===== Forcing =====
 
-&indices
-    ! Indices: named scalar series, read by name (snapshots axes, [anom]).
-    ! Each is a tsgen group [idx_<name>] (method, series_file, ...; optional
-    ! units and restart_every_df), advanced on the forcing clock time_rel.
-    names  = ""       ! e.g. "at" "ramp"; "" = none
-    var_defs = "input/forcing_db.nml"   ! files of the [idx_<name>] groups not in this file, searched in order
+&forcing
+    ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
+    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! file, then the var_defs files (input/forcing_db.nml: the shared library;
+    ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
+    reference = "pd"
+    series    = ""
+    terms     = ""
+    ! Paleo: -p (scripts/ant-paleo/params.sh): series glacial, dTo; terms glacial, ocean.
 /
 
-&anom
-    ! Homogeneous anomaly from one index, applied after the climate backend:
-    ! dTa/dTo/dSo = gain * index (precipitation * exp(beta_p*dTa)).
-    active = False    ! Apply it?
-    index  = ""       ! the index driving the anomalies ([indices] names)
-    f_ta   = 1.0      ! [K]   dTa = f * f_ta  (air temperature)
-    f_to   = 0.0      ! [K]   dTo = f * f_to  (ocean temperature)
-    f_so   = 0.0      ! [psu] dSo = f * f_so  (ocean salinity)
-/
-
-&ocn_fraction
-    ! Ocean temperature anomaly as a fraction of the mean sea-level air
-    ! temperature anomaly over a region, applied after [anom]: to_ann =
-    ! to_ann_ref + f_to * mean(tsl_ann - tsl_ann_ref). Snapshot backends only.
-    active = False    ! Apply it?
-    f_to   = 0.25     ! [1] fraction of the air temperature anomaly
-    region = "all"    ! cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
-/
 
 &orbit
     ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
-    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
-    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
-    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+    ! per (method = "fixed_orbit") and fldr from input/yelmox_defaults.nml.
+    method = "fixed_time"   ! forcing_time: at the forcing time; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
 /
 
 ! ===== Simulation options =====
@@ -567,29 +553,15 @@
 
 ! ===== Climate =====
 
-&snap
-    ! Snapshot backend (snapshots): the present-day reference only, RACMO2.3p2
-    ! 1981-2010 and the ISMIP7 ocean climatology. Groups: this file, then
-    ! var_defs; unset keys: input/yelmox_defaults.nml.
-    var_defs   = "input/clim_db.nml" "input/forcing_db.nml"
-    snapshots  = "pd"
+&snapshots
+    ! Snapshot backend: the fixed rules of the composition (lapse rates Gamma,
+    ! precipitation sensitivity beta_p = f_p); the snapshots of the run are the
+    ! reference and the snap0/snap1 of the terms ([forcing]).
 /
 
-! ---- fields (blend rule and axes; the others follow the reference) ---------
 
-&snap_field_tas
-    blend = "linear"
-    axes  = ""
-/
-
-&snap_field_pr
-    blend = "linear"
-    axes  = ""
-/
-
-! ---- snapshots (var_defs groups per field) ---------------------------------
-
-&snap_pd
+&snapshot_pd
+    ! Present day (the reference): RACMO2.3p2 1981-2010 and the ISMIP7 ocean.
     tas = "racmo23p2_1981_2010_tas"
     pr  = "racmo23p2_1981_2010_pr"
     zs  = "racmo23p2_1981_2010_zs"

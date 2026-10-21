@@ -70,11 +70,12 @@ run_test() {
 run_test "Test 1: coupling OFF (baseline)" "tmp/mgbi_test1_baseline"
 
 # --- Test 2: ocean box model ON; atmosphere <-> ocean <-> ice ----------------
-# Exercises obm_update + atm2obm (global index gmt) + obm2ism (box-model ocean
-# temperature fed into marine_shelf through ocn_obm_<sfx>, which replaces
-# ocn_fraction_north). Freshwater flux (ism2obm) is OFF here because it needs
+# Exercises obm_update + atm2obm (global series gmt) + obm2ism (box-model ocean
+# temperature fed into marine_shelf through the series derived from the boxes
+# and the replace terms term_obm_north/south, in place of the ocean term from
+# the air anomaly). Freshwater flux (ism2obm) is OFF here because it needs
 # the hydrographic mask files, which are not in every checkout (see Test 3).
-OBM_ON="ctrl.active_obm=True ctrl.atm2obm=True ocn_obm_north.active=True ocn_obm_south.active=True ocn_fraction_north.active=False"
+OBM_ON="ctrl.active_obm=True ctrl.atm2obm=True forcing.series==orbital,gmt,obm_north,obm_south forcing_north.terms==orbital,regional_north,obm_north forcing_south.terms==regional_south,obm_south"
 run_test "Test 2: OBM on (atm2obm + obm2ism, no fwf)" "tmp/mgbi_test2_obm" \
     -p $OBM_ON
 

@@ -6,6 +6,29 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- The forcing as terms (`docs/_forcing-terms.md`; docs `yelmox.md`, `climate-snapshots.md`):
+  the climate at the forcing time is a reference snapshot plus terms, each a scalar series
+  times a pattern. `[forcing]`: `reference`, `series`, `terms`, one `var_defs` list for every
+  named group (default `"input/clim_db.nml" "input/forcing_db.nml"`; the par file first).
+  `[series_<name>]` (template `[series]`): a tsgen series, or `method = "derived"`, set by
+  the model each update (`from = "air_anomaly"`: `factor` x the mean sea-level air anomaly
+  over `region`; `"obm_north"`/`"obm_south"`: a box temperature of the bipolar ocean box
+  model, its anomaly with `anomaly = True`); ocean fields only. `[term_<name>]` (template
+  `[term]`): `series` (`""` = 1), `pattern` (`snapshots`: `snap0` -> `snap1`, or `snap1`
+  alone as a given anomaly or ratio; `uniform`: `f_ta`, `f_to`, `f_so`; `replace`: the
+  ocean field = the series), explicit `fields`; the rule fixed by field (tas, to, so add;
+  pr a ratio, exp(beta_p f_ta f) in a uniform term). Contracts checked at init (series and
+  snapshots exist, fields bound, replace once per field, derived series on the ocean,
+  esm with its smb refuses atmosphere terms). `libs/climate_terms.f90`; the ocean terms
+  idempotent (re-applied by `yelmox_bipolar` after the box model). Output `term_<name>`
+  (2D), `series_<name>` (1D), restart `series_<name>_restart.nc`. `test_indices` covers
+  the derived series. Library (`input/forcing_db.nml`) with descriptive names:
+  `snapshot_picontrol`, `_lgm`, `_b18_base`, `_b18`, `_b20`; `series_glacial`,
+  `_orbital`, `_orbital_t2018`, `_dTo`, `_ramp`, `_hyst`, `_dT`, `_obm_north`, `_obm_south`;
+  `term_glacial`, `_orbital`, `_b18`, `_b20`, `_ocean`, `_ramp`, `_hyst`, `_dT`,
+  `_obm_north`, `_obm_south`. Experiments select with `-p forcing.series==... forcing.terms==...`.
+- `[bias]` groups with a time axis: sliced at the forcing time at every climate update
+  (`bias_dtas_ann_now` in the 2D output).
 - `input/forcing_db.nml`: one library of the named forcing groups that par files share:
   snapshots `snap_picontrol`, `snap_lgm`, `snap_b18_base`, `snap_b18`, `snap_b20`; axes
   `snap_axis_a`, `_at`, `_b18`, `_b20`; indices `idx_a`, `idx_at`, `idx_one`, `idx_ramp`,
@@ -122,6 +145,27 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Forcing groups renamed and merged into the terms: `[indices] names`/`var_defs` ->
+  `[forcing] series`/`var_defs`; `[idx_<name>]` -> `[series_<name>]`; `[snap]` ->
+  `[snapshots]` (`lapse`, `f_p`, `grid_global`, `combine`, `fields`; `ref_name` ->
+  `[forcing] reference`; `snapshots`, `axes` dropped: the snapshots of a run are the
+  reference and the `snap0`/`snap1` of its terms); `[snap_<name>]` -> `[snapshot_<name>]`;
+  `[snap_axis_<name>]` (`lo`, `hi`, `index`) -> `[term_<name>]` (`snap0`, `snap1`,
+  `series`, `fields`); `[snap_field_<name>]` dropped (the rule is fixed by field);
+  `[anom]` -> a `uniform` term (rembo: the uniform `tas` terms are its summer anomaly, its
+  ocean anomaly `1.3 f_ta f_to f` is gone, a term on `to` instead); `[ocn_fraction]` ->
+  the derived series `dTo` + `term_ocean`; `[ocn_obm]` -> the derived series
+  `obm_north`/`obm_south` + the `replace` terms; `[taper]`, `[bias]`, `[ice_bnd]`
+  `var_defs` removed (`[forcing] var_defs`); `[ice_bnd] index` is a series. Output:
+  `idx_<name>` -> `series_<name>`, `axis_<name>` -> `term_<name>`, `ocn_fraction_dto`,
+  `ocn_obm_*`, rembo `dT_ocn` gone; restart files `series_<name>_restart.nc`. In
+  `yelmox_bipolar`, `[forcing]` holds the series, `[forcing_north]`/`[forcing_south]` the
+  reference and terms (`snapshot_pd_grl`, `snapshot_pd_ant`), `[snapshots_north]`/`_south`
+  the rules. `scripts/check_par_nml.py`, the bases, the bipolar par file and every script
+  converted; `.runme/info.json` unchanged. Breaking for external par files (convert with
+  the table of `docs/_forcing-terms.md` section 5).
+- `[orbit] method`: `forcing_time` | `fixed_time` | `fixed_orbit` (was `clock` | `time` |
+  `fixed`); "forcing time" replaces "forcing clock" in the docs and comments.
 - Par files: `yelmox/` holds one base per domain and climate backend (Greenland,
   GreenlandPaleo, Antarctica, North, LIS, Pyrenees, SRG, esm_Greenland, esm_Antarctica,
   rembo_Greenland) plus the REMBO file `rembo_Greenland.nml`. An experiment is a `-p` list in its scripts:

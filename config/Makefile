@@ -133,6 +133,14 @@ test_timestepping : fesmutils-static yelmo-static
 	@echo " "
 
 
+test_indices : fesmutils-static $(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -I$(objdir) -o ./libyelmox/bin/test_indices.x tests/test_indices.f90 \
+		$(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o $(LIB_FESMUTILS) $(LIB_NC) $(LFLAGS_EXTRA)
+	@echo " "
+	@echo "    ./libyelmox/bin/test_indices.x is ready."
+	@echo " "
+
+
 .PHONY : usage
 usage:
 	@echo ""

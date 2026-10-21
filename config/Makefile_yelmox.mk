@@ -37,7 +37,12 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/yelmox_nml.o: $(libdir)/yelmox_nml.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/snapshots.o: $(libdir)/snapshots.f90 $(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
+# The terms of the forcing (series x pattern) and the backend capabilities.
+$(objdir)/climate_terms.o: $(libdir)/climate_terms.f90 $(objdir)/climate_out.o \
+						$(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
+	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
+
+$(objdir)/snapshots.o: $(libdir)/snapshots.f90 $(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o $(objdir)/climate_terms.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
@@ -45,7 +50,7 @@ $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 
 # Climate modifiers on climate_out after the backend (anom, ocn_fraction, bias), fixed order.
 $(objdir)/climate_mods.o: $(libdir)/climate_mods.f90 $(objdir)/climate_out.o \
-						$(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
+						$(objdir)/climate_terms.o $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 # REMBO for the rembo climate backend: the adapter over rembo1 with rembo=1,
@@ -58,7 +63,7 @@ $(objdir)/climate_rembo_stub.o: $(libdir)/climate_rembo_stub.f90
 
 # The climate backend of a domain ([comps] climate = snapshots | esm | rembo),
 # chosen at runtime; the domain reads dom%clim, filled by yelmox_climate.
-$(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o $(objdir)/climate_mods.o \
+$(objdir)/yelmox_climate.o: $(libdir)/yelmox_climate.f90 $(objdir)/climate_out.o $(objdir)/climate_terms.o $(objdir)/climate_mods.o \
 						$(objdir)/snapshots.o $(objdir)/esm_forcing.o \
 						$(objdir)/marine_shelf.o $(objdir)/kryos_forcing.o $(climate_rembo_obj)
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
@@ -103,7 +108,7 @@ $(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)
 # alongside the bipolar driver in yelmox_bipolar/ -- it is only pertinent to
 # that program -- and is linked via obm_libs (bipolar targets only).
 $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
-						$(objdir)/kryos_coupling.o $(objdir)/kryos_forcing.o $(objdir)/climate_mods.o \
+						$(objdir)/kryos_coupling.o $(objdir)/kryos_forcing.o $(objdir)/climate_terms.o $(objdir)/climate_mods.o \
 						$(objdir)/yelmox_nml.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
@@ -204,7 +209,7 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 					    $(objdir)/surface_chion.o \
 					    $(objdir)/climate_out.o \
 					    $(objdir)/yelmox_nml.o \
-					    $(objdir)/climate_mods.o \
+					    $(objdir)/climate_terms.o $(objdir)/climate_mods.o \
 					    $(climate_rembo_obj) \
 					    $(objdir)/yelmox_climate.o \
 					    $(objdir)/snapshots.o \

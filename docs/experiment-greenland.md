@@ -26,14 +26,13 @@ runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.n
 runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-ramp \
       -p ctrl.tstep_method=rel domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM \
          domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 tm_2D.dt=50 \
-         indices.names==at,ramp anom.active=True anom.index=ramp
+         forcing.series==orbital,dTo,ramp forcing.terms==orbital,ocean,ramp
 ```
 
 ```bash
 runme -rs -q compute -w 08:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-pd \
-      -p ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 indices.names="" \
-         snap.snapshots=pd snap.axes="" snap_field_tas.axes="" snap_field_pr.axes="" snap_field_pr.blend=linear \
-         ocn_fraction.active=False
+      -p ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 \
+         forcing.series="" forcing.terms=""
 ```
 
 On a busy queue, run them as chains of short jobs ([Long runs in
@@ -58,45 +57,45 @@ glacial cycle.
 - **Output:** 1D every year; 2D every 200 yr (ramp: 50 yr; pd: 500 yr), small
   2D every 50 yr (pd: 500 yr).
 
-## Climate: snapshots on a glacial index
+## Climate: snapshots on an orbital index
 
-Snapshots `pd`, `picontrol`, `lgm` and the axis `at` (`[snap_axis_at]`,
-`picontrol` -> `lgm`). The temperature adds the PMIP3 LGM -- piControl anomaly
-scaled by `at` (`[snap_field_tas] axes = "at"`), the precipitation is
-multiplied by their ratio (`[snap_field_pr] blend = "ratio"`). The PMIP3
-snapshots give the annual mean and JJA temperature (`monthly = False`) and the
-annual precipitation, smoothed over 50 km at loading (`clim_sigma = 50`). The
-precipitation-temperature scaling is `[snap] f_p = 0.06` (default 0.05).
+The reference `pd` plus the term `orbital` (`[term_orbital]`, `picontrol` ->
+`lgm` on `tas` and `pr`): the temperature adds the PMIP3 LGM -- piControl
+anomaly scaled by the series `orbital`, the precipitation is multiplied by
+their ratio. The PMIP3 snapshots give the annual mean and JJA temperature
+(`monthly = False`) and the annual precipitation, smoothed over 50 km at
+loading (`clim_sigma = 50`). The precipitation-temperature scaling is
+`[snapshots] f_p = 0.06` (default 0.05).
 
-The index `[idx_at]` is the orbital series `input/alpha_orbital_r2020.dat`
+The series `[series_orbital]` is the orbital series `input/alpha_orbital_r2020.dat`
 (`method = "series"`, 300 ka to present), normalised to 0 at present
 (`norm_t0 = 0`) and 1 at 21 ka (`norm_t1 = -21e3`). The ocean (ORAS5) has no
-axis: its anomaly is `f_to = 0.25` times the mean sea-level air temperature
-anomaly over the domain (`[ocn_fraction]`, `region = "all"`).
+snapshot term: the term `ocean` adds the derived series `dTo`, 0.25 times the
+mean sea-level air temperature anomaly over the domain (`[series_dTo]`,
+`from = "air_anomaly"`, `region = "all"`).
 
 ![Forcing of yelmox_Greenland.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_snap.png)
 
 ## Air temperature ramp
 
-The ramp run adds the index `ramp` (`[indices] names = "at" "ramp"`;
-`[idx_ramp]` from `input/forcing_db.nml`) and applies it as a homogeneous
-anomaly (`[anom] active = True`, `index = "ramp"`, `f_ta = 1`, `f_to = 0`,
-`f_so = 0`):
+The ramp run adds the series `ramp` and the uniform term `ramp` of
+`input/forcing_db.nml` (`forcing.series==orbital,dTo,ramp`,
+`forcing.terms==orbital,ocean,ramp`; `[term_ramp]` on `tas` and `pr` with
+`f_ta = 1`):
 
-- **Index:** `[idx_ramp] method = "ramp-slope"`, `df_dt_max = 0.0025` yr⁻¹
+- **Series:** `[series_ramp] method = "ramp-slope"`, `df_dt_max = 0.0025` yr⁻¹
   from `f_min = 0` to `f_max = 5`: the air temperature rises by 5 K over
-  2000 yr and stays there; white noise of `sigma = 0.3` on the index;
+  2000 yr and stays there; white noise of `sigma = 0.3` on the series;
   `with_kill = False`.
 - **Response:** the precipitation is multiplied by exp(`f_p`·dTa); the ocean
-  follows through `[ocn_fraction]`, whose sea-level anomaly includes dTa.
+  follows through the term `ocean`, whose sea-level anomaly includes dTa.
 
 ![Forcing of the ramp run at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_ramp.png)
 
 ## Present day
 
-The present-day run keeps the reference only (`[snap] snapshots = "pd"`),
-without indices (`[indices] names = ""`) and with `[ocn_fraction]
-active = False`. Its basin sets are `Zwally2012` only (no `NEGIS`).
+The present-day run keeps the reference only (`forcing.series=""`,
+`forcing.terms=""`). Its basin sets are `Zwally2012` only (no `NEGIS`).
 
 ## Configuration
 
@@ -105,8 +104,8 @@ active = False`. Its basin sets are `Zwally2012` only (no `NEGIS`).
 | Grids | `GRL-16KM` for every component (ramp: `GRL-32KM`) |
 | Topography | BedMachine v6 (`{grid_name}_TOPO-BedMachine-v6.nc`) |
 | Ice domain | `[yelmo_masks] mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"` |
-| Reference climate (`snap_pd`) | MAR v3.14 1961--1990 (temperature, snowfall + rainfall, elevation); ocean ORAS5 1981--2010 |
-| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows `[ocn_fraction]`) |
+| Reference climate (`snapshot_pd`) | MAR v3.14 1961--1990 (temperature, snowfall + rainfall, elevation); ocean ORAS5 1981--2010 |
+| Snapshots (`snapshot_picontrol`, `snapshot_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows the term `ocean`) |
 | Surface mass balance | chion ITM (`[comps] surface_method = "chion"`, `[chion] nml_itm = "itm_chion"`, `alb_ice = 0.31`) |
 | Shelf melt | `bmb_method = "lin"`, `tf_method = 1` |
 | Calving | `calv_flt_method = calv_grnd_method = "equil"` (level set, calving rate opposite to the ice velocity) |

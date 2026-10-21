@@ -53,17 +53,17 @@ runme -rs -q 12h -w 10:00:00 -e yelmox -n yelmox/yelmox_North.nml -o output/nort
 
 ## Climate
 
-Snapshots `pd`, `picontrol`, `lgm` on one axis `a` (`[snap_axis_a]`,
-`picontrol` -> `lgm`): ERA5 1981--2010 plus the PMIP3 LGM -- piControl anomaly,
-linear for the temperature (`[snap_field_tas]`), as a ratio for the
-precipitation (`[snap_field_pr] blend = "ratio"`). The PMIP3 snapshots are
-annual and JJA means (`monthly = False`), smoothed over 50 km (`clim_sigma`).
-The index is constant at the LGM (`[idx_a] method = "const"`, `f_min = 1`), so
-the climate does not depend on the forcing time. The ocean is ORAS5 1981--2010
-plus `f_to = 0.25` times the mean sea-level air temperature anomaly over the
-domain (`[ocn_fraction]`, `region = "all"`). `[anom]` is inactive.
+The reference `pd` plus the term `glacial` (`[term_glacial]`, `picontrol`
+-> `lgm` on `tas` and `pr`): ERA5 1981--2010 plus the PMIP3 LGM -- piControl
+anomaly, additive for the temperature, as a ratio for the precipitation. The
+PMIP3 snapshots are annual and JJA means (`monthly = False`), smoothed over
+50 km (`clim_sigma`). The series is constant at the LGM (the par file
+redefines `[series_glacial]` as `method = "const"`, `f_min = 1`), so the
+climate does not depend on the forcing time. The ocean is ORAS5 1981--2010
+plus the term `ocean`, 0.25 times the mean sea-level air temperature anomaly
+over the domain (the derived series `dTo`, `region = "all"`).
 
-![Forcing of yelmox_LIS.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/lis.png)
+![Forcing of yelmox_LIS.nml at the LGM (series glacial = 1) minus present day (0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/lis.png)
 
 ![Forcing of yelmox_North.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/north.png)
 
@@ -114,8 +114,8 @@ through the sea-level air temperature: `t_srf = t_sl - gamma_t z_syn`
 |---|---|---|
 | Grids | `LIS-32KM` for every component (153 x 219) | `NH-32KM` for every component (276 x 276) |
 | Topography | GEBCO 2026 (`TOPO-GEBCO2026`, FesmData) with `z_bed_sd` | GEBCO 2026, without `z_bed_sd` |
-| Reference climate (`snap_pd`) | ERA5 1981--2010; ocean ORAS5 1981--2010 | same |
-| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 ensemble means, global (`GLOBAL-1DEG`, remapped; atmosphere only) | same |
+| Reference climate (`snapshot_pd`) | ERA5 1981--2010; ocean ORAS5 1981--2010 | same |
+| Snapshots (`snapshot_picontrol`, `snapshot_lgm`) | PMIP3 ensemble means, global (`GLOBAL-1DEG`, remapped; atmosphere only) | same |
 | Surface mass balance | `smb_simple`, Batchelor2019 LGM mask | chion PDD |
 | Shelf melt | `bmb_method = "anom"`, `tf_method = 2` | same |
 | Calving | `calv_flt_method = "vm-m16"`, level set | same |

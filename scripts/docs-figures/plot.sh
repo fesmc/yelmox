@@ -23,7 +23,7 @@ while IFS='|' read -r fig run opts; do
     eval "$J $OUT/$run $FIG/$fig.png $opts"
 done <<'EOF2'
 grl_snap   | grl_snap   | --ref 0 --at -21000 -125000 --title "yelmox_Greenland.nml: snapshots on the glacial index"
-grl_ramp   | grl_ramp   | --ref 0 --at 2000 --title "yelmox_Greenland.nml + idx_ramp: air temperature ramp"
+grl_ramp   | grl_ramp   | --ref 0 --at 2000 --title "yelmox_Greenland.nml + term_ramp: air temperature ramp"
 ant_pd     | ant_pd     | --ref 10 --abs --title "yelmox_Antarctica.nml: present-day reference climate"
 ant_paleo  | ant_paleo  | --ref 0 --at -21000 -125000 --title "yelmox_Antarctica.nml + antpal_physics, antpal_lgp"
 grlpal_pd  | grlpal_pd  | --ref 10 --abs --title "yelmox_GreenlandPaleo.nml: ERA5 + MAR - ERA5 bias"

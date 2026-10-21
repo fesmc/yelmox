@@ -91,7 +91,7 @@ ERA5 1981--2010 (monthly) is the present-day reference on the whole domain; MAR
 v3.14 covers only Greenland. Over Greenland, `[bias]` corrects ERA5 to MAR
 1981--2010 with a monthly temperature difference `dtas` and precipitation factor
 `fpr`, both taken at sea level with the reduction of the snapshot backend
-(`[snap] lapse`, `f_p`), so they do not depend on elevation. Outside the MAR
+(`[snapshots] lapse`, `f_p`), so they do not depend on elevation. Outside the MAR
 coverage the correction is the nearest value of the bias smoothed over 50 km,
 tapered to zero over 100 km (cosine). `fpr` is clamped to [0.2, 5].
 
@@ -105,7 +105,7 @@ julia --project=scripts/grl-paleo scripts/grl-paleo/make_bias_mar_era5.jl --fig
 
 from the yelmox root (`fesmdata` and `ice_data` links in place; options `--res`,
 `--l1`, `--l2`, `--f_p`, `--D`, `--sigma`, `--fpr_min`, `--fpr_max`). The lapse
-rates and `f_p` are written as attributes: remake the file when `[snap] lapse` or
+rates and `f_p` are written as attributes: remake the file when `[snapshots] lapse` or
 `f_p` change.
 
 ![Present-day climate of yelmox_GreenlandPaleo.nml (ERA5 1981--2010 with the MAR -- ERA5 bias), climate-only run: annual and summer air temperature, annual precipitation.](figures/grlpal_pd.png)
@@ -113,23 +113,23 @@ rates and `f_p` are written as attributes: remake the file when `[snap] lapse` o
 ## A. Spin-up
 
 - **Timeline:** `[ctrl]` 0 to 15 kyr, `dtt = 10` yr, present-day insolation
-  (`[orbit] method = "time"`, `time = 0`), sea level from file at 0 ka.
+  (`[orbit] method = "fixed_time"`, `time = 0`), sea level from file at 0 ka.
 - **No optimization** (`[sim] opt = False`); the ice thickness relaxes towards
   the observations until 6 kyr (`[sim] relax = True`, `[relax] time2`).
-- **Climate:** present day (`[snap] snapshots = "pd"`) with the MAR -- ERA5 bias.
+- **Climate:** present day (`forcing.series=""`, `forcing.terms=""`) with the MAR -- ERA5 bias.
 - **Output:** restart bundles at 0 and 15 kyr; 2D output every 1 kyr.
 
 ## A. Transient
 
 - **Timeline:** `[ctrl]` -130 kyr to 0, `dtt = 10` yr, on relative time
   (`tstep_method = "rel"`). `[sim] relax = False`, `opt = False`.
-- **Climate:** snapshots `pd`, `picontrol`, `lgm` and the axis `a`
-  (`[snap_axis_a]`): the present-day reference plus the PMIP3 LGM -- piControl
-  anomaly, scaled by the glacial index `[idx_a]`
-  (`input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
-  21 ka, -0.2 in the last interglacial). The ocean anomaly is `f_to = 0.25` times
-  the mean sea-level air temperature anomaly (`[ocn_fraction]`). Insolation varies
-  in time (`[orbit] method = "clock"`).
+- **Climate:** the present-day reference plus the term `glacial`
+  (`[term_glacial]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
+  piControl anomaly scaled by the series `glacial` (`[series_glacial]`,
+  `input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
+  21 ka, -0.2 in the last interglacial). The term `ocean` adds the derived
+  series `dTo`, 0.25 times the mean sea-level air temperature anomaly.
+  Insolation varies in time (`[orbit] method = "forcing_time"`).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_spratt2016.dat`.
 
 ![Forcing of yelmox_GreenlandPaleo.nml with grlpal_lgp of scripts/grl-paleo/params.sh at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grlpal_a.png)
@@ -140,21 +140,21 @@ rates and `f_p` are written as attributes: remake the file when `[snap] lapse` o
 
 ## B. Reconstruction forcing
 
-Snapshots `pd`, `b18_base`, `b18`, `b20` and two axes at a constant index `one`
-(`[idx_one]`, 1), each field bound to one axis:
+The reference `pd` plus two terms without a series (the constant 1), one per
+field (`forcing.terms==b18,b20,ocean`):
 
-- **Temperature**, axis `b18` (`[snap_field_tas] axes`): the Buizert et al.
-  (2018) monthly reconstruction (`snap_b18`, decadal, 22 ka to 2005 CE) minus its
-  1981--2010 baseline (`snap_b18_base`), both at the reconstruction's elevation.
-- **Precipitation**, axis `b20` (`[snap_field_pr] axes`, `blend = "ratio"`): the
-  Badgeley et al. (2020) fraction relative to 1850--2000 CE (`snap_b20`,
-  `lo = ""`: the hi is the ratio itself; 50-yr means, 20 ka to 0; annual, the
+- **Temperature**, term `b18` (`[term_b18]` on `tas`): the Buizert et al.
+  (2018) monthly reconstruction (`snapshot_b18`, decadal, 22 ka to 2005 CE) minus its
+  1981--2010 baseline (`snapshot_b18_base`), both at the reconstruction's elevation.
+- **Precipitation**, term `b20` (`[term_b20]` on `pr`): the
+  Badgeley et al. (2020) fraction relative to 1850--2000 CE (`snapshot_b20`,
+  `snap0 = ""`: the snapshot is the ratio itself; 50-yr means, 20 ka to 0; annual, the
   same factor in every month). `b20_pr_frac_low`/`_high` are the other
   accumulation scenarios.
 
-Swapping the axes of the two fields gives the other combinations (Badgeley
+Swapping the fields of the two terms gives the other combinations (Badgeley
 temperature: its annual anomaly in every month). The time-varying groups are
-read in time on the forcing clock (`extrap`: the first slice before the
+read in time at the forcing time (`extrap`: the first slice before the
 record starts, e.g. Badgeley at 20 ka during the LGM spin-up).
 
 The reconstructions are GRL-16KM products, remapped online onto GRL-PAL and
@@ -168,9 +168,10 @@ cosine to 0 over 100 km (hand-built file
 `scripts/grl-paleo/make_taper_recon.jl`). West of it (Ellesmere, Baffin Bay)
 the climate is the present-day reference plus that mean anomaly.
 
-The ocean anomaly is `f_to = 0.25` times the mean sea-level air temperature
-anomaly (`[ocn_fraction]`); sea level from `input/sealevel_spratt2016.dat`
-(as A); insolation at the forcing clock (`[orbit] method = "clock"`). The
+The ocean anomaly is the term `ocean`, 0.25 times the mean sea-level air
+temperature anomaly (the derived series `dTo`); sea level from
+`input/sealevel_spratt2016.dat` (as A); insolation at the forcing time
+(`[orbit] method = "forcing_time"`). The
 climate is updated every 100 yr (`dt_clim`; the reconstructions are read and
 remapped from GRL-16KM at each update, which made 10 yr six times slower).
 
@@ -198,8 +199,8 @@ remapped from GRL-16KM at each update, which made 10 yr six times slower).
 |---|---|
 | Grids | `GRL-PAL-16KM` for every component |
 | Topography | BedMachine v6 (`GRL-PAL-16KM_TOPO-BedMachine-v6.nc`) |
-| Reference climate (`snap_pd`) | ERA5 1981--2010 + MAR -- ERA5 bias over Greenland (`[bias]`); ocean ORAS5 1981--2010 |
-| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows `[ocn_fraction]`) |
+| Reference climate (`snapshot_pd`) | ERA5 1981--2010 + MAR -- ERA5 bias over Greenland (`[bias]`); ocean ORAS5 1981--2010 |
+| Snapshots (`snapshot_picontrol`, `snapshot_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows the term `ocean`) |
 | Surface mass balance | chion (`[comps] surface_method = "chion"`) |
 | Shelf melt | `bmb_method = "lin"`, `tf_method = 1` |
 | Dynamics | DIVA, `nz_aa = 10`, `grad_lim = 0.1` |

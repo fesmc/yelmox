@@ -50,11 +50,11 @@ program yelmox
     ! Restart bundle folder to start from ([ctrl]); "None" = cold start.
     character(len=512) :: restart
 
-    ! Indices ([indices], one tsgen series [idx_<name>] each), owned by the
-    ! driver and advanced once per step on the forcing clock time_rel; read by
-    ! name by the climate (snapshots axes, the modifiers such as [anom]). The
-    ! registry also owns the kill switch and the forcing-increment restarts
-    ! (see libs/kryos_forcing.f90).
+    ! Series ([forcing] series, one group [series_<name>] each: tsgen, or
+    ! derived and set by the model), owned by the driver and advanced once per
+    ! step on the forcing time time_rel; read by name by the climate (the
+    ! terms) and the prescribed ice. The registry also owns the kill switch
+    ! and the forcing-increment restarts (see libs/kryos_forcing.f90).
     type(indices_class)   :: idx
     real(wp) :: fvar
 
@@ -83,9 +83,9 @@ program yelmox
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
 
-    ! Indices on the forcing clock, before the domain (its climate checks the
-    ! indices it names) and the startup (the initial climate carries the same
-    ! index values as the time loop). On a restart run, resume them from the
+    ! Series on the forcing time, before the domain (its climate checks the
+    ! series it names) and the startup (the initial climate carries the same
+    ! series values as the time loop). On a restart run, resume them from the
     ! bundle.
     call indices_init(idx, path_par, ts%time_rel)
     if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
@@ -171,7 +171,7 @@ program yelmox
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        ! Indices: advance every series once per step on the forcing clock
+        ! Series: advance every tsgen series once per step on the forcing time
         ! (feedback methods need the response-derivative window); response
         ! variable = ice volume [Gt].
         fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp

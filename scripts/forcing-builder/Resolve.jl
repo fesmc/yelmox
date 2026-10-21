@@ -10,10 +10,9 @@ using JSON
 export Config, load_config, resolve, parse_overrides, template, RGroup, Entry, value_of
 
 const TEMPLATES = [
-    (r"^idx_\w+$", "idx"),
-    (r"^snap_field_\w+$", "snap_field"),
-    (r"^snap_axis_\w+$", "snap_axis"),
-    (r"^snap_\w+$", "snap_snapshot"),
+    (r"^series_\w+$", "series"),
+    (r"^term_\w+$", "term"),
+    (r"^snapshot_\w+$", "snapshot"),
 ]
 
 struct Entry
@@ -118,8 +117,10 @@ end
 """
 Resolve `base_path` with `overrides` (from parse_overrides). Returns the groups
 (Dict name => RGroup) and their order: the base's groups, then the named groups
-the configuration references (indices, snapshots, axes, fields), from the base,
-the library, or new from the template.
+the configuration references (the series, the terms, the reference snapshot
+and the snap0/snap1 of the terms), from the base, the library, or new from the
+template. A multi-domain base ([forcing_<sfx>] with reference and terms) is
+followed too; the page shows the single-domain groups.
 """
 function resolve(cfg::Config, base_path::AbstractString, overrides=Tuple{String,Vector{String},Bool}[])
     base_groups = read_namelist(base_path)
@@ -174,13 +175,14 @@ function resolve(cfg::Config, base_path::AbstractString, overrides=Tuple{String,
         v = override_value(toks, vector, e.value)
         rg.entries[kname] = Entry(format_value(v), v, "override", e.comment, e.pre)
     end
-    for n in names_of(get(out, "indices", nothing), "names")
-        group!("idx_" * n)
-    end
-    if haskey(out, "snap")
-        for n in names_of(out["snap"], "snapshots"); group!("snap_" * n); end
-        for n in names_of(out["snap"], "axes");      group!("snap_axis_" * n); end
-        for n in names_of(out["snap"], "fields");    group!("snap_field_" * n); end
+    for f in filter(g -> occursin(r"^forcing(_\w+)?$", g), copy(order))
+        for n in names_of(out[f], "series"); group!("series_" * n); end
+        for n in names_of(out[f], "reference"); group!("snapshot_" * n); end
+        for n in names_of(out[f], "terms")
+            t = group!("term_" * n)
+            string(value_of(t, "pattern", "snapshots")) == "snapshots" || continue
+            for k in ("snap0", "snap1"), s in names_of(t, k); group!("snapshot_" * s); end
+        end
     end
     return out, order
 end

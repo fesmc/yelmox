@@ -1,14 +1,14 @@
 module orbit_forcing
     ! The orbit of the insolation ([orbit<sfx>], one per domain): the orbital
-    ! elements that apply at a time of the forcing clock. Shared by the surface
+    ! elements that apply at a time of the forcing time. Shared by the surface
     ! models that take insolation (chion's host for itm/bessi, smbpal's itm);
     ! each owns its insol_class (fesmc/insol), initialised once with its
     ! latitudes and the tables in fldr, and recomputes its insolation only when
     ! the elements change. This module only resolves the elements:
     !
-    !   method = "clock": the elements at the forcing clock time_rel (Laskar et al. 2004 tables)
-    !            "time":  the elements at a fixed time [yr, model time: relative to 1950, past < 0]
-    !            "fixed": the given elements ecc, obl [deg], per [deg] (longitude of perihelion)
+    !   method = "forcing_time": the elements at the forcing time time_rel (Laskar et al. 2004 tables)
+    !            "fixed_time":   the elements at a fixed time [yr, model time: relative to 1950, past < 0]
+    !            "fixed_orbit":  the given elements ecc, obl [deg], per [deg] (longitude of perihelion)
     !
     ! Read with input/yelmox_defaults.nml: a par file lists only what differs.
 
@@ -21,11 +21,11 @@ module orbit_forcing
     private
 
     type orbit_ctl_class
-        character(len=16)  :: method    ! clock | time | fixed
-        real(dp)           :: time      ! [yr] model time of the orbit (time)
-        real(dp)           :: ecc       ! [1]   eccentricity (fixed)
-        real(dp)           :: obl       ! [deg] obliquity (fixed)
-        real(dp)           :: per       ! [deg] longitude of perihelion (fixed)
+        character(len=16)  :: method    ! forcing_time | fixed_time | fixed_orbit
+        real(dp)           :: time      ! [yr] model time of the orbit (fixed_time)
+        real(dp)           :: ecc       ! [1]   eccentricity (fixed_orbit)
+        real(dp)           :: obl       ! [deg] obliquity (fixed_orbit)
+        real(dp)           :: per       ! [deg] longitude of perihelion (fixed_orbit)
         character(len=512) :: fldr      ! folder of the orbital tables
     end type orbit_ctl_class
 
@@ -53,31 +53,31 @@ contains
         call nml_read(filename, group, "fldr",   ctl%fldr,   defaults_file=def_file, defaults_group="orbit")
 
         select case(trim(ctl%method))
-            case("clock", "time")
+            case("forcing_time", "fixed_time")
                 ! The tables are read by each host's insol_init.
-            case("fixed")
+            case("fixed_orbit")
                 orbit = orbit_pars_fixed(ctl%ecc, ctl%obl, ctl%per)   ! stops on invalid elements
             case default
                 write(*,*) "orbit_ctl_load:: error: ["//trim(group)//"] method must be &
-                           &clock, time or fixed; got '"//trim(ctl%method)//"'."
+                           &forcing_time, fixed_time or fixed_orbit; got '"//trim(ctl%method)//"'."
                 error stop 1
         end select
     end subroutine orbit_ctl_load
 
     function orbit_pars_now(ctl, is, time_rel) result(orbit)
-        ! The orbital elements at the forcing clock time_rel [yr], from the
-        ! tables of the host's insol_class (clock, time).
+        ! The orbital elements at the forcing time time_rel [yr], from the
+        ! tables of the host's insol_class (forcing_time, fixed_time).
         type(orbit_ctl_class), intent(in) :: ctl
         type(insol_class),     intent(in) :: is
         real(dp),              intent(in) :: time_rel
         type(orbit_pars_class) :: orbit
 
         select case(trim(ctl%method))
-            case("clock")
+            case("forcing_time")
                 orbit = orbit_pars_at(is, time_rel)
-            case("time")
+            case("fixed_time")
                 orbit = orbit_pars_at(is, ctl%time)
-            case default   ! fixed
+            case default   ! fixed_orbit
                 orbit = orbit_pars_fixed(ctl%ecc, ctl%obl, ctl%per)
         end select
     end function orbit_pars_now

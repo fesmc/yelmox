@@ -66,8 +66,9 @@ the Yelmo grid; the hub and the marine shelf on the shelf grid.
 - **`run_mg_forward.sh`:** 1-kyr runs from `restart-25.000-kyr` of the three
   Yelmo-32KM spin-ups in `output/mg_opt` (a missing bundle is skipped), with
   `sim.relax=False`, `sim.opt=False`, `yelmo.restart_relax=0`: `ctrl` (no
-  anomaly) and `warm` (+2 K air and ocean temperature: `[anom]` on the constant
-  index `[idx_dT]`, `f_ta = 1`, `f_to = 1`), into `output/mg_fwd/<case>_<ctrl|warm>`;
+  anomaly) and `warm` (+2 K air and ocean temperature: the uniform term
+  `[term_dT]` on the constant series `[series_dT]`, `f_ta = 1`, `f_to = 1`),
+  into `output/mg_fwd/<case>_<ctrl|warm>`;
   `compute` queue, 4 h.
 
 ## Spin-up
@@ -92,11 +93,12 @@ the Yelmo grid; the hub and the marine shelf on the shelf grid.
 
 ## Climate
 
-Present day only (`[snap] snapshots = "pd"`), without indices (`[indices]
-names = ""`), `[anom]` or `[ocn_fraction]`. `run_mg_forward.sh` adds the
-constant index `[idx_dT]` (`method = "const"`, 0) of `input/forcing_db.nml`:
-it sets `idx_dT.f_min` and `f_max` with `-p`, so runme copies the group into
-the staged par file.
+Present day only (`[forcing] series = ""`, `terms = ""`).
+`run_mg_forward.sh` adds the constant series `[series_dT]` (`method =
+"const"`, 0) and the uniform term `[term_dT]` of `input/forcing_db.nml`
+(`forcing.series=dT forcing.terms=dT`): it sets `series_dT.f_min` and
+`f_max` and the term's fields with `-p`, so runme copies the groups into the
+staged par file.
 
 ![Present-day reference climate of yelmox_Antarctica.nml: annual and summer air temperature, annual precipitation.](figures/ant_pd.png)
 
@@ -139,7 +141,7 @@ needs about 15 GB: run with `--omp 32` or more (the memory follows the cores).
 |---|---|
 | Grids | hub and marine shelf `ANT-16KM`; Yelmo, isostasy, climate and surface `ANT-32KM` (pd: `ANT-32KM` for every component) |
 | Topography | BedMachine v4 (`{grid_name}_TOPO-BedMachine-v4.nc`) |
-| Reference climate (`snap_pd`) | RACMO2.3p2 1981--2010 (temperature, precipitation, elevation); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
+| Reference climate (`snapshot_pd`) | RACMO2.3p2 1981--2010 (temperature, precipitation, elevation); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
 | Surface mass balance | chion PDD (`[chion] model = "pdd"`, `[pdd_chion] pdd_method = "cg05"`, `temperature_sigma = 5` K) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1`; grounding-line melt `[ytopo] bmb_gl_method = "pmpt"` |
 | Calving | `calv_flt_method = calv_grnd_method = "equil"` (level set, calving rate opposite to the ice velocity) |

@@ -1,10 +1,11 @@
 module yelmox_nml
-    ! Namelist helpers shared by the yelmox forcing modules (indices, snapshots,
-    ! the climate modifiers): the defaults file of their groups, and the
-    ! lookup of a named group (varslice, snapshot, axis, index) in the par
-    ! file, then in a list of database files (var_defs).
+    ! Namelist helpers shared by the yelmox forcing modules (series, terms,
+    ! snapshots, the climate transforms): the defaults file of their groups,
+    ! the run's database list ([forcing] var_defs) and the lookup of a named
+    ! group (varslice, snapshot, term, series) in the par file, then in that
+    ! list.
 
-    use nml, only : nml_has_group
+    use nml, only : nml_has_group, nml_read
 
     implicit none
 
@@ -17,9 +18,20 @@ module yelmox_nml
 
     integer, parameter, public :: VAR_DEFS_MAX = 8   ! max files of a var_defs list
 
-    public :: var_defs_find
+    public :: forcing_var_defs, var_defs_find
 
 contains
+
+    function forcing_var_defs(par_file) result(var_defs)
+        ! The run's database list, [forcing] var_defs (the one list every
+        ! named group is looked up in after the par file: varslice groups,
+        ! snapshots, terms, series); the default of the template when the
+        ! group or the key is absent.
+        character(len=*), intent(in) :: par_file
+        character(len=256) :: var_defs(VAR_DEFS_MAX)
+        call nml_read(par_file, "forcing", "var_defs", var_defs, init=.true., &
+                      defaults_file=yelmox_defaults_file, defaults_group="forcing")
+    end function forcing_var_defs
 
     function var_defs_find(var_defs, par_file, group, what) result(filename)
         ! The par file itself if it holds the group (searched implicitly first,
@@ -27,7 +39,7 @@ contains
         ! databases), else the first file of the list var_defs ("" entries
         ! ignored) that holds it; stops naming the group and the files when
         ! none has it. `what` names the reader in the message (e.g.
-        ! "&snap_lgm tas").
+        ! "&snapshot_lgm tas").
         character(len=*), intent(in) :: var_defs(:), par_file, group, what
         character(len=max(len(var_defs),len(par_file))) :: filename
 

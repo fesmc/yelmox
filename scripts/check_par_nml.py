@@ -15,19 +15,17 @@ script reproduces that check offline, with more:
   2. duplicate: a group or key defined twice in one file. `nml_read` takes the
      first occurrence, so later copies are silently ignored.
   3. var_defs: a snapshot (or an active [bias], [taper] or [ice_bnd]) binds a
-     varslice group that neither the par file itself (searched implicitly
-     first) nor its var_defs files hold, or a var_defs file is missing. Bound
-     groups in the par file are not reported by --dead. The snapshot and axis
-     groups [snap<sfx>_<s>], [snap<sfx>_axis_<a>] and the index groups
-     [idx_<name>] are looked up the same way, through [snap<sfx>] var_defs and
-     [indices] var_defs: a listed group found in neither is an error, one
-     found in a var_defs file is checked there (item 1).
+     varslice group that is in neither the par file nor the [forcing] var_defs
+     files (the par file is searched first); such groups in the par file are
+     not reported by --dead. The series, term and snapshot groups
+     [series_<name>], [term_<name>], [snapshot_<name>] are looked up the same
+     way: a listed group found in neither is an error, one found in a var_defs
+     file is checked there.
   4. dead (only with --dead): keys in the other groups (ctrl, smbpal, isos,
      ...) whose name appears nowhere in the Fortran sources as a string
      literal, so no `nml_read` can read them. The match is by key name
      only (not by group), so it misses keys that are read in another group.
-     Also snapshot-backend groups that are not read ([snap_field_x] for a
-     field not in [snap] fields, ...). Needs the dependency checkouts (yelmo,
+     Needs the dependency checkouts (yelmo,
      fesm-utils, FastIsostasy, rembo1, chion) next to the scripts directory.
 
 The yelmo groups of a file are found from its control blocks: `&yelmo<sfx>`
@@ -39,18 +37,17 @@ files (see below).
 
 The yelmox forcing groups, with <sfx> the same domain suffixes, and their
 group in yelmox_defaults.nml:
-  [indices] -> indices, [idx_<name>] -> idx, [obm_forcing] -> obm_forcing,
-  [anom<sfx>], [ocn_fraction<sfx>], [ocn_obm<sfx>], [taper<sfx>], [bias<sfx>], [orbit<sfx>]
-  -> anom, ocn_fraction, ocn_obm, taper, bias, orbit, [ice_bnd<sfx>] -> ice_bnd,
-  with [comps<sfx>] climate = snapshots or rembo (the snapshot backend):
-  [snap<sfx>] -> snap, [snap<sfx>_field_<f>] -> snap_field (f in fields),
-  [snap<sfx>_<s>] -> snap_snapshot (s in snapshots),
-  [snap<sfx>_axis_<a>] -> snap_axis (a in axes); unset lists from the defaults.
+  [forcing<sfx>] -> forcing, [series_<name>] -> series, [term_<name>] -> term,
+  [snapshots<sfx>] -> snapshots, [snapshot_<name>] -> snapshot, [obm_forcing] -> obm_forcing,
+  [taper<sfx>], [bias<sfx>], [orbit<sfx>] -> taper, bias, orbit, [ice_bnd<sfx>] -> ice_bnd;
+  the series of [forcing] series, the terms of [forcing<sfx>] terms, the
+  reference and the snap0/snap1 of the snapshot terms (with [comps<sfx>]
+  climate = snapshots or rembo); unset lists from the defaults.
 
 A library file has no control block and holds only named groups
-(snap_*, snap_axis_*, idx_*, elsa_*), shared by par files through their
-var_defs lists. Each group is checked against its template by prefix:
-snap_axis_* -> snap_axis, snap_* -> snap_snapshot, idx_* -> idx; elsa_*
+(snapshot_*, series_*, term_*, elsa_*), shared by par files through the
+[forcing] var_defs list. Each group is checked against its template by prefix:
+snapshot_* -> snapshot, series_* -> series, term_* -> term; elsa_*
 groups (read by elsa) are skipped. Duplicates are reported as in item 2.
 
 Usage:
@@ -78,9 +75,9 @@ SRC_DIRS = ["libs", "yelmox", "yelmox_bipolar", "fesm-utils", "FastIsostasy",
 SKIP_DIRS = {".git", ".claude", "output", "logs", "tmp"}
 
 # Group prefixes of a library file -> template group of yelmox_defaults.nml
-# (None: not checked here). First match wins, so snap_axis_ before snap_.
-LIBRARY_PREFIX = [("snap_axis_", "snap_axis"), ("snap_", "snap_snapshot"),
-                  ("idx_", "idx"), ("elsa_", None)]
+# (None: not checked here). First match wins.
+LIBRARY_PREFIX = [("series_", "series"), ("term_", "term"), ("snapshot_", "snapshot"),
+                  ("elsa_", None)]
 
 # nml_* key of the control block -> group of the defaults file it maps to.
 NML_KEY = {
@@ -187,42 +184,58 @@ def domain_suffixes(groups):
 
 def yelmox_groups(groups, ydefaults):
     """User group -> template group of yelmox_defaults.nml for the forcing
-    groups of a file, the snapshot-backend groups that are not read, and the
-    named groups looked up through a var_defs list -> the group holding that
-    list ([snap<sfx>] for snapshots and axes, [indices] for indices)."""
+    groups of a file ([forcing<sfx>], the series and terms they list, the
+    snapshot backend [snapshots<sfx>], the transforms), and the named groups
+    looked up through the one var_defs list ([forcing] var_defs) -> "forcing".
+    The snapshot groups follow once the terms are resolved
+    (snapshot_groups)."""
     out, stale, owner = {}, [], {}
-    for g in ("indices", "obm_forcing"):
-        if g in groups:
-            out[g] = g
+    if "obm_forcing" in groups:
+        out["obm_forcing"] = "obm_forcing"
     for g in groups:
-        if g.startswith("idx_"):
-            out[g] = "idx"
-    if "indices" in groups:
-        for n in listval(groups["indices"].get("names", ydefaults["indices"].get("names", ""))):
-            out.setdefault("idx_" + n, "idx")
-            owner["idx_" + n] = "indices"
+        tmpl = library_template(g)
+        if tmpl:
+            out[g] = tmpl
+    forcing = groups.get("forcing", {})
+    for n in listval(forcing.get("series", ydefaults["forcing"].get("series", ""))):
+        out.setdefault("series_" + n, "series")
+        owner["series_" + n] = "forcing"
     for sfx in domain_suffixes(groups):
-        for base in ("anom", "ocn_fraction", "ocn_obm", "taper", "bias", "orbit", "ice_bnd"):
+        fg = "forcing" + sfx
+        if fg in groups:
+            out[fg] = "forcing"
+        for base in ("taper", "bias", "orbit", "ice_bnd"):
             if base + sfx in groups:
                 out[base + sfx] = base
+        for n in listval(groups.get(fg, {}).get("terms", ydefaults["forcing"].get("terms", ""))):
+            out.setdefault("term_" + n, "term")
+            owner["term_" + n] = "forcing"
         climate = scalar(groups.get("comps" + sfx, {}).get("climate", ""))
-        snap = "snap" + sfx
-        if climate not in ("snapshots", "rembo") or snap not in groups:
-            continue
-        out[snap] = "snap"
-
-        def names(key):
-            return listval(groups[snap].get(key, ydefaults["snap"].get(key, "")))
-        for f in names("fields"):
-            out[snap + "_field_" + f] = "snap_field"
-        for a in names("axes"):
-            out[snap + "_axis_" + a] = "snap_axis"
-            owner[snap + "_axis_" + a] = snap
-        for s_ in names("snapshots"):
-            out.setdefault(snap + "_" + s_, "snap_snapshot")
-            owner.setdefault(snap + "_" + s_, snap)
-        stale += [g for g in groups if g.startswith(snap + "_") and g not in out]
+        if climate in ("snapshots", "rembo"):
+            if "snapshots" + sfx in groups:
+                out["snapshots" + sfx] = "snapshots"
+            ref = scalar(groups.get(fg, {}).get("reference", ydefaults["forcing"]["reference"]))
+            out.setdefault("snapshot_" + ref, "snapshot")
+            owner["snapshot_" + ref] = "forcing"
     return out, stale, owner
+
+
+def snapshot_groups(groups, xgroups, owner, resolved):
+    """The snapshot groups the resolved snapshot terms name (snap0, snap1):
+    added to xgroups/owner; True when any was new."""
+    new = False
+    for name, (src, params) in list(resolved.items()):
+        if xgroups.get(name) != "term":
+            continue
+        if scalar(params.get("pattern", "snapshots")) != "snapshots":
+            continue
+        for key in ("snap0", "snap1"):
+            sn = scalar(params.get(key, ""))
+            if sn and ("snapshot_" + sn) not in xgroups:
+                xgroups["snapshot_" + sn] = "snapshot"
+                owner["snapshot_" + sn] = "forcing"
+                new = True
+    return new
 
 
 def var_defs_files(path, listed, label, errors):
@@ -276,8 +289,9 @@ def var_defs_errors(path, groups, ygroups, ydefaults, vd_files, resolved, cache)
     hold. Also returns the bound groups found in the par file itself (read by
     varslice, not dead)."""
     errors, local = [], set()
+    files = vd_files["forcing"]
 
-    def check(label, files, refs):
+    def check(label, refs):
         db = set()
         for f in files[1:]:
             db |= set(library_groups(f, cache))
@@ -288,26 +302,22 @@ def var_defs_errors(path, groups, ygroups, ydefaults, vd_files, resolved, cache)
                 errors.append("&%s %s: group %s in neither the par file nor the var_defs files"
                               % (label, key, ref))
 
-    for snap, tmpl in ygroups.items():
-        if tmpl == "snap":
-            files = vd_files[snap]
-            for name, t in ygroups.items():
-                if t != "snap_snapshot" or not name.startswith(snap + "_") or name not in resolved:
-                    continue
-                keys = resolved[name][1]
-                check(name, files, [(key, ref) for key in ("tas", "pr", "zs", "to", "so")
-                                    for ref in listval(keys.get(key, ""))])
+    for name, tmpl in ygroups.items():
+        if tmpl == "snapshot":
+            if name not in resolved:
+                continue
+            keys = resolved[name][1]
+            check(name, [(key, ref) for key in ("tas", "pr", "zs", "to", "so")
+                         for ref in listval(keys.get(key, ""))])
         elif tmpl in ("bias", "taper", "ice_bnd"):
-            g = groups[snap]
+            g = groups[name]
             if scalar(g.get("active", ydefaults[tmpl]["active"])).lower() not in (
                     "true", ".true.", "t"):
                 continue
-            files = var_defs_files(path, listval(g.get(
-                "var_defs", ydefaults[tmpl]["var_defs"])), snap, errors)
             keys = {"bias": ("dtas", "fpr"), "taper": ("weight",), "ice_bnd": ("H_ice",)}[tmpl]
-            check(snap, files, [(key, scalar(g.get(key, ydefaults[tmpl].get(key, ""))))
-                                for key in keys
-                                if scalar(g.get(key, ydefaults[tmpl].get(key, "")))])
+            check(name, [(key, scalar(g.get(key, ydefaults[tmpl].get(key, ""))))
+                         for key in keys
+                         if scalar(g.get(key, ydefaults[tmpl].get(key, "")))])
     return errors, local
 
 
@@ -367,16 +377,14 @@ def check_file(path, defaults, ydefaults, lits):
                           % (name, def_group, ", ".join(unknown)))
 
     xgroups, stale, owner = yelmox_groups(groups, ydefaults)
-    # The var_defs lists: of every [snap<sfx>], and of [indices] when it lists
-    # indices (the par file first, then the listed files).
+    # The one var_defs list, [forcing] var_defs (the par file first, then the
+    # listed files); the snapshot groups follow the resolved terms.
     cache = {}
-    vd_files = {}
-    for g in [g for g, t in xgroups.items() if t == "snap"] + sorted(set(owner.values())):
-        if g not in vd_files:
-            tmpl = "indices" if g == "indices" else "snap"
-            vd_files[g] = var_defs_files(path, listval(groups[g].get(
-                "var_defs", ydefaults[tmpl]["var_defs"])), g, errors)
+    vd_files = {"forcing": var_defs_files(path, listval(groups.get("forcing", {}).get(
+        "var_defs", ydefaults["forcing"]["var_defs"])), "forcing", errors)}
     resolved, rs_errors = resolve_named(path, groups, xgroups, owner, vd_files, cache)
+    if snapshot_groups(groups, xgroups, owner, resolved):
+        resolved, rs_errors = resolve_named(path, groups, xgroups, owner, vd_files, cache)
     errors += rs_errors
     for name, def_group in xgroups.items():
         if name not in resolved:

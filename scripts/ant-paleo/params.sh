@@ -1,14 +1,15 @@
 # Antarctic paleo setup on the base yelmox/yelmox_Antarctica.nml, as runme -p
 # arrays. Sourced by the run_*.sh scripts of this folder and by
-# scripts/docs-figures/run.sh. The named groups (idx_*, snap_*, snap_axis_*) come
-# from input/forcing_db.nml.
+# scripts/docs-figures/run.sh. The named groups (series_*, term_*, snapshot_*)
+# come from input/forcing_db.nml (docs/_forcing-terms.md).
 
 # 32 km physics and data of the spin-up and the transient.
 antpal_physics=(
     "domain.grid_hub=ANT-32KM"          # single-grid setup: the hub on the Yelmo grid
     "domain.grid_shelf=ANT-32KM"        # marine shelf on the Yelmo grid
     "ctrl.dtt=5.0"                      # [yr] main loop timestep
-    "ocn_fraction.active=True"          # ocean anomaly from the air temperature anomaly
+    "forcing.series==dTo"               # dTo: the mean sea-level air anomaly x series_dTo.factor (derived)
+    "forcing.terms==ocean"              # the ocean profiles plus dTo
     # surface: chion with the ITM (group [itm], shared with smbpal)
     "chion.model=itm"                   # snowpack model (parameters: [itm], the chion default nml_itm)
     "smbpal.abl_method=itm"             # smbpal ablation
@@ -59,14 +60,10 @@ antpal_physics=(
 # the glacial index input/alpha_combined_125kyr_interp.dat; Antarctic summer
 # (DJF) as the second temperature of the PMIP3 snapshots.
 antpal_lgp=(
-    "indices.names==a"                  # glacial index [idx_a] (series)
-    "snap.snapshots==pd,picontrol,lgm"  # present day plus PMIP3 piControl and LGM
-    "snap.axes==a"                      # axis picontrol -> lgm, position from index a
-    "snap_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"   # summer: DJF
-    "snap_lgm.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"         # summer: DJF
-    "snap_field_tas.axes=a"             # temperature on the axis a
-    "snap_field_pr.blend=ratio"         # precipitation as a ratio
-    "snap_field_pr.axes=a"              # ... on the axis a
-    "orbit.method=clock"                # transient insolation (orbit at the forcing clock)
+    "forcing.series==glacial,dTo"       # the glacial index [series_glacial]; dTo as in antpal_physics
+    "forcing.terms==glacial,ocean"      # glacial: lgm - picontrol (PMIP3) weighted by the index, on tas and pr
+    "snapshot_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"   # summer: DJF
+    "snapshot_lgm.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"         # summer: DJF
+    "orbit.method=forcing_time"                # transient insolation (orbit at the forcing time)
     "barysealevel.method=file"          # sea level from sl_path
 )

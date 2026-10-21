@@ -379,13 +379,14 @@ contains
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend and its
-        ! modifiers into dom%clim, read by step_surface, step_shelf and
-        ! couple_climate_to_yelmo. idx is the driver-owned indices registry
-        ! (advanced to this step). init=.true. marks the cold start: the update
-        ! runs regardless of the cadence.
+        ! terms into dom%clim, read by step_surface, step_shelf and
+        ! couple_climate_to_yelmo. idx is the driver-owned series registry
+        ! (advanced to this step; the climate sets its derived series in it).
+        ! init=.true. marks the cold start: the update runs regardless of the
+        ! cadence.
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
-        type(indices_class),   intent(in)    :: idx
+        type(indices_class),   intent(inout) :: idx
         logical,               intent(in), optional :: init
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)

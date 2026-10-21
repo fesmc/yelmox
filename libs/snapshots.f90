@@ -7,41 +7,42 @@ module snapshots
     !
     ! See docs/climate-snapshots.md for its configuration.
     !
-    ! Config model: the `var_defs` databases (a list of nml files; the shared
-    ! input/clim_db.nml by default) define varslice groups (permanent per-file
-    ! variable metadata). A group is taken from the par file if it has it, else
-    ! from the first database that does (var_defs_find); the snapshot groups
-    ! &<group>_<snapshot> and the axis groups &<group>_axis_<name> are looked
-    ! up the same way. Each climate-state group &<group>_<snapshot> names the group(s)
-    ! supplying each field (1 = monthly, 2 = [ann, season] -> synthesized). Their
-    ! paths take the keywords {grid_global} ([snap] grid_global, the global grid
+    ! Config model: the [forcing] var_defs databases (a list of nml files)
+    ! define varslice groups (permanent per-file variable metadata). A group
+    ! is taken from the par file if it has it, else from the first database
+    ! that does (var_defs_find); the snapshot groups &snapshot_<name> are
+    ! looked up the same way. Each snapshot group names the group(s) supplying
+    ! each field (1 = monthly, 2 = [ann, season] -> synthesized). Their paths
+    ! take the keywords {grid_global} ([snapshots] grid_global, the global grid
     ! of the paleoclimate products) and {exp} (the snapshot's exp), besides
     ! {domain} and {grid_name}.
     ! Fields are optional per snapshot (key absent or "" = not bound): the backend
     ! builds the fields the reference snapshot binds, the atmosphere (tas and pr,
     ! with zs) and/or the ocean (to, optionally so); an ocean-only reference serves
-    ! the rembo ocean. Every snapshot an axis of a blended field names must bind
-    ! that field (checked at init).
+    ! the rembo ocean. Every snapshot a term names must bind the term's fields
+    ! (checked at init).
     !
-    ! Axes: each axis &<group>_axis_<name> spans two snapshots (lo -> hi) and
-    ! names an index of the driver's registry ([indices], kryos_forcing); the
-    ! value of the index is the position on the axis (0 at lo, 1 at hi). A field
-    ! sums the axes it lists on top of the reference snapshot (Banderas et al.,
-    ! 2018, for two axes). With lo = "", hi is itself the anomaly (linear) or the
-    ! ratio (ratio): an anomaly snapshot binds no zs, its fields are taken as
-    ! given, at sea level (no elevation correction of their own). The indices
-    ! restart with the registry, so snapshots holds no state of its own.
-    !
-    ! The ocean temperature as a fraction of the air temperature anomaly is the
-    ! climate modifier ocn_fraction (climate_mods), on the field `to` held at
-    ! the reference (no axes, or blend = "const").
+    ! Terms (climate_terms, pattern snapshots): each spans two snapshots
+    ! (snap0 -> snap1) and names a series of the driver's registry
+    ! ([forcing] series, kryos_forcing), or none (the constant 1); the value
+    ! of the series is the position between them (0 at snap0, 1 at snap1).
+    ! The reference is [forcing<sfx>] reference; the snapshots of a run are
+    ! the reference and the snap0/snap1 of its terms. A field sums the terms
+    ! that list it on top of the reference (Banderas et al., 2018, for two),
+    ! additively (tas, to, so) or as a ratio (pr), fixed by field. With
+    ! snap0 = "", snap1 is itself the anomaly or the ratio: such a snapshot
+    ! binds no zs, its fields are taken as given, at sea level (no elevation
+    ! correction of their own). The series restart with the registry, so
+    ! snapshots holds no state of its own. The uniform and replace terms are
+    ! applied by climate_terms after the backend.
 
     use precision, only : wp, sp, dp
     use ncio
     use nml
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use kryos_forcing, only : indices_class, indices_value, indices_has
-    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
+    use climate_terms, only : terms_class, term_class, series_label
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, forcing_var_defs, def_file => yelmox_defaults_file
     use gaussian_filter, only : filter_gaussian
     use coordinates, only : grid_class
 
@@ -51,8 +52,8 @@ module snapshots
 
     private
 
-    integer, parameter :: SNP_MAX = 32   ! max entries in a snapshots/fields/axes list
-    integer, parameter :: AXS_MAX = 8    ! max axes of one field
+    integer, parameter :: SNP_MAX = 32   ! max snapshots / fields
+    integer, parameter :: AXS_MAX = 16   ! max terms of one field
     integer, parameter :: NMONTH   = 12
 
     ! =====================================================================
@@ -71,9 +72,8 @@ module snapshots
         character(len=32) :: name           ! "tas","pr","to","so","zs","smb","bmb_shlf",...
         character(len=16) :: kind           ! from the name: "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
-        character(len=16) :: blend          ! "linear" | "ratio" | "const"
-        character(len=64) :: axes(AXS_MAX)  ! names of the axes of this field ("" = none)
-        integer           :: n_axis         ! number of axes
+        character(len=16) :: blend          ! "linear" | "ratio" | "const", fixed by the field name
+        integer           :: n_axis         ! number of terms on this field
         integer           :: axis_k(AXS_MAX) ! their positions in snapshots_class%axis
         logical           :: enabled        ! off by default for exotic fields
         logical           :: apply_lapse
@@ -134,7 +134,7 @@ module snapshots
     type snapshots_param_class
         character(len=256) :: domain
         character(len=256) :: grid_name
-        character(len=256) :: var_defs(VAR_DEFS_MAX) ! databases, searched in order after the par file
+        character(len=256) :: var_defs(VAR_DEFS_MAX) ! [forcing] var_defs: databases, searched in order after the par file
         character(len=512) :: par_file      ! the par file, searched first
         character(len=64)  :: grid_global   ! global grid of the paleoclimate products ({grid_global})
         character(len=64)  :: group         ! base namelist group (already domain-suffixed)
@@ -153,11 +153,12 @@ module snapshots
         integer            :: n_snap, n_field, n_axis
     end type
 
-    ! One axis: two snapshots and the registry index giving the position on it.
+    ! One snapshot term: two snapshots and the registry series giving the
+    ! position between them.
     type axis_class
-        character(len=64) :: name
-        character(len=64) :: index          ! registry index (kryos_forcing)
-        integer           :: lo, hi         ! snapshots at index = 0 and 1 (positions in snap;
+        character(len=64) :: name           ! the term's name
+        character(len=64) :: index          ! its series (kryos_forcing); "" = the constant 1
+        integer           :: lo, hi         ! snap0 and snap1 (positions in snap;
                                             ! lo = 0: none, hi is the anomaly/ratio)
         real(wp)          :: f              ! position at the last update (output)
     end type
@@ -167,7 +168,7 @@ module snapshots
         type(snapshots_param_class)        :: par
         type(field_spec_class),  allocatable :: registry(:)  ! field definitions
         type(snapshot_class),    allocatable :: snap(:)      ! was clim0..clim3
-        type(axis_class),        allocatable :: axis(:)      ! snapshot axes
+        type(axis_class),        allocatable :: axis(:)      ! the snapshot terms
         type(climate_state_class)            :: now          ! current output
         type(climate_state_class)            :: ref          ! distinguished reference (was clim0)
     end type
@@ -187,11 +188,14 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapshots_init(sc, filename, domain, grid, time, south, idx, group)
+    subroutine snapshots_init(sc, filename, domain, grid, time, south, idx, terms, group, reference)
         ! `grid` is the climate grid: the snapshot fields are read on it, or
         ! remapped onto it online (var_defs groups with remap/grid_src). `time`
-        ! primes the time-varying snapshots. `idx` is the driver's registry: each
-        ! axis must name one of its indices.
+        ! primes the time-varying snapshots. `idx` is the driver's registry
+        ! (the series of the terms were checked against it by terms_init);
+        ! `terms` the domain's terms, of which those with the snapshots
+        ! pattern are read here; `group` the backend group ([snapshots<sfx>])
+        ! and `reference` the reference snapshot ([forcing<sfx>] reference).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
@@ -200,21 +204,18 @@ contains
         real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
         type(indices_class),   intent(IN)    :: idx
-        character(len=*),      intent(IN), optional :: group
-
-        character(len=64) :: base_group
-
-        base_group = "snp"
-        if (present(group)) base_group = trim(group)
+        type(terms_class),     intent(IN)    :: terms
+        character(len=*),      intent(IN)    :: group, reference
 
         sc%par%nx = grid%G%nx
         sc%par%ny = grid%G%ny
         sc%par%dx_km = real(grid%G%dx*grid%cs%xy_conv*1e-3_dp, wp)   ! [km] (clim_sigma)
         sc%par%south = south
 
-        ! Read all configuration: top-level, field registry, snapshot specs and
-        ! their bindings, axes; then check the bindings against each other.
-        call snapshots_par_load(sc, filename, trim(base_group), domain, trim(grid%name), idx)
+        ! Read all configuration: top-level, field registry, the terms, the
+        ! snapshot specs and their bindings; then check the bindings against
+        ! each other.
+        call snapshots_par_load(sc, filename, trim(group), domain, trim(grid%name), terms, reference)
         call snapshots_check_bindings(sc)
 
         ! Load the snapshot fields (varslice), reduce them, and set the reference state.
@@ -224,11 +225,10 @@ contains
     end subroutine snapshots_init
 
     subroutine snapshots_update(sc, z_srf, time, idx, dx)
-        ! Pipeline: axis positions from the registry
-        ! (advanced by the driver to `time`) -> refresh loads -> combine ->
-        ! transform (the atmosphere, if bound). Homogeneous anomalies and the
-        ! ocean fraction rule are climate modifiers (climate_mods), applied by
-        ! the caller afterwards.
+        ! Pipeline: term positions from the registry (advanced by the driver
+        ! to `time`) -> refresh loads -> combine -> transform (the atmosphere,
+        ! if bound). The uniform and replace terms are applied by the caller
+        ! afterwards (climate_terms).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
@@ -238,9 +238,10 @@ contains
 
         integer :: k
 
-        ! 1. The position on each axis: the current value of its index.
+        ! 1. The position on each term: the current value of its series (1 without).
         do k = 1, sc%par%n_axis
-            sc%axis(k)%f = indices_value(idx, sc%axis(k)%index)
+            sc%axis(k)%f = 1.0_wp
+            if (len_trim(sc%axis(k)%index) > 0) sc%axis(k)%f = indices_value(idx, sc%axis(k)%index)
         end do
 
         ! 2. Refresh time-varying loads and re-reduce those snapshots.
@@ -292,14 +293,14 @@ contains
 
     subroutine snapshots_combine(sc)
         ! Blend the reduced snapshot states into `now`, per field bound in the
-        ! reference, from the reference baseline (was clim0). Each axis k of a
-        ! field (lo_k -> hi_k) adds with weight a_k = the value of its index:
-        !   linear (temp/salinity): now = ref + sum_k a_k*(hi_k - lo_k)
-        !   ratio  (precip):        now = ref * prod_k (a_k*(hi_k/lo_k - 1) + 1)
-        !   const:                  now = ref
-        ! An axis with lo = "" adds hi itself: a_k*hi_k (linear) or the factor
-        ! a_k*(hi_k - 1) + 1 (ratio). Two axes as in Banderas et al. (2018).
-        ! The snapshots of the axes bind the field
+        ! reference, from the reference baseline. Each term k on a field
+        ! (snap0_k -> snap1_k) adds with weight a_k = the value of its series:
+        !   linear (tas, to, so): now = ref + sum_k a_k*(snap1_k - snap0_k)
+        !   ratio  (pr):          now = ref * prod_k (a_k*(snap1_k/snap0_k - 1) + 1)
+        !   const  (zs):          now = ref
+        ! A term with snap0 = "" adds snap1 itself: a_k*snap1_k (linear) or the
+        ! factor a_k*(snap1_k - 1) + 1 (ratio). Two terms as in Banderas et al.
+        ! (2018). The snapshots of the terms bind the field
         ! (snapshots_check_bindings).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
@@ -325,7 +326,7 @@ contains
                     cycle   ! "elev" and other non-blended fields: nothing to combine.
             end select
 
-            ! linear/ratio fields add their axes; const fields stay at the
+            ! linear/ratio fields add their terms; const fields stay at the
             ! reference.
             blended = trim(sc%registry(f)%blend) == "linear" .or. &
                       trim(sc%registry(f)%blend) == "ratio"
@@ -479,7 +480,7 @@ contains
     end function lapse_monthly
 
     subroutine snapshots_end(sc)
-        ! Teardown: the varslice sources of every snapshot, the snapshots, axes
+        ! Teardown: the varslice sources of every snapshot, the snapshots, terms
         ! and registry, and the output and reference states.
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
@@ -521,7 +522,7 @@ contains
 
     subroutine snapshots_write_step(sc, filename, ncid, n)
         ! Write record n of the snapshots state into an open 2D output file
-        ! (axes from snapshots_write_init): the axis positions and the surface
+        ! (axes from snapshots_write_init): the term positions and the surface
         ! elevation. The climate as applied (after the climate modifiers) is
         ! written by the caller (climate_write_2D).
         implicit none
@@ -532,10 +533,10 @@ contains
         integer :: k
 
         do k = 1, sc%par%n_axis
-            call nc_write(filename, "axis_"//trim(sc%axis(k)%name), sc%axis(k)%f, dim1="time", &
+            call nc_write(filename, "term_"//trim(sc%axis(k)%name), sc%axis(k)%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Position on axis "//trim(sc%axis(k)%name)//" (index "// &
-                                    trim(sc%axis(k)%index)//")")
+                          long_name="Position on the snapshot term "//trim(sc%axis(k)%name)// &
+                                    " (series "//trim(series_label(sc%axis(k)%index))//")")
         end do
 
         associate(now => sc%now)
@@ -560,114 +561,117 @@ contains
     ! Parameter loading & setup
     ! =====================================================================
 
-    subroutine snapshots_par_load(sc, filename, group, domain, grid_name, idx)
-        ! Read the full configuration: top-level knobs, the field registry
-        ! (&<group>_field_<name>), the snapshot specs and their field bindings
-        ! (&<group>_<name>), and the axes (&<group>_axis_<name>: lo, hi, index),
-        ! whose indices must be in the registry idx. Keys not set take the
-        ! defaults of input/yelmox_defaults.nml, the named groups those of the
-        ! templates snap_field, snap_snapshot and snap_axis. The snapshot and
-        ! axis groups are read from the par file if it has them, else from the
-        ! first var_defs file that does; [snap] and the field groups from the
-        ! par file only.
+    subroutine snapshots_par_load(sc, filename, group, domain, grid_name, terms, reference)
+        ! Read the full configuration: the top-level knobs ([snapshots<sfx>],
+        ! template snapshots), the field registry (the fields a snapshot may
+        ! bind, fixed blend rule by name), the snapshot terms of `terms`
+        ! (pattern snapshots: snap0, snap1, series, fields), and the snapshot
+        ! specs and their field bindings (&snapshot_<name>, template snapshot)
+        ! of the reference and the terms' snapshots. The snapshot groups are
+        ! read from the par file if it has them, else from the first
+        ! [forcing] var_defs file that does; [snapshots<sfx>] from the par
+        ! file only. Keys not set take the defaults of input/yelmox_defaults.nml.
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
-        character(len=*),      intent(IN)    :: group      ! base group (already domain-suffixed)
+        character(len=*),      intent(IN)    :: group      ! backend group (already domain-suffixed)
         character(len=*),      intent(IN)    :: domain
         character(len=*),      intent(IN)    :: grid_name
-        type(indices_class),   intent(IN)    :: idx
+        type(terms_class),     intent(IN)    :: terms
+        character(len=*),      intent(IN)    :: reference
 
         character(len=64) :: names(SNP_MAX)
-        character(len=64) :: lo, hi
-        character(len=256):: agroup, sgroup
-        character(len=512):: gfile        ! the file holding sgroup / agroup
-        integer           :: i, j
+        character(len=256):: sgroup
+        character(len=512):: gfile        ! the file holding sgroup
+        integer           :: i, j, k, f, n
 
         sc%par%group     = group
         sc%par%par_file  = filename
         sc%par%domain    = domain
         sc%par%grid_name = grid_name
+        sc%par%var_defs  = forcing_var_defs(filename)
+        sc%par%ref_name  = reference
 
         ! --- top-level --------------------------------------------------------
-        call nml_validate(filename, def_file, group, defaults_group="snap")
-        call nml_read(filename, group, "var_defs",    sc%par%var_defs,    init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+        call nml_validate(filename, def_file, group, defaults_group="snapshots")
         call nml_read(filename, group, "grid_global", sc%par%grid_global, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+                      defaults_file=def_file, defaults_group="snapshots")
         call nml_read(filename, group, "combine",     sc%par%combine,     init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
-        call nml_read(filename, group, "ref_name",    sc%par%ref_name,    init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+                      defaults_file=def_file, defaults_group="snapshots")
         call nml_read(filename, group, "lapse",       sc%par%lapse,       init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+                      defaults_file=def_file, defaults_group="snapshots")
         call nml_read(filename, group, "f_p",         sc%par%f_p,         init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+                      defaults_file=def_file, defaults_group="snapshots")
         call nml_read(filename, group, "f_p_ne",      sc%par%f_p_ne,      init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+                      defaults_file=def_file, defaults_group="snapshots")
 
         ! --- field registry ---------------------------------------------------
         call nml_read(filename, group, "fields", names, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
+                      defaults_file=def_file, defaults_group="snapshots")
         sc%par%n_field = count(len_trim(names) > 0)
         if (allocated(sc%registry)) deallocate(sc%registry)
         allocate(sc%registry(sc%par%n_field))
         do i = 1, sc%par%n_field
-            call read_field_spec(sc%registry(i), filename, &
-                                 trim(group)//"_field_"//trim(names(i)), &
-                                 trim(names(i)), sc%par%combine)
+            call read_field_spec(sc%registry(i), group, trim(names(i)), sc%par%combine)
+        end do
+
+        ! --- the snapshot terms, and the snapshots they and the reference name -
+        n = 0
+        do k = 1, terms%n
+            if (trim(terms%term(k)%pattern) == "snapshots") n = n + 1
+        end do
+        sc%par%n_axis = n
+        if (allocated(sc%axis)) deallocate(sc%axis)
+        allocate(sc%axis(n))
+        names    = ""
+        names(1) = reference
+        sc%par%n_snap = 1
+        i = 0
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) /= "snapshots") cycle
+            i = i + 1
+            sc%axis(i)%name  = t%name
+            sc%axis(i)%index = t%series
+            sc%axis(i)%f     = 0.0_wp
+            if (len_trim(t%snap0) > 0) call add_name(t%snap0)
+            call add_name(t%snap1)
+            end associate
         end do
 
         ! --- snapshots and their bindings ------------------------------------
-        call nml_read(filename, group, "snapshots", names, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
-        sc%par%n_snap = count(len_trim(names) > 0)
         if (allocated(sc%snap)) deallocate(sc%snap)
         allocate(sc%snap(sc%par%n_snap))
         do i = 1, sc%par%n_snap
-            sgroup = trim(group)//"_"//trim(names(i))
+            sgroup = "snapshot_"//trim(names(i))
             gfile  = var_defs_find(sc%par%var_defs, filename, trim(sgroup), &
-                                   "&"//trim(group)//" snapshots")
+                                   "a snapshot of the forcing of "//trim(group))
             call read_snapshot_spec(sc%snap(i)%spec, trim(gfile), trim(sgroup), &
                                     trim(names(i)), sc%par%ref_name, sc%registry, sc%par%south)
         end do
-        sc%par%iref = snapshot_position(sc, sc%par%ref_name, "ref_name of &"//trim(group))
+        sc%par%iref = snapshot_position(sc, sc%par%ref_name, "reference")
 
-        ! --- axes: two snapshots (lo may be "") and a registry index ----------
-        call nml_read(filename, group, "axes", names, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap")
-        sc%par%n_axis = count(len_trim(names) > 0)
-        if (allocated(sc%axis)) deallocate(sc%axis)
-        allocate(sc%axis(sc%par%n_axis))
-        do i = 1, sc%par%n_axis
-            agroup = trim(group)//"_axis_"//trim(names(i))
-            gfile  = var_defs_find(sc%par%var_defs, filename, trim(agroup), &
-                                   "&"//trim(group)//" axes")
-            sc%axis(i)%name = trim(names(i))
-            call nml_validate(trim(gfile), def_file, trim(agroup), defaults_group="snap_axis")
-            call nml_read(trim(gfile), trim(agroup), "lo",    lo,               init=.TRUE., &
-                          defaults_file=def_file, defaults_group="snap_axis")
-            call nml_read(trim(gfile), trim(agroup), "hi",    hi,               init=.TRUE., &
-                          defaults_file=def_file, defaults_group="snap_axis")
-            call nml_read(trim(gfile), trim(agroup), "index", sc%axis(i)%index, init=.TRUE., &
-                          defaults_file=def_file, defaults_group="snap_axis")
+        ! --- the terms' snapshots, and the fields each term adds to -----------
+        i = 0
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (trim(t%pattern) /= "snapshots") cycle
+            i = i + 1
             sc%axis(i)%lo = 0
-            if (len_trim(lo) > 0) sc%axis(i)%lo = snapshot_position(sc, lo, "lo of &"//trim(agroup))
-            sc%axis(i)%hi = snapshot_position(sc, hi, "hi of &"//trim(agroup))
-            if (.not. indices_has(idx, sc%axis(i)%index)) then
-                write(*,*) "snapshots:: Error: index '"//trim(sc%axis(i)%index)//"' (index of &"// &
-                           trim(agroup)//") is not in [indices] names."
-                stop
-            end if
-            sc%axis(i)%f = 0.0_wp
-        end do
-
-        ! --- field axes -> positions in sc%axis -------------------------------
-        do i = 1, sc%par%n_field
-            do j = 1, sc%registry(i)%n_axis
-                sc%registry(i)%axis_k(j) = axis_position(sc, sc%registry(i)%axes(j), &
-                                "field "//trim(sc%registry(i)%name))
+            if (len_trim(t%snap0) > 0) sc%axis(i)%lo = snapshot_position(sc, t%snap0, "snap0 of &"//trim(t%group))
+            sc%axis(i)%hi = snapshot_position(sc, t%snap1, "snap1 of &"//trim(t%group))
+            do j = 1, size(t%fields)
+                if (len_trim(t%fields(j)) == 0) cycle
+                f = field_position(sc, t%fields(j), "field of &"//trim(t%group))
+                if (sc%registry(f)%n_axis >= AXS_MAX) then
+                    write(*,*) "snapshots:: Error: more than ", AXS_MAX, " terms on field "// &
+                               trim(t%fields(j))//"."
+                    stop 1
+                end if
+                sc%registry(f)%n_axis = sc%registry(f)%n_axis + 1
+                sc%registry(f)%axis_k(sc%registry(f)%n_axis) = i
             end do
+            end associate
         end do
 
         ! --- what the backend builds: the fields of the reference -------------
@@ -675,6 +679,24 @@ contains
         sc%par%with_ocn = binds(sc, sc%par%iref, "to")
 
         return
+
+    contains
+
+        subroutine add_name(name)
+            ! Add a snapshot name to `names` once.
+            character(len=*), intent(IN) :: name
+            integer :: m
+            do m = 1, sc%par%n_snap
+                if (trim(names(m)) == trim(name)) return
+            end do
+            if (sc%par%n_snap >= SNP_MAX) then
+                write(*,*) "snapshots:: Error: more than ", SNP_MAX, " snapshots."
+                stop 1
+            end if
+            sc%par%n_snap = sc%par%n_snap + 1
+            names(sc%par%n_snap) = name
+        end subroutine add_name
+
     end subroutine snapshots_par_load
 
     subroutine snapshots_check_bindings(sc)
@@ -683,16 +705,16 @@ contains
         !  - number of var_defs groups: tas 1 (monthly) or 2 ([ann, season]),
         !    pr 1 or 2 (monthly: sum, e.g. snowfall + rainfall) or 1 (annual),
         !    every other field 1;
-        !  - a state snapshot (the reference, or on an axis with a lo) binding tas
-        !    or pr binds zs (sea-level reduction); a snapshot binding zs and pr
-        !    binds tas (the precipitation is reduced with the temperature). Only
-        !    the hi of a lo = "" axis may leave out zs: its fields are then taken
-        !    as given, at sea level;
+        !  - a state snapshot (the reference, or of a term with a snap0) binding
+        !    tas or pr binds zs (sea-level reduction); a snapshot binding zs and
+        !    pr binds tas (the precipitation is reduced with the temperature).
+        !    Only the snap1 of a term without snap0 may leave out zs: its fields
+        !    are then taken as given, at sea level;
         !  - so needs to;
         !  - the reference binds the atmosphere as tas and pr together, or neither;
         !  - no snapshot binds a field the reference does not (it would not be
         !    built);
-        !  - every snapshot of an axis of a blended (linear, ratio) field binds it.
+        !  - every snapshot of a term on a blended (linear, ratio) field binds it.
         implicit none
         type(snapshots_class), intent(IN) :: sc
 
@@ -704,7 +726,7 @@ contains
 
         do s = 1, sc%par%n_snap
             associate(spec => sc%snap(s)%spec)
-            sgroup = "&"//trim(sc%par%group)//"_"//trim(spec%name)
+            sgroup = "&snapshot_"//trim(spec%name)
 
             do f = 1, sc%par%n_field
                 n = spec%nsrc(f)
@@ -729,7 +751,7 @@ contains
                                        &the backend builds only what the reference binds.")
             end do
 
-            ! A state: the reference, or a snapshot of an axis with a lo.
+            ! A state: the reference, or a snapshot of a term with a snap0.
             state = (s == iref)
             do k = 1, sc%par%n_axis
                 if (sc%axis(k)%lo > 0 .and. (sc%axis(k)%lo == s .or. sc%axis(k)%hi == s)) &
@@ -738,8 +760,8 @@ contains
             if (state .and. (binds(sc, s, "tas") .or. binds(sc, s, "pr")) .and. &
                 .not. binds(sc, s, "zs")) &
                 call binding_error(trim(sgroup)//" binds tas or pr but not zs (its elevation, &
-                                   &for the sea-level reduction); only the hi of an axis with &
-                                   &lo = """" may leave it out.")
+                                   &for the sea-level reduction); only the snap1 of a term &
+                                   &without snap0 may leave it out.")
             if (binds(sc, s, "zs") .and. binds(sc, s, "pr") .and. .not. binds(sc, s, "tas")) &
                 call binding_error(trim(sgroup)//" binds pr and zs but not tas (the &
                                    &precipitation is reduced to sea level with the temperature).")
@@ -750,17 +772,17 @@ contains
         end do
 
         if (binds(sc, iref, "tas") .neqv. binds(sc, iref, "pr")) &
-            call binding_error("the reference &"//trim(sc%par%group)//"_"//trim(sc%par%ref_name)// &
+            call binding_error("the reference &snapshot_"//trim(sc%par%ref_name)// &
                                " binds one of tas and pr: the atmosphere needs both (or neither).")
 
-        ! The snapshots of the axes of every blended field the reference binds.
+        ! The snapshots of the terms on every blended field the reference binds.
         do f = 1, sc%par%n_field
             if (sc%snap(iref)%spec%nsrc(f) == 0) cycle
             if (trim(sc%registry(f)%blend) /= "linear" .and. trim(sc%registry(f)%blend) /= "ratio") cycle
             do j = 1, sc%registry(f)%n_axis
                 k = sc%registry(f)%axis_k(j)
-                if (sc%axis(k)%lo > 0) call check_axis_snapshot(sc%axis(k)%lo, "lo")
-                call check_axis_snapshot(sc%axis(k)%hi, "hi")
+                if (sc%axis(k)%lo > 0) call check_axis_snapshot(sc%axis(k)%lo, "snap0")
+                call check_axis_snapshot(sc%axis(k)%hi, "snap1")
             end do
         end do
 
@@ -772,10 +794,9 @@ contains
             integer,          intent(IN) :: s
             character(len=*), intent(IN) :: end_name
             if (sc%snap(s)%spec%nsrc(f) == 0) &
-                call binding_error("field "//trim(sc%registry(f)%name)//" (blend "// &
-                                   trim(sc%registry(f)%blend)//") lists axis "// &
-                                   trim(sc%axis(k)%name)//", whose "//end_name//" snapshot "// &
-                                   trim(sc%snap(s)%spec%name)//" does not bind it.")
+                call binding_error("term "//trim(sc%axis(k)%name)//" lists the field "// &
+                                   trim(sc%registry(f)%name)//", but its "//end_name// &
+                                   " snapshot "//trim(sc%snap(s)%spec%name)//" does not bind it.")
         end subroutine check_axis_snapshot
 
         subroutine binding_error(msg)
@@ -794,26 +815,29 @@ contains
             if (trim(sc%snap(s)%spec%name) == trim(name)) return
         end do
         write(*,*) "snapshots:: Error: snapshot '"//trim(name)//"' ("//trim(what)// &
-                   ") is not in the snapshots list."
+                   ") is not a snapshot of this run."
         stop
     end function snapshot_position
 
-    integer function axis_position(sc, name, what) result(k)
-        ! Position of the axis `name` in sc%axis; stops if it is not listed.
+    integer function field_position(sc, name, what) result(f)
+        ! Position of the field `name` in the registry; stops if it is not a field.
         type(snapshots_class), intent(IN) :: sc
         character(len=*),    intent(IN) :: name, what
-        do k = 1, sc%par%n_axis
-            if (trim(sc%axis(k)%name) == trim(name)) return
+        do f = 1, sc%par%n_field
+            if (trim(sc%registry(f)%name) == trim(name)) return
         end do
-        write(*,*) "snapshots:: Error: axis '"//trim(name)//"' ("//trim(what)// &
-                   ") is not in the axes list."
-        stop
-    end function axis_position
+        write(*,*) "snapshots:: Error: field '"//trim(name)//"' ("//trim(what)// &
+                   ") is not one of [snapshots] fields."
+        stop 1
+    end function field_position
 
-    subroutine read_field_spec(fs, filename, group, name, combine_default)
+    subroutine read_field_spec(fs, group, name, combine_default)
+        ! One field of the registry: its kind and blend rule follow from its
+        ! name (tas, to, so: linear; pr: ratio; zs: const); the terms on it
+        ! are added by snapshots_par_load.
         implicit none
         type(field_spec_class), intent(OUT) :: fs
-        character(len=*),       intent(IN)  :: filename, group, name, combine_default
+        character(len=*),       intent(IN)  :: group, name, combine_default
 
         fs%name           = name
         fs%combine        = combine_default
@@ -823,44 +847,26 @@ contains
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
         fs%seasonal_synth = .FALSE.
-        ! Only the keys the current model uses are read (blend/axes, template
-        ! snap_field); the remaining knobs (combine/enabled/*_flags) keep their
-        ! struct defaults. The field name decides its kind.
-        call nml_validate(filename, def_file, group, defaults_group="snap_field")
-        call nml_read(filename, group, "blend", fs%blend, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_field")
-        call nml_read(filename, group, "axes",  fs%axes,  init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_field")
-        fs%n_axis = count(len_trim(fs%axes) > 0)
 
         select case(trim(name))
             case("tas")
-                fs%kind = "atm_temp"
+                fs%kind  = "atm_temp"
+                fs%blend = "linear"
             case("pr")
-                fs%kind = "atm_precip"
+                fs%kind  = "atm_precip"
+                fs%blend = "ratio"
             case("to")
-                fs%kind = "ocn"
+                fs%kind  = "ocn"
+                fs%blend = "linear"
             case("so")
-                fs%kind = "ocn_salt"
+                fs%kind  = "ocn_salt"
+                fs%blend = "linear"
             case("zs")
-                fs%kind = "elev"
+                fs%kind  = "elev"
+                fs%blend = "const"
             case default
-                write(*,*) "snapshots:: Error: &"//trim(group)//": unknown field '"// &
+                write(*,*) "snapshots:: Error: &"//trim(group)//" fields: unknown field '"// &
                            trim(name)//"' (tas, pr, to, so, zs)."
-                stop 1
-        end select
-
-        select case(trim(fs%blend))
-            case("linear", "ratio", "const")
-                ! ok
-            case("fraction")
-                write(*,*) "snapshots:: Error: &"//trim(group)//" blend = 'fraction' was removed: &
-                           &set blend = 'const' and use the climate modifier [ocn_fraction] &
-                           &(f_to, region; see docs/climate-snapshots.md)."
-                stop 1
-            case default
-                write(*,*) "snapshots:: Error: &"//trim(group)//" blend = '"//trim(fs%blend)// &
-                           "'; must be linear, ratio or const."
                 stop 1
         end select
 
@@ -884,17 +890,17 @@ contains
 
         ss%name      = name
         ss%is_ref    = .FALSE.
-        call nml_validate(filename, def_file, group, defaults_group="snap_snapshot")
+        call nml_validate(filename, def_file, group, defaults_group="snapshot")
         call nml_read(filename, group, "exp",        ss%exp,        init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_snapshot")
+                      defaults_file=def_file, defaults_group="snapshot")
         call nml_read(filename, group, "monthly",    ss%monthly,    init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_snapshot")
+                      defaults_file=def_file, defaults_group="snapshot")
         call nml_read(filename, group, "clim_sigma", ss%clim_sigma, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_snapshot")
+                      defaults_file=def_file, defaults_group="snapshot")
         call nml_read(filename, group, "ocn_sigma",  ss%ocn_sigma,  init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_snapshot")
+                      defaults_file=def_file, defaults_group="snapshot")
         call nml_read(filename, group, "tas_season", ss%tas_season, init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snap_snapshot")
+                      defaults_file=def_file, defaults_group="snapshot")
         if (len_trim(ss%tas_season) == 0) then
             ss%tas_season = "jja"
             if (south) ss%tas_season = "djf"
@@ -915,7 +921,7 @@ contains
         ss%refs = ""
         do f = 1, size(registry)
             call nml_read(filename, group, trim(registry(f)%name), refs, init=.TRUE., &
-                          defaults_file=def_file, defaults_group="snap_snapshot")
+                          defaults_file=def_file, defaults_group="snapshot")
             ss%refs(f,:) = refs
             ss%nsrc(f)   = count(len_trim(refs) > 0)
             if (len_trim(refs(1)) == 0 .and. ss%nsrc(f) > 0) then
@@ -962,7 +968,7 @@ contains
                 do k = 1, nsrc
                     vdb = var_defs_find(sc%par%var_defs, trim(sc%par%par_file), &
                                         trim(sc%snap(s)%spec%refs(f,k)), &
-                                        "&"//trim(sc%par%group)//"_"//trim(sc%snap(s)%spec%name)// &
+                                        "&snapshot_"//trim(sc%snap(s)%spec%name)// &
                                         " "//trim(sc%registry(f)%name))
                     call varslice_init_nml(sc%snap(s)%bind(f)%src(k), trim(vdb), &
                                            trim(sc%snap(s)%spec%refs(f,k)), &

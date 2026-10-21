@@ -3,8 +3,8 @@
 # with its comments), the forcing library (input/forcing_db.nml), the run
 # control and forcing groups of the base par files (yelmox/yelmox_*.nml), the
 # climate database groups (input/clim_db.nml, for display) and the scalar
-# series files of input/ (downsampled), so the page can draw every index and
-# sea-level series.
+# series files of input/ (downsampled), so the page can draw every tsgen
+# series and the sea level.
 #
 # Usage (from the repository root):
 #   julia --project=scripts/forcing-builder scripts/forcing-builder/export.jl [OUT.json]
@@ -20,8 +20,8 @@ const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 const OUT = length(ARGS) >= 1 ? ARGS[1] : joinpath(ROOT, "docs", "forcing-builder", "forcing.json")
 const NMAX = 800          # points per exported series
 
-# The groups of a base exported: run control, components, forcing, modifiers.
-const BASE_GROUPS = r"^(ctrl|comps|sim|output|tm_\w+|indices|idx_\w+|anom|ocn_fraction|ocn_obm|taper|bias|orbit|ice_bnd|barysealevel|snap|snap_\w+|esm|obm_forcing|domain|spinup|transient)$"
+# The groups of a base exported: run control, components, forcing, transforms.
+const BASE_GROUPS = r"^(ctrl|comps|sim|output|tm_\w+|forcing|series_\w+|term_\w+|snapshots|snapshot_\w+|taper|bias|orbit|ice_bnd|barysealevel|esm|obm_forcing|domain|spinup|transient)$"
 
 jkey(k::Key) = Dict("raw" => k.raw, "v" => parse_value(k.raw), "c" => k.comment, "pre" => k.pre)
 jgroup(g::Group) = Dict("c" => g.comment, "order" => [k.name for k in g.keys],
