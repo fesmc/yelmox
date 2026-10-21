@@ -150,7 +150,7 @@
     ! Static bias correction of the atmosphere: MAR v3.14 - ERA5 (1981-2010)
     ! over Greenland, tapered to zero within 100 km outside the MAR coverage
     ! (docs/_grl-paleo-plan.md, "Reference climate on GRL-PAL"). Made with
-    ! [snap] lapse and f_p = 0.06: remake it when these change.
+    ! [snapshots] lapse and f_p = 0.06: remake it when these change.
     active   = True     ! Apply it?
     dtas     = "bias_mar_era5_1981_2010_dtas"
     fpr      = "bias_mar_era5_1981_2010_fpr"
@@ -158,9 +158,9 @@
 
 &orbit
     ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
-    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
-    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
-    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+    ! per (method = "fixed_orbit") and fldr from input/yelmox_defaults.nml.
+    method = "fixed_time"   ! forcing_time: at the forcing time; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
 /
 
 
@@ -171,7 +171,7 @@
     active     = False
     method     = "file"               ! file: H_ice at the forcing time; scaled: H = f(index)*H_ice(slice_time)
     H_ice      = "paleomist_H_ice"    ! input/clim_db.nml: PaleoMIST 1.0, 80-0 ka (glac1d_H_ice: GLAC-1D, 26-0 ka)
-    index      = ""                   ! scaled: the index f ([indices] names)
+    index      = ""                   ! scaled: the series f ([forcing] series)
     slice_time = -21e3                ! [yr] scaled: time of the slice
 /
 

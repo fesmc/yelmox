@@ -20,7 +20,7 @@ if [ ! -d "${restart}" ]; then
 fi
 
 run_params=(
-    "ctrl.tstep_method=rel"     # forcing clock = model time (paleo sea level follows time)
+    "ctrl.tstep_method=rel"     # forcing time = model time (paleo sea level follows time)
     "ctrl.time_init=-130e3"     # [yr]
     "ctrl.time_end=0.0"         # [yr]
     "tm_1D.dt=100"              # [yr] 1D output

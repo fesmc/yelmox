@@ -13,7 +13,7 @@ grlpal_lgp=(
     "forcing.series==glacial,dTo"       # the glacial index [series_glacial]; dTo: 0.25 x the mean air anomaly
     "forcing.terms==glacial,ocean"      # glacial: lgm - picontrol (PMIP3) weighted by the index, on tas and pr;
                                         # ocean: the profiles plus dTo
-    "orbit.method=clock"                # transient insolation (orbit at the forcing time)
+    "orbit.method=forcing_time"                # transient insolation (orbit at the forcing time)
 )
 
 # B: deglaciation after Tabone et al. (2024) (run_spinup.sh recon, run_deglac.sh).
@@ -30,5 +30,5 @@ grlpal_recon=(
     "taper.active=True"                     # towards the reference outside the GRL box:
     "taper.weight=taper_b18_b20"            #   w = 1 in the reconstructions' coverage, 0 beyond 100 km
     "taper.outside=mean"                    #   where w < 1: ref + the mean anomaly of the cells with w = 1
-    "orbit.method=clock"                    # insolation at the forcing time
+    "orbit.method=forcing_time"                    # insolation at the forcing time
 )

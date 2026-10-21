@@ -22,7 +22,7 @@
 #         [--fpr_min 0.2] [--fpr_max 5] [--fig]
 #
 # Writes ice_data/GreenlandPaleo/GRL-PAL-<res>KM/GRL-PAL-<res>KM_BIAS-MARv3.14-ERA5-1981-2010.nc
-# (and a figure next to it with --fig). l1, l2, f_p must be the [snap] lapse and
+# (and a figure next to it with --fig). l1, l2, f_p must be the [snapshots] lapse and
 # f_p of the par file; they are written as attributes.
 
 using NCDatasets

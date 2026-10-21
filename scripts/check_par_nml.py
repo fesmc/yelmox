@@ -75,7 +75,7 @@ SRC_DIRS = ["libs", "yelmox", "yelmox_bipolar", "fesm-utils", "FastIsostasy",
 SKIP_DIRS = {".git", ".claude", "output", "logs", "tmp"}
 
 # Group prefixes of a library file -> template group of yelmox_defaults.nml
-# (None: not checked here). First match wins, so snap_axis_ before snap_.
+# (None: not checked here). First match wins.
 LIBRARY_PREFIX = [("series_", "series"), ("term_", "term"), ("snapshot_", "snapshot"),
                   ("elsa_", None)]
 

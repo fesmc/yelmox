@@ -20,7 +20,7 @@ if [ ! -d "${restart}" ]; then
 fi
 
 run_params=(
-    "ctrl.tstep_method=rel"     # forcing clock = model time
+    "ctrl.tstep_method=rel"     # forcing time = model time
     "ctrl.time_init=-21e3"      # [yr]
     "ctrl.time_end=0.0"         # [yr]
     "comps.dt_clim=100"         # [yr] the reconstructions are read and remapped at each update

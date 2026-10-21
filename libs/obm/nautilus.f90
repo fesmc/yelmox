@@ -78,7 +78,8 @@ module nautilus
 
         ! Initial state: the *_init parameters, which stay the cold-start values
         ! (the reference of the atmospheric forcing, theta_i_init + ampl_i*dT,
-        ! and of the box anomaly of ocn_obm, tn - tn_init); on a restart the
+        ! and of the box anomaly of the derived series obm_north/obm_south,
+        ! tn - tn_init); on a restart the
         ! state is then taken from the restart file.
         call nml_read(filename, group, "tn_init", ntls%par%tn_init)
         call nml_read(filename, group, "tt_init", ntls%par%tt_init)

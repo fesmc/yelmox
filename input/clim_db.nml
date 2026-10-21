@@ -15,7 +15,7 @@
 ! Path keywords:
 !   {domain}, {grid_name}  the domain ([domain] name) and the climate grid
 !   {grid_global}          the global grid of the paleoclimate products,
-!                          [snap] grid_global (default GLOBAL-1DEG)
+!                          [snapshots] grid_global (default GLOBAL-1DEG)
 !   {exp}                  the experiment of the snapshot, its exp key
 !                          (lgm, piControl, present, stadial, ...)
 ! Present-day references are regional ({domain}/{grid_name}, high
@@ -155,7 +155,7 @@
 
 ! ---- Bias MAR v3.14 - ERA5, 1981-2010, GreenlandPaleo, monthly ([bias]) ----
 ! ice_data, made by scripts/grl-paleo/make_bias_mar_era5.jl: at sea level with
-! [snap] lapse = 0.0080 0.0065 and f_p = 0.06 (file attributes).
+! [snapshots] lapse = 0.0080 0.0065 and f_p = 0.06 (file attributes).
 
 &bias_mar_era5_1981_2010_dtas
     filename = "ice_data/{domain}/{grid_name}/{grid_name}_BIAS-MARv3.14-ERA5-1981-2010.nc"

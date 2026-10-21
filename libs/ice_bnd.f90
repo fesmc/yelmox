@@ -85,7 +85,7 @@ contains
         end select
         if (trim(ibnd%method) == "scaled" .and. .not. indices_has(idx, ibnd%index)) then
             write(*,*) "ice_bnd_init:: error: ["//trim(group)//"] method = scaled: index = '"// &
-                       trim(ibnd%index)//"' is not in [indices] names."
+                       trim(ibnd%index)//"' is not in [forcing] series."
             error stop 1
         end if
 

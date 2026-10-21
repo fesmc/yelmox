@@ -38,7 +38,7 @@ be multiples of the climate, isostasy and output intervals (`dt_clim`,
 ## What changes after the first chunk
 
 Some settings are timed from the start of a run (`time_elapsed`), not from the
-forcing clock, and must be set for the later chunks (`--p-rest`):
+forcing time, and must be set for the later chunks (`--p-rest`):
 
 | Setting | Later chunks |
 |---|---|

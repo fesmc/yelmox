@@ -156,11 +156,11 @@
 &orbit
     ! The orbital elements of the insolation of the surface models (chion
     ! itm/bessi, smbpal itm; fesmc/insol, Laskar et al. 2004 tables).
-    method = "time"     ! clock: at the forcing time time_rel; time: at a fixed time; fixed: ecc, obl, per
-    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
-    ecc    = 0.016702   ! [1]   eccentricity (fixed; these: the tables at 1950)
-    obl    = 23.4393    ! [deg] obliquity (fixed)
-    per    = 102.918    ! [deg] longitude of perihelion (fixed)
+    method = "fixed_time"   ! forcing_time: at the forcing time time_rel; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
+    ecc    = 0.016702   ! [1]   eccentricity (fixed_orbit; these: the tables at 1950)
+    obl    = 23.4393    ! [deg] obliquity (fixed_orbit)
+    per    = 102.918    ! [deg] longitude of perihelion (fixed_orbit)
     fldr   = "input"    ! folder of the orbital tables (LA2004.INSOLN.5Ma.txt, LA2004.INSOLP.1Ma.txt)
 /
 

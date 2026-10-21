@@ -141,7 +141,7 @@ contains
         end if
         if (oc%atm2obm .and. .not. indices_has(idx, oc%forcing_index)) then
             write(*,*) "obm_coupling_init:: error: [obm_forcing] index = '"// &
-                       trim(oc%forcing_index)//"' is not in [indices] names (needed by atm2obm)."
+                       trim(oc%forcing_index)//"' is not in [forcing] series (needed by atm2obm)."
             error stop 1
         end if
         if (oc%ism2obm .and. .not. (active_north .or. active_south)) then

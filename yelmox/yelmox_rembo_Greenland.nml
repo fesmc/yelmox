@@ -21,7 +21,7 @@
     with_climate      = True   ! Is the climate (atmosphere + ocean) active?
     with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
     with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
-    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapshots ocean ([snap])
+    climate         = "rembo"  ! climate backend: REMBO atmosphere + smb, snapshots ocean ([snapshots])
     surface_method  = "climate" ! the smb from the climate (REMBO)
     dt_clim         = 10.0     ! [yr] climate update interval (= dtt: REMBO has its own intervals)
     dt_isos         = 10.0     ! [yr] isostasy update interval
@@ -131,9 +131,9 @@
 
 &orbit
     ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
-    ! per (method = "fixed") and fldr from input/yelmox_defaults.nml.
-    method = "time"     ! clock: at the forcing clock; time: at a fixed time; fixed: ecc, obl, per
-    time   = 0.0        ! [yr] model time of the orbit (time; relative to 1950, past < 0)
+    ! per (method = "fixed_orbit") and fldr from input/yelmox_defaults.nml.
+    method = "fixed_time"   ! forcing_time: at the forcing time; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
 /
 
 ! ===== Simulation options =====

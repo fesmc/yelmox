@@ -46,9 +46,9 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`cf_init = -1`); the ice relaxes towards the observations at the grounding
   line and grounding zone (`[relax] topo_rel = 4`) until 3 kyr (`[sim] relax =
   True`, `[relax] time2`).
-- **Climate:** present day (`[snap] snapshots = "pd"`); `[ocn_fraction]`
-  (`f_to = 0.40`) is active but sees no anomaly (the sea-level air temperature
-  is the reference's).
+- **Climate:** present day (`forcing.series==dTo`, `forcing.terms==ocean`);
+  the term `ocean` (`series_dTo.factor=0.40`) is active but sees no anomaly
+  (the sea-level air temperature is the reference's).
 - **Output:** restart bundles every 15 kyr, so `restart-0.000-kyr` and
   `restart-15.000-kyr`; 2D output every 5 kyr, 1D every 100 yr.
 
@@ -58,16 +58,15 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`tstep_method = "rel"`), so that the sea level and the index follow the
   records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
   from the restart.
-- **Climate:** snapshots `pd`, `picontrol`, `lgm` and the axis `a`
-  (`[snap_axis_a]`, `picontrol` -> `lgm`): the present-day reference plus the
-  PMIP3 LGM -- piControl anomaly of the air temperature (`[snap_field_tas]`,
-  `blend = "linear"`) and ratio of the precipitation (`[snap_field_pr]`,
-  `blend = "ratio"`), scaled by the glacial index `[idx_a]`
-  (`method = "series"`, `input/alpha_combined_125kyr_interp.dat`, as is: 0 =
-  present day, 0.92 at 21 ka, -0.2 in the last interglacial). The ocean
-  anomaly is `f_to = 0.25` times the mean sea-level air temperature anomaly
-  (`[ocn_fraction]`). Insolation varies in time
-  (`[orbit] method = "clock"`, the orbit at the forcing clock, for chion and smbpal).
+- **Climate:** the present-day reference plus the term `glacial`
+  (`[term_glacial]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
+  piControl anomaly of the air temperature and ratio of the precipitation,
+  scaled by the series `glacial` (`[series_glacial]`, `method = "series"`,
+  `input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, 0.92 at
+  21 ka, -0.2 in the last interglacial). The term `ocean` adds the derived
+  series `dTo`, 0.25 times the mean sea-level air temperature anomaly.
+  Insolation varies in time (`[orbit] method = "forcing_time"`, the orbit at
+  the forcing time, for chion and smbpal).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
 - **Ice age:** isochrones with elsa (`[ytrc] use_elsa`, `[elsa_ant_paleo]`): one
   layer every 1 kyr, coupled every 50 yr.
@@ -81,8 +80,8 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 |---|---|
 | Grids | `ANT-32KM` for every component (single-grid setup) |
 | Topography | BedMachine v4 (`[topo]`, FesmData `ANT-32KM_TOPO-BedMachine-v4.nc`) |
-| Reference climate (`snap_pd`) | RACMO2.3p2 1981--2010, monthly (2 m air temperature, precipitation, surface elevation; FesmData `SMB-RACMO2.3p2-1981-2010`); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
-| Snapshots (`snap_picontrol`, `snap_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; annual mean and DJF air temperature, annual precipitation; atmosphere only, the ocean follows `[ocn_fraction]`) |
+| Reference climate (`snapshot_pd`) | RACMO2.3p2 1981--2010, monthly (2 m air temperature, precipitation, surface elevation; FesmData `SMB-RACMO2.3p2-1981-2010`); ocean ISMIP7 climatology (FesmData `Ocean-ISMIP7`) |
+| Snapshots (`snapshot_picontrol`, `snapshot_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; annual mean and DJF air temperature, annual precipitation; atmosphere only, the ocean follows the term `ocean`) |
 | Surface mass balance | chion ITM (`[comps] surface_method = "chion"`) |
 | Shelf melt | `bmb_method = "quad-nl"`, `tf_method = 1` |
 | Calving | `calv_flt_method = "vm-m16"` |

@@ -64,6 +64,6 @@ antpal_lgp=(
     "forcing.terms==glacial,ocean"      # glacial: lgm - picontrol (PMIP3) weighted by the index, on tas and pr
     "snapshot_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"   # summer: DJF
     "snapshot_lgm.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"         # summer: DJF
-    "orbit.method=clock"                # transient insolation (orbit at the forcing time)
+    "orbit.method=forcing_time"                # transient insolation (orbit at the forcing time)
     "barysealevel.method=file"          # sea level from sl_path
 )

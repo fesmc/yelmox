@@ -102,7 +102,7 @@ contains
 
     subroutine run_restart_write(dom, bsl, time, idx, fldr)
         ! Single-domain restart: write the domain bundle + the run-level shared bsl
-        ! restart + the driver-owned indices (idx_<name>_restart.nc) into one
+        ! restart + the driver-owned series (series_<name>_restart.nc) into one
         ! folder. By default the auto-named per-time folder; `fldr` overrides it
         ! (e.g. the forcing-increment "restart-<n>" folders). Multi-domain drivers
         ! write the run-level files themselves, each domain into a subfolder.

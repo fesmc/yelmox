@@ -16,12 +16,13 @@ program yelmox_bipolar
     ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
-    ! Per-step coupling order: shared sea level and indices ([indices], read
-    ! by the climate of both domains and the OBM forcing), then per domain
+    ! Per-step coupling order: shared sea level and series ([forcing] series,
+    ! read by the climate of both domains and the OBM forcing), then per domain
     ! relaxation, optimization + isostasy, then one OBM step, then per domain
     ! ice sheet + climate + smb, then the ocean exchanges (atm->obm from the
-    ! global index of [obm_forcing], ism->obm freshwater flux, hysteresis
-    ! forcing, obm->ism ocean temperature through each domain's ocn_obm<sfx>),
+    ! global series of [obm_forcing], ism->obm freshwater flux, hysteresis
+    ! forcing, obm->ism ocean temperature through the derived series obm_north/
+    ! obm_south and each domain's terms on them),
     ! then per domain marine shelf (which reads the obm-updated ocean
     ! temperature). Per-domain physics live in the
     ! kryos modules (libs/kryos*.f90); the ocean coupling lives in
@@ -60,8 +61,8 @@ program yelmox_bipolar
     character(len=512) :: path_par
     type(tstep_class)  :: ts
     type(bsl_class)    :: bsl                 ! shared, driver-owned sea level
-    type(indices_class) :: idx                ! shared, driver-owned indices ([indices])
-    real(wp)           :: fvar                ! response variable of the indices: ice volume [Gt]
+    type(indices_class) :: idx                ! shared, driver-owned series ([forcing] series)
+    real(wp)           :: fvar                ! response variable of the series: ice volume [Gt]
     character(len=512) :: restart             ! run restart bundle ([ctrl]), or "None"
 
     ! Two explicit hemispheric domains (bipolar: never more than north + south).
@@ -118,9 +119,9 @@ program yelmox_bipolar
     call nml_read(path_par, "ctrl", "restart", restart)
     call bsl_startup(bsl, restart)
 
-    ! === Shared, driver-owned indices on the forcing clock (both domains read
+    ! === Shared, driver-owned series on the forcing time (both domains read
     !     them), restored from the run restart bundle. Before the domains: their
-    !     climate checks the indices it names. ===
+    !     climate checks the series it names. ===
     call indices_init(idx, path_par, ts%time_rel)
     if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
 
@@ -128,8 +129,9 @@ program yelmox_bipolar
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
     if (active_south) call setup_domain(dom_south, "_south", outfldr_south)
 
-    ! The ocean couplings checked against the indices and the domains
-    ! (ocn_obm<sfx>), and the hydrographic masks (Yelmo grid) restricting the
+    ! The ocean couplings checked against the series and the domains (the
+    ! derived series obm_north/obm_south and the terms on them), and the
+    ! hydrographic masks (Yelmo grid) restricting the
     ! freshwater flux per domain.
     call obm_coupling_init(oc, idx, dom_north, dom_south, active_north, active_south)
 
@@ -142,7 +144,7 @@ program yelmox_bipolar
         call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
 
-        ! The domains' ocean from the box (ocn_obm<sfx>) and their shelf
+        ! The domains' ocean from the box (the obm_* series) and their shelf
         ! forcing, so the first record and the first step see it.
         call obm_ocean_init(oc, obox, idx, dom_north, dom_south, active_north, active_south, ts, &
                             cold_start=(trim(restart) == "None"))
@@ -253,14 +255,14 @@ program yelmox_bipolar
             call timer_step(tmr, tt_surface)
         end if
 
-        ! Inter-domain ocean coupling (shared obm): atm->obm (global index),
+        ! Inter-domain ocean coupling (shared obm): atm->obm (global series),
         ! ism->obm freshwater flux, hysteresis forcing, obm->ism ocean
-        ! temperature (ocn_obm<sfx>).
+        ! temperature (the obm_* series and the ocean terms).
         call obm_exchange(oc, obox, idx, dom_north, dom_south, active_north, active_south, &
                           ts%time, ts%time_init, dtt)
         call timer_step(tmr, tt_obm_exchange)
 
-        ! Marine shelf (both domains) -- reads the obm-updated to_ann (ocn_obm<sfx>).
+        ! Marine shelf (both domains) -- reads the obm-updated to_ann.
         if (active_north) call step_shelf(dom_north, ts)
         if (active_south) call step_shelf(dom_south, ts)
         call timer_step(tmr, tt_shelf)

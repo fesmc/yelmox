@@ -28,23 +28,26 @@ the surface mass balance; the ocean comes from the snapshot backend.
   the run at start-up (REMBO gives annual fields only).
 - **Update cadence.** `[comps] dt_clim = dtt` (10 yr): REMBO updates its energy
   balance and its smb on its own intervals (`dtime_emb = 100`, `dtime_smb = 1`
-  in `rembo_Greenland.nml`), with the insolation at the forcing clock
+  in `rembo_Greenland.nml`), with the insolation at the forcing time
   `time_rel`.
-- **Ocean.** The `[snap]` groups of the snapshot backend (see [Snapshots](climate-snapshots.md))
-  with an ocean-only reference snapshot: `snapshots = "pd"`, `ref_name = "pd"`,
-  no axes, the `pd` snapshot binding the ORAS5 1981-2010 climatology
-  (`oras5_1981_2010_to`, `oras5_1981_2010_so` of `input/clim_db.nml`). The
-  reference must bind `to` and no atmosphere (checked at start-up); `so` is
-  optional (salinity 0 without it).
-- **Transient forcing.** `[anom]`, read by the rembo backend itself (an input of
-  REMBO, not a modifier after it), maps the value `f` of its index onto REMBO's
-  anomalies: the summer air temperature `dT_sum = f·f_ta`, the annual
-  `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6), and the ocean
-  `dT_ocn = dT_ann·f_to`, added to the snapshot ocean; `f_so` is not used.
-  Off in the par file (`[anom] active = False`, `[indices] names = ""`).
-- **Climate modifiers.** `[ocn_fraction]`, `[taper]` and `[bias]` are refused
-  at start-up (no sea-level air temperature, no reference atmosphere, annual
-  fields only).
+- **Ocean.** The snapshot backend (see [Snapshots](climate-snapshots.md))
+  with an ocean-only reference snapshot: `[forcing] reference = "pd"`, the
+  `pd` snapshot binding the ORAS5 1981-2010 climatology (`oras5_1981_2010_to`,
+  `oras5_1981_2010_so` of `input/clim_db.nml`). The reference must bind `to`
+  and no atmosphere (checked at start-up); `so` is optional (salinity 0
+  without it). The ocean takes the ocean terms of `[forcing]` as for the
+  snapshots backend (a uniform term on `to`, e.g. `series = "hyst"`,
+  `f_to = 0.25`).
+- **Transient forcing.** The uniform terms on `tas` (`[term_<name>]
+  pattern = "uniform"`) are an input of REMBO, not applied after it: their
+  sum `f_ta·f` is REMBO's summer air temperature anomaly `dT_sum`, the annual
+  `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6); `pr` in their fields has
+  no effect (REMBO computes the precipitation). Snapshot terms on the
+  atmosphere are refused. Off in the par file (`[forcing] series = ""`,
+  `terms = ""`).
+- **Transforms.** `[taper]` and `[bias]` are refused at start-up (no reference
+  atmosphere, annual fields only); so is a derived `air_anomaly` series (no
+  sea-level air temperature).
 - **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
 ## Output
@@ -52,9 +55,10 @@ the surface mass balance; the ocean comes from the snapshot backend.
 The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, ...), plus, with
 `[output] write_clim`, `rembo.nc` (annual and summer air temperature,
 precipitation, smb, surface temperature, ocean profiles) and `rembo_ts.nc` (the applied anomalies, the smb integrated
-over the ice sheet and the accumulation-area ratio). The indices go to
-the Yelmo 1D file (`idx_<name>`), as for the other climates. The shipped
-`rembo_Greenland` keeps the hysteresis setup as an unlisted `[idx_hyst]`
-(PI42 with kill switch): add `"hyst"` to `[indices] names` and set
-`[anom] active = True, index = "hyst"` to run it. Restart bundles hold REMBO's
+over the ice sheet and the accumulation-area ratio). The series go to
+the Yelmo 1D file (`series_<name>`), as for the other climates. The library
+holds the hysteresis setup, `series_hyst` (PI42 with kill switch) and the
+uniform `term_hyst` on `tas` and `pr`: `-p forcing.series=hyst
+forcing.terms=hyst` runs it (a second uniform term on `to` for the ocean).
+Restart bundles hold REMBO's
 `rembo_restart.nc`; REMBO reads its restart as set in `rembo_Greenland.nml`.

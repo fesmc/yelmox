@@ -845,11 +845,10 @@ contains
     subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
                             idx, init)
         ! REMBO's atmosphere and surface mass balance, and the ocean from snapshots
-        ! (at `time`, as for the snapshots backend). The exception to the
-        ! modifiers: REMBO needs the anomaly before it runs, so it reads [anom]
-        ! itself (climate_mods skips anom for rembo). The index f maps onto
-        ! REMBO's anomalies: the summer air temperature dT_sum = f*f_ta, the
-        ! annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6), and the ocean
+        ! (at `time`, as for the snapshots backend). REMBO needs the anomaly
+        ! before it runs, so the uniform terms on tas are its input (not applied
+        ! after it): their sum f_ta*f is the summer air temperature anomaly
+        ! dT_sum, the annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6).
         ! Its ocean comes from the snapshots and the ocean terms (climate_update).
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
