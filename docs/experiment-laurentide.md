@@ -53,12 +53,12 @@ runme -rs -q 12h -w 10:00:00 -e yelmox -n yelmox/yelmox_North.nml -o output/nort
 
 ## Climate
 
-The reference `pd` plus the term `glacial` (`[term_glacial]`, `picontrol`
+The reference `pd` plus the term `lgm` (`[term_lgm]`, `picontrol`
 -> `lgm` on `tas` and `pr`): ERA5 1981--2010 plus the PMIP3 LGM -- piControl
 anomaly, additive for the temperature, as a ratio for the precipitation. The
 PMIP3 snapshots are annual and JJA means (`monthly = False`), smoothed over
 50 km (`clim_sigma`). The series is constant at the LGM (the par file
-redefines `[series_glacial]` as `method = "const"`, `f_min = 1`), so the
+redefines `[series_alpha]` as `method = "const"`, `f_min = 1`), so the
 climate does not depend on the forcing time. The ocean is ORAS5 1981--2010
 plus the term `ocean`, 0.25 times the mean sea-level air temperature anomaly
 over the domain (the derived series `dTo`, `region = "all"`).

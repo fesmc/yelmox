@@ -123,9 +123,9 @@ rates and `f_p` are written as attributes: remake the file when `[snapshots] lap
 
 - **Timeline:** `[ctrl]` -130 kyr to 0, `dtt = 10` yr, on relative time
   (`tstep_method = "rel"`). `[sim] relax = False`, `opt = False`.
-- **Climate:** the present-day reference plus the term `glacial`
-  (`[term_glacial]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
-  piControl anomaly scaled by the series `glacial` (`[series_glacial]`,
+- **Climate:** the present-day reference plus the term `lgm`
+  (`[term_lgm]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
+  piControl anomaly scaled by the series `alpha` (`[series_alpha]`,
   `input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
   21 ka, -0.2 in the last interglacial). The term `ocean` adds the derived
   series `dTo`, 0.25 times the mean sea-level air temperature anomaly.

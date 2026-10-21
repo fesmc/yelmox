@@ -6,13 +6,13 @@
 ! Lookup: a named group is read from the par file if it has it, else from the
 ! first [forcing] var_defs file that does (this file is in the default list).
 ! A par file uses the library by selecting groups by name:
-!     &forcing  reference = "pd"  series = "glacial" "dTo"  terms = "glacial" "ocean"
+!     &forcing  reference = "pd"  series = "alpha" "dTo"  terms = "lgm" "ocean"
 ! elsa groups are read by yelmo straight from the file [ytrc] elsa_nml names,
 ! selected by [ytrc] elsa_group:
 !     &ytrc     elsa_nml = "input/forcing_db.nml"  elsa_group = "elsa_grl_lgp"
 !
 ! Override: define the group in the par file (it wins over this file), or set
-! a key with runme -p (e.g. -p series_glacial.f_min=1): runme copies the whole
+! a key with runme -p (e.g. -p term_lgm.fields=tas): runme copies the whole
 ! group from this file into the staged par file, then applies the override
 ! (par_library in .runme/info.json).
 !
@@ -69,30 +69,14 @@
 
 ! ===== Series (tsgen groups, or derived; units and restart_every_df optional) =====
 
-&series_glacial
-    ! Glacial index (alpha_combined_125kyr_interp: 0 at present, ~0.9 at
-    ! 21 ka), used as is (not normalised): the weight of the LGM anomaly
-    ! (term_glacial).
+&series_alpha
+    ! The default alpha, read when the par file has no [series_alpha]: the
+    ! glacial index alpha_combined_125kyr_interp (0 at present, ~0.9 at 21 ka),
+    ! as is (not normalised). The series are named by their symbol in the
+    ! equation (alpha, beta, gamma, ...); a setup sets the record of each in
+    ! its par file (yelmox_Greenland.nml: alpha_orbital_r2020, normalised).
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
-/
-
-&series_orbital
-    ! Orbital index: alpha_orbital_r2020 normalised to 0 at present (piControl)
-    ! and 1 at 21 ka (LGM): the weight of the LGM anomaly (term_orbital).
-    method      = "series"
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
-/
-
-&series_orbital_t2018
-    ! Orbital index: alpha_orbital_t2018 (1 at present, 0 at 21 ka) normalised
-    ! to 0 at present and 1 at 21 ka (Pyrenees: a uniform cooling, f_ta = -10 K).
-    method      = "series"
-    series_file = "input/alpha_orbital_t2018.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
 /
 
 &series_dTo
@@ -172,18 +156,10 @@
 
 ! ===== Terms (series x pattern on explicit fields) =====
 
-&term_glacial
-    ! The LGM anomaly (PMIP3 lgm - piControl) weighted by the glacial index:
-    ! tas + glacial*(lgm - picontrol), pr * (1 + glacial*(lgm/picontrol - 1)).
-    series = "glacial"
-    snap0  = "picontrol"
-    snap1  = "lgm"
-    fields = "tas" "pr"
-/
-
-&term_orbital
-    ! The LGM anomaly weighted by the orbital index (0 at present, 1 at 21 ka).
-    series = "orbital"
+&term_lgm
+    ! The LGM anomaly (PMIP3 lgm - piControl) weighted by alpha:
+    ! tas + alpha*(lgm - picontrol), pr * (1 + alpha*(lgm/picontrol - 1)).
+    series = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"
     fields = "tas" "pr"

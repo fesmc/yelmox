@@ -58,10 +58,10 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`tstep_method = "rel"`), so that the sea level and the index follow the
   records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
   from the restart.
-- **Climate:** the present-day reference plus the term `glacial`
-  (`[term_glacial]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
+- **Climate:** the present-day reference plus the term `lgm`
+  (`[term_lgm]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
   piControl anomaly of the air temperature and ratio of the precipitation,
-  scaled by the series `glacial` (`[series_glacial]`, `method = "series"`,
+  scaled by the series `alpha` (`[series_alpha]`, `method = "series"`,
   `input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, 0.92 at
   21 ka, -0.2 in the last interglacial). The term `ocean` adds the derived
   series `dTo`, 0.25 times the mean sea-level air temperature anomaly.

@@ -26,7 +26,7 @@ RUN_ENSEMBLES="${RUN_ENSEMBLES:-0}"       # set to 1 to also submit the paramete
 # ice_data/Laurentide/LIS-32KM/LIS-32KM_Batchelor2019_ice_masks.nc):
 #   14=45ka  15=40ka  16=35ka (MIS-3)  17=30ka  18=LGM
 # ctrl.tstep_const is the forcing time [yr, relative to 1950]; with the constant
-# index [series_glacial], the fixed orbit ([orbit] method = "time") and the constant CO2
+# alpha [series_alpha], the fixed orbit ([orbit] method = "fixed_time") and the constant CO2
 # and insolation of smb_simple it does not change the climate here: the periods
 # differ in the target mask (smb_simple.mask_idx) only.
 
