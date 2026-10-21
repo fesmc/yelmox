@@ -300,9 +300,10 @@ yelmox/libs/
   kryos_startup.f90     cold start, restart bundles (domain_startup, ...)
   kryos_output.f90      per-module 2D/1D output, CMIP output
   kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
-  kryos_forcing.f90     driver-owned indices registry (tsgen)
+  kryos_forcing.f90     driver-owned series registry (tsgen, derived)
   yelmox_climate.f90    climate backends behind one interface (climate_out)
-  climate_mods.f90      climate modifiers after the backend (anom, ocn_fraction, bias)
+  climate_terms.f90     the terms of the forcing (series x pattern) on the climate
+  climate_mods.f90      climate transforms after the terms (taper, bias)
         │
         ▼
 yelmox/yelmox.f90                 single domain
@@ -400,7 +401,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <li><code>couple_to_yelmo</code> — assemble the Yelmo boundary state from the component outputs (incl.&nbsp;the climate’s subglacial discharge, when supplied).</li>
 <li><code>step_icesheet</code> — run <code>yelmo_update</code>.</li>
 <li><code>couple_yelmo_to_htopo</code> — the hub’s current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo’s anomalies on a finer hub).</li>
-<li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the indices registry and the transient forcing, on the <code>dt_clim</code> cadence.</li>
+<li><code>step_climate</code> — climate on <code>grid_clim</code> from the backend, with the series registry and the terms of the forcing, on the <code>dt_clim</code> cadence.</li>
 <li><code>step_surface</code> — surface mass balance on <code>grid_surface</code> (<code>surface_method</code>: chion, smbpal, smb_simple, or the climate’s own, <code>climate</code>).</li>
 </ul>
 <p>The hub geometry reaches <code>grid_clim</code> and <code>grid_surface</code> averaged over the target cell when the hub is finer (conservative), else interpolated (<code>remap_method_smooth</code>). The atmosphere is computed on <code>grid_clim</code> for the surface elevation there (<code>clim%now%z_srf</code>). On a different <code>grid_surface</code>, the monthly <code>tas</code> and <code>pr</code> are interpolated (bilinear) and moved to the surface elevation of <code>grid_surface</code> with the backend’s monthly lapse rate (<code>clim%lapse</code>) and precipitation sensitivity (<code>clim%now%beta_p</code>):</p>
@@ -419,7 +420,7 @@ yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM</code></
 <li><strong><code>tstep_init(ts, path_par, group, dtt [, time_ref, cal])</code></strong> (fesm-utils <code>timestepping</code>) — reads the run’s timeline group (<code>[ctrl] run_step</code>: <code>"ctrl"</code> for <code>[ctrl]</code> itself, or a phase group such as <code>[spinup]</code>/<code>[transient]</code>) and initializes the driver-owned timestepper; <code>[ctrl] calendar</code> / <code>calendar_ref</code> give <code>cal</code> / <code>time_ref</code> (calendar years, e.g.&nbsp;ESM runs). <code>domain_init</code> takes the same group name (<code>timeline_group</code>) and reads the values the domain needs (<code>tstep_method</code>, <code>dtt</code>) itself.</li>
 <li><strong><code>domain_startup(dom, ts, bsl, restart, idx [, restore_bsl, tsf])</code></strong> (<code>kryos_startup</code>) — cold start (<code>restart = "None"</code>, <code>domain_init_state</code>) or restore of the domain bundle <code>restart</code> + hub rebuild, continuing the restored state: only the climate (and a stateless <code>smb_simple</code> surface) is re-derived, nothing is stepped. The driver reads <code>[ctrl] restart</code>. <code>yelmox</code> restores the shared bsl from the same bundle; <code>yelmox_bipolar</code> restores it once via <strong><code>bsl_startup(bsl, fldr)</code></strong>, passes each domain its subfolder of the bundle and <code>restore_bsl=.false.</code>.</li>
 <li><strong><code>domain_init_ice(dom, ts, idx)</code></strong> — the cold-start ice state after <code>yelmo_init_state</code> (<code>[sim]</code> <code>init_kill_shelves</code>, <code>init_marine_H</code>, <code>init_method</code>, <code>init_time_thrm</code>; see <a href="./yelmox.html#configuration">yelmox</a>).</li>
-<li><strong><code>run_restart_write(dom, bsl, time, idx [, fldr])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + one <code>idx_&lt;name&gt;_restart.nc</code> per index, one auto-named folder).</li>
+<li><strong><code>run_restart_write(dom, bsl, time, idx [, fldr])</code></strong> — the single-domain restart bundle (domain sub-models + <code>bsl_restart.nc</code> + one <code>series_&lt;name&gt;_restart.nc</code> per tsgen series, one auto-named folder).</li>
 <li><strong><code>cadence_due(time, dt)</code></strong> (<code>kryos</code>) — the cadence predicate for <code>dt_clim</code>, <code>dt_isos</code> and <code>dt_cmip</code>; <code>dt &lt;= 0</code> disables a cadence. Output and restart bundles follow fesm-utils <code>timeout</code> schedules (<code>[tm_1D]</code>, <code>[tm_2D]</code>, <code>[tm_2Dsm]</code>, <code>[tm_rst]</code>); a restart bundle is always written at <code>time_end</code>.</li>
 </ul>
 <p>Every driver loop has the same shape: output and restarts are written at the top of the loop for the current time (<code>time_init</code> on the first pass), then the loop exits if the run is finished (<code>time_end</code>, or a tripped kill switch), else <code>tstep_update</code> advances the time and the domain is stepped with the coupling sequence written out inline. Each output call appears once, and the final state + restart bundle are written on the last pass (<code>timeout_check(...) .or. ts%is_finished</code>).</p>

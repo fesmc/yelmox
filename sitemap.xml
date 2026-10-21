@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://fesmc.github.io/yelmox/yelmox.html</loc>
-    <lastmod>2026-10-20T17:28:15.072Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.485Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/submodules-plan.html</loc>
@@ -10,15 +10,15 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/multigrid.html</loc>
-    <lastmod>2026-10-19T06:27:26.370Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.482Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/forcing-builder.html</loc>
-    <lastmod>2026-10-20T17:28:15.067Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.479Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-mountain.html</loc>
-    <lastmod>2026-10-20T12:30:54.700Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.478Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-ismip7.html</loc>
@@ -26,19 +26,19 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-greenland.html</loc>
-    <lastmod>2026-10-20T12:30:54.700Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.476Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-ant-paleo.html</loc>
-    <lastmod>2026-10-20T12:30:54.699Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.475Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/database-namelists.html</loc>
-    <lastmod>2026-10-19T04:24:23.155Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.475Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/climate-snapshots.html</loc>
-    <lastmod>2026-10-20T12:30:54.699Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.474Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/climate-esm.html</loc>
@@ -46,7 +46,7 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/climate-rembo.html</loc>
-    <lastmod>2026-10-19T13:53:26.519Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.474Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/configme-install-details.html</loc>
@@ -58,15 +58,15 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-antarctica.html</loc>
-    <lastmod>2026-10-20T12:30:54.699Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.475Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-grl-paleo.html</loc>
-    <lastmod>2026-10-20T16:17:19.179Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.476Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-laurentide.html</loc>
-    <lastmod>2026-10-19T15:55:34.077Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.478Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-tipmip.html</loc>
@@ -78,10 +78,10 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/run-chunks.html</loc>
-    <lastmod>2026-10-20T16:17:19.179Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.483Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/yelmox-bipolar.html</loc>
-    <lastmod>2026-10-19T13:53:26.521Z</lastmod>
+    <lastmod>2026-10-21T15:17:16.485Z</lastmod>
   </url>
 </urlset>

@@ -243,7 +243,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#database" id="toc-database" class="nav-link" data-scroll-target="#database">Database</a></li>
   <li><a href="#defaults" id="toc-defaults" class="nav-link" data-scroll-target="#defaults">Defaults</a></li>
-  <li><a href="#fields-and-blending" id="toc-fields-and-blending" class="nav-link" data-scroll-target="#fields-and-blending">Fields and blending</a></li>
+  <li><a href="#fields-and-composition" id="toc-fields-and-composition" class="nav-link" data-scroll-target="#fields-and-composition">Fields and composition</a></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/fesmc/yelmox/edit/main/climate-snapshots.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/fesmc/yelmox/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
@@ -270,35 +270,36 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>The snapshot backend <code>snapshots</code> builds the climate from a reference state plus climate <strong>snapshots</strong> (e.g.&nbsp;present day, pre-industrial, LGM), blended in time by scalar <strong>indices</strong> (e.g.&nbsp;a glacial index), as one blend model over any number of snapshots, fields and axes, on the fesm-utils <code>varslice</code> reader and <code>tsgen</code> series. It supplies the atmosphere (monthly <code>tas</code>, <code>pr</code>, lapse-rate corrected to the current surface) and the ocean as depth profiles (<code>to_ann</code>, <code>so_ann</code>), which the marine shelf interpolates to the shelf base. It runs on <code>grid_clim</code>, reads the <code>[snap]</code> groups and also supplies the ocean of the rembo climate (an ocean-only reference snapshot).</p>
+<p>The snapshot backend <code>snapshots</code> builds the climate from a reference <strong>snapshot</strong> (e.g.&nbsp;present day) plus the <strong>terms</strong> of <code>[forcing]</code>: each a scalar <strong>series</strong> on the forcing time (e.g.&nbsp;a glacial index) times a pattern, the difference of two snapshots (e.g.&nbsp;LGM minus pre-industrial) or a uniform anomaly (see <a href="./yelmox.html#forcing">yelmox</a>), on the fesm-utils <code>varslice</code> reader and <code>tsgen</code> series. It supplies the atmosphere (monthly <code>tas</code>, <code>pr</code>, lapse-rate corrected to the current surface) and the ocean as depth profiles (<code>to_ann</code>, <code>so_ann</code>), which the marine shelf interpolates to the shelf base. It runs on <code>grid_clim</code>, reads <code>[snapshots]</code> and the <code>[snapshot_&lt;name&gt;]</code> groups, and also supplies the ocean of the rembo climate (an ocean-only reference snapshot).</p>
 <ul>
 <li><strong>Program:</strong> <code>yelmox</code> (<code>make yelmox</code>), backend in <code>libs/snapshots.f90</code>, behind <code>libs/yelmox_climate.f90</code>.</li>
 <li><strong>Select:</strong> <code>[comps] climate = "snapshots"</code>.</li>
-<li><strong>Output:</strong> with <code>[output] write_clim</code>, <code>snap.nc</code>, the climate as applied (after the climate modifiers): the annual air temperature and its summer mean (<code>t2m_ann</code>, <code>t2m_sum</code>), the annual precipitation, the ocean profiles (<code>to_ann</code>, <code>so_ann</code> on <code>depth</code>), the position on each axis (<code>axis_&lt;name&gt;</code>), the surface elevation, the monthly atmosphere (<code>tas</code>, <code>pr</code>), <code>tsl_ann</code> and the diagnostics of the active climate modifiers.</li>
+<li><strong>Output:</strong> with <code>[output] write_clim</code>, <code>snap.nc</code>, the climate as applied (after the transforms): the annual air temperature and its summer mean (<code>t2m_ann</code>, <code>t2m_sum</code>), the annual precipitation, the ocean profiles (<code>to_ann</code>, <code>so_ann</code> on <code>depth</code>), the value of each term’s series (<code>term_&lt;name&gt;</code>), the surface elevation, the monthly atmosphere (<code>tas</code>, <code>pr</code>), <code>tsl_ann</code> and the diagnostics of the active transforms.</li>
 </ul>
-<p>The climate modifiers <code>[anom]</code>, <code>[ocn_fraction]</code>, <code>[taper]</code> and <code>[bias]</code> (see <a href="./yelmox.html">yelmox</a>) apply after the backend, in this order; <code>[ocn_obm]</code> is applied by <code>yelmox_bipolar</code>.</p>
+<p>The transforms <code>[taper]</code> and <code>[bias]</code> (see <a href="./yelmox.html">yelmox</a>) apply after the terms, in this order.</p>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
-<p>Example: <code>yelmox/yelmox_Greenland.nml</code>, present day and PMIP3 piControl and LGM on one axis; its ocean anomaly comes from <code>[ocn_fraction]</code>.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    var_defs  <span class="kw">=</span> <span class="st">"input/clim_db.nml"</span>   <span class="co">! databases of the input files (default)</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    ref_name  <span class="kw">=</span> <span class="st">"pd"</span>                  <span class="co">! the reference snapshot (default)</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    snapshots <span class="kw">=</span> <span class="st">"pd"</span> <span class="st">"picontrol"</span> <span class="st">"lgm"</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    axes      <span class="kw">=</span> <span class="st">"at"</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    lapse     <span class="kw">=</span> <span class="fl">0.0080</span> <span class="fl">0.0065</span>         <span class="co">! [K m-1] annual, summer (default)</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    f_p       <span class="kw">=</span> <span class="fl">0.06</span>                  <span class="co">! [K-1] precipitation scaling (default 0.05)</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Every key of the <code>[snap*]</code> groups has a default in <code>input/yelmox_defaults.nml</code> (see <a href="#defaults">Defaults</a>): <code>combine = "anomaly"</code> (snapshots as anomalies from the reference), <code>fields = "tas" "pr" "to" "so" "zs"</code>, <code>grid_global = "GLOBAL-1DEG"</code>, … Three kinds of group follow:</p>
+<p>Example: <code>yelmox/yelmox_Greenland.nml</code>, present day plus the PMIP3 LGM minus piControl anomaly weighted by the orbital index, the ocean plus a quarter of the mean air temperature anomaly (the derived series <code>dTo</code>):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>forcing</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    reference <span class="kw">=</span> <span class="st">"pd"</span>                  <span class="co">! [snapshot_pd], in the par file</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    series    <span class="kw">=</span> <span class="st">"orbital"</span> <span class="st">"dTo"</span>       <span class="co">! [series_orbital], [series_dTo] (library)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    terms     <span class="kw">=</span> <span class="st">"orbital"</span> <span class="st">"ocean"</span>     <span class="co">! [term_orbital]: picontrol -&gt; lgm on tas, pr; [term_ocean]: dTo on to</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snapshots</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    lapse     <span class="kw">=</span> <span class="fl">0.0080</span> <span class="fl">0.0065</span>         <span class="co">! [K m-1] annual, summer (default)</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    f_p       <span class="kw">=</span> <span class="fl">0.06</span>                  <span class="co">! [K-1] precipitation scaling (default 0.05)</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The snapshots of the run are the reference and the <code>snap0</code>/<code>snap1</code> of its terms (no list): <code>pd</code>, <code>picontrol</code> and <code>lgm</code> here. Every key of <code>[snapshots]</code> and <code>[snapshot_&lt;name&gt;]</code> has a default in <code>input/yelmox_defaults.nml</code> (see <a href="#defaults">Defaults</a>): <code>combine = "anomaly"</code> (snapshots as anomalies from the reference), <code>fields = "tas" "pr" "to" "so" "zs"</code> (the fields a snapshot may bind), <code>grid_global = "GLOBAL-1DEG"</code>, … Two kinds of group:</p>
 <ul>
-<li><strong>Fields</strong>, <code>[snap_field_&lt;name&gt;]</code>: <code>blend</code> (<code>linear</code>, <code>ratio</code>, <code>const</code>; default <code>linear</code>) and the <code>axes</code>, one or more names (default <code>""</code> = none). The field name (<code>tas</code>, <code>pr</code>, <code>to</code>, <code>so</code>, <code>zs</code>) decides what the field is. A field without axes follows the reference: its group can be left out.</li>
-<li><strong>Snapshots</strong>, <code>[snap_&lt;name&gt;]</code>: <code>exp</code> (the experiment, <code>{exp}</code> in the database paths), <code>monthly</code> (default <code>True</code>), <code>clim_sigma</code>/<code>ocn_sigma</code> ([km] Gaussian smoothing of the atmosphere and the ocean at loading, the land mask following the smoothed elevation; default 0), <code>tas_season</code> and, per field, the database group(s) holding it (see <a href="#database">Database</a>).</li>
-<li><strong>Axes</strong>, <code>[snap_axis_&lt;name&gt;]</code>: two snapshots <code>lo</code> -&gt; <code>hi</code> and the <code>index</code> giving the position on the axis: 0 at <code>lo</code>, 1 at <code>hi</code>. The index is a driver-owned <code>[idx_&lt;name&gt;]</code> (a <code>tsgen</code> generator of any method: <code>const</code>, ramps, <code>series</code>, …; see <a href="./yelmox.html">yelmox</a>), listed in <code>[indices]</code>.</li>
+<li><strong>Rules</strong>, <code>[snapshots]</code>: the lapse rates <code>lapse</code> (annual, summer) and the precipitation sensitivity <code>f_p</code> (β_p), used in the sea-level reduction of the snapshots, the uniform terms and the move to the model surface.</li>
+<li><strong>Snapshots</strong>, <code>[snapshot_&lt;name&gt;]</code>: <code>exp</code> (the experiment, <code>{exp}</code> in the database paths), <code>monthly</code> (default <code>True</code>), <code>clim_sigma</code>/<code>ocn_sigma</code> ([km] Gaussian smoothing of the atmosphere and the ocean at loading, the land mask following the smoothed elevation; default 0), <code>tas_season</code> and, per field, the database group(s) holding it (see <a href="#database">Database</a>).</li>
 </ul>
 <section id="database" class="level3">
 <h3 class="anchored" data-anchor-id="database">Database</h3>
-<p>The snapshots bind varslice groups (see <a href="./database-namelists.html">Database namelists</a>) by name, from the par file itself if it has the group (searched implicitly first, so it never has to name itself and its groups win), else from the files listed in <code>[snap] var_defs</code>, searched in order (first file that has the group). The snapshot groups <code>[snap_&lt;name&gt;]</code> and the axis groups <code>[snap_axis_&lt;name&gt;]</code> are looked up the same way, and the index groups <code>[idx_&lt;name&gt;]</code> through <code>[indices] var_defs</code> (default none). The shared database <code>input/clim_db.nml</code> holds one group per product field; a par file can add run-specific groups:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    var_defs <span class="kw">=</span> <span class="st">"input/clim_db.nml"</span>   <span class="co">! the default</span></span>
+<p>The snapshots bind varslice groups (see <a href="./database-namelists.html">Database namelists</a>) by name, from the par file itself if it has the group (searched implicitly first, so it never has to name itself and its groups win), else from the files listed in <code>[forcing] var_defs</code>, searched in order (first file that has the group). The snapshot groups <code>[snapshot_&lt;name&gt;]</code>, the series and the terms are looked up the same way. The shared database <code>input/clim_db.nml</code> holds one group per product field; a par file can add run-specific groups:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>forcing</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    var_defs <span class="kw">=</span> <span class="st">"input/clim_db.nml"</span> <span class="st">"input/forcing_db.nml"</span>   <span class="co">! the default</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>my_tas                              <span class="co">! in the par file: found before clim_db.nml</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    filename <span class="kw">=</span> <span class="st">"ice_data/..."</span></span>
@@ -306,7 +307,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>A group missing from the par file and every var_defs file stops the run, naming the group and the files. The paths of the database take, besides <code>{domain}</code> and <code>{grid_name}</code>, two keywords:</p>
 <ul>
-<li><code>{grid_global}</code>: the global grid of the paleoclimate products, <code>[snap] grid_global</code> (default <code>GLOBAL-1DEG</code>);</li>
+<li><code>{grid_global}</code>: the global grid of the paleoclimate products, <code>[snapshots] grid_global</code> (default <code>GLOBAL-1DEG</code>);</li>
 <li><code>{exp}</code>: the experiment of the snapshot, its <code>exp</code>, so one group serves every experiment of a product family.</li>
 </ul>
 <p>Present-day references are regional (<code>{domain}/{grid_name}</code>, the resolution of the climate grid): MAR v3.14 1961-1990 (<code>mar314_1961_1990_{tas,sf,rf,pr,zs}</code>), RACMO2.3p2 1981-2010 (<code>racmo23p2_1981_2010_{tas,tsrf,pr,sf,zs}</code>), ERA5 1981-2010 (<code>era5_1981_2010_{tas,pr,sf,zs}</code>), ORAS5 1981-2010 (<code>oras5_1981_2010_{to,so}</code>, monthly climatology) and the ISMIP7 ocean (<code>ismip7_{to,so}</code>). The paleoclimate snapshots are the global products, remapped online onto the climate grid (<code>remap = "bilin"</code>, the map cached in <code>maps/</code>):</p>
@@ -342,7 +343,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="even">
 <td><code>Paleoclimate-CLIMBERX-Willeit2025-{exp}</code>, <code>-ocean</code></td>
 <td>piControl, interstadial, stadial, heinrich</td>
-<td><code>cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}</code>, <code>cx_{tas_mon_anom,pr_mon_anom}</code> (anomalies to piControl, for <code>lo = ""</code> axes; <code>pr_mon_anom</code> is a difference in mm d-1, not a ratio), <code>cx_{to,so}</code></td>
+<td><code>cx_{tas_mon,pr_mon,tas_ann,pr_ann,zs}</code>, <code>cx_{tas_mon_anom,pr_mon_anom}</code> (anomalies to piControl, for terms without <code>snap0</code>; <code>pr_mon_anom</code> is a difference in mm d-1, not a ratio), <code>cx_{to,so}</code></td>
 </tr>
 </tbody>
 </table>
@@ -374,13 +375,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td><code>Paleoclimate-Badgeley2020</code></td>
 <td>annual, every 50 yr, 20 ka to 0</td>
-<td><code>b20_tas_anom</code> [K], <code>b20_pr_frac</code>, <code>b20_pr_frac_low</code>, <code>b20_pr_frac_high</code> (anomaly and ratios relative to 1850-2000 CE, for <code>lo = ""</code> axes)</td>
+<td><code>b20_tas_anom</code> [K], <code>b20_pr_frac</code>, <code>b20_pr_frac_low</code>, <code>b20_pr_frac_high</code> (anomaly and ratios relative to 1850-2000 CE, for terms without <code>snap0</code>)</td>
 </tr>
 </tbody>
 </table>
-<p>The database also holds the groups of the climate modifiers (<code>[bias]</code>: <code>bias_mar_era5_1981_2010_{dtas,fpr}</code>; <code>[taper]</code>: <code>taper_b18_b20</code>) and the ice histories of <code>[ice_bnd]</code> (<code>paleomist_H_ice</code>, <code>glac1d_H_ice</code>).</p>
-<p><strong>Time-varying groups.</strong> A group with a time axis (<code>time = 1 x0 x1 dx nsub</code>) is sliced at the forcing clock <code>time_rel</code> at the start and at every climate update: linear interpolation between the two bracketing records, the first or last record outside the axis (varslice <code>extrap</code>). Its snapshot is then reduced to sea level again (and the reference reset, if it is the reference). A group without a time axis (<code>time = 0 ...</code>) is read once at the start.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_pd</span>
+<p>The database also holds the groups of the transforms (<code>[bias]</code>: <code>bias_mar_era5_1981_2010_{dtas,fpr}</code>; <code>[taper]</code>: <code>taper_b18_b20</code>) and the ice histories of <code>[ice_bnd]</code> (<code>paleomist_H_ice</code>, <code>glac1d_H_ice</code>).</p>
+<p><strong>Time-varying groups.</strong> A group with a time axis (<code>time = 1 x0 x1 dx nsub</code>) is sliced at the forcing time <code>time_rel</code> at the start and at every climate update: linear interpolation between the two bracketing records, the first or last record outside the axis (varslice <code>extrap</code>). Its snapshot is then reduced to sea level again (and the reference reset, if it is the reference). A group without a time axis (<code>time = 0 ...</code>) is read once at the start.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snapshot_pd</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    tas <span class="kw">=</span> <span class="st">"mar314_1961_1990_tas"</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    pr  <span class="kw">=</span> <span class="st">"mar314_1961_1990_sf"</span> <span class="st">"mar314_1961_1990_rf"</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    zs  <span class="kw">=</span> <span class="st">"mar314_1961_1990_zs"</span></span>
@@ -388,7 +389,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    so  <span class="kw">=</span> <span class="st">"oras5_1981_2010_so"</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_lgm</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snapshot_lgm</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">exp</span>        <span class="kw">=</span> <span class="st">"lgm"</span></span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    monthly    <span class="kw">=</span> False</span>
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    clim_sigma <span class="kw">=</span> <span class="fl">50.0</span></span>
@@ -399,82 +400,78 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="defaults" class="level3">
 <h3 class="anchored" data-anchor-id="defaults">Defaults</h3>
-<p><code>input/yelmox_defaults.nml</code> declares every key of the <code>[snap*]</code> groups, the indices and the climate modifiers, with its default. The named groups fall back to a template group: <code>[snap_field_&lt;name&gt;]</code> to <code>[snap_field]</code>, <code>[snap_&lt;name&gt;]</code> (a snapshot) to <code>[snap_snapshot]</code>, <code>[snap_axis_&lt;name&gt;]</code> to <code>[snap_axis]</code>, <code>[snap]</code> to <code>[snap]</code>, with the domain suffix of a multi-domain driver (<code>[snap_north_field_tas]</code> to <code>[snap_field]</code>). A par file lists only what differs; a key the defaults file does not declare stops the run (<code>nml_validate</code>), and <code>scripts/check_par_nml.py</code> reports it offline.</p>
+<p><code>input/yelmox_defaults.nml</code> declares every key of <code>[snapshots]</code> and <code>[snapshot_&lt;name&gt;]</code>, of the forcing (<code>[forcing]</code>, the series, the terms) and of the transforms, with its default. The named groups fall back to a template group: <code>[snapshot_&lt;name&gt;]</code> to <code>[snapshot]</code>, <code>[snapshots&lt;sfx&gt;]</code> to <code>[snapshots]</code> with the domain suffix of a multi-domain driver (<code>[snapshots_north]</code>). A par file lists only what differs; a key the defaults file does not declare stops the run (<code>nml_validate</code>), and <code>scripts/check_par_nml.py</code> reports it offline.</p>
 </section>
-<section id="fields-and-blending" class="level3">
-<h3 class="anchored" data-anchor-id="fields-and-blending">Fields and blending</h3>
-<p><strong>Fields are optional per snapshot.</strong> A snapshot binds the fields it names (a key absent or <code>""</code> binds nothing). The backend builds what the reference snapshot (<code>ref_name</code>) binds: the atmosphere (<code>tas</code> and <code>pr</code>, with the elevation <code>zs</code>) and/or the ocean (<code>to</code>, optionally <code>so</code>). An ocean-only reference serves the ocean of the rembo climate; <code>climate = "snapshots"</code> needs the atmosphere. Checked at start-up, with an error naming the group:</p>
+<section id="fields-and-composition" class="level3">
+<h3 class="anchored" data-anchor-id="fields-and-composition">Fields and composition</h3>
+<p><strong>Fields are optional per snapshot.</strong> A snapshot binds the fields it names (a key absent or <code>""</code> binds nothing). The backend builds what the reference snapshot (<code>[forcing] reference</code>) binds: the atmosphere (<code>tas</code> and <code>pr</code>, with the elevation <code>zs</code>) and/or the ocean (<code>to</code>, optionally <code>so</code>). An ocean-only reference serves the ocean of the rembo climate; <code>climate = "snapshots"</code> needs the atmosphere. Checked at start-up, with an error naming the group:</p>
 <ul>
-<li>every snapshot of an axis of a <code>linear</code>/<code>ratio</code> field binds that field, and no snapshot binds a field the reference does not;</li>
-<li>a snapshot with <code>tas</code> or <code>pr</code> binds <code>zs</code> (the sea-level reduction), except the <code>hi</code> of a <code>lo = ""</code> axis (below); <code>pr</code> with <code>zs</code> needs <code>tas</code>; <code>so</code> needs <code>to</code>; the reference binds <code>tas</code> and <code>pr</code> together;</li>
+<li>every snapshot of a term binds the fields the term lists, and no snapshot binds a field the reference does not;</li>
+<li>a snapshot with <code>tas</code> or <code>pr</code> binds <code>zs</code> (the sea-level reduction), except the <code>snap1</code> of a term without <code>snap0</code> (below); <code>pr</code> with <code>zs</code> needs <code>tas</code>; <code>so</code> needs <code>to</code>; the reference binds <code>tas</code> and <code>pr</code> together;</li>
 <li>the number of groups: <code>tas</code> one (<code>monthly = True</code>) or two (annual mean and one season); <code>pr</code> one or two summed (monthly, e.g.&nbsp;snowfall + rainfall) or one (annual); every other field one.</li>
 </ul>
 <p><strong>Seasons.</strong> A snapshot with two <code>tas</code> groups (annual mean <code>ta_ann</code> and one season <code>ta_seas</code>) builds the monthly cycle as a cosine with its extremes in January and July, <code>c(m) = cos(2π(m-1)/12)</code>: with <code>tas_season = "djf"</code>, <code>tas(m) = ta_ann + (ta_seas - ta_ann) c(m)</code> (the season in January); with <code>"jja"</code>, <code>tas(m) = ta_ann - (ta_seas - ta_ann) c(m)</code> (in July). The default is the summer of the hemisphere (<code>jja</code> north, <code>djf</code> south), so the second field of CLIMBER-3α (JJA only) serves the south as its winter, and PMIP3 offers both (<code>t2m_jja</code>, <code>t2m_djf</code>).</p>
 <p><strong>Ocean.</strong> <code>to</code> and <code>so</code> are depth profiles, interpolated to the model depth axis (23 levels, 0-3000 m). A monthly climatology (12 slices, e.g.&nbsp;ORAS5) is averaged to the annual mean; an annual field (one slice: no time axis, e.g. the CLIMBER ocean products, or one record) is taken as is. Without <code>so</code>, the salinity is 0.</p>
-<p>Each axis of a field adds to the reference snapshot, with weight <code>a_k</code> (the index value):</p>
+<p><strong>Composition.</strong> Each term with the <code>snapshots</code> pattern adds to the reference with the weight <code>a_k</code>, the value of its series; the rule is fixed by field:</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
-<th>blend</th>
+<th>field</th>
 <th>now</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>linear</code></td>
-<td><code>ref + sum_k a_k (hi_k - lo_k)</code></td>
+<td><code>tas</code>, <code>to</code>, <code>so</code></td>
+<td><code>ref + sum_k a_k (snap1_k - snap0_k)</code></td>
 </tr>
 <tr class="even">
-<td><code>ratio</code></td>
-<td><code>ref * prod_k (1 + a_k (hi_k/lo_k - 1))</code></td>
-</tr>
-<tr class="odd">
-<td><code>const</code></td>
-<td><code>ref</code></td>
+<td><code>pr</code></td>
+<td><code>ref * prod_k (1 + a_k (snap1_k/snap0_k - 1))</code></td>
 </tr>
 </tbody>
 </table>
-<p>An axis with <code>lo = ""</code> adds its <code>hi</code> snapshot as the anomaly itself: <code>ref + a_k hi_k</code> (<code>linear</code>) or <code>ref (1 + a_k (hi_k - 1))</code> (<code>ratio</code>), e.g.&nbsp;a reconstructed temperature anomaly or precipitation ratio (Badgeley et al., 2020) without a zero snapshot. Such a snapshot binds no <code>zs</code>: its fields are taken as given, so they must be <strong>sea-level</strong> anomalies or ratios (there is no elevation correction of their own). If it binds <code>zs</code>, it is reduced to sea level like any other snapshot.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_axis_b20                <span class="co">! input/forcing_db.nml</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    lo    <span class="kw">=</span> <span class="st">""</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    hi    <span class="kw">=</span> <span class="st">"b20"</span>             <span class="co">! snapshot binding tas (anomaly) and pr (ratio), no zs</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span> <span class="kw">=</span> <span class="st">"one"</span>             <span class="co">! a const index, f = 1</span></span>
+<p>A term with <code>snap0 = ""</code> adds its <code>snap1</code> snapshot as the anomaly itself: <code>ref + a_k snap1_k</code> (<code>tas</code>) or <code>ref (1 + a_k (snap1_k - 1))</code> (<code>pr</code>), e.g.&nbsp;a reconstructed temperature anomaly or precipitation ratio (Badgeley et al., 2020) without a zero snapshot. Such a snapshot binds no <code>zs</code>: its fields are taken as given, so they must be <strong>sea-level</strong> anomalies or ratios (there is no elevation correction of their own). If it binds <code>zs</code>, it is reduced to sea level like any other snapshot.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>term_b20                     <span class="co">! input/forcing_db.nml</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    snap0  <span class="kw">=</span> <span class="st">""</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    snap1  <span class="kw">=</span> <span class="st">"b20"</span>            <span class="co">! snapshot binding tas (anomaly) and pr (ratio), no zs</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    fields <span class="kw">=</span> <span class="st">"pr"</span>             <span class="co">! series = "": the constant 1</span></span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Two axes give the orbital + millennial decomposition of Banderas et al.&nbsp;(2018), e.g.&nbsp;<code>at</code> on <code>picontrol</code> -&gt; <code>lgm</code> and <code>bt</code> on <code>lgm_weak</code> -&gt; <code>lgm_strong</code>. Several axes or fields may share one index:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>indices</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    names <span class="kw">=</span> <span class="st">"at"</span> <span class="st">"bt"</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>idx_at</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    method      <span class="kw">=</span> <span class="st">"series"</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    series_file <span class="kw">=</span> <span class="st">"input/alpha_orbital_r2020.dat"</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    norm_t0     <span class="kw">=</span> <span class="fl">0.0</span>             <span class="co">! [yr] index 0 here</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    norm_t1     <span class="kw">=</span> <span class="kw">-</span><span class="fl">21e3</span>           <span class="co">! [yr] index 1 here (or a window, e.g. -23e3, -19e3)</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>idx_bt</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    method      <span class="kw">=</span> <span class="st">"series"</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    series_file <span class="kw">=</span> <span class="st">"input/beta_ngrip_millennial.dat"</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_axis_at</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    lo    <span class="kw">=</span> <span class="st">"picontrol"</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    hi    <span class="kw">=</span> <span class="st">"lgm"</span></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span> <span class="kw">=</span> <span class="st">"at"</span></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_axis_bt</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    lo    <span class="kw">=</span> <span class="st">"lgm_weak"</span></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    hi    <span class="kw">=</span> <span class="st">"lgm_strong"</span></span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    <span class="bu">index</span> <span class="kw">=</span> <span class="st">"bt"</span></span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snap_field_tas</span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    axes  <span class="kw">=</span> <span class="st">"at"</span> <span class="st">"bt"</span>             <span class="co">! blend = "linear" (default)</span></span>
+<p>Two terms give the orbital + millennial decomposition of Banderas et al. (2018), e.g.&nbsp;<code>orbital</code> on <code>picontrol</code> -&gt; <code>lgm</code> and <code>millennial</code> on <code>lgm_weak</code> -&gt; <code>lgm_strong</code>, each on its own series; several terms may share one series:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>forcing</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    reference <span class="kw">=</span> <span class="st">"pd"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    series    <span class="kw">=</span> <span class="st">"alpha"</span> <span class="st">"beta"</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    terms     <span class="kw">=</span> <span class="st">"orbital"</span> <span class="st">"millennial"</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>series_alpha</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    method      <span class="kw">=</span> <span class="st">"series"</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    series_file <span class="kw">=</span> <span class="st">"input/alpha_orbital_r2020.dat"</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    norm_t0     <span class="kw">=</span> <span class="fl">0.0</span>             <span class="co">! [yr] series 0 here</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    norm_t1     <span class="kw">=</span> <span class="kw">-</span><span class="fl">21e3</span>           <span class="co">! [yr] series 1 here (or a window, e.g. -23e3 -19e3: the mean)</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>series_beta</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    method      <span class="kw">=</span> <span class="st">"series"</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    series_file <span class="kw">=</span> <span class="st">"input/beta_ngrip_millennial.dat"</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>term_orbital</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    series <span class="kw">=</span> <span class="st">"alpha"</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    snap0  <span class="kw">=</span> <span class="st">"picontrol"</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    snap1  <span class="kw">=</span> <span class="st">"lgm"</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    fields <span class="kw">=</span> <span class="st">"tas"</span> <span class="st">"pr"</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>term_millennial</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    series <span class="kw">=</span> <span class="st">"beta"</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    snap0  <span class="kw">=</span> <span class="st">"lgm_weak"</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    snap1  <span class="kw">=</span> <span class="st">"lgm_strong"</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    fields <span class="kw">=</span> <span class="st">"tas"</span> <span class="st">"pr"</span></span>
 <span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Turning a proxy series into an index is done by tsgen (<code>norm_t0</code>/<code>norm_t1</code>, see the fesm-utils tsgen docs); a steady state is a <code>const</code> index (<code>df_dt_max = 0</code>, value <code>f_min</code>), independent of the model time.</p>
-<p><strong>The ocean anomaly from the atmosphere</strong> is the climate modifier <code>[ocn_fraction]</code> (see <a href="./yelmox.html">yelmox</a>): the field <code>to</code> without axes (or <code>blend = "const"</code>) stays at the reference, and the modifier adds <code>f_to</code> times the mean sea-level air temperature anomaly of the same update, without lag and without the lapse-rate cooling of the ice sheet. <code>blend = "fraction"</code> stops the run.</p>
-<p>The backend holds no state of its own: the indices restart with the driver (<code>idx_&lt;name&gt;_restart.nc</code>). The climate output carries the position on each axis, <code>axis_&lt;name&gt;</code>.</p>
+<p>Turning a proxy series into an index is done by tsgen (<code>norm_t0</code>/<code>norm_t1</code>, see the fesm-utils tsgen docs); a steady state is a <code>const</code> series (<code>df_dt_max = 0</code>, value <code>f_min</code>), independent of the model time.</p>
+<p><strong>Uniform terms</strong> (<code>pattern = "uniform"</code>) add <code>f_ta a</code> to <code>tas</code> (and multiply <code>pr</code> by exp(β_p f_ta a)), <code>f_to a</code> to <code>to</code> and <code>f_so a</code> to <code>so</code> on the fields they list. <strong>The ocean anomaly from the atmosphere</strong> is a derived series (<code>method = "derived"</code>, <code>from = "air_anomaly"</code>: <code>factor</code> times the mean sea-level air temperature anomaly of the same update over <code>region</code>, without lag and without the lapse-rate cooling of the ice sheet) with a uniform term on <code>to</code>, the library <code>series_dTo</code> + <code>term_ocean</code>; <code>to</code> without terms stays at the reference. The ocean terms are applied after the atmosphere (a derived series may drive ocean fields only).</p>
+<p>The backend holds no state of its own: the series restart with the driver (<code>series_&lt;name&gt;_restart.nc</code>). The climate output carries the value of each term’s series, <code>term_&lt;name&gt;</code>.</p>
 <p>The transient forcing is added on top in every configuration.</p>
 
 

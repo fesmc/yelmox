@@ -241,7 +241,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#running" id="toc-running" class="nav-link active" data-scroll-target="#running">Running</a></li>
   <li><a href="#timeline" id="toc-timeline" class="nav-link" data-scroll-target="#timeline">Timeline</a></li>
-  <li><a href="#climate-snapshots-on-a-glacial-index" id="toc-climate-snapshots-on-a-glacial-index" class="nav-link" data-scroll-target="#climate-snapshots-on-a-glacial-index">Climate: snapshots on a glacial index</a></li>
+  <li><a href="#climate-snapshots-on-an-orbital-index" id="toc-climate-snapshots-on-an-orbital-index" class="nav-link" data-scroll-target="#climate-snapshots-on-an-orbital-index">Climate: snapshots on an orbital index</a></li>
   <li><a href="#air-temperature-ramp" id="toc-air-temperature-ramp" class="nav-link" data-scroll-target="#air-temperature-ramp">Air temperature ramp</a></li>
   <li><a href="#present-day" id="toc-present-day" class="nav-link" data-scroll-target="#present-day">Present day</a></li>
   <li><a href="#configuration" id="toc-configuration" class="nav-link" data-scroll-target="#configuration">Configuration</a></li>
@@ -282,11 +282,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 02:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_Greenland.nml <span class="at">-o</span> output/grl-ramp <span class="dt">\</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>      <span class="at">-p</span> ctrl.tstep_method=rel domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM <span class="dt">\</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>         domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 tm_2D.dt=50 <span class="dt">\</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         indices.names==at,ramp anom.active=True anom.index=ramp</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         forcing.series==orbital,dTo,ramp forcing.terms==orbital,ocean,ramp</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-q</span> compute <span class="at">-w</span> 08:00:00 <span class="at">--omp</span> 16 <span class="at">-e</span> yelmox <span class="at">-n</span> yelmox/yelmox_Greenland.nml <span class="at">-o</span> output/grl-pd <span class="dt">\</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>      <span class="at">-p</span> ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 indices.names=<span class="st">""</span> <span class="dt">\</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>         snap.snapshots=pd snap.axes=<span class="st">""</span> snap_field_tas.axes=<span class="st">""</span> snap_field_pr.axes=<span class="st">""</span> snap_field_pr.blend=linear <span class="dt">\</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>         ocn_fraction.active=False</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>      <span class="at">-p</span> ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>         forcing.series=<span class="st">""</span> forcing.terms=<span class="st">""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>On a busy queue, run them as chains of short jobs (<a href="./run-chunks.html">Long runs in chunks</a>). The forcing time of <code>yelmox_Greenland.nml</code> is set with <code>-p</code>: e.g. <code>ctrl.tstep_const=-21e3</code> holds the climate of 21 ka, <code>ctrl.tstep_method=rel ctrl.time_init=-130e3 ctrl.time_end=0</code> follows the index through the last glacial cycle.</p>
 </section>
 <section id="timeline" class="level2">
@@ -299,10 +298,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Output:</strong> 1D every year; 2D every 200 yr (ramp: 50 yr; pd: 500 yr), small 2D every 50 yr (pd: 500 yr).</li>
 </ul>
 </section>
-<section id="climate-snapshots-on-a-glacial-index" class="level2">
-<h2 class="anchored" data-anchor-id="climate-snapshots-on-a-glacial-index">Climate: snapshots on a glacial index</h2>
-<p>Snapshots <code>pd</code>, <code>picontrol</code>, <code>lgm</code> and the axis <code>at</code> (<code>[snap_axis_at]</code>, <code>picontrol</code> -&gt; <code>lgm</code>). The temperature adds the PMIP3 LGM – piControl anomaly scaled by <code>at</code> (<code>[snap_field_tas] axes = "at"</code>), the precipitation is multiplied by their ratio (<code>[snap_field_pr] blend = "ratio"</code>). The PMIP3 snapshots give the annual mean and JJA temperature (<code>monthly = False</code>) and the annual precipitation, smoothed over 50 km at loading (<code>clim_sigma = 50</code>). The precipitation-temperature scaling is <code>[snap] f_p = 0.06</code> (default 0.05).</p>
-<p>The index <code>[idx_at]</code> is the orbital series <code>input/alpha_orbital_r2020.dat</code> (<code>method = "series"</code>, 300 ka to present), normalised to 0 at present (<code>norm_t0 = 0</code>) and 1 at 21 ka (<code>norm_t1 = -21e3</code>). The ocean (ORAS5) has no axis: its anomaly is <code>f_to = 0.25</code> times the mean sea-level air temperature anomaly over the domain (<code>[ocn_fraction]</code>, <code>region = "all"</code>).</p>
+<section id="climate-snapshots-on-an-orbital-index" class="level2">
+<h2 class="anchored" data-anchor-id="climate-snapshots-on-an-orbital-index">Climate: snapshots on an orbital index</h2>
+<p>The reference <code>pd</code> plus the term <code>orbital</code> (<code>[term_orbital]</code>, <code>picontrol</code> -&gt; <code>lgm</code> on <code>tas</code> and <code>pr</code>): the temperature adds the PMIP3 LGM – piControl anomaly scaled by the series <code>orbital</code>, the precipitation is multiplied by their ratio. The PMIP3 snapshots give the annual mean and JJA temperature (<code>monthly = False</code>) and the annual precipitation, smoothed over 50 km at loading (<code>clim_sigma = 50</code>). The precipitation-temperature scaling is <code>[snapshots] f_p = 0.06</code> (default 0.05).</p>
+<p>The series <code>[series_orbital]</code> is the orbital series <code>input/alpha_orbital_r2020.dat</code> (<code>method = "series"</code>, 300 ka to present), normalised to 0 at present (<code>norm_t0 = 0</code>) and 1 at 21 ka (<code>norm_t1 = -21e3</code>). The ocean (ORAS5) has no snapshot term: the term <code>ocean</code> adds the derived series <code>dTo</code>, 0.25 times the mean sea-level air temperature anomaly over the domain (<code>[series_dTo]</code>, <code>from = "air_anomaly"</code>, <code>region = "all"</code>).</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grl_snap.png" class="img-fluid figure-img"></p>
@@ -312,10 +311,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="air-temperature-ramp" class="level2">
 <h2 class="anchored" data-anchor-id="air-temperature-ramp">Air temperature ramp</h2>
-<p>The ramp run adds the index <code>ramp</code> (<code>[indices] names = "at" "ramp"</code>; <code>[idx_ramp]</code> from <code>input/forcing_db.nml</code>) and applies it as a homogeneous anomaly (<code>[anom] active = True</code>, <code>index = "ramp"</code>, <code>f_ta = 1</code>, <code>f_to = 0</code>, <code>f_so = 0</code>):</p>
+<p>The ramp run adds the series <code>ramp</code> and the uniform term <code>ramp</code> of <code>input/forcing_db.nml</code> (<code>forcing.series==orbital,dTo,ramp</code>, <code>forcing.terms==orbital,ocean,ramp</code>; <code>[term_ramp]</code> on <code>tas</code> and <code>pr</code> with <code>f_ta = 1</code>):</p>
 <ul>
-<li><strong>Index:</strong> <code>[idx_ramp] method = "ramp-slope"</code>, <code>df_dt_max = 0.0025</code> yr⁻¹ from <code>f_min = 0</code> to <code>f_max = 5</code>: the air temperature rises by 5 K over 2000 yr and stays there; white noise of <code>sigma = 0.3</code> on the index; <code>with_kill = False</code>.</li>
-<li><strong>Response:</strong> the precipitation is multiplied by exp(<code>f_p</code>·dTa); the ocean follows through <code>[ocn_fraction]</code>, whose sea-level anomaly includes dTa.</li>
+<li><strong>Series:</strong> <code>[series_ramp] method = "ramp-slope"</code>, <code>df_dt_max = 0.0025</code> yr⁻¹ from <code>f_min = 0</code> to <code>f_max = 5</code>: the air temperature rises by 5 K over 2000 yr and stays there; white noise of <code>sigma = 0.3</code> on the series; <code>with_kill = False</code>.</li>
+<li><strong>Response:</strong> the precipitation is multiplied by exp(<code>f_p</code>·dTa); the ocean follows through the term <code>ocean</code>, whose sea-level anomaly includes dTa.</li>
 </ul>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
@@ -326,7 +325,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="present-day" class="level2">
 <h2 class="anchored" data-anchor-id="present-day">Present day</h2>
-<p>The present-day run keeps the reference only (<code>[snap] snapshots = "pd"</code>), without indices (<code>[indices] names = ""</code>) and with <code>[ocn_fraction] active = False</code>. Its basin sets are <code>Zwally2012</code> only (no <code>NEGIS</code>).</p>
+<p>The present-day run keeps the reference only (<code>forcing.series=""</code>, <code>forcing.terms=""</code>). Its basin sets are <code>Zwally2012</code> only (no <code>NEGIS</code>).</p>
 </section>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
@@ -349,12 +348,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td><code>[yelmo_masks] mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"</code></td>
 </tr>
 <tr class="even">
-<td>Reference climate (<code>snap_pd</code>)</td>
+<td>Reference climate (<code>snapshot_pd</code>)</td>
 <td>MAR v3.14 1961–1990 (temperature, snowfall + rainfall, elevation); ocean ORAS5 1981–2010</td>
 </tr>
 <tr class="odd">
-<td>Snapshots (<code>snap_picontrol</code>, <code>snap_lgm</code>)</td>
-<td>PMIP3 piControl and LGM ensemble means, global (<code>GLOBAL-1DEG</code>, remapped, 50 km smoothing; atmosphere only, the ocean follows <code>[ocn_fraction]</code>)</td>
+<td>Snapshots (<code>snapshot_picontrol</code>, <code>snapshot_lgm</code>)</td>
+<td>PMIP3 piControl and LGM ensemble means, global (<code>GLOBAL-1DEG</code>, remapped, 50 km smoothing; atmosphere only, the ocean follows the term <code>ocean</code>)</td>
 </tr>
 <tr class="even">
 <td>Surface mass balance</td>

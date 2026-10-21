@@ -303,10 +303,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="reference-climate" class="level2">
 <h2 class="anchored" data-anchor-id="reference-climate">Reference climate</h2>
-<p>ERA5 1981–2010 (monthly) is the present-day reference on the whole domain; MAR v3.14 covers only Greenland. Over Greenland, <code>[bias]</code> corrects ERA5 to MAR 1981–2010 with a monthly temperature difference <code>dtas</code> and precipitation factor <code>fpr</code>, both taken at sea level with the reduction of the snapshot backend (<code>[snap] lapse</code>, <code>f_p</code>), so they do not depend on elevation. Outside the MAR coverage the correction is the nearest value of the bias smoothed over 50 km, tapered to zero over 100 km (cosine). <code>fpr</code> is clamped to [0.2, 5].</p>
+<p>ERA5 1981–2010 (monthly) is the present-day reference on the whole domain; MAR v3.14 covers only Greenland. Over Greenland, <code>[bias]</code> corrects ERA5 to MAR 1981–2010 with a monthly temperature difference <code>dtas</code> and precipitation factor <code>fpr</code>, both taken at sea level with the reduction of the snapshot backend (<code>[snapshots] lapse</code>, <code>f_p</code>), so they do not depend on elevation. Outside the MAR coverage the correction is the nearest value of the bias smoothed over 50 km, tapered to zero over 100 km (cosine). <code>fpr</code> is clamped to [0.2, 5].</p>
 <p>The product is a hand-built file in ice_data, <code>ice_data/GreenlandPaleo/GRL-PAL-16KM/GRL-PAL-16KM_BIAS-MARv3.14-ERA5-1981-2010.nc</code> (<code>clim_db.nml</code> groups <code>bias_mar_era5_1981_2010_dtas</code>, <code>_fpr</code>), made by</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">julia</span> <span class="at">--project</span><span class="op">=</span>scripts/grl-paleo scripts/grl-paleo/make_bias_mar_era5.jl <span class="at">--fig</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>from the yelmox root (<code>fesmdata</code> and <code>ice_data</code> links in place; options <code>--res</code>, <code>--l1</code>, <code>--l2</code>, <code>--f_p</code>, <code>--D</code>, <code>--sigma</code>, <code>--fpr_min</code>, <code>--fpr_max</code>). The lapse rates and <code>f_p</code> are written as attributes: remake the file when <code>[snap] lapse</code> or <code>f_p</code> change.</p>
+<p>from the yelmox root (<code>fesmdata</code> and <code>ice_data</code> links in place; options <code>--res</code>, <code>--l1</code>, <code>--l2</code>, <code>--f_p</code>, <code>--D</code>, <code>--sigma</code>, <code>--fpr_min</code>, <code>--fpr_max</code>). The lapse rates and <code>f_p</code> are written as attributes: remake the file when <code>[snapshots] lapse</code> or <code>f_p</code> change.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grlpal_pd.png" class="img-fluid figure-img"></p>
@@ -317,9 +317,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="a.-spin-up" class="level2">
 <h2 class="anchored" data-anchor-id="a.-spin-up">A. Spin-up</h2>
 <ul>
-<li><strong>Timeline:</strong> <code>[ctrl]</code> 0 to 15 kyr, <code>dtt = 10</code> yr, present-day insolation (<code>[orbit] method = "time"</code>, <code>time = 0</code>), sea level from file at 0 ka.</li>
+<li><strong>Timeline:</strong> <code>[ctrl]</code> 0 to 15 kyr, <code>dtt = 10</code> yr, present-day insolation (<code>[orbit] method = "fixed_time"</code>, <code>time = 0</code>), sea level from file at 0 ka.</li>
 <li><strong>No optimization</strong> (<code>[sim] opt = False</code>); the ice thickness relaxes towards the observations until 6 kyr (<code>[sim] relax = True</code>, <code>[relax] time2</code>).</li>
-<li><strong>Climate:</strong> present day (<code>[snap] snapshots = "pd"</code>) with the MAR – ERA5 bias.</li>
+<li><strong>Climate:</strong> present day (<code>forcing.series=""</code>, <code>forcing.terms=""</code>) with the MAR – ERA5 bias.</li>
 <li><strong>Output:</strong> restart bundles at 0 and 15 kyr; 2D output every 1 kyr.</li>
 </ul>
 </section>
@@ -327,7 +327,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="a.-transient">A. Transient</h2>
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> -130 kyr to 0, <code>dtt = 10</code> yr, on relative time (<code>tstep_method = "rel"</code>). <code>[sim] relax = False</code>, <code>opt = False</code>.</li>
-<li><strong>Climate:</strong> snapshots <code>pd</code>, <code>picontrol</code>, <code>lgm</code> and the axis <code>a</code> (<code>[snap_axis_a]</code>): the present-day reference plus the PMIP3 LGM – piControl anomaly, scaled by the glacial index <code>[idx_a]</code> (<code>input/alpha_combined_125kyr_interp.dat</code>, as is: 0 = present day, ~0.9 at 21 ka, -0.2 in the last interglacial). The ocean anomaly is <code>f_to = 0.25</code> times the mean sea-level air temperature anomaly (<code>[ocn_fraction]</code>). Insolation varies in time (<code>[orbit] method = "clock"</code>).</li>
+<li><strong>Climate:</strong> the present-day reference plus the term <code>glacial</code> (<code>[term_glacial]</code>, <code>picontrol</code> -&gt; <code>lgm</code> on <code>tas</code> and <code>pr</code>): the PMIP3 LGM – piControl anomaly scaled by the series <code>glacial</code> (<code>[series_glacial]</code>, <code>input/alpha_combined_125kyr_interp.dat</code>, as is: 0 = present day, ~0.9 at 21 ka, -0.2 in the last interglacial). The term <code>ocean</code> adds the derived series <code>dTo</code>, 0.25 times the mean sea-level air temperature anomaly. Insolation varies in time (<code>[orbit] method = "forcing_time"</code>).</li>
 <li><strong>Sea level:</strong> <code>[barysealevel] method = "file"</code>, <code>input/sealevel_spratt2016.dat</code>.</li>
 </ul>
 <div class="quarto-figure quarto-figure-center">
@@ -343,17 +343,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="b.-reconstruction-forcing" class="level2">
 <h2 class="anchored" data-anchor-id="b.-reconstruction-forcing">B. Reconstruction forcing</h2>
-<p>Snapshots <code>pd</code>, <code>b18_base</code>, <code>b18</code>, <code>b20</code> and two axes at a constant index <code>one</code> (<code>[idx_one]</code>, 1), each field bound to one axis:</p>
+<p>The reference <code>pd</code> plus two terms without a series (the constant 1), one per field (<code>forcing.terms==b18,b20,ocean</code>):</p>
 <ul>
-<li><strong>Temperature</strong>, axis <code>b18</code> (<code>[snap_field_tas] axes</code>): the Buizert et al.
+<li><strong>Temperature</strong>, term <code>b18</code> (<code>[term_b18]</code> on <code>tas</code>): the Buizert et al.
 <ol start="2018" type="1">
-<li>monthly reconstruction (<code>snap_b18</code>, decadal, 22 ka to 2005 CE) minus its 1981–2010 baseline (<code>snap_b18_base</code>), both at the reconstruction’s elevation.</li>
+<li>monthly reconstruction (<code>snapshot_b18</code>, decadal, 22 ka to 2005 CE) minus its 1981–2010 baseline (<code>snapshot_b18_base</code>), both at the reconstruction’s elevation.</li>
 </ol></li>
-<li><strong>Precipitation</strong>, axis <code>b20</code> (<code>[snap_field_pr] axes</code>, <code>blend = "ratio"</code>): the Badgeley et al.&nbsp;(2020) fraction relative to 1850–2000 CE (<code>snap_b20</code>, <code>lo = ""</code>: the hi is the ratio itself; 50-yr means, 20 ka to 0; annual, the same factor in every month). <code>b20_pr_frac_low</code>/<code>_high</code> are the other accumulation scenarios.</li>
+<li><strong>Precipitation</strong>, term <code>b20</code> (<code>[term_b20]</code> on <code>pr</code>): the Badgeley et al.&nbsp;(2020) fraction relative to 1850–2000 CE (<code>snapshot_b20</code>, <code>snap0 = ""</code>: the snapshot is the ratio itself; 50-yr means, 20 ka to 0; annual, the same factor in every month). <code>b20_pr_frac_low</code>/<code>_high</code> are the other accumulation scenarios.</li>
 </ul>
-<p>Swapping the axes of the two fields gives the other combinations (Badgeley temperature: its annual anomaly in every month). The time-varying groups are read in time on the forcing clock (<code>extrap</code>: the first slice before the record starts, e.g.&nbsp;Badgeley at 20 ka during the LGM spin-up).</p>
+<p>Swapping the fields of the two terms gives the other combinations (Badgeley temperature: its annual anomaly in every month). The time-varying groups are read in time at the forcing time (<code>extrap</code>: the first slice before the record starts, e.g.&nbsp;Badgeley at 20 ka during the LGM spin-up).</p>
 <p>The reconstructions are GRL-16KM products, remapped online onto GRL-PAL and filled from the nearest cell outside the GRL box. <code>[taper]</code> with <code>outside = "mean"</code> replaces the anomaly there by the mean anomaly of the coverage (per month: the temperature difference and the precipitation ratio of the totals, recomputed at every climate update): <code>w = 1</code> in the coverage of both, a cosine to 0 over 100 km (hand-built file <code>ice_data/GreenlandPaleo/GRL-PAL-16KM/GRL-PAL-16KM_TAPER-Buizert2018-Badgeley2020.nc</code>, <code>clim_db.nml</code> group <code>taper_b18_b20</code>, made by <code>scripts/grl-paleo/make_taper_recon.jl</code>). West of it (Ellesmere, Baffin Bay) the climate is the present-day reference plus that mean anomaly.</p>
-<p>The ocean anomaly is <code>f_to = 0.25</code> times the mean sea-level air temperature anomaly (<code>[ocn_fraction]</code>); sea level from <code>input/sealevel_spratt2016.dat</code> (as A); insolation at the forcing clock (<code>[orbit] method = "clock"</code>). The climate is updated every 100 yr (<code>dt_clim</code>; the reconstructions are read and remapped from GRL-16KM at each update, which made 10 yr six times slower).</p>
+<p>The ocean anomaly is the term <code>ocean</code>, 0.25 times the mean sea-level air temperature anomaly (the derived series <code>dTo</code>); sea level from <code>input/sealevel_spratt2016.dat</code> (as A); insolation at the forcing time (<code>[orbit] method = "forcing_time"</code>). The climate is updated every 100 yr (<code>dt_clim</code>; the reconstructions are read and remapped from GRL-16KM at each update, which made 10 yr six times slower).</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grlpal_b.png" class="img-fluid figure-img"></p>
@@ -394,12 +394,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>BedMachine v6 (<code>GRL-PAL-16KM_TOPO-BedMachine-v6.nc</code>)</td>
 </tr>
 <tr class="odd">
-<td>Reference climate (<code>snap_pd</code>)</td>
+<td>Reference climate (<code>snapshot_pd</code>)</td>
 <td>ERA5 1981–2010 + MAR – ERA5 bias over Greenland (<code>[bias]</code>); ocean ORAS5 1981–2010</td>
 </tr>
 <tr class="even">
-<td>Snapshots (<code>snap_picontrol</code>, <code>snap_lgm</code>)</td>
-<td>PMIP3 piControl and LGM ensemble means, global (<code>GLOBAL-1DEG</code>, remapped, 50 km smoothing; atmosphere only, the ocean follows <code>[ocn_fraction]</code>)</td>
+<td>Snapshots (<code>snapshot_picontrol</code>, <code>snapshot_lgm</code>)</td>
+<td>PMIP3 piControl and LGM ensemble means, global (<code>GLOBAL-1DEG</code>, remapped, 50 km smoothing; atmosphere only, the ocean follows the term <code>ocean</code>)</td>
 </tr>
 <tr class="odd">
 <td>Surface mass balance</td>

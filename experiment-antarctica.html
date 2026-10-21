@@ -291,7 +291,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong><code>run_mg_resolution.sh</code>:</strong> six 25-kyr spin-ups (<code>ctrl.time_end=25e3</code>) into <code>output/mg_opt/y&lt;ice&gt;_m&lt;shelf&gt;</code>: Yelmo and shelf on the same grid (<code>ANT-8KM</code>, <code>ANT-16KM</code>, <code>ANT-32KM</code>), and the shelf on a finer grid (Yelmo 32 km with shelf 8 or 16 km, Yelmo 16 km with shelf 8 km). 2D output every 1 kyr, <code>ytopo.gz_Hg1=100</code>; <code>shared</code> queue, 10 h.</li>
 <li><strong><code>run_mg_cfmin.sh</code>:</strong> the three Yelmo-32KM spin-ups again with the friction floor <code>ytill.cf_min=1e-4</code> (par file: 0.01), into <code>output/mg_opt_cfmin1e-4</code>; <code>compute</code> queue, 8 h.</li>
-<li><strong><code>run_mg_forward.sh</code>:</strong> 1-kyr runs from <code>restart-25.000-kyr</code> of the three Yelmo-32KM spin-ups in <code>output/mg_opt</code> (a missing bundle is skipped), with <code>sim.relax=False</code>, <code>sim.opt=False</code>, <code>yelmo.restart_relax=0</code>: <code>ctrl</code> (no anomaly) and <code>warm</code> (+2 K air and ocean temperature: <code>[anom]</code> on the constant index <code>[idx_dT]</code>, <code>f_ta = 1</code>, <code>f_to = 1</code>), into <code>output/mg_fwd/&lt;case&gt;_&lt;ctrl|warm&gt;</code>; <code>compute</code> queue, 4 h.</li>
+<li><strong><code>run_mg_forward.sh</code>:</strong> 1-kyr runs from <code>restart-25.000-kyr</code> of the three Yelmo-32KM spin-ups in <code>output/mg_opt</code> (a missing bundle is skipped), with <code>sim.relax=False</code>, <code>sim.opt=False</code>, <code>yelmo.restart_relax=0</code>: <code>ctrl</code> (no anomaly) and <code>warm</code> (+2 K air and ocean temperature: the uniform term <code>[term_dT]</code> on the constant series <code>[series_dT]</code>, <code>f_ta = 1</code>, <code>f_to = 1</code>), into <code>output/mg_fwd/&lt;case&gt;_&lt;ctrl|warm&gt;</code>; <code>compute</code> queue, 4 h.</li>
 </ul>
 </section>
 <section id="spin-up" class="level2">
@@ -306,7 +306,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="climate" class="level2">
 <h2 class="anchored" data-anchor-id="climate">Climate</h2>
-<p>Present day only (<code>[snap] snapshots = "pd"</code>), without indices (<code>[indices] names = ""</code>), <code>[anom]</code> or <code>[ocn_fraction]</code>. <code>run_mg_forward.sh</code> adds the constant index <code>[idx_dT]</code> (<code>method = "const"</code>, 0) of <code>input/forcing_db.nml</code>: it sets <code>idx_dT.f_min</code> and <code>f_max</code> with <code>-p</code>, so runme copies the group into the staged par file.</p>
+<p>Present day only (<code>[forcing] series = ""</code>, <code>terms = ""</code>). <code>run_mg_forward.sh</code> adds the constant series <code>[series_dT]</code> (<code>method = "const"</code>, 0) and the uniform term <code>[term_dT]</code> of <code>input/forcing_db.nml</code> (<code>forcing.series=dT forcing.terms=dT</code>): it sets <code>series_dT.f_min</code> and <code>f_max</code> and the term’s fields with <code>-p</code>, so runme copies the groups into the staged par file.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/ant_pd.png" class="img-fluid figure-img"></p>
@@ -387,7 +387,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>BedMachine v4 (<code>{grid_name}_TOPO-BedMachine-v4.nc</code>)</td>
 </tr>
 <tr class="odd">
-<td>Reference climate (<code>snap_pd</code>)</td>
+<td>Reference climate (<code>snapshot_pd</code>)</td>
 <td>RACMO2.3p2 1981–2010 (temperature, precipitation, elevation); ocean ISMIP7 climatology (FesmData <code>Ocean-ISMIP7</code>)</td>
 </tr>
 <tr class="even">
