@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://fesmc.github.io/yelmox/yelmox.html</loc>
-    <lastmod>2026-10-21T15:17:16.485Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.347Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/submodules-plan.html</loc>
@@ -14,11 +14,11 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/forcing-builder.html</loc>
-    <lastmod>2026-10-21T15:17:16.479Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.380Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-mountain.html</loc>
-    <lastmod>2026-10-21T15:17:16.478Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.347Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-ismip7.html</loc>
@@ -26,11 +26,11 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-greenland.html</loc>
-    <lastmod>2026-10-21T15:17:16.476Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.346Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-ant-paleo.html</loc>
-    <lastmod>2026-10-21T15:17:16.475Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.345Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/database-namelists.html</loc>
@@ -38,7 +38,7 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/climate-snapshots.html</loc>
-    <lastmod>2026-10-21T15:17:16.474Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.345Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/climate-esm.html</loc>
@@ -62,11 +62,11 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-grl-paleo.html</loc>
-    <lastmod>2026-10-21T15:17:16.476Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.346Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-laurentide.html</loc>
-    <lastmod>2026-10-21T15:17:16.478Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.346Z</lastmod>
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/experiment-tipmip.html</loc>
@@ -82,6 +82,6 @@
   </url>
   <url>
     <loc>https://fesmc.github.io/yelmox/yelmox-bipolar.html</loc>
-    <lastmod>2026-10-21T15:17:16.485Z</lastmod>
+    <lastmod>2026-10-21T16:18:59.347Z</lastmod>
   </url>
 </urlset>

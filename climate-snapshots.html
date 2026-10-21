@@ -279,11 +279,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>The transforms <code>[taper]</code> and <code>[bias]</code> (see <a href="./yelmox.html">yelmox</a>) apply after the terms, in this order.</p>
 <section id="configuration" class="level2">
 <h2 class="anchored" data-anchor-id="configuration">Configuration</h2>
-<p>Example: <code>yelmox/yelmox_Greenland.nml</code>, present day plus the PMIP3 LGM minus piControl anomaly weighted by the orbital index, the ocean plus a quarter of the mean air temperature anomaly (the derived series <code>dTo</code>):</p>
+<p>Example: <code>yelmox/yelmox_Greenland.nml</code>, present day plus the PMIP3 LGM minus piControl anomaly weighted by <code>alpha</code> (here the orbital record r2020), the ocean plus a quarter of the mean air temperature anomaly (the derived series <code>dTo</code>):</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>forcing</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    reference <span class="kw">=</span> <span class="st">"pd"</span>                  <span class="co">! [snapshot_pd], in the par file</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    series    <span class="kw">=</span> <span class="st">"orbital"</span> <span class="st">"dTo"</span>       <span class="co">! [series_orbital], [series_dTo] (library)</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    terms     <span class="kw">=</span> <span class="st">"orbital"</span> <span class="st">"ocean"</span>     <span class="co">! [term_orbital]: picontrol -&gt; lgm on tas, pr; [term_ocean]: dTo on to</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    series    <span class="kw">=</span> <span class="st">"alpha"</span> <span class="st">"dTo"</span>         <span class="co">! [series_alpha] (par file: alpha_orbital_r2020), [series_dTo] (library)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    terms     <span class="kw">=</span> <span class="st">"lgm"</span> <span class="st">"ocean"</span>         <span class="co">! [term_lgm]: picontrol -&gt; lgm on tas, pr; [term_ocean]: dTo on to</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>snapshots</span>
@@ -437,11 +437,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    snap1  <span class="kw">=</span> <span class="st">"b20"</span>            <span class="co">! snapshot binding tas (anomaly) and pr (ratio), no zs</span></span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    fields <span class="kw">=</span> <span class="st">"pr"</span>             <span class="co">! series = "": the constant 1</span></span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Two terms give the orbital + millennial decomposition of Banderas et al. (2018), e.g.&nbsp;<code>orbital</code> on <code>picontrol</code> -&gt; <code>lgm</code> and <code>millennial</code> on <code>lgm_weak</code> -&gt; <code>lgm_strong</code>, each on its own series; several terms may share one series:</p>
+<p>Two terms give the orbital + millennial decomposition of Banderas et al. (2018), e.g.&nbsp;<code>lgm</code> on <code>picontrol</code> -&gt; <code>lgm</code> and <code>millennial</code> on <code>lgm_weak</code> -&gt; <code>lgm_strong</code>, each on its own series; several terms may share one series:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode fortran code-with-copy"><code class="sourceCode fortranfixed"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>forcing</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    reference <span class="kw">=</span> <span class="st">"pd"</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    series    <span class="kw">=</span> <span class="st">"alpha"</span> <span class="st">"beta"</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    terms     <span class="kw">=</span> <span class="st">"orbital"</span> <span class="st">"millennial"</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    terms     <span class="kw">=</span> <span class="st">"lgm"</span> <span class="st">"millennial"</span></span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>series_alpha</span>
@@ -456,7 +456,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    series_file <span class="kw">=</span> <span class="st">"input/beta_ngrip_millennial.dat"</span></span>
 <span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
 <span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>term_orbital</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>term_lgm</span>
 <span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    series <span class="kw">=</span> <span class="st">"alpha"</span></span>
 <span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    snap0  <span class="kw">=</span> <span class="st">"picontrol"</span></span>
 <span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    snap1  <span class="kw">=</span> <span class="st">"lgm"</span></span>
