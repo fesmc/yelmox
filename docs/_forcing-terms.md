@@ -1,8 +1,9 @@
 # Forcing as terms: series × pattern
 
-Status: design (2026-10-21), agreed on the interactive mock-up
+Status: design agreed 2026-10-21 on the interactive mock-up
 `docs/_forcing-terms-mockup.html` (open it in a browser; the series are the
-real files of `input/`). Nothing implemented. The leading `_` keeps quarto
+real files of `input/`); phases 2-4 implemented on the branch `forcing-terms`
+(2026-10-21, not yet verified on Levante). The leading `_` keeps quarto
 from rendering it. Supersedes sections 3, 4, 6, 7 and 8 of
 `_forcing-design.md` (indices, axes, modifiers, OBM); the rest of that doc
 (insolation, database, retirement of snapclim, phases 0-6 done) stands.
@@ -151,10 +152,18 @@ which stays as it is (it defines what time means; the forcing then uses it).
 ## 4. The par file
 
 One database list, `[forcing] var_defs`, searched by every consumer
-(series, snapshots and their fields, taper, bias, ice_bnd): the par file
-first, then the files in order (the lookup rule of `_par-files-plan.md`).
-Unset keys from `input/yelmox_defaults.nml` (templates `series`, `term`,
-`snapshot`).
+(series, terms, snapshots and their fields, taper, bias, ice_bnd): the par
+file first, then the files in order (the lookup rule of
+`_par-files-plan.md`); default `"input/clim_db.nml" "input/forcing_db.nml"`.
+Unset keys from `input/yelmox_defaults.nml` (templates `forcing`, `series`,
+`term`, `snapshots`, `snapshot`).
+
+The series are driver-owned and shared by every domain, the reference and
+the terms belong to a domain: in `yelmox` all four keys sit in one
+`[forcing]`; in `yelmox_bipolar` `[forcing]` holds `series` and `var_defs`,
+`[forcing_north]` and `[forcing_south]` hold `reference` and `terms`, and
+the snapshots are named by content (`snapshot_pd_grl`, `snapshot_pd_ant`)
+since the library has no domain suffix.
 
 ```fortran
 &snapshots
@@ -223,16 +232,26 @@ par-files plan's `-p` arrays shrink to.
 | `[snap_<name>]` | `[snapshot_<name>]` |
 | `[snap_axis_<name>]` `lo`, `hi`, `index` | `[term_<name>]` `snap0`, `snap1`, `series`, `fields` |
 | `[snap_field_<name>]` `blend`, `axes` | dropped: the rule is fixed by field, the fields are listed by the term |
-| `[anom]` | a `uniform` term; rembo reads the uniform `tas` term |
+| `[anom]` | a `uniform` term; rembo takes the uniform `tas` terms as ΔT_sum (its ocean anomaly `1.3 f_ta f_to α` is gone: a uniform term on `to` instead) |
 | `[ocn_fraction]` | a derived series `air_anomaly` + a `uniform` term on `to` |
-| `[ocn_obm]` absolute / anomaly | a derived series `obm_<hemisphere>` (`anomaly`) + a `replace` / `uniform` term on `to`, applied by the bridge |
+| `[ocn_obm]` absolute / anomaly | the library series `obm_north`/`obm_south` (derived, `anomaly = False`) + the `replace` terms `term_obm_north`/`_south` (`uniform` with `anomaly = True` for the anomaly mode); the bridge sets the series and re-applies the ocean terms (idempotent) |
 | `[obm_forcing]` | unchanged (a consumer of a series, as `[ice_bnd]`) |
 | `[taper]`, `[bias]`, `[orbit]`, `[barysealevel]`, `[ice_bnd]` | unchanged; `[bias]` groups may have a time axis; `[orbit] method` renamed |
 | `idx_one` | gone (`series = ""`) |
 | bipolar `snap_north_pd`, `snap_north_axis_at`, ... | `[forcing_north]` selecting library snapshots by content name (`pd_grl`, `pd_ant`); `[snapshots_north]` |
 
-Library names become descriptive and free of use: `series_glacial_alpha`
-rather than `idx_a`; the par file names what it is in this run.
+Library names are descriptive: `series_glacial` (alpha_combined, as is),
+`series_orbital` (r2020, normalised 0 at 0, 1 at 21 ka), `series_orbital_t2018`,
+`series_dTo` (derived, 0.25), `series_ramp`, `series_hyst`, `series_dT`,
+`series_obm_north/south`; terms `term_glacial`, `term_orbital` (the LGM
+anomaly on those series), `term_b18`, `term_b20`, `term_ocean`,
+`term_ramp`, `term_hyst`, `term_dT`, `term_obm_north/south`. A par file
+redefines a library group to change it for its run (LIS, North:
+`series_glacial` constant 1 for the LGM steady state).
+
+The `-p` arrays of the experiments shrink to `forcing.series==...` and
+`forcing.terms==...` plus the transforms (scripts/grl-paleo/params.sh,
+scripts/ant-paleo/params.sh).
 
 ## 6. Design idea, not planned: the equation as text
 
@@ -275,9 +294,9 @@ All on dev, one branch `forcing-terms`, merged when the whole chain passes.
 | # | Content | Check |
 |---|---|---|
 | 1 | this doc, the mock-up in `docs/` | |
-| 2 | series registry: rename, `derived` kind, `series_set`; configs unchanged through an alias of the old keys is **not** done: the configs convert in 4 | unit: a derived series set and read |
-| 3 | terms in the snapshot backend, uniform and replace terms, derived `air_anomaly`, bridge sets the OBM series; `anom`/`ocn_fraction`/`ocn_obm` removed | |
-| 4 | library, defaults, bases, bipolar, scripts, checker | `check_par_nml` clean |
+| 2 | series registry: the `derived` kind, `indices_set` (internal names kept; done, `tests/test_indices.f90`) | unit: a derived series set and read |
+| 3 | `libs/climate_terms.f90`; terms in the snapshot backend, uniform and replace terms, derived `air_anomaly`, bridge sets the OBM series; `anom`/`ocn_fraction`/`ocn_obm` removed; new keys, library, defaults, bases, bipolar and checker converted in the same commit (every commit runs) | `check_par_nml` clean, both drivers build |
+| 4 | scripts (`-p` arrays, docs-figures, run_mg_forward, bipolar tests) | |
 | 5 | docs-figures 18 cases + the bipolar case on Levante | bit-identical to dev 54d9ee6 (the same operations in the same order) |
 | 6 | forcing builder on the new groups, with the equation panel; docs; CHANGELOG | |
 

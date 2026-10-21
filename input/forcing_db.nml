@@ -152,6 +152,24 @@
     units  = "K"
 /
 
+&series_obm_north
+    ! yelmox_bipolar: the northern box temperature of the ocean box model [K]
+    ! (derived, set by the bridge after the box model), the ocean of the
+    ! northern domain with term_obm_north.
+    method  = "derived"
+    from    = "obm_north"
+    anomaly = False     ! the temperature itself (True: minus its initial value)
+    units   = "K"
+/
+
+&series_obm_south
+    ! yelmox_bipolar: the southern box temperature [K] (term_obm_south).
+    method  = "derived"
+    from    = "obm_south"
+    anomaly = False
+    units   = "K"
+/
+
 ! ===== Terms (series x pattern on explicit fields) =====
 
 &term_glacial
@@ -213,6 +231,23 @@
     series  = "dT"
     pattern = "uniform"
     fields  = "tas" "pr"
+/
+
+&term_obm_north
+    ! yelmox_bipolar: the ocean temperature profiles replaced by the northern
+    ! box temperature at every depth (series_obm_north); with anomaly = True
+    ! in the series and pattern = "uniform" here, the reference plus the box
+    ! anomaly instead.
+    series  = "obm_north"
+    pattern = "replace"
+    fields  = "to"
+/
+
+&term_obm_south
+    ! yelmox_bipolar: the ocean of the southern domain from the southern box.
+    series  = "obm_south"
+    pattern = "replace"
+    fields  = "to"
 /
 
 ! ===== elsa (Lagrangian isochrone layers; read by yelmo, see the header) =====

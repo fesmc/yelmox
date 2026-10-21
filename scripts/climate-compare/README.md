@@ -15,7 +15,7 @@ time-varying snapshots (GRL paleo; `timing.txt` of each run).
 ## Run (Levante)
 
 ```bash
-scripts/climate-compare/run.sh --pb "ocn_fraction.f_to=0.5" \
+scripts/climate-compare/run.sh --pb "series_dTo.factor=0.5" \
     yelmox/yelmox_Greenland.nml yelmox/yelmox_Greenland.nml output/climcmp/grl
 ```
 
