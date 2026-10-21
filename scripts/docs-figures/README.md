@@ -16,7 +16,9 @@ scripts/docs-figures/run.sh
 The cases (par file, timeline, overrides) are the table in `run.sh`; give case
 names to run only those. Output: `output/docs-figures/<case>` (`OUT`). Slurm
 options: `RUNOPTS` (default `-q compute -w 00:30:00 --omp 16`); `STAGE=1` stages
-the runs only.
+the runs only. `run.sh --list` prints the cases without running them (case, par
+file, the `-p` overrides of the experiment and its timeline): the presets of
+the forcing builder (`scripts/forcing-builder/export.jl`).
 
 ## Plot
 

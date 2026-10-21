@@ -7,6 +7,10 @@
 #
 # Usage (Levante, from anywhere; runs from the repo root):
 #   scripts/docs-figures/run.sh [CASE ...]      (default: all cases)
+#   scripts/docs-figures/run.sh --list          the cases as presets of the forcing
+#       builder (scripts/forcing-builder/export.jl): one line per case, tab
+#       separated, case, par file, then the -p overrides of the experiment and
+#       its timeline (not the climate-only ones)
 #
 # Environment:
 #   OUT       output root (default output/docs-figures)
@@ -54,6 +58,8 @@ tipmip_grl |yelmox/yelmox_esm_Greenland.nml           |transient |cal  |0      |
 EOF
 )
 
+LIST=0; [ "${1:-}" = "--list" ] && { LIST=1; shift; }
+
 want () { [ $# -eq 0 ] && return 0; local c; for c in "${SEL[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
 SEL=("$@")
 
@@ -61,22 +67,27 @@ while IFS='|' read -r name par g ts t0 t1 dt extra; do
     name=$(echo $name); par=$(echo $par); g=$(echo $g); ts=$(echo $ts)
     t0=$(echo $t0); t1=$(echo $t1); dt=$(echo $dt)
     [ ${#SEL[@]} -gt 0 ] && ! want "$name" && continue
-    # Climate-only: ice sheet and isostasy off, climate updated and written
-    # every dt (write_clim on: the ESM par files have it off), the final
-    # restart bundle only.
-    o=("comps.with_ice_sheet=False" "comps.with_isostasy=False" "comps.dt_clim=$dt" "$g.dtt=$dt"
-       "tm_2D.method=const" "tm_2D.dt=$dt" "tm_2Dsm.method=const" "tm_2Dsm.dt=$dt"
-       "tm_1D.method=const" "tm_1D.dt=$dt" "tm_rst.method=none" "output.write_clim=True")
+    # The timeline of the case.
     case $ts in
-        const) o+=("$g.tstep_method=const" "$g.tstep_const=$t0" "$g.time_init=0" "$g.time_end=$t1") ;;
-        rel)   o+=("$g.tstep_method=rel" "$g.time_init=$t0" "$g.time_end=$t1") ;;
-        cal)   o+=("$g.tstep_method=cal" "$g.time_init=$t0" "$g.time_end=$t1") ;;
+        const) tl=("$g.tstep_method=const" "$g.tstep_const=$t0" "$g.time_init=0" "$g.time_end=$t1") ;;
+        rel)   tl=("$g.tstep_method=rel" "$g.time_init=$t0" "$g.time_end=$t1") ;;
+        cal)   tl=("$g.tstep_method=cal" "$g.time_init=$t0" "$g.time_end=$t1") ;;
     esac
     read -r -a toks <<< "$extra"
     ex=()
     for tok in ${toks[@]+"${toks[@]}"}; do
         if [[ $tok == @* ]]; then ref="${tok#@}[@]"; ex+=("${!ref}"); else ex+=("$tok"); fi
     done
+    if [ $LIST = 1 ]; then
+        (IFS=$'\t'; echo "${name}"$'\t'"${par}"$'\t'"${ex[*]+${ex[*]}}${ex[*]+$'\t'}${tl[*]}")
+        continue
+    fi
+    # Climate-only: ice sheet and isostasy off, climate updated and written
+    # every dt (write_clim on: the ESM par files have it off), the final
+    # restart bundle only.
+    o=("comps.with_ice_sheet=False" "comps.with_isostasy=False" "comps.dt_clim=$dt" "$g.dtt=$dt"
+       "tm_2D.method=const" "tm_2D.dt=$dt" "tm_2Dsm.method=const" "tm_2Dsm.dt=$dt"
+       "tm_1D.method=const" "tm_1D.dt=$dt" "tm_rst.method=none" "output.write_clim=True" "${tl[@]}")
     echo ">> $name: $par -> $OUT/$name"
     # The case's overrides first, the climate-only ones last: they win.
     runme $MODE "${RUNOPTS_ARR[@]}" --jobname "docfig-$name" -e yelmox -n "$par" \
