@@ -183,19 +183,19 @@ function checkList(g, k, options, marks = {}) {
   return fieldRow(g, k, info, input);
 }
 
-// A list of names (a vector-of-strings key): chips with remove, and an add control.
-function namesEditor(g, k, candidates, label) {
+// The add box under the cards of a list of names (a vector-of-strings key,
+// forcing.series or forcing.terms): a named group of the par file or the
+// library, or a new name (from the template).
+function addBox(g, k, candidates, what) {
   const names = asList(eff(g, k, ""));
-  const cands = candidates.filter(c => !names.includes(c));
-  const sel = h("select", {}, h("option", { value: "" }, "add…"), ...cands.map(c => h("option", { value: c }, c)));
-  const txt = h("input", { type: "text", class: "fb-num", placeholder: "new name" });
-  const add = (n) => { if (n && !names.includes(n)) setOv(g, k, [...names, n]); };
-  sel.addEventListener("change", () => add(sel.value));
-  txt.addEventListener("change", () => add(txt.value.trim()));
-  return h("div", { class: "fb-names" },
-    h("code", {}, label || `${g}.${k}`), " = ",
-    ...names.map(n => h("span", { class: "fb-chip" }, n, h("button", { class: "fb-x", title: "remove", onclick: () => setOv(g, k, names.filter(x => x !== n)) }, "×"))),
-    sel, txt);
+  const sel = h("select", {}, h("option", { value: "" }, "from the par file or the library…"), ...candidates.filter(c => !names.includes(c)).map(c => h("option", { value: c }, c)));
+  const txt = h("input", { type: "text", class: "fb-num", placeholder: "or a new name" });
+  const add = () => { const n = sel.value || txt.value.trim(); if (n && !names.includes(n)) setOv(g, k, [...names, n]); };
+  return h("div", { class: "fb-card fb-card-add" }, h("div", { class: "fb-names" }, h("span", {}, `add a ${what}`), sel, txt, h("button", { class: "fb-btn", onclick: add }, "add")));
+}
+// The remove button of a card in a list of names.
+function removeBtn(g, k, name) {
+  return h("button", { class: "fb-btn fb-remove", title: `remove ${name} from ${g}.${k}`, onclick: () => setOv(g, k, asList(eff(g, k, "")).filter(x => x !== name)) }, "remove");
 }
 
 // ------------------------------------------------------------------ timeline
@@ -444,7 +444,7 @@ function seriesCard(name, tl) {
   const { p, ser, f, derived } = seriesOnRun(name, tl);
   const method = String(p.method);
   const head = [h("div", { class: "fb-cardhead" }, h("span", { class: "fb-sym", html: katex.renderToString(sym(name) + "(\\tau)", { throwOnError: false }) }), h("code", {}, `[${g}]`), h("span", { class: "fb-src fb-src-" + src }, src === "new" ? "new (template series)" : src),
-    h("button", { class: "fb-x", title: "remove from forcing.series", onclick: () => setOv("forcing", "series", asList(eff("forcing", "series", "")).filter(x => x !== name)) }, "×")), fields(g, ["method"])];
+    removeBtn("forcing", "series", name)), fields(g, ["method"])];
   if (derived) {
     const from = String(p.from || "");
     return h("div", { class: "fb-card" }, ...head,
@@ -492,9 +492,9 @@ function seriesCard(name, tl) {
 function secSeries(tl) {
   const names = asList(eff("forcing", "series", ""));
   return section("series", "Scalar series", "named functions of τ: a file, a constant, a ramp, a controller, or derived",
-    h("div", { class: "fb-card fb-card-flat" }, namesEditor("forcing", "series", named("series_"), "forcing.series"),
-      details("var-defs", "where the named groups are read", note("[series_<name>], [term_<name>], [snapshot_<name>]: from the par file, then the files of forcing.var_defs (the forcing library). -p on a library group copies it into the run's par file."), fields("forcing", ["var_defs"]))),
-    ...names.map(n => seriesCard(n, tl)));
+    ...names.map(n => seriesCard(n, tl)),
+    addBox("forcing", "series", named("series_"), "series"),
+    details("var-defs", "where the named groups are read", note("[series_<name>], [term_<name>], [snapshot_<name>]: from the par file, then the files of forcing.var_defs (the forcing library). -p on a library group copies it into the run's par file."), fields("forcing", ["var_defs"])));
 }
 
 // ------------------------------------------------- left: terms, snapshots
@@ -564,7 +564,7 @@ function termCard(name, ctx) {
   const { w, derived } = termWarnings(t, ctx);
   const content = [h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), h("span", { class: "fb-src fb-src-" + src }, src === "new" ? "new (template term)" : src),
     h("span", { class: "fb-kind" }, t.pattern), h("span", { class: "fb-help" }, PATTERN_HELP[t.pattern] || ""),
-    h("button", { class: "fb-x", title: "remove from forcing.terms", onclick: () => setOv("forcing", "terms", asList(eff("forcing", "terms", "")).filter(x => x !== name)) }, "×"))];
+    removeBtn("forcing", "terms", name))];
   content.push(fields(g, ["series", "pattern"], { series: { options: ["", ...ctx.snames], labels: { "": "\"\" (the constant 1)" } } }));
   const marks = {};
   if (t.pattern === "snapshots") {
@@ -617,9 +617,9 @@ function secTerms(ctx) {
       note(cl === "snapshots" ? "tas, to, so add, pr multiplies (fixed by field). Applied in this order: the snapshot terms, the uniform terms on tas/pr, the derived series, the ocean terms."
         : cl === "rembo" ? "REMBO supplies the atmosphere and takes the uniform tas terms as its summer anomaly (ΔT_sum = Σ f_ta α, ΔT_ann = 1.3 ΔT_sum); the snapshot backend supplies the ocean from the reference snapshot plus the ocean terms."
         : "The ESM composes the atmosphere and the ocean from its own anomalies; the terms add to its result: uniform terms on tas/pr unless the ESM supplies the smb, ocean terms at the shelf base."),
-      withSnaps ? fields("forcing", ["reference"], { reference: { options: candSnap } }) : null,
-      namesEditor("forcing", "terms", named("term_"), "forcing.terms")),
-    ...ctx.tnames.map(n => termCard(n, ctx)));
+      withSnaps ? fields("forcing", ["reference"], { reference: { options: candSnap } }) : null),
+    ...ctx.tnames.map(n => termCard(n, ctx)),
+    addBox("forcing", "terms", named("term_"), "term"));
 }
 
 function secSnapshots(ctx) {
