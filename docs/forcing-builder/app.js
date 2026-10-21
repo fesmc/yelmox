@@ -1,9 +1,9 @@
 // Forcing builder: the forcing of one run as the equation of
 // docs/_forcing-terms.md, built in the order of the equation. Left, top to
 // bottom: the forcing time, the equation (the reference, the scalar series,
-// the terms), the pieces that populate it (the record of each series, the
-// fields of each snapshot), what comes after (transforms, orbit, sea level,
-// prescribed ice). Right: the equation chain evaluated at a chosen time, the
+// the terms; each with where its data comes from: the record of a series,
+// the fields of each snapshot), what comes after (transforms, orbit, sea
+// level, prescribed ice). Right: the equation chain evaluated at a chosen time, the
 // series over the run, and the run written out (the forcing groups as a par
 // file; the -p list against a base par file with the runme command).
 //
@@ -522,7 +522,7 @@ function setKind(g, kind) {
 }
 
 // The card of a series in the equation: its kind and the parameters of the
-// equation (the record's file is a piece, below).
+// equation; a record also where it comes from (the file, the normalisation).
 function seriesCard(name, tl) {
   const g = "series_" + name;
   if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}]: no such group and no series template`), removeBtn("series", name));
@@ -547,16 +547,8 @@ function seriesCard(name, tl) {
     shown.push("f_min", "f_max", "df_dt_max");
     if (r.given.has("f_max") && num(p.f_max) !== num(p.f_min) && num(p.df_dt_max) <= 0) content.push(note(`f_min = ${fmtNum(p.f_min)} and f_max = ${fmtNum(p.f_max)} differ; with no rate the series stays at ${fmtNum(v)}.`));
   } else if (kind === "record") {
-    const r = grp(g);
-    const normGiven = r.given.has("norm_t0") && r.given.has("norm_t1");
-    const fixed = sourceDef(g) && sourceDef(g).keys.norm_t0 && sourceDef(g).keys.norm_t1;
-    const cb = h("input", { type: "checkbox", disabled: !!fixed, title: fixed ? "the par file sets norm_t0 and norm_t1; -p cannot remove a key" : "",
-      onchange: (e) => { if (e.target.checked) setMany(g, { norm_t0: val(g, "norm_t0", 0), norm_t1: num(val(g, "norm_t1", 0)) === num(val(g, "norm_t0", 0)) ? -21000 : val(g, "norm_t1") }); else { unset(g, "norm_t0"); unset(g, "norm_t1"); } } });
-    cb.checked = normGiven;
-    content.push(h("div", { class: "fb-fields" }, fieldRow(g, "norm", cb, { label: "normalise", help: "0 at t₀, 1 at t₁ (a time, or two: the mean over the window)" }),
-      ...(normGiven ? [field(g, "norm_t0", { label: "t₀ (0)" }), field(g, "norm_t1", { label: "t₁ (1)" })] : []), field(g, "units")));
+    content.push(fields(g, ["units"]));
     shown.push("norm_t0", "norm_t1", ...RECORD_KEYS);
-    content.push(note(p.series_file ? `The record ${p.series_file}${p.series_var ? ":" + p.series_var : ""} is read at τ (the piece below).` : "No record yet: name the file in the pieces below."));
   } else if (kind === "controller") {
     content.push(fields(g, ["method", ...CONTROLLER_KEYS, "units"], { method: { options: KINDS.controller } }));
     shown.push(...CONTROLLER_KEYS);
@@ -574,11 +566,44 @@ function seriesCard(name, tl) {
   if (num(p.win_t1) > num(p.win_t0)) content.push(vals(`window ${fmtNum(p.win_t0)} < τ < ${fmtNum(p.win_t1)}: ${name} → ${fmtNum(p.win_ref)} + ${fmtNum(p.win_fac)}·(${name} − ${fmtNum(p.win_ref)})`));
   if (num(p.sigma) > 0) content.push(vals(`noise: + ε, ε ~ N(0, ${fmtNum(p.sigma)}²) every step`));
   content.push(alsoSets(g, [...shown, "win_t0", "win_t1", "win_taper", "win_fac", "win_ref", "win_above", "sigma"]));
-  if (f && f.some(Number.isFinite)) {
+  if (kind === "record") content.push(recordFrom(name, p, ser, tl));
+  else if (f && f.some(Number.isFinite)) {
     const rules = (kind === "ramp" || kind === "controller") ? [{ y: num(p.f_min), label: "f_min" }, { y: num(p.f_max), label: "f_max" }] : [];
     content.push(smallPlot([{ label: name, t: tl.t, f }], { y: name, rules }));
-  } else if (kind === "record" && !ser && p.series_file) content.push(warn(`${p.series_file}: not in the exported series`));
+  }
   return h("div", { class: "fb-card" }, ...content);
+}
+// Where a piece of the equation gets its data, below its definition.
+const fromBlock = (...content) => h("div", { class: "fb-from" }, h("div", { class: "fb-from-label" }, "from"), ...content);
+// The record F of a series: the file (and the variable of a netCDF file),
+// the normalisation on it, the record over its full extent with the run's
+// τ range as a yellow band and t₀/t₁ marked.
+function recordFrom(name, p, ser, tl) {
+  const g = "series_" + name, r = grp(g);
+  const netcdf = !!(p.series_file && D.series[p.series_file] && D.series[p.series_file].kind === "netcdf");
+  const opts = { series_file: { options: ["", ...Object.keys(D.series).sort()], help: "a series file of input/ (table or netCDF)" } };
+  if (netcdf) opts.series_var = { options: Object.keys(D.series[p.series_file].vars), help: "the variable of the netCDF file" };
+  const keys = ["series_file", ...(netcdf ? ["series_var", "series_time_name"] : [])];
+  const normGiven = r.given.has("norm_t0") && r.given.has("norm_t1");
+  const fixed = sourceDef(g) && sourceDef(g).keys.norm_t0 && sourceDef(g).keys.norm_t1;
+  const cb = h("input", { type: "checkbox", disabled: !!fixed, title: fixed ? "the par file sets norm_t0 and norm_t1; -p cannot remove a key" : "",
+    onchange: (e) => { if (e.target.checked) setMany(g, { norm_t0: val(g, "norm_t0", 0), norm_t1: num(val(g, "norm_t1", 0)) === num(val(g, "norm_t0", 0)) ? -21000 : val(g, "norm_t1") }); else { unset(g, "norm_t0"); unset(g, "norm_t1"); } } });
+  cb.checked = normGiven;
+  const content = [h("div", { class: "fb-fields" }, ...keys.map(k => field(g, k, opts[k] || {})),
+    fieldRow(g, "norm", cb, { label: "normalise", help: "0 at t₀, 1 at t₁ (a time, or two: the mean over the window)" }),
+    ...(normGiven ? [field(g, "norm_t0", { label: "t₀ (0)" }), field(g, "norm_t1", { label: "t₁ (1)" })] : []))];
+  if (!p.series_file) content.push(warn("no record: the series has no file"));
+  else if (!ser) content.push(warn(`${p.series_file}${p.series_var ? ":" + p.series_var : ""}: not in the exported series (netCDF: set series_var)`));
+  else {
+    const vr = tl.method === "const" ? [{ x: tl.tc, label: "τ" }] : [];
+    if (p.norm) { for (const t of asList(p.norm_t0).map(num)) vr.push({ x: t, label: "t0", stroke: "#393" }); for (const t of asList(p.norm_t1).map(num)) vr.push({ x: t, label: "t1", stroke: "#393" }); }
+    if (p.norm) { const [v0, v1] = ser.norm; content.push(vals(`normalised: F̄[t₀] = ${fmtV(v0)}, F̄[t₁] = ${fmtV(v1)}`)); if (!Number.isFinite(v1 - v0) || Math.abs(v1 - v0) < 1e-12) content.push(warn("F̄[t₁] = F̄[t₀]: the normalisation divides by zero")); }
+    const lo = ser.time[0], hi = ser.time[ser.time.length - 1];
+    if (tl.tfmin < Math.min(lo, hi) || tl.tfmax > Math.max(lo, hi)) content.push(warn(`the record covers τ ∈ [${fmtNum(Math.min(lo, hi))}, ${fmtNum(Math.max(lo, hi))}] yr; the run reads τ ∈ [${fmtNum(tl.tfmin)}, ${fmtNum(tl.tfmax)}] yr (held at the end values outside)`));
+    content.push(smallPlot([{ label: "F", t: ser.time, f: ser.f }], { x: "forcing time τ [yr]", y: p.norm ? "normalised" : "F", vrules: vr, band: tl.method !== "const" ? { x0: tl.tfmin, x1: tl.tfmax } : null }));
+    content.push(vals(`${ser.n} points` + (ser.header ? `; ${ser.header.slice(0, 120)}` : "") + (tl.method !== "const" ? "; the run in yellow" : "")));
+  }
+  return fromBlock(...content);
 }
 
 // One term [term_<name>] as a record.
@@ -619,7 +644,7 @@ function termPart(t, f) {
 }
 const PATTERN_HELP = { snapshots: "series × (snap1 − snap0)", uniform: "series × a gain, the same everywhere", replace: "the field = the series, in place of the reference" };
 
-// Structural warnings of a term (the equation); the pieces check the fields.
+// Structural warnings of a term (the equation); the snapshot blocks check the fields.
 function termWarnings(t, tl) {
   const cl = climate();
   const sinfo = t.series === "" ? null : (seriesNames().includes(t.series) ? seriesOnRun(t.series, tl) : null);
@@ -664,35 +689,13 @@ function termCard(name, tl) {
   }
   if (t.pattern === "snapshots" && t.fields.length && t.snap1) content.push(tex(FIELDS.filter(f => t.fields.includes(f)).map(f => `${FSYM[f]}\\!:\\ ${f === "pr" ? "\\times" : ""}${termPart(t, f)}`).join(",\\qquad "), false));
   content.push(...termWarnings(t, tl).map(warn));
+  if (t.pattern === "snapshots") {
+    const snaps = [t.snap0, t.snap1].filter((s, i, a) => s && a.indexOf(s) === i);
+    const role = (s) => `${s === t.snap0 && s === t.snap1 ? "snap0 and snap1" : s === t.snap0 ? "snap0" : "snap1"} of ${name}`;
+    if (snaps.length) content.push(fromBlock(...snaps.map(s => snapshotBlock(s, role(s), tl))));
+  }
   return h("div", { class: "fb-card" }, ...content);
 }
-
-function secEquation(tl) {
-  const cl = climate();
-  const content = [];
-  if (cl === "esm") {
-    content.push(card("[esm]", null, h("span", { class: "fb-help" }, "the ESM supplies the climate; the terms add to it"),
-      fields("esm", ["experiment", "esm_name", "use_esm", "use_hist", "use_proj"]),
-      note("The ESM backend composes the atmosphere and the ocean from its own anomalies (a reference climatology plus the ESM anomaly over its reference period). No reference snapshot and no snapshot terms here: uniform terms on tas/pr unless the ESM supplies the smb, ocean terms at the shelf base. The periods and the ESM files: [esm] and the ESM par file (climate-esm.html)."),
-      h("p", { class: "fb-note" }, h("a", { href: "climate-esm.html" }, "the ESM backend"))));
-  } else {
-    content.push(h("div", { class: "fb-card fb-card-flat" },
-      fields("forcing", ["reference"], { reference: { list: "fb-snaps", help: "S₀: the snapshot the terms add to" } }),
-      note(cl === "snapshots" ? "tas, to, so add; pr multiplies (fixed by field). Applied in this order: the snapshot terms, the uniform terms on tas/pr, the derived series, the ocean terms."
-        : "REMBO supplies the atmosphere and takes the uniform tas terms as its summer anomaly (ΔT_sum = Σ f_ta α, ΔT_ann = 1.3 ΔT_sum); the snapshot backend supplies the ocean from the reference and the ocean terms.")));
-  }
-  const snames = seriesNames();
-  content.push(h("h3", { class: "fb-sub" }, "Scalar series ", h("span", { class: "fb-hint" }, "α_k(τ): a record, a constant, a ramp, a controller, or derived from the model")));
-  content.push(...snames.map(n => seriesCard(n, tl)));
-  content.push(addBox("series", "series_", "series", (g) => { const r = grp(g); r.k.method = "series"; r.given.add("method"); }));
-  content.push(h("h3", { class: "fb-sub" }, "Terms ", h("span", { class: "fb-hint" }, "series × pattern on explicit fields, added to the reference")));
-  content.push(...termNames().map(n => termCard(n, tl)));
-  content.push(addBox("terms", "term_", "term", (g) => { const r = grp(g); r.k.snap0 = "picontrol"; r.k.snap1 = "lgm"; r.k.fields = ["tas", "pr"]; r.k.series = snames[0] || ""; for (const k of ["series", "snap0", "snap1", "fields"]) r.given.add(k); }));
-  content.push(datalist("fb-snaps", namesOf("snapshot_")));
-  return section("equation", "1–3 · The equation", "reference + Σ series × pattern", ...content);
-}
-
-// ---------------------------------------------------------- left: pieces
 
 // The fields a snapshot must bind for the equation: the reference the
 // atmosphere (tas, pr, zs) and every field of the terms on it; snap0/snap1
@@ -713,11 +716,18 @@ function coverage(c, tl) {
   const [, a, b] = c.time; const lo = Math.min(a, b), hi = Math.max(a, b);
   return { lo, hi, ok: tl.tfmin >= lo && tl.tfmax <= hi };
 }
-function snapshotCard(name, tl) {
+// The roles of a snapshot in the equation: the reference, snap0/snap1 of a term.
+const snapRoles = (name) => [name === reference() ? "the reference" : null, ...runTerms().filter(t => t.pattern === "snapshots" && (t.snap0 === name || t.snap1 === name)).map(t => `${t.snap0 === name ? "snap0" : "snap1"} of ${t.name}`)].filter(Boolean);
+// The block of [snapshot_<name>] inside the card that names it (role: what it
+// is there): the clim_db group of each field, ✓/✗ where the equation needs
+// it, the files they resolve to, the coverage in τ, how the fields are read.
+// The same snapshot named twice is the same group: edits apply to both.
+function snapshotBlock(name, role, tl) {
   const g = "snapshot_" + name;
-  const roles = [name === reference() ? "the reference" : null, ...runTerms().filter(t => t.pattern === "snapshots" && (t.snap0 === name || t.snap1 === name)).map(t => `${t.snap0 === name ? "snap0" : "snap1"} of ${t.name}`)].filter(Boolean);
-  if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}] (${roles.join(", ")}): no group and no snapshot template`));
-  const need = neededFields(name), bound = boundFields(name);
+  const roles = snapRoles(name);
+  const head = (...extra) => h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), sourceOf(g) ? srcBadge(g) : null, h("span", { class: "fb-help" }, role, ...extra));
+  if (!grp(g)) return h("div", { class: "fb-sub-card" }, head(), warn(`[${g}]: no group and no snapshot template`));
+  const need = neededFields(name);
   const rows = [], resolved = [], warns = [];
   for (const f of SNAPFIELDS) {
     const groups = asList(val(g, f, ""));
@@ -736,46 +746,40 @@ function snapshotCard(name, tl) {
   }
   const extraF = SNAPFIELDS.filter(f => !need.includes(f) && asList(val(g, f, "")).length);
   const uniq = [...new Set(warns)];
-  return card(`[${g}]`, g,
-    h("span", { class: "fb-help" }, roles.join(", ") + (snapTdep(name) ? "; depends on τ" : "") + (need.length ? `; needs ${need.join(", ")}` : "")),
+  return h("div", { class: "fb-sub-card" },
+    head((snapTdep(name) ? "; depends on τ" : "") + (need.length ? `; needs ${need.join(", ")}` : "")),
     h("div", { class: "fb-fields" }, ...rows),
     resolved.length ? h("ul", { class: "fb-list" }, ...resolved.map(x => h("li", {}, x))) : note("No fields bound: name a varslice group of input/clim_db.nml per field, or pick a snapshot of the library."),
     extraF.length ? vals(`also bound, not used by the equation: ${extraF.join(", ")}`) : null,
-    details("snap-" + name, "how the fields are read (exp, monthly, smoothing)", fields(g, ["exp", "monthly", "clim_sigma", "ocn_sigma"]), alsoSets(g, [...SNAPFIELDS, "exp", "monthly", "clim_sigma", "ocn_sigma"])),
+    details(`snap-${name}-${role}`, "how the fields are read (exp, monthly, smoothing)", fields(g, ["exp", "monthly", "clim_sigma", "ocn_sigma"]), alsoSets(g, [...SNAPFIELDS, "exp", "monthly", "clim_sigma", "ocn_sigma"])),
     ...uniq.map(warn));
 }
-function recordCard(name, tl) {
-  const g = "series_" + name;
-  const { p, ser } = seriesOnRun(name, tl);
-  const opts = { series_file: { options: ["", ...Object.keys(D.series).sort()], help: "a series file of input/ (table or netCDF)" } };
-  if (p.series_file && D.series[p.series_file] && D.series[p.series_file].kind === "netcdf") opts.series_var = { options: Object.keys(D.series[p.series_file].vars), help: "the variable of the netCDF file" };
-  const keys = ["series_file", ...(p.series_file && D.series[p.series_file] && D.series[p.series_file].kind === "netcdf" ? ["series_var", "series_time_name"] : [])];
-  const content = [h("div", { class: "fb-cardhead" }, texi(sym(name) + "(\\tau)"), h("code", {}, `[${g}]`), srcBadge(g), h("span", { class: "fb-help" }, "the record F")), fields(g, keys, opts)];
-  if (!p.series_file) content.push(warn("no record: the series has no file"));
-  else if (!ser) content.push(warn(`${p.series_file}${p.series_var ? ":" + p.series_var : ""}: not in the exported series (netCDF: set series_var)`));
-  else {
-    const vr = tl.method === "const" ? [{ x: tl.tc, label: "τ" }] : [];
-    if (p.norm) { for (const t of asList(p.norm_t0).map(num)) vr.push({ x: t, label: "t0", stroke: "#393" }); for (const t of asList(p.norm_t1).map(num)) vr.push({ x: t, label: "t1", stroke: "#393" }); }
-    const lo = ser.time[0], hi = ser.time[ser.time.length - 1];
-    if (tl.tfmin < Math.min(lo, hi) || tl.tfmax > Math.max(lo, hi)) content.push(warn(`the record covers τ ∈ [${fmtNum(Math.min(lo, hi))}, ${fmtNum(Math.max(lo, hi))}] yr; the run reads τ ∈ [${fmtNum(tl.tfmin)}, ${fmtNum(tl.tfmax)}] yr (held at the end values outside)`));
-    if (p.norm) { const [v0, v1] = ser.norm; content.push(vals(`normalised: F̄[t₀] = ${fmtV(v0)}, F̄[t₁] = ${fmtV(v1)}`)); if (!Number.isFinite(v1 - v0) || Math.abs(v1 - v0) < 1e-12) content.push(warn("F̄[t₁] = F̄[t₀]: the normalisation divides by zero")); }
-    content.push(smallPlot([{ label: "F", t: ser.time, f: ser.f }], { x: "forcing time τ [yr]", y: p.norm ? "normalised" : "F", vrules: vr, band: tl.method !== "const" ? { x0: tl.tfmin, x1: tl.tfmax } : null }));
-    content.push(vals(`${ser.n} points` + (ser.header ? `; ${ser.header.slice(0, 120)}` : "") + (tl.method !== "const" ? "; the run in yellow" : "")));
-  }
-  return h("div", { class: "fb-card" }, ...content);
-}
-function secPieces(tl) {
-  const records = seriesNames().filter(n => { const p = seriesPar(n); return p && kindOf(p) === "record"; });
+
+function secEquation(tl) {
+  const cl = climate();
   const content = [];
-  if (records.length) content.push(h("h3", { class: "fb-sub" }, "Records of the series"), ...records.map(n => recordCard(n, tl)));
-  if (withSnaps()) {
-    content.push(h("h3", { class: "fb-sub" }, "Fields of the snapshots ", h("span", { class: "fb-hint" }, "each field a varslice group of input/clim_db.nml: the file, variable, grid and remap")),
-      ...runSnaps().map(s => snapshotCard(s, tl)),
-      h("div", { class: "fb-card fb-card-flat" }, fields("snapshots", ["lapse", "f_p"]), note("Γ (annual, summer) and β_p: the sea-level reduction of every snapshot, the uniform terms and the elevation transform use the same values.")),
-      datalist("fb-climdb", Object.keys(D.climdb).sort()));
+  if (cl === "esm") {
+    content.push(card("[esm]", null, h("span", { class: "fb-help" }, "the ESM supplies the climate; the terms add to it"),
+      fields("esm", ["experiment", "esm_name", "use_esm", "use_hist", "use_proj"]),
+      note("The ESM backend composes the atmosphere and the ocean from its own anomalies (a reference climatology plus the ESM anomaly over its reference period). No reference snapshot and no snapshot terms here: uniform terms on tas/pr unless the ESM supplies the smb, ocean terms at the shelf base. The periods and the ESM files: [esm] and the ESM par file (climate-esm.html)."),
+      h("p", { class: "fb-note" }, h("a", { href: "climate-esm.html" }, "the ESM backend"))));
+  } else {
+    content.push(h("div", { class: "fb-card fb-card-flat" },
+      fields("forcing", ["reference"], { reference: { list: "fb-snaps", help: "S₀: the snapshot the terms add to" } }),
+      note(cl === "snapshots" ? "tas, to, so add; pr multiplies (fixed by field). Applied in this order: the snapshot terms, the uniform terms on tas/pr, the derived series, the ocean terms."
+        : "REMBO supplies the atmosphere and takes the uniform tas terms as its summer anomaly (ΔT_sum = Σ f_ta α, ΔT_ann = 1.3 ΔT_sum); the snapshot backend supplies the ocean from the reference and the ocean terms."),
+      fromBlock(snapshotBlock(reference(), "the reference", tl),
+        fields("snapshots", ["lapse", "f_p"]), note("Γ (annual, summer) and β_p: the sea-level reduction of every snapshot, the uniform terms and the elevation transform use the same values."))));
   }
-  if (!content.length) content.push(note("Nothing to populate: no records, and the backend has no snapshots."));
-  return section("pieces", "The pieces", "what the equation names, and where each comes from", ...content);
+  const snames = seriesNames();
+  content.push(h("h3", { class: "fb-sub" }, "Scalar series ", h("span", { class: "fb-hint" }, "α_k(τ): a record, a constant, a ramp, a controller, or derived from the model")));
+  content.push(...snames.map(n => seriesCard(n, tl)));
+  content.push(addBox("series", "series_", "series", (g) => { const r = grp(g); r.k.method = "series"; r.given.add("method"); }));
+  content.push(h("h3", { class: "fb-sub" }, "Terms ", h("span", { class: "fb-hint" }, "series × pattern on explicit fields, added to the reference")));
+  content.push(...termNames().map(n => termCard(n, tl)));
+  content.push(addBox("terms", "term_", "term", (g) => { const r = grp(g); r.k.snap0 = "picontrol"; r.k.snap1 = "lgm"; r.k.fields = ["tas", "pr"]; r.k.series = snames[0] || ""; for (const k of ["series", "snap0", "snap1", "fields"]) r.given.add(k); }));
+  content.push(datalist("fb-snaps", namesOf("snapshot_")), datalist("fb-climdb", Object.keys(D.climdb).sort()));
+  return section("equation", "1–3 · The equation", "reference + Σ series × pattern, each piece with its source", ...content);
 }
 
 // ---------------------------------------------- left: after the composition
@@ -1034,7 +1038,7 @@ function render() {
   const y = window.scrollY;
   const tl = timeline();
   root.replaceChildren();
-  LEFT = h("div", { class: "fb-left" }, secTime(tl), secEquation(tl), secPieces(tl), secAfter(),
+  LEFT = h("div", { class: "fb-left" }, secTime(tl), secEquation(tl), secAfter(),
     h("p", { class: "fb-help" }, `Data: forcing.json generated ${D.generated}${D.commit ? " from " + D.commit : ""} (scripts/forcing-builder/export.jl).`));
   RIGHT = RIGHT || h("div", { class: "fb-right" });
   root.append(topBar(), h("div", { class: "fb-cols" }, LEFT, RIGHT));

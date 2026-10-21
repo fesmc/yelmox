@@ -15,8 +15,9 @@ format:
 The forcing of a run, built in the order of its equation (the [forcing as
 terms](yelmox.md#forcing)). Left, top to bottom: the forcing time τ; the
 equation, a reference snapshot plus terms, each a scalar series times a
-pattern on explicit fields; the pieces the equation names, the record of each
-series and the fields of each snapshot, with what is missing; and what comes
+pattern on explicit fields, where each series and each term carries in its
+own card where its data comes from (the record of a series; the clim_db
+fields of each snapshot a term names) and what is missing; and what comes
 after the composition. Right: the equation chain evaluated at a chosen time,
 the series over the run, and the run written out as a par file and as the
 `-p` list with the `runme` command against a base par file. Start from a case
@@ -32,7 +33,12 @@ template in `input/yelmox_defaults.nml` when the equation names it, and edited
 in place; writing the run out compares each group with its source, so the
 `-p` list is what differs and a new group is given as a block to add to the
 par file or the library. A preset or a base plus `-p` is read the other way
-into the groups. The files are read as exported to `forcing-builder/forcing.json`
+into the groups. A symbol is complete where it is introduced: a record
+series shows its file, normalisation and the record over its full extent; a
+snapshot term, and the reference, show each snapshot with the `input/clim_db.nml`
+group of every field, ✓ or ✗ where the equation needs it, and the files these
+resolve to. A snapshot named by two terms is the same group in both cards.
+The files are read as exported to `forcing-builder/forcing.json`
 by `scripts/forcing-builder/export.jl`; the page has no server. The rare keys
 of a group (noise, windows, restarts, smoothing) are kept as the par file sets
 them and listed, not edited. The series curves follow the fesm-utils `tsgen`
