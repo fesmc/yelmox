@@ -95,3 +95,9 @@ pre.fb-cfg .g { color: var(--fb-accent); font-weight: 600; }
 pre.fb-cfg .ov { background: #fde9b8; }
 .fb-ta { width: 100%; font-family: var(--bs-font-monospace, monospace); font-size: 0.8rem; }
 @media (max-width: 640px) { .fb-field { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .fb-field .fb-help { grid-column: 1 / -1; white-space: normal; } }
+
+/* equation-first layout: subheadings inside a section, inline equations in a card */
+.fb-sub { font-size: 0.85rem; font-weight: 600; margin: 0.9rem 0 0.35rem; color: var(--fb-fg); border: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: baseline; }
+.fb-eq-inline { font-size: 0.9rem; margin: 0.25rem 0 0.1rem; overflow-x: auto; }
+.fb-cardhead select { font-size: 0.8rem; padding: 0.1rem 0.3rem; border: 1px solid var(--fb-line); border-radius: 4px; background: var(--fb-panel); color: var(--fb-fg); }
+.fb-field input[list] { max-width: 16rem; width: 16rem; }
