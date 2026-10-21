@@ -14,29 +14,28 @@ module obm_coupling
     !              of the driver's registry) -> obm box air temperatures/vapor
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
     !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
-    !              to_ann (marine-shelf forcing), through the climate modifier
-    !              the series derived from the boxes (obm_north, obm_south) and the
-    !              domains' ocean terms on them (climate_terms), applied here
+    !              to_ann (marine-shelf forcing), through the series derived
+    !              from the boxes (obm_north, obm_south) and the domains' ocean
+    !              terms on them (climate_terms), applied here
     !
     ! The module owns its whole configuration (obm_coupling_ctl: exchange
     ! switches, the atmospheric forcing, freshwater-flux masks, nautilus
     ! hysteresis forcing), loaded by obm_ctl_load from [ctrl] and
     ! [obm_forcing]. obm2ism is on when a series is derived from a box.
-    ! The driver calls obm_ctl_load, then obm_coupling_init once the indices
-    ! and the domains are initialized, obm_ocean_init once the box model is
-    ! initialized (cold start or restart), then obm_exchange once per step
-    ! after the domains' climate steps.
+    ! The driver calls obm_ctl_load, then coupling_obm2ism once the box model
+    ! is initialized (cold start or restart) and before the domains, so their
+    ! startup climate sees the box, then obm_coupling_init once the domains are
+    ! initialized, then obm_exchange once per step after the domains' climate
+    ! steps.
 
     use nml,           only : nml_read, nml_validate, nml_replace
     use ncio,          only : nc_read
     use precision,     only : dp
     use yelmo,         only : wp
-    use timestepping,  only : tstep_class
     use kryos,         only : kryos_domain
-    use kryos_coupling, only : step_shelf
     use kryos_forcing, only : indices_class, indices_has, indices_value, indices_uses_derived, &
                               indices_set_obm
-    use yelmox_climate, only : climate_apply_ocean, climate_uses_derived
+    use yelmox_climate, only : climate_apply_ocean
     use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
@@ -69,7 +68,7 @@ module obm_coupling
         real(dp)           :: hyster_positive_branch_time = 0.0_dp
     end type obm_coupling_ctl
 
-    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_ocean_init, obm_exchange
+    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
     public :: coupling_atm2obm, coupling_ism2obm, coupling_obm2ism
     public :: update_bipolar_hyster_forcing
 
@@ -170,40 +169,6 @@ contains
             call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
         end if
     end subroutine obm_coupling_init
-
-    subroutine obm_ocean_init(oc, obm, idx, dom_north, dom_south, active_north, active_south, ts, &
-                              cold_start)
-        ! The domains' ocean from the box model at the start of the run (cold
-        ! start or restart), as after every exchange: the series derived from
-        ! the boxes set, the ocean terms re-applied. On a cold start also their
-        ! shelf forcing from it: the domains' startup ran their shelf step on
-        ! the backend's ocean, so the first record and the first step would
-        ! otherwise miss the box. A restart restored the shelf state the run
-        ! held, computed from the box.
-        type(obm_coupling_ctl), intent(in)    :: oc
-        type(obm_class),        intent(in)    :: obm
-        type(indices_class),    intent(inout) :: idx
-        type(kryos_domain),     intent(inout) :: dom_north, dom_south
-        logical,                intent(in)    :: active_north, active_south
-        type(tstep_class),      intent(in)    :: ts
-        logical,                intent(in)    :: cold_start
-
-        call coupling_obm2ism(obm, oc%obm_name, idx)
-        if (active_north) then
-            if (climate_uses_derived(dom_north%cl, idx, "obm_north") .or. &
-                climate_uses_derived(dom_north%cl, idx, "obm_south")) then
-                call climate_apply_ocean(dom_north%cl, dom_north%clim, idx)
-                if (cold_start) call step_shelf(dom_north, ts)
-            end if
-        end if
-        if (active_south) then
-            if (climate_uses_derived(dom_south%cl, idx, "obm_north") .or. &
-                climate_uses_derived(dom_south%cl, idx, "obm_south")) then
-                call climate_apply_ocean(dom_south%cl, dom_south%clim, idx)
-                if (cold_start) call step_shelf(dom_south, ts)
-            end if
-        end if
-    end subroutine obm_ocean_init
 
     subroutine obm_exchange(oc, obm, idx, dom_north, dom_south, active_north, active_south, &
                             time, time_init, dtt)

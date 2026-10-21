@@ -51,8 +51,8 @@ program yelmox_bipolar
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
-    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_ocean_init, &
-                             obm_exchange
+    use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange, &
+                             coupling_obm2ism
     use timer,        only : timer_class, timer_init, timer_step, &
                              timer_print_totals, timer_write_totals
 
@@ -125,6 +125,19 @@ program yelmox_bipolar
     call indices_init(idx, path_par, ts%time_rel)
     if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
 
+    ! === Ocean box model init (from the run-level bundle when restarting) +
+    !     output file, then the series derived from its boxes (obm_north,
+    !     obm_south). Before the domains: their startup climate (and the shelf
+    !     and ice state built on it) sees the box ocean. ===
+    if (oc%active_obm) then
+        obm_file    = trim(oc%obm_name)//".nc"
+        obm_restart = "None"
+        if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
+        call obm_init(obox, path_par, oc%obm_name, obm_restart)
+        call write_obm_init(obm_file, ts%time, "years")
+        call coupling_obm2ism(obox, oc%obm_name, idx)
+    end if
+
     ! === Per-domain initialization ===
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
     if (active_south) call setup_domain(dom_south, "_south", outfldr_south)
@@ -134,21 +147,6 @@ program yelmox_bipolar
     ! hydrographic masks (Yelmo grid) restricting the
     ! freshwater flux per domain.
     call obm_coupling_init(oc, idx, dom_north, dom_south, active_north, active_south)
-
-    ! === Ocean box model init (from the run-level bundle when restarting) +
-    !     output file ===
-    if (oc%active_obm) then
-        obm_file    = trim(oc%obm_name)//".nc"
-        obm_restart = "None"
-        if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
-        call obm_init(obox, path_par, oc%obm_name, obm_restart)
-        call write_obm_init(obm_file, ts%time, "years")
-
-        ! The domains' ocean from the box (the obm_* series) and their shelf
-        ! forcing, so the first record and the first step see it.
-        call obm_ocean_init(oc, obox, idx, dom_north, dom_south, active_north, active_south, ts, &
-                            cold_start=(trim(restart) == "None"))
-    end if
 
     ! === Output + restart schedules (shared cadence, from [tm_2D]/[tm_2Dsm]/
     !     [tm_1D]/[tm_rst]; a restart bundle is always written at time_end) ===

@@ -92,7 +92,7 @@ module yelmox_climate
     public :: yelmox_climate_class
     public :: climate_init
     public :: climate_update
-    public :: climate_apply_ocean, climate_uses_derived
+    public :: climate_apply_ocean
     public :: climate_end
     public :: climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     public :: climate_restart_write
@@ -348,22 +348,6 @@ contains
         type(indices_class),        intent(in)    :: idx
         call terms_apply_ocn(cl%terms, out, idx)
     end subroutine climate_apply_ocean
-
-    logical function climate_uses_derived(cl, idx, from) result(uses)
-        ! Does any term of this climate use a series derived `from` (e.g.
-        ! obm_north)?
-        type(yelmox_climate_class), intent(in) :: cl
-        type(indices_class),        intent(in) :: idx
-        character(len=*),           intent(in) :: from
-        type(derived_spec) :: drv
-        integer :: k
-        uses = .false.
-        do k = 1, cl%terms%n
-            if (.not. cl%terms%term(k)%derived) cycle
-            drv = indices_derived(idx, cl%terms%term(k)%series)
-            if (trim(drv%from) == trim(from)) uses = .true.
-        end do
-    end function climate_uses_derived
 
     subroutine snapshots_state_copy(dst, src)
         ! The fields of a snapshots state that climate_out carries, those it built:

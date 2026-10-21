@@ -35,7 +35,7 @@ across both domains plus the OBM.
   (`bsl_startup`) and written to the run restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
-  (`obm_coupling_init`, `obm_ocean_init`, `obm_exchange`). The OBM writes its own
+  (`coupling_obm2ism`, `obm_coupling_init`, `obm_exchange`). The OBM writes its own
   1D output, `<obm_name>.nc` (`[ctrl] obm_name`, `nautilus` or `stommel`), on the
   `[tm_1D]` cadence; its restart (`obm_restart.nc`) goes into the run restart
   bundle next to `bsl_restart.nc`.
@@ -126,10 +126,9 @@ One global series drives the box model and, with regional gains, the domains
   (`[term_obm_north]`/`[term_obm_south]`: `replace`, `to_ann` = the box
   temperature; a `uniform` term with the anomaly series for the reference +
   the box anomaly). `obm_exchange` sets the series and re-applies the ocean
-  terms after both climate steps, and once at the start (`obm_ocean_init`,
-  after the box model's cold start or restart; on a cold start then the shelf
-  step again, a restart restores the shelf), so the first record and the
-  first step see the box. It needs `active_obm`; the series replace `dTo`
+  terms after both climate steps. At the start the box model is initialized
+  (cold start or restart) and the series set before the domains, so their
+  startup climate, shelf and ice state already see the box. It needs `active_obm`; the series replace `dTo`
   (`forcing_north.terms==orbital,regional_north,obm_north`, see
   `run_tests.sh`).
 - **`ism2obm`**: freshwater flux of each domain into the boxes (`fn`, `fs`),
