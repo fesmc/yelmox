@@ -32,14 +32,14 @@ the terms, in this order.
 ## Configuration
 
 Example: `yelmox/yelmox_Greenland.nml`, present day plus the PMIP3 LGM minus
-piControl anomaly weighted by the orbital index, the ocean plus a quarter of
+piControl anomaly weighted by `alpha` (here the orbital record r2020), the ocean plus a quarter of
 the mean air temperature anomaly (the derived series `dTo`):
 
 ```fortran
 &forcing
     reference = "pd"                  ! [snapshot_pd], in the par file
-    series    = "orbital" "dTo"       ! [series_orbital], [series_dTo] (library)
-    terms     = "orbital" "ocean"     ! [term_orbital]: picontrol -> lgm on tas, pr; [term_ocean]: dTo on to
+    series    = "alpha" "dTo"         ! [series_alpha] (par file: alpha_orbital_r2020), [series_dTo] (library)
+    terms     = "lgm" "ocean"         ! [term_lgm]: picontrol -> lgm on tas, pr; [term_ocean]: dTo on to
 /
 
 &snapshots
@@ -219,7 +219,7 @@ level like any other snapshot.
 ```
 
 Two terms give the orbital + millennial decomposition of Banderas et al.
-(2018), e.g. `orbital` on `picontrol` -> `lgm` and `millennial` on
+(2018), e.g. `lgm` on `picontrol` -> `lgm` and `millennial` on
 `lgm_weak` -> `lgm_strong`, each on its own series; several terms may share
 one series:
 
@@ -227,7 +227,7 @@ one series:
 &forcing
     reference = "pd"
     series    = "alpha" "beta"
-    terms     = "orbital" "millennial"
+    terms     = "lgm" "millennial"
 /
 
 &series_alpha
@@ -242,7 +242,7 @@ one series:
     series_file = "input/beta_ngrip_millennial.dat"
 /
 
-&term_orbital
+&term_lgm
     series = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"

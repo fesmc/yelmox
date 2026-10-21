@@ -107,12 +107,12 @@ takes ocean terms at the shelf base).
 ```fortran
 &forcing
     reference = "pd"                 ! the reference snapshot [snapshot_pd]
-    series    = "glacial" "dTo"      ! [series_glacial], [series_dTo]
-    terms     = "glacial" "ocean"    ! [term_glacial], [term_ocean]
+    series    = "alpha" "dTo"        ! [series_alpha], [series_dTo]
+    terms     = "lgm" "ocean"        ! [term_lgm], [term_ocean]
     var_defs  = "input/clim_db.nml" "input/forcing_db.nml"   ! the default
 /
 
-&series_glacial                      ! a tsgen series (unset keys: template [series])
+&series_alpha                        ! a tsgen series (unset keys: template [series])
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
 /
@@ -125,8 +125,8 @@ takes ocean terms at the shelf base).
     units  = "K"
 /
 
-&term_glacial                        ! tas + f (lgm - picontrol), pr (1 + f (lgm/picontrol - 1))
-    series = "glacial"
+&term_lgm                            ! tas + alpha (lgm - picontrol), pr (1 + alpha (lgm/picontrol - 1))
+    series = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"
     fields = "tas" "pr"
@@ -140,10 +140,14 @@ takes ocean terms at the shelf base).
 ```
 
 This reads T = T_pd + α (T_lgm − T_pic), P = P_pd [1 + α (P_lgm/P_pic − 1)],
-Θ = Θ_pd + 0.25 ⟨T^sl − T^sl_pd⟩ (Greenland paleo A). The library
-`input/forcing_db.nml` holds these groups ([Forcing library](#forcing-library)),
-so a par file lists names; an experiment adds or removes terms with
-`-p forcing.terms==glacial,ocean`.
+Θ = Θ_pd + 0.25 ⟨T^sl − T^sl_pd⟩ (Greenland paleo A). The series are named
+by their symbol in the equation (`alpha`, `beta`, `gamma`, ...), the record
+each loads is the setup's: `[series_alpha]` is `alpha_combined_125kyr` in
+`yelmox_GreenlandPaleo.nml` and `alpha_orbital_r2020` (normalised) in
+`yelmox_Greenland.nml`, so a term on `alpha` (`term_lgm`) is the same in both.
+The library `input/forcing_db.nml` holds shared groups ([Forcing
+library](#forcing-library)), so a par file lists names; an experiment adds or
+removes terms with `-p forcing.terms==lgm,ocean`.
 
 **Series** are named scalars on the forcing time, **driver-owned**: the
 program holds one registry (`indices_class`, `idx`, libs/kryos_forcing.f90),
@@ -430,9 +434,9 @@ A minimal skeleton:
 `input/forcing_db.nml` holds the named forcing groups that several par files
 share: snapshots `[snapshot_<name>]` (PMIP3 `picontrol`, `lgm`; the Greenland
 reconstructions `b18_base`, `b18`, `b20`), series `[series_<name>]`
-(`glacial`, `orbital`, `orbital_t2018`, `dTo`, `ramp`, `hyst`, `dT`,
-`obm_north`, `obm_south`), terms `[term_<name>]` (`glacial`, `orbital`,
-`b18`, `b20`, `ocean`, `ramp`, `hyst`, `dT`, `obm_north`, `obm_south`) and
+(`alpha`, the default record, read when the par file has none; `dTo`,
+`ramp`, `hyst`, `dT`, `obm_north`, `obm_south`), terms `[term_<name>]`
+(`lgm`, `b18`, `b20`, `ocean`, `ramp`, `hyst`, `dT`, `obm_north`, `obm_south`) and
 elsa layer settings (`elsa_grl_lgp`, `elsa_grl_deglac`, `elsa_ant_paleo`).
 `[forcing]` (the per-run selection), `[snapshots]` (the backend's rules) and
 `[snapshot_pd]` (domain-specific) stay in the par file.
@@ -444,8 +448,8 @@ from the file `[ytrc] elsa_nml` names (`input/forcing_db.nml`), selected by
 `elsa_group`. A listed group found nowhere stops the run.
 
 To change a library group for one run, define it in the par file (it wins; LIS
-and North redefine `series_glacial` as the constant 1), or set one of its keys
-with `-p` (e.g. `-p series_glacial.f_min=0`): runme copies the whole group into
+and North redefine `series_alpha` as the constant 1), or set one of its keys
+with `-p` (e.g. `-p series_alpha.f_min=0`): runme copies the whole group into
 the staged par file, then applies the override (`par_library` in
 `.runme/info.json`). `par_defaults` (`input/yelmo_defaults.nml`,
 `input/yelmox_defaults.nml`) lets `-p` set a key of a group the par file lacks,

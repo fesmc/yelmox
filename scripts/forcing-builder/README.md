@@ -38,7 +38,7 @@ the export before publishing the docs.
 
 ```bash
 julia --project=scripts/forcing-builder scripts/forcing-builder/explain.jl yelmox/yelmox_Greenland.nml \
-      -p ctrl.tstep_method=rel ctrl.time_init=-120e3 ctrl.time_end=0 forcing.series==orbital,dTo,ramp forcing.terms==orbital,ocean,ramp
+      -p ctrl.tstep_method=rel ctrl.time_init=-120e3 ctrl.time_end=0 forcing.series==alpha,dTo,ramp forcing.terms==lgm,ocean,ramp
 ```
 
 ```bash

@@ -126,7 +126,15 @@
     reference = "pd"
     series    = ""
     terms     = ""
-    ! Paleo: -p (scripts/ant-paleo/params.sh): series glacial, dTo; terms glacial, ocean.
+    ! Paleo: -p (scripts/ant-paleo/params.sh): series alpha, dTo; terms lgm, ocean.
+/
+
+&series_alpha
+    ! alpha of this setup: the glacial index alpha_combined_125kyr_interp (0 at
+    ! present, ~0.9 at 21 ka), as is (not normalised), the weight of the LGM
+    ! anomaly (term_lgm) when the forcing names it (see [forcing]).
+    method      = "series"
+    series_file = "input/alpha_combined_125kyr_interp.dat"
 /
 
 

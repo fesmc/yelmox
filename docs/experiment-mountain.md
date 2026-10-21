@@ -57,11 +57,11 @@ Pyrenees on 2 km.
   (`TOPO-GLO90-GEBCO2026`), a 10-yr equilibration with constant boundaries
   (`[sim] init_method = "equil"`, `init_equil_time = 10`).
 - **Climate:** the reference (`snapshot_pd`, ERA5 1981--2010: `tas`, `pr`,
-  `zs`) plus the uniform term `cooling` (`[term_cooling]` on `tas` and `pr`,
-  `f_ta = -10` K) on the series `orbital_t2018` (`[series_orbital_t2018]
+  `zs`) plus the term `uniform` (`[term_uniform]`, a uniform anomaly on `tas` and `pr`,
+  `f_ta = -10` K) on the series `alpha` (`[series_alpha]
   method = "series"`, `input/alpha_orbital_t2018.dat`, 1 at present and 0 at
   21 ka, normalised with `norm_t0 = 0`, `norm_t1 = -21e3` to 0 at present and
-  1 at 21 ka): `dTa = f_ta * f`, the precipitation times `exp(f_p dTa)`
+  1 at 21 ka): `dTa = f_ta * alpha`, the precipitation times `exp(f_p dTa)`
   (`f_p = 0.05` K-1, the default). The air temperature is the ERA5 reference
   at present and 10 K below it at 21 ka (+1.4 to -11.1 K over the run). No
   ocean.

@@ -121,15 +121,14 @@
     ! file, then the var_defs files (input/forcing_db.nml: the shared library;
     ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
     reference = "pd"
-    series    = "glacial" "dTo"
-    terms     = "glacial" "ocean"
-    ! glacial: PMIP3 lgm - picontrol weighted by the glacial index (constant 1 here);
+    series    = "alpha" "dTo"
+    terms     = "lgm" "ocean"
+    ! lgm: PMIP3 lgm - picontrol weighted by alpha (constant 1 here);
     ! ocean: the profiles plus 0.25 x the mean sea-level air anomaly (series dTo).
 /
 
-&series_glacial
-    ! Glacial index, constant 1 (LGM): overrides [series_glacial] of
-    ! input/forcing_db.nml (the alpha_combined series) for the steady state.
+&series_alpha
+    ! alpha of this setup: constant 1 (the LGM) for the steady state.
     method = "const"
     f_min  = 1.0
 /

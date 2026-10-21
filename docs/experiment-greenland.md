@@ -4,7 +4,7 @@ title: "Greenland"
 
 Greenland test cases at 16 km, without optimization of the basal friction or the
 ocean thermal forcing: the present-day reference climate with the PMIP3
-piControl and LGM snapshots on a glacial index axis `at`
+piControl and LGM snapshots weighted by the series `alpha`, an orbital record
 (`yelmox_Greenland.nml`), the same with a homogeneous air temperature ramp as a
 functionality test at 32 km, and the present-day reference alone (both
 `yelmox_Greenland.nml` with `-p` overrides).
@@ -26,7 +26,7 @@ runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.n
 runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-ramp \
       -p ctrl.tstep_method=rel domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM \
          domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 tm_2D.dt=50 \
-         forcing.series==orbital,dTo,ramp forcing.terms==orbital,ocean,ramp
+         forcing.series==alpha,dTo,ramp forcing.terms==lgm,ocean,ramp
 ```
 
 ```bash
@@ -57,17 +57,17 @@ glacial cycle.
 - **Output:** 1D every year; 2D every 200 yr (ramp: 50 yr; pd: 500 yr), small
   2D every 50 yr (pd: 500 yr).
 
-## Climate: snapshots on an orbital index
+## Climate: snapshots weighted by alpha
 
-The reference `pd` plus the term `orbital` (`[term_orbital]`, `picontrol` ->
+The reference `pd` plus the term `lgm` (`[term_lgm]`, `picontrol` ->
 `lgm` on `tas` and `pr`): the temperature adds the PMIP3 LGM -- piControl
-anomaly scaled by the series `orbital`, the precipitation is multiplied by
+anomaly scaled by the series `alpha`, the precipitation is multiplied by
 their ratio. The PMIP3 snapshots give the annual mean and JJA temperature
 (`monthly = False`) and the annual precipitation, smoothed over 50 km at
 loading (`clim_sigma = 50`). The precipitation-temperature scaling is
 `[snapshots] f_p = 0.06` (default 0.05).
 
-The series `[series_orbital]` is the orbital series `input/alpha_orbital_r2020.dat`
+The series `[series_alpha]` of the par file is the orbital record `input/alpha_orbital_r2020.dat`
 (`method = "series"`, 300 ka to present), normalised to 0 at present
 (`norm_t0 = 0`) and 1 at 21 ka (`norm_t1 = -21e3`). The ocean (ORAS5) has no
 snapshot term: the term `ocean` adds the derived series `dTo`, 0.25 times the
@@ -79,8 +79,8 @@ mean sea-level air temperature anomaly over the domain (`[series_dTo]`,
 ## Air temperature ramp
 
 The ramp run adds the series `ramp` and the uniform term `ramp` of
-`input/forcing_db.nml` (`forcing.series==orbital,dTo,ramp`,
-`forcing.terms==orbital,ocean,ramp`; `[term_ramp]` on `tas` and `pr` with
+`input/forcing_db.nml` (`forcing.series==alpha,dTo,ramp`,
+`forcing.terms==lgm,ocean,ramp`; `[term_ramp]` on `tas` and `pr` with
 `f_ta = 1`):
 
 - **Series:** `[series_ramp] method = "ramp-slope"`, `df_dt_max = 0.0025` yr⁻¹

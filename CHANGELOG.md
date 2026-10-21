@@ -22,11 +22,16 @@ annotated git tag. Dates are release (tag) dates.
   esm with its smb refuses atmosphere terms). `libs/climate_terms.f90`; the ocean terms
   idempotent (re-applied by `yelmox_bipolar` after the box model). Output `term_<name>`
   (2D), `series_<name>` (1D), restart `series_<name>_restart.nc`. `test_indices` covers
-  the derived series. Library (`input/forcing_db.nml`) with descriptive names:
-  `snapshot_picontrol`, `_lgm`, `_b18_base`, `_b18`, `_b20`; `series_glacial`,
-  `_orbital`, `_orbital_t2018`, `_dTo`, `_ramp`, `_hyst`, `_dT`, `_obm_north`, `_obm_south`;
-  `term_glacial`, `_orbital`, `_b18`, `_b20`, `_ocean`, `_ramp`, `_hyst`, `_dT`,
-  `_obm_north`, `_obm_south`. Experiments select with `-p forcing.series==... forcing.terms==...`.
+  the derived series. Series are named by their symbol in the equation (`alpha`, `beta`,
+  ...); the record a symbol loads is the setup's, in its par file (`[series_alpha]`:
+  `alpha_orbital_r2020` normalised in `yelmox_Greenland.nml` and the bipolar north,
+  `alpha_combined_125kyr` in the paleo bases, `alpha_orbital_t2018` normalised in
+  `yelmox_Pyrenees.nml`, constant 1 in LIS and North). Terms are named by what they add.
+  Library (`input/forcing_db.nml`): `snapshot_picontrol`, `_lgm`, `_b18_base`, `_b18`,
+  `_b20`; `series_alpha` (the default record, combined), `_dTo`, `_ramp`, `_hyst`, `_dT`,
+  `_obm_north`, `_obm_south`; `term_lgm` (lgm - picontrol on alpha), `_b18`, `_b20`,
+  `_ocean`, `_ramp`, `_hyst`, `_dT`, `_obm_north`, `_obm_south`. Experiments select with
+  `-p forcing.series==... forcing.terms==...`.
 - `[bias]` groups with a time axis: sliced at the forcing time at every climate update
   (`bias_dtas_ann_now` in the 2D output).
 - `input/forcing_db.nml`: one library of the named forcing groups that par files share:
