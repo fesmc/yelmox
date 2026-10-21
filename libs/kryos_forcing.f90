@@ -1,16 +1,25 @@
 module kryos_forcing
     ! Driver-owned forcing: the indices registry.
     !
-    ! Indices: named scalar series ([indices] names = "a" "b"), each a tsgen
-    ! group [idx_<name>] (from the par file, else the first of the [indices]
-    ! var_defs files that has it), advanced once per step on the forcing clock
-    ! with the response variable (ice volume) and read by name by their consumers (the
-    ! snapshots axes, the climate modifiers). One registry per run, held by the
-    ! driver like bsl -- deliberately NOT part of kryos_domain, so every domain
-    ! of a multi-domain driver reads the same indices. The registry also holds the
-    ! kill switch (any index tripped) and the forcing-increment restarts (a
-    ! bundle each time an index moves by more than its restart_every_df,
-    ! folders restart-<n>); each index restarts from idx_<name>_restart.nc.
+    ! Indices: named scalar series ([indices] names = "a" "b"), each a group
+    ! [idx_<name>] (from the par file, else the first of the [indices] var_defs
+    ! files that has it), read by name by their consumers (the snapshots axes,
+    ! the climate modifiers, ice_bnd, the OBM forcing). Two kinds:
+    !   - tsgen series (method const, ramp-*, sin, series, feedback ...):
+    !     advanced once per step on the forcing time with the response
+    !     variable (ice volume);
+    !   - derived (method = "derived"): computed each step by the model from
+    !     its own state (from = air_anomaly: the mean sea-level air anomaly of
+    !     the climate update; obm_north/obm_south: a box temperature of the
+    !     bipolar ocean box model), set by its producer with indices_set after
+    !     the atmosphere of the step is composed. No tsgen state, no restart
+    !     file, no kill switch: it is recomputed.
+    ! One registry per run, held by the driver like bsl -- deliberately NOT
+    ! part of kryos_domain, so every domain of a multi-domain driver reads the
+    ! same indices. The registry also holds the kill switch (any index tripped)
+    ! and the forcing-increment restarts (a bundle each time an index moves by
+    ! more than its restart_every_df, folders restart-<n>); each tsgen index
+    ! restarts from idx_<name>_restart.nc.
 
     use nml,          only : nml_read, nml_validate
     use yelmox_nml,   only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
@@ -24,13 +33,24 @@ module kryos_forcing
 
     integer, parameter :: IDX_MAX = 32   ! max entries of [indices] names
 
-    ! One index: a named tsgen series.
+    ! The definition of a derived index ([idx_<name>] method = "derived").
+    type derived_spec
+        character(len=32) :: from    = ""        ! air_anomaly | obm_north | obm_south
+        real(wp)          :: factor  = 1.0_wp    ! air_anomaly: value = factor * mean anomaly
+        character(len=64) :: region  = "all"     ! air_anomaly: cells of the mean ([regions] selection)
+        logical           :: anomaly = .true.    ! obm_*: the box temperature minus its initial value
+    end type derived_spec
+
+    ! One index: a named series, tsgen or derived.
     type index_class
-        character(len=64) :: name
-        character(len=32) :: units            = "1"      ! label of idx_<name> in the 1D output
-        real(wp)          :: restart_every_df = 0.0_wp   ! [f] |Δf| between restarts; 0 = off
-        real(wp)          :: f_last_restart   = 0.0_wp   ! f_now at the last restart mark
-        type(tsgen_class) :: tsg
+        character(len=64)  :: name
+        character(len=32)  :: units            = "1"      ! label of idx_<name> in the 1D output
+        real(wp)           :: restart_every_df = 0.0_wp   ! [f] |Δf| between restarts; 0 = off
+        real(wp)           :: f_last_restart   = 0.0_wp   ! f at the last restart mark
+        real(wp)           :: f                = 0.0_wp   ! the current value (both kinds)
+        logical            :: derived          = .false.
+        type(derived_spec) :: drv
+        type(tsgen_class)  :: tsg                         ! tsgen indices only
     end type index_class
 
     ! The registry.
@@ -39,7 +59,9 @@ module kryos_forcing
         integer :: counter_restart = 0                  ! forcing-increment restarts written
     end type indices_class
 
-    public :: indices_class, indices_init, indices_update, indices_value, indices_has
+    public :: indices_class, derived_spec
+    public :: indices_init, indices_update, indices_value, indices_has
+    public :: indices_set, indices_is_derived, indices_derived
     public :: indices_kill, indices_restart_due, indices_restart_fldr
     public :: indices_restart_write, indices_restart_read, indices_write_step
 
@@ -48,14 +70,15 @@ contains
     ! ===== indices registry ===================================================
 
     subroutine indices_init(idx, path_par, time)
-        ! Read [indices] names and initialise each index from its tsgen group
-        ! [idx_<name>] at `time` (the forcing clock). The group is read from the
+        ! Read [indices] names and initialise each index from its group
+        ! [idx_<name>] at `time` (the forcing time). The group is read from the
         ! par file if it has it, else from the first of the [indices] var_defs
-        ! files that does (var_defs_find). Per index, besides the
-        ! tsgen keys: restart_every_df and units. Unset keys from the defaults
-        ! file (the template idx for [idx_<name>]). An absent [indices] group or
-        ! empty names give an empty registry. On a restart run the caller then
-        ! calls indices_restart_read.
+        ! files that does (var_defs_find). Per index, besides the tsgen keys:
+        ! restart_every_df and units; a derived index (method = "derived")
+        ! reads from, factor, region, anomaly instead and starts at 0. Unset
+        ! keys from the defaults file (the template idx for [idx_<name>]). An
+        ! absent [indices] group or empty names give an empty registry. On a
+        ! restart run the caller then calls indices_restart_read.
         type(indices_class), intent(inout) :: idx
         character(len=*),    intent(in)    :: path_par
         real(dp),            intent(in)    :: time
@@ -64,6 +87,7 @@ contains
         character(len=256) :: var_defs(VAR_DEFS_MAX)
         character(len=128) :: group
         character(len=512) :: gfile      ! the file holding the group
+        character(len=32)  :: method
         integer :: k, n
 
         call nml_validate(path_par, def_file, "indices")
@@ -86,33 +110,85 @@ contains
             gfile = var_defs_find(var_defs, path_par, trim(group), "&indices names")
 
             call nml_validate(trim(gfile), def_file, trim(group), defaults_group="idx")
+            call nml_read(trim(gfile), trim(group), "method", method, init=.true., &
+                          defaults_file=def_file, defaults_group="idx")
             call nml_read(trim(gfile), trim(group), "units", ix%units, init=.true., &
                           defaults_file=def_file, defaults_group="idx")
             call nml_read(trim(gfile), trim(group), "restart_every_df", ix%restart_every_df, &
                           defaults_file=def_file, defaults_group="idx")
 
-            call tsgen_init(ix%tsg, trim(gfile), time, group=trim(group), &
-                            defaults_file=def_file, defaults_group="idx")
-            ix%f_last_restart = ix%tsg%f_now
-
-            write(*,*) "indices_init:: "//trim(ix%name)//" ("//trim(ix%tsg%par%method)// &
-                       "), f =", ix%tsg%f_now
+            if (trim(method) == "derived") then
+                ix%derived = .true.
+                call nml_read(trim(gfile), trim(group), "from",    ix%drv%from,    init=.true., &
+                              defaults_file=def_file, defaults_group="idx")
+                call nml_read(trim(gfile), trim(group), "factor",  ix%drv%factor, &
+                              defaults_file=def_file, defaults_group="idx")
+                call nml_read(trim(gfile), trim(group), "region",  ix%drv%region,  init=.true., &
+                              defaults_file=def_file, defaults_group="idx")
+                call nml_read(trim(gfile), trim(group), "anomaly", ix%drv%anomaly, &
+                              defaults_file=def_file, defaults_group="idx")
+                select case(trim(ix%drv%from))
+                    case("air_anomaly", "obm_north", "obm_south")
+                    case default
+                        write(*,*) "indices_init:: error: ["//trim(group)//"] from = '"// &
+                                   trim(ix%drv%from)//"': derived indices come from air_anomaly, "// &
+                                   "obm_north or obm_south."
+                        error stop 1
+                end select
+                if (ix%restart_every_df > 0.0_wp) then
+                    write(*,*) "indices_init:: error: ["//trim(group)//"] restart_every_df > 0 on a "// &
+                               "derived index; the forcing-increment restarts follow tsgen indices only."
+                    error stop 1
+                end if
+                ix%f = 0.0_wp
+                write(*,*) "indices_init:: "//trim(ix%name)//" (derived from "//trim(ix%drv%from)// &
+                           "), set each step by the model"
+            else
+                call tsgen_init(ix%tsg, trim(gfile), time, group=trim(group), &
+                                defaults_file=def_file, defaults_group="idx")
+                ix%f = ix%tsg%f_now
+                write(*,*) "indices_init:: "//trim(ix%name)//" ("//trim(ix%tsg%par%method)// &
+                           "), f =", ix%f
+            end if
+            ix%f_last_restart = ix%f
             end associate
         end do
     end subroutine indices_init
 
     subroutine indices_update(idx, time, var)
-        ! Advance every index to `time` (the forcing clock). `var` is the model
-        ! response variable (ice volume [Gt]) that feedback methods and the kill
-        ! switch consume; ignored by open-loop ones.
+        ! Advance every tsgen index to `time` (the forcing time). `var` is the
+        ! model response variable (ice volume [Gt]) that feedback methods and
+        ! the kill switch consume; ignored by open-loop ones. Derived indices
+        ! keep their value until their producer sets them this step.
         type(indices_class), intent(inout) :: idx
         real(dp),            intent(in)    :: time
         real(wp),            intent(in)    :: var
         integer :: k
         do k = 1, size(idx%idx)
+            if (idx%idx(k)%derived) cycle
             call tsgen_update(idx%idx(k)%tsg, time, var=var)
+            idx%idx(k)%f = idx%idx(k)%tsg%f_now
         end do
     end subroutine indices_update
+
+    subroutine indices_set(idx, name, value)
+        ! Set the value of the derived index `name` (its producer, once per
+        ! step); stops on an unknown or a tsgen index.
+        type(indices_class), intent(inout) :: idx
+        character(len=*),    intent(in)    :: name
+        real(wp),            intent(in)    :: value
+        integer :: k
+        k = index_position(idx, name)
+        if (k == 0) then
+            write(*,*) "indices_set:: error: unknown index '"//trim(name)//"' (not in [indices] names)."
+            error stop 1
+        end if
+        if (.not. idx%idx(k)%derived) then
+            write(*,*) "indices_set:: error: index '"//trim(name)//"' is a tsgen series, not derived."
+            error stop 1
+        end if
+        idx%idx(k)%f = value
+    end subroutine indices_set
 
     logical function indices_has(idx, name) result(found)
         ! Is `name` an index of the registry?
@@ -121,19 +197,46 @@ contains
         found = index_position(idx, name) > 0
     end function indices_has
 
-    real(wp) function indices_value(idx, name) result(f)
-        ! Current value f_now of the index `name`; stops on an unknown name.
+    logical function indices_is_derived(idx, name) result(derived)
+        ! Is the index `name` derived (set by the model)? Stops on an unknown name.
         type(indices_class), intent(in) :: idx
         character(len=*),    intent(in) :: name
+        derived = idx%idx(index_checked(idx, name, "indices_is_derived"))%derived
+    end function indices_is_derived
+
+    function indices_derived(idx, name) result(drv)
+        ! The definition (from, factor, region, anomaly) of the derived index
+        ! `name`; stops on an unknown or a tsgen index.
+        type(indices_class), intent(in) :: idx
+        character(len=*),    intent(in) :: name
+        type(derived_spec) :: drv
         integer :: k
+        k = index_checked(idx, name, "indices_derived")
+        if (.not. idx%idx(k)%derived) then
+            write(*,*) "indices_derived:: error: index '"//trim(name)//"' is a tsgen series, not derived."
+            error stop 1
+        end if
+        drv = idx%idx(k)%drv
+    end function indices_derived
+
+    real(wp) function indices_value(idx, name) result(f)
+        ! Current value of the index `name`; stops on an unknown name.
+        type(indices_class), intent(in) :: idx
+        character(len=*),    intent(in) :: name
+        f = idx%idx(index_checked(idx, name, "indices_value"))%f
+    end function indices_value
+
+    integer function index_checked(idx, name, caller) result(k)
+        ! Position of the index `name`; stops with the caller's name if absent.
+        type(indices_class), intent(in) :: idx
+        character(len=*),    intent(in) :: name, caller
         k = index_position(idx, name)
         if (k == 0) then
-            write(*,*) "indices_value:: error: unknown index '"//trim(name)// &
+            write(*,*) trim(caller)//":: error: unknown index '"//trim(name)// &
                        "' (not in [indices] names)."
             error stop 1
         end if
-        f = idx%idx(k)%tsg%f_now
-    end function indices_value
+    end function index_checked
 
     integer function index_position(idx, name) result(k)
         ! Position of the index `name` in the registry, 0 if absent.
@@ -152,6 +255,7 @@ contains
         integer :: k
         kill = .false.
         do k = 1, size(idx%idx)
+            if (idx%idx(k)%derived) cycle
             kill = kill .or. idx%idx(k)%tsg%kill
         end do
     end function indices_kill
@@ -169,8 +273,8 @@ contains
         do k = 1, size(idx%idx)
             associate(ix => idx%idx(k))
             if (ix%restart_every_df <= 0.0_wp) cycle
-            if (abs(ix%tsg%f_now - ix%f_last_restart) > ix%restart_every_df) then
-                ix%f_last_restart = ix%tsg%f_now
+            if (abs(ix%f - ix%f_last_restart) > ix%restart_every_df) then
+                ix%f_last_restart = ix%f
                 due = .true.
             end if
             end associate
@@ -189,21 +293,24 @@ contains
     end function indices_restart_fldr
 
     subroutine indices_restart_write(idx, fldr, time)
-        ! The state of every index in the bundle folder fldr: idx_<name>_restart.nc.
+        ! The state of every tsgen index in the bundle folder fldr:
+        ! idx_<name>_restart.nc. Derived indices are recomputed, not restarted.
         type(indices_class), intent(in) :: idx
         character(len=*),    intent(in) :: fldr
         real(dp),            intent(in) :: time
         integer :: k
         do k = 1, size(idx%idx)
+            if (idx%idx(k)%derived) cycle
             call tsgen_restart_write(trim(index_restart_file(fldr, idx%idx(k)%name)), &
                                      idx%idx(k)%tsg, time)
         end do
     end subroutine indices_restart_write
 
     subroutine indices_restart_read(idx, fldr)
-        ! Restore every index from the bundle folder fldr (after indices_init) and
-        ! reset its restart mark. An index without a restart file (a bundle from a
-        ! run without it) keeps its cold-start state, i.e. starts at the restart time.
+        ! Restore every tsgen index from the bundle folder fldr (after
+        ! indices_init) and reset its restart mark. An index without a restart
+        ! file (a bundle from a run without it) keeps its cold-start state, i.e.
+        ! starts at the restart time.
         type(indices_class), intent(inout) :: idx
         character(len=*),    intent(in)    :: fldr
         character(len=1024) :: fnm
@@ -212,11 +319,13 @@ contains
 
         do k = 1, size(idx%idx)
             associate(ix => idx%idx(k))
+            if (ix%derived) cycle
             fnm = index_restart_file(fldr, ix%name)
             inquire(file=trim(fnm), exist=found)
             if (found) then
                 call tsgen_restart_read(ix%tsg, trim(fnm))
-                ix%f_last_restart = ix%tsg%f_now
+                ix%f = ix%tsg%f_now
+                ix%f_last_restart = ix%f
             else
                 write(*,*) "indices_restart_read:: no restart file "//trim(fnm)// &
                            "; index "//trim(ix%name)//" keeps its cold-start state."
@@ -234,9 +343,10 @@ contains
 
     subroutine indices_write_step(idx, filename, time)
         ! Append every index to an existing 1D timeseries file at `time`: its value
-        ! idx_<name> (in its units), the rate idx_<name>_df_dt and, for indices
-        ! with a response history (feedback methods, kill switch), the windowed
-        ! response rate idx_<name>_dv_dt. Call after the file's own 1D write.
+        ! idx_<name> (in its units) and, for tsgen indices, the rate
+        ! idx_<name>_df_dt and, with a response history (feedback methods, kill
+        ! switch), the windowed response rate idx_<name>_dv_dt. Call after the
+        ! file's own 1D write.
         type(indices_class), intent(in) :: idx
         character(len=*),    intent(in) :: filename
         real(dp),            intent(in) :: time
@@ -252,9 +362,10 @@ contains
         do k = 1, size(idx%idx)
             associate(ix => idx%idx(k))
             vnm = "idx_"//trim(ix%name)
-            call nc_write(filename, trim(vnm), ix%tsg%f_now, dim1="time", &
+            call nc_write(filename, trim(vnm), ix%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(ix%units), &
                           long_name="Index "//trim(ix%name))
+            if (ix%derived) cycle
             call nc_write(filename, trim(vnm)//"_df_dt", ix%tsg%df_dt, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(ix%units)//"/yr", &
                           long_name="Rate of change of index "//trim(ix%name))

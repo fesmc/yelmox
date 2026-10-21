@@ -34,8 +34,15 @@
 /
 
 &idx
-    ! A tsgen series (fesm-utils tsgen), advanced on the forcing clock time_rel.
-    method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1
+    ! A tsgen series (fesm-utils tsgen), advanced on the forcing time time_rel,
+    ! or a derived index (method = "derived"), set each step by the model.
+    method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1|derived
+    ! derived: computed by the model after the atmosphere of the step is composed
+    from             = ""            ! air_anomaly: factor * mean sea-level air anomaly of the climate update over region;
+                                     ! obm_north, obm_south: the box temperature of the bipolar ocean box model [K]
+    factor           = 1.0           ! [1] air_anomaly: value = factor * mean(tsl_ann - tsl_ann_ref)
+    region           = "all"         ! air_anomaly: cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+    anomaly          = True          ! obm_*: the box temperature minus its initial value (False: the temperature itself)
     sigma            = 0.0           ! [f] std. dev. of gaussian noise added to the series
     ! series
     series_file      = ""            ! table (time, f) or netcdf file of the series
