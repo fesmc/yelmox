@@ -78,7 +78,10 @@ program yelmox
     call nml_read(path_par, "ctrl", "calendar",     calendar)
     call nml_read(path_par, "ctrl", "calendar_ref", calendar_ref)
     call nml_read(path_par, "ctrl", "restart",      restart)
-    call nml_read(path_par, "ctrl", "write_lossless", write_lossless)
+    ! Optional: write all output lossless (ignore prec_abs/prec_rel), e.g. for bit-for-bit comparisons
+    write_lossless = .FALSE.
+    if (nml_has_param(path_par, "ctrl", "write_lossless")) &
+        call nml_read(path_par, "ctrl", "write_lossless", write_lossless)
     call nc_set_lossless(write_lossless)
     call tstep_init(ts, path_par, trim(run_step), dtt, time_ref=calendar_ref, cal=calendar)
 

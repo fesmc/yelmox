@@ -469,7 +469,7 @@ command; `scripts/forcing-builder/explain.jl` does it on the command line.
 | `run_step` | group name | the group holding the timeline: `"ctrl"` for `[ctrl]` itself, or a phase group such as `[spinup]` or `[transient]`, so one par file can hold several run phases |
 | `calendar`, `calendar_ref` | bool, [yr CE] | timeline in calendar years, against the reference year `calendar_ref` (ESM runs) |
 | `restart` | folder, `"None"` | the restart bundle to start from; `"None"` = cold start |
-| `write_lossless` | bool | write all output lossless, ignoring the per-field precision (e.g. for bit-for-bit comparisons of runs) |
+| `write_lossless` | bool | optional (default `False`): write all output lossless, ignoring the per-field precision (e.g. for bit-for-bit comparisons of runs) |
 
 The timeline group holds `tstep_method` (`"const"`: the time advances and the
 forcing time stays at `tstep_const`; `"rel"`: the forcing follows the time, e.g.

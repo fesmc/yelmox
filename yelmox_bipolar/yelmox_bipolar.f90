@@ -102,8 +102,10 @@ program yelmox_bipolar
     call nml_read(path_par, "ctrl", "active_north", active_north)
     call nml_read(path_par, "ctrl", "active_south", active_south)
 
-    ! Output precision ([ctrl]): lossless ignores the precision of each field.
-    call nml_read(path_par, "ctrl", "write_lossless", write_lossless)
+    ! Output precision ([ctrl], optional): lossless ignores the precision of each field.
+    write_lossless = .FALSE.
+    if (nml_has_param(path_par, "ctrl", "write_lossless")) &
+        call nml_read(path_par, "ctrl", "write_lossless", write_lossless)
     call nc_set_lossless(write_lossless)
 
     ! Ocean coupling control ([ctrl] switches, [obm_forcing], nautilus
