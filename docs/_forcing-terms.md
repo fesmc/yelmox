@@ -289,7 +289,7 @@ can produce the same term structure.
 | `input/forcing_db.nml` | `snapshot_*`, `series_*`, `term_*` with descriptive names |
 | `yelmox/*.nml`, `yelmox_bipolar/*.nml`, `scripts/*/params.sh` | converted; the `-p` arrays shrink to `forcing.terms` plus run control |
 | `scripts/check_par_nml.py` | templates by prefix `series_`, `term_`, `snapshot_` |
-| `scripts/forcing-builder/`, `docs/forcing-builder/` | export the new groups; the equation panel of the mock-up moves into the builder |
+| `scripts/forcing-builder/`, `docs/forcing-builder/` | export the new groups; the builder rebuilt in the order of the equation (time, equation, pieces, after), the run's forcing groups as its state, the par file and `-p` as its export (done 2026-10-21) |
 | docs | `yelmox.md`, `climate-snapshots.md`, experiment pages, CHANGELOG; "forcing time" wording |
 
 ## 8. Phases
@@ -303,7 +303,7 @@ All on dev, one branch `forcing-terms`, merged when the whole chain passes.
 | 3 | `libs/climate_terms.f90`; terms in the snapshot backend, uniform and replace terms, derived `air_anomaly`, bridge sets the OBM series; `anom`/`ocn_fraction`/`ocn_obm` removed; new keys, library, defaults, bases, bipolar and checker converted in the same commit (every commit runs) | `check_par_nml` clean, both drivers build |
 | 4 | scripts (`-p` arrays, docs-figures, run_mg_forward, bipolar tests) | |
 | 5 | docs-figures 18 cases + the bipolar case on Levante | bit-identical to dev 54d9ee6 (the same operations in the same order) |
-| 6 | forcing builder on the new groups, with the equation panel; docs; CHANGELOG | |
+| 6 | forcing builder on the new groups, equation first (the state the forcing groups, import from a base plus `-p`, export the difference); docs; CHANGELOG | done |
 
 ## 9. Decisions taken (2026-10-21)
 
