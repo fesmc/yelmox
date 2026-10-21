@@ -1,11 +1,16 @@
 // Forcing builder: the forcing of one run as the equation of
 // docs/_forcing-terms.md, built in the order of the equation. Left, top to
-// bottom: the forcing time, the equation (the reference, the scalar series,
-// the terms; each with where its data comes from: the record of a series,
-// the fields of each snapshot), what comes after (transforms, orbit, sea
-// level, prescribed ice). Right: the equation chain evaluated at a chosen time, the
-// series over the run, and the run written out (the forcing groups as a par
-// file; the -p list against a base par file with the runme command).
+// bottom: the forcing time, the equation (the reference, the terms, then the
+// coefficients they name; each with where its data comes from: the record of
+// a coefficient, the fields of each snapshot), what comes after (transforms,
+// orbit, sea level, prescribed ice). Right: the equation chain evaluated at a
+// chosen time, the coefficients over the run, and the run written out (the
+// forcing groups as a par file; the -p list against a base par file with the
+// runme command).
+//
+// Words: the UI calls the scalar α(τ) a coefficient; in the namelist it is a
+// group [series_<name>], listed in [forcing] series and named by the key
+// series of a term (the three constants below).
 //
 // State: the forcing groups of the run, materialised (S.g). A group is
 // created from its source on first use (the base par file, the library
@@ -22,15 +27,27 @@ import katex from "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.mjs";
 const root = document.getElementById("fb");
 let D = null;                       // forcing.json
 let TEMPLATES = [];                 // [regex, template] (series_, term_, snapshot_)
-const S = { base: null, g: new Map(), extra: [], preset: null, presetKey: "", tsel: null, tab: "par", open: new Set(), runopts: "-r", outdir: "" };
+const S = { base: null, g: new Map(), extra: [], preset: null, presetKey: "", tsel: null, tab: "par", open: new Set(["eq-guide"]), runopts: "-r", outdir: "" };
+
+// The namelist names of the coefficients: the group prefix, the list in
+// [forcing], the key of a term. A rename of the namelist changes these three.
+const COEF_PREFIX = "series_", COEF_LIST_KEY = "series", TERM_COEF_KEY = "series";
+// the template of the coefficient groups in input/yelmox_defaults.nml
+const COEF_T = COEF_PREFIX.replace(/_$/, "");
 
 const FIELDS = ["tas", "pr", "to", "so"];
 const SNAPFIELDS = ["tas", "pr", "zs", "to", "so"];
 const FSYM = { tas: "T^{\\mathrm{sl}}", pr: "P^{\\mathrm{sl}}", to: "\\Theta", so: "S" };
 const GAIN = { tas: "f_ta", to: "f_to", so: "f_so" };
 const GREEK = { alpha: "\\alpha", beta: "\\beta", gamma: "\\gamma", delta: "\\delta", epsilon: "\\epsilon", zeta: "\\zeta", eta: "\\eta", theta: "\\theta", kappa: "\\kappa", lambda: "\\lambda", mu: "\\mu", nu: "\\nu", xi: "\\xi", rho: "\\rho", sigma: "\\sigma", tau: "\\tau", phi: "\\phi", chi: "\\chi", psi: "\\psi", omega: "\\omega" };
+const GREEK_U = { alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", zeta: "ζ", eta: "η", theta: "θ", kappa: "κ", lambda: "λ", mu: "μ", nu: "ν", xi: "ξ", rho: "ρ", sigma: "σ", tau: "τ", phi: "φ", chi: "χ", psi: "ψ", omega: "ω" };
+const WARN_TEX = "#9a4b00";         // --fb-warn, for KaTeX \color
 const sub = (n) => "\\mathrm{" + String(n).replace(/_/g, "\\_") + "}";
 const sym = (n) => GREEK[n] || sub(n);
+// the symbol of a coefficient in text (β), and in TeX in the warn colour when
+// the equation does not define it yet
+const usym = (n) => GREEK_U[n] || n;
+const csym = (n) => coefNames().includes(n) ? sym(n) : `{\\color{${WARN_TEX}}${sym(n)}}`;
 
 // ------------------------------------------------------------ the run's groups
 
@@ -121,7 +138,7 @@ function changed(g, k) {
 const stateKey = () => JSON.stringify([[...S.g].map(([g, r]) => [g, r.k, [...r.given].sort()]), S.extra]);
 
 // the lists of the equation
-const seriesNames = () => asList(val("forcing", "series", ""));
+const coefNames = () => asList(val("forcing", COEF_LIST_KEY, ""));
 const termNames = () => asList(val("forcing", "terms", ""));
 const reference = () => String(val("forcing", "reference", "pd"));
 const climate = () => String(val("comps", "climate", "snapshots"));
@@ -195,10 +212,102 @@ const OPTIONS = {
   "ctrl.tstep_method": ["const", "rel", "cal"], "spinup.tstep_method": ["const", "rel", "cal"], "transient.tstep_method": ["const", "rel", "cal"],
   "barysealevel.method": ["const", "file", "fastiso"],
   "orbit.method": ["forcing_time", "fixed_time", "fixed_orbit"], "ice_bnd.method": ["file", "scaled"],
-  "series.from": ["", "air_anomaly", "obm_north", "obm_south"],
+  [COEF_T + ".from"]: ["", "air_anomaly", "obm_north", "obm_south"],
   "term.pattern": ["snapshots", "uniform", "replace"],
   "taper.outside": ["ref", "mean"],
 };
+
+// The help under a field, in plain words, by "group.key" or "template.key";
+// consulted before the namelist comment. The time keys are written for ctrl
+// and serve the timeline group of the run ([ctrl] run_step).
+const HELP = {
+  "ctrl.tstep_method": "How the forcing time τ relates to the model time: held at tstep_const (const), equal to the model time (rel), or calendar years (cal).",
+  "ctrl.tstep_const": "The forcing time τ [yr] the whole run is held at (const); past < 0, e.g. -21000 for the LGM.",
+  "ctrl.time_init": "The model time [yr] at the start of the run.",
+  "ctrl.time_end": "The model time [yr] at the end of the run.",
+  "ctrl.calendar_ref": "The calendar year [yr CE] where τ = 0 (cal): τ = t − calendar_ref.",
+
+  "forcing.reference": "The reference snapshot S₀: the climate every term adds to.",
+  "snapshots.lapse": "The lapse rates Γ [K/m], annual and summer: every snapshot is reduced to sea level with them, and the climate brought back to the model surface.",
+  "snapshots.f_p": "Precipitation sensitivity: P scales by exp(β_p ΔT) with elevation and in uniform terms.",
+
+  ["term." + TERM_COEF_KEY]: "The coefficient that scales this term; empty = the constant 1 (the full anomaly of a reconstruction).",
+  "term.pattern": "snapshots: coefficient × (snap1 − snap0); uniform: coefficient × a gain, the same everywhere; replace: the ocean field = the coefficient.",
+  "term.snap0": "The snapshot where the coefficient is 0 (e.g. piControl). Empty: snap1 is itself an anomaly or ratio.",
+  "term.snap1": "The snapshot where the coefficient is 1 (e.g. LGM).",
+  "term.fields": "The fields the term changes. tas, to, so add; pr multiplies (fixed rule).",
+  "term.f_ta": "Gain [K] on the air temperature: ΔT = f_ta × the coefficient, everywhere; pr follows it through β_p.",
+  "term.f_to": "Gain [K] on the ocean temperature: ΔΘ = f_to × the coefficient, at every depth.",
+  "term.f_so": "Gain [psu] on the salinity: ΔS = f_so × the coefficient, at every depth.",
+
+  [COEF_T + ".method"]: "How the coefficient moves in time: the curve of a ramp or wave, or the rule of a controller.",
+  [COEF_T + ".units"]: "The units of the coefficient, a label in the 1D output.",
+  [COEF_T + ".f_min"]: "The lower limit of the coefficient; a rising ramp starts here.",
+  [COEF_T + ".f_max"]: "The upper limit of the coefficient; a falling ramp starts here.",
+  [COEF_T + ".df_dt_max"]: "The rate [1/yr] of the ramp; for a controller, the fastest it may move.",
+  [COEF_T + ".df_sign"]: "+1: from f_min upwards; -1: from f_max downwards.",
+  [COEF_T + ".dt_init"]: "Years [yr] at the start where the coefficient is held at its start value.",
+  [COEF_T + ".dt_ramp"]: "The length [yr] of the ramp, or the period of the wave.",
+  [COEF_T + ".dt_conv"]: "The years [yr] after the ramp to move to f_conv.",
+  [COEF_T + ".f_conv"]: "The value held after the ramp and the convergence.",
+  [COEF_T + ".dt_ave"]: "The window [yr] over which the controller averages the ice-volume change.",
+  [COEF_T + ".tol"]: "The ice-volume change rate the controller treats as equilibrium.",
+  [COEF_T + ".with_kill"]: "Stop the run once the ice sheet is in equilibrium at a limit (f_min or f_max).",
+  [COEF_T + ".from"]: "What the model derives the coefficient from: the mean air temperature anomaly, or a box temperature of the ocean box model.",
+  [COEF_T + ".factor"]: "The coefficient = factor × the mean sea-level air temperature anomaly.",
+  [COEF_T + ".region"]: "Where the anomaly is averaged: all = the whole climate grid, or a region, e.g. zone:open_ocean.",
+  [COEF_T + ".anomaly"]: "On: the box temperature minus its value at the start; off: the temperature itself.",
+  [COEF_T + ".series_file"]: "The file of the record, in input/: a two-column table or a netCDF time series.",
+  [COEF_T + ".series_var"]: "The variable of the netCDF file that holds the record.",
+  [COEF_T + ".series_time_name"]: "The name of the time variable in the netCDF file.",
+  [COEF_T + ".norm_t0"]: "Time where the normalised record is 0; two times = the mean over that window.",
+  [COEF_T + ".norm_t1"]: "Time where the normalised record is 1; two times = the mean over that window.",
+
+  "snapshot.tas": "The clim_db group(s) of the air temperature: one monthly group, or two for annual + summer temperature.",
+  "snapshot.pr": "The clim_db group(s) of the precipitation: one, or two summed (snowfall + rainfall).",
+  "snapshot.zs": "The clim_db group of the surface elevation of the climate data, for the reduction to sea level.",
+  "snapshot.to": "The clim_db group of the ocean temperature profiles.",
+  "snapshot.so": "The clim_db group of the ocean salinity profiles.",
+  "snapshot.exp": "The experiment name filled into {exp} of the file names (lgm, piControl, ...).",
+  "snapshot.monthly": "On: tas and pr are monthly fields; off: tas is annual + summer, pr annual.",
+  "snapshot.clim_sigma": "Smoothing [km] of the atmosphere fields when they are read; 0 = none.",
+  "snapshot.ocn_sigma": "Smoothing [km] of the ocean fields when they are read; 0 = none.",
+
+  "esm.experiment": "The ESM experiment of the projection (ssp585, 1pctCO2, ...); ctrl = the reference climate only.",
+  "esm.esm_name": "The ESM whose anomalies are read.",
+  "esm.use_esm": "Read the ESM anomalies; off: the reference climate, or the homogeneous warming of 1pctCO2.",
+  "esm.use_hist": "Read the historical period of the ESM.",
+  "esm.use_proj": "Read the projection period of the ESM.",
+
+  "taper.active": "Pull the climate towards the reference where the weight is below 1.",
+  "taper.weight": "The clim_db group of the weight w: 1 keeps the composed climate, 0 the reference.",
+  "taper.outside": "Where w < 1, towards the reference (ref), or the reference plus the mean anomaly where w = 1 (mean).",
+  "bias.active": "Add a temperature correction and multiply the precipitation by a correction factor.",
+  "bias.dtas": "The clim_db group of the temperature correction [K].",
+  "bias.fpr": "The clim_db group of the precipitation factor [1].",
+  "bias.f_tas": "The weight of the temperature correction.",
+  "bias.f_pr": "The weight of the precipitation factor (applied to factor − 1).",
+  "orbit.method": "The orbit of the insolation: at the forcing time τ (forcing_time), at one fixed time (fixed_time), or given elements (fixed_orbit).",
+  "orbit.time": "The time [yr] of the fixed orbit, relative to 1950 (past < 0).",
+  "orbit.ecc": "The eccentricity of the fixed orbit.",
+  "orbit.obl": "The obliquity [deg] of the fixed orbit.",
+  "orbit.per": "The longitude of perihelion [deg] of the fixed orbit.",
+  "barysealevel.method": "The sea level: a constant (const), a record read at τ (file), or from the ice volume of the FastIsostasy domains (fastiso).",
+  "barysealevel.bsl_init": "The constant sea level [m] relative to present day.",
+  "barysealevel.sl_path": "The file of the sea-level record, read at τ.",
+  "barysealevel.sl_name": "The variable of a netCDF sea-level file; none for a table.",
+  "ice_bnd.active": "Prescribe the ice thickness in the fixed and relaxation cells at the domain border.",
+  "ice_bnd.method": "file: the ice thickness at τ from the file; scaled: a coefficient × one slice of it.",
+  "ice_bnd.H_ice": "The clim_db group of the prescribed ice thickness [m].",
+  "ice_bnd.index": "scaled: the coefficient that scales the slice.",
+  "ice_bnd.slice_time": "scaled: the time [yr] of the slice.",
+};
+// the help of a key: HELP, else the namelist comment in full
+function helpOf(g, k) {
+  const t = templateOf(g);
+  for (const hk of [g + "." + k, t && t + "." + k, g === tgroup() ? "ctrl." + k : null]) if (hk && HELP[hk]) return HELP[hk];
+  return (commentOf(g, k) || "").split("\n").map(s => s.trim()).join(" ");
+}
 function optionsOf(g, k) {
   const t = templateOf(g);
   if (OPTIONS[g + "." + k]) return OPTIONS[g + "." + k];
@@ -208,23 +317,22 @@ function optionsOf(g, k) {
   return null;
 }
 
-// A labelled widget of one key: checkbox, select, number, text or a text
-// with a datalist; a badge when the value differs from the source.
-// opts: {label, options, labels: {value: label}, list: datalist id, multi, help}
+// A labelled widget of one key: checkbox, select, number or text; a badge
+// when the value differs from the source.
+// opts: {label (text or a node), options, labels: {value: label}, help,
+// chips: the clim_db groups to pick from (a chip list), single}
 function field(g, k, opts = {}) {
   const r = grp(g);
   if (!r) return h("div", { class: "fb-field fb-missing" }, `[${g}]: no such group`);
   const v = val(g, k);
   if (v === undefined) return h("div", { class: "fb-field fb-missing" }, `${g}.${k}: not in the schema`);
+  if (opts.chips) return chipList(g, k, opts.chips, opts);
   let input;
   const options = opts.options || optionsOf(g, k);
   const labels = opts.labels || {};
   if (typeof v === "boolean") {
     input = h("input", { type: "checkbox", onchange: (e) => set(g, k, e.target.checked) });
     input.checked = v;
-  } else if (opts.list) {
-    input = h("input", { type: "text", class: "fb-text", list: opts.list, value: asList(v).join(opts.multi ? ", " : ""),
-      onchange: (e) => set(g, k, opts.multi ? e.target.value.split(/[,\s]+/).filter(s => s !== "") : e.target.value.trim()) });
   } else if (options && !Array.isArray(v)) {
     input = h("select", { onchange: (e) => set(g, k, e.target.value) },
       ...options.map(o => h("option", { value: o }, labels[o] ?? o)), ...(options.includes(String(v)) ? [] : [h("option", { value: v }, String(v))]));
@@ -240,13 +348,21 @@ function field(g, k, opts = {}) {
   }
   return fieldRow(g, k, input, opts);
 }
+// One row: the label, the widget with its badge, and the help in full on a
+// second line under the widget. The
+// badge: "new" for a key of a new group, "changed" where -p must set it.
 function fieldRow(g, k, input, opts = {}) {
-  const ch = changed(g, k), ref = refOf(g, k);
-  const badge = ch ? h("span", { class: "fb-src fb-src-override", title: ref ? `${ref.src}: ${fmtNml(ref.v)}` : "new key" }, sourceOf(g) === "new" ? "new" : "-p") : h("span", {});
+  const ch = changed(g, k), ref = refOf(g, k), src = sourceOf(g);
+  const was = ref && ref.src !== "default" ? ` (there: ${fmtNml(ref.v)})` : "";
+  const badge = !ch ? h("span", {}) : src === "new"
+    ? h("span", { class: "fb-src fb-src-new", title: "a key of a new group: written in the block to add" }, "new")
+    : h("span", { class: "fb-src fb-src-override", title: `differs from the ${src === "library" ? "library" : "par file"}${was}; set with -p` }, "changed");
   const comment = commentOf(g, k);
-  const help = opts.help !== undefined ? opts.help : (comment || "").split("\n")[0];
+  const help = opts.help !== undefined ? opts.help : helpOf(g, k);
+  const label = opts.label && opts.label.nodeType ? opts.label : h("code", {}, opts.label || k);
+  const tip = comment || (help ? "" : helpOf(g, k));
   return h("div", { class: "fb-field" },
-    h("label", { title: comment }, h("code", {}, opts.label || k)), input, badge, help ? h("span", { class: "fb-help", title: help }, help) : h("span", {}));
+    h("label", { title: tip ? `${g}.${k}: ${tip}` : `${g}.${k}` }, label), h("span", { class: "fb-val" }, input, badge), help ? h("span", { class: "fb-help" }, help) : null);
 }
 function fields(g, keys, opts = {}) { return h("div", { class: "fb-fields" }, ...keys.map(k => field(g, k, opts[k] || {}))); }
 // A vector-of-strings key as checkboxes over a fixed set (the fields of a term).
@@ -257,8 +373,61 @@ function checkList(g, k, options, marks = {}) {
     cb.checked = cur.includes(o);
     return h("label", { title: marks[o] || "" }, cb, o + (marks[o] ? " ✗" : ""));
   }));
-  return fieldRow(g, k, input, { help: "" });
+  return fieldRow(g, k, input);
 }
+// A name key as a select over known names, with "new name…": choosing it
+// shows a text input next to the select; Enter or leaving it sets the key.
+// items: [[value, label]]; the current value is added when not among them.
+const NEW_NAME = "\u0000new";
+function namePicker(g, k, items, opts = {}) {
+  const v = String(val(g, k, ""));
+  const all = items.some(([x]) => x === v) ? items : [...items, [v, v === "" ? "(none)" : `${v} (not defined)`]];
+  const sel = h("select", {}, ...all.map(([x, lab]) => h("option", { value: x }, lab)), h("option", { value: NEW_NAME }, "new name…"));
+  sel.value = v;
+  const txt = h("input", { type: "text", class: "fb-num fb-newname", placeholder: "a name", hidden: true });
+  let done = false;
+  const commit = () => {
+    if (done) return;
+    done = true;
+    const n = txt.value.trim();
+    if (/^\w+$/.test(n)) set(g, k, n); else render();
+  };
+  sel.addEventListener("change", () => {
+    if (sel.value === NEW_NAME) { txt.hidden = false; txt.focus(); } else set(g, k, sel.value);
+  });
+  txt.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); else if (e.key === "Escape") { done = true; render(); } });
+  txt.addEventListener("blur", commit);
+  return fieldRow(g, k, h("span", { class: "fb-picker" }, sel, txt), opts);
+}
+// The snapshot of a reference or a term: the snapshots of the par file, the
+// library and those the run created new; snap0 may be none.
+function snapPicker(g, k, opts = {}) {
+  const P = "snapshot_";
+  const where = (s) => ({ base: "in par file", library: "in library", new: "new" })[sourceOf(P + s)] || "?";
+  // the current name too: a new one is created by the snapshot block, after this picker
+  const v = String(val(g, k, "")), names = namesOf(P);
+  if (v && !names.includes(v) && sourceOf(P + v)) names.push(v);
+  const items = names.map(s => [s, `${s} (${where(s)})`]);
+  if (opts.none) items.unshift(["", opts.none]);
+  return namePicker(g, k, items, opts);
+}
+// The coefficient of a term: the defined ones, the constant 1, or a new name.
+function coefPicker(g, k, opts = {}) {
+  return namePicker(g, k, [["", "1: no coefficient"], ...coefNames().map(n => [n, n])], opts);
+}
+// The clim_db groups of a key as chips (× removes one) and a select that
+// adds one; single: one group, adding replaces it.
+function chipList(g, k, options, opts = {}) {
+  const v = val(g, k, "");
+  const cur = asList(v);
+  const put = (list) => set(g, k, opts.single ? (list[0] ?? "") : list);
+  const chips = cur.map((c, i) => h("span", { class: "fb-chip" + (options.includes(c) ? "" : " fb-chip-bad"), title: options.includes(c) ? c : `${c}: not a group of input/clim_db.nml` }, c,
+    h("button", { class: "fb-chip-x", title: `remove ${c}`, onclick: () => put(cur.filter((_, j) => j !== i)) }, "×")));
+  const add = h("select", { class: "fb-chip-add", onchange: (e) => { if (e.target.value) put(opts.single ? [e.target.value] : [...cur, e.target.value]); } },
+    h("option", { value: "" }, opts.single && cur.length ? "replace with…" : "add a group…"), ...options.map(o => h("option", { value: o }, o)));
+  return fieldRow(g, k, h("span", { class: "fb-chips" }, ...chips, add), opts);
+}
+const climdbNames = () => Object.keys(D.climdb).sort();
 // The keys a group sets that the cards do not show (the rare ones), as a line.
 function alsoSets(g, shown) {
   const r = S.g.get(g);
@@ -268,14 +437,27 @@ function alsoSets(g, shown) {
   if (!rest.length) return null;
   return h("div", { class: "fb-vals" }, "also set: " + rest.map(k => `${k} = ${fmtNml(r.k[k])}`).join(", ") + " (in the par file; not edited here)");
 }
-const datalist = (id, items) => h("datalist", { id }, ...items.map(i => h("option", { value: i })));
+// The gist of a group's comment for a list: its first clause (up to the first
+// " (", ": " or ". " past a few words), at most 70 characters.
+function gist(c) {
+  const s = String(c || "").split("\n").map(x => x.trim()).join(" ").trim();
+  if (!s) return "";
+  // not at "et al." nor at a year in parentheses (a citation)
+  const cut = [...s.matchAll(/ \((?!\d)|: |(?<!\bal)\. /g)].map(m => m.index).filter(i => i >= 15);
+  const t = (cut.length ? s.slice(0, Math.min(...cut)) : s).replace(/[.:]$/, "");
+  return t.length > 70 ? t.slice(0, 69).trimEnd() + "…" : t;
+}
+const groupGist = (g) => { const s = sourceOf(g); return gist(s === "base" ? base().groups[g].c : s === "library" ? D.library.groups[g].c : ""); };
 
-// The add box under a list of names (forcing.series, forcing.terms): a named
-// group of the par file or the library, or a new name (from the template).
+// The add box under a list of names (the coefficients, the terms of
+// [forcing]): a named group of the par file or the library, each with the
+// gist of its comment, or a new name (from the template).
 function addBox(k, prefix, what, onnew) {
   const list = asList(val("forcing", k, ""));
   const cands = namesOf(prefix).filter(c => !list.includes(c));
-  const sel = h("select", {}, h("option", { value: "" }, "a named group…"), ...cands.map(c => h("option", { value: c }, c + (sourceOf(prefix + c) === "library" ? " (library)" : sourceOf(prefix + c) === "base" ? " (par file)" : ""))));
+  const where = (c) => sourceOf(prefix + c) === "library" ? " (in library)" : sourceOf(prefix + c) === "base" ? " (in par file)" : "";
+  const sel = h("select", {}, h("option", { value: "" }, "one of the par file or the library…"),
+    ...cands.map(c => { const gs = groupGist(prefix + c); return h("option", { value: c, title: prefix + c }, c + (gs ? " — " + gs : "") + where(c)); }));
   const txt = h("input", { type: "text", class: "fb-num", placeholder: "or a new name" });
   const add = () => {
     const n = sel.value || txt.value.trim();
@@ -288,7 +470,7 @@ function addBox(k, prefix, what, onnew) {
   return h("div", { class: "fb-card fb-card-add" }, h("div", { class: "fb-names" }, h("span", {}, `add a ${what}:`), sel, txt, h("button", { class: "fb-btn", onclick: add }, "add")));
 }
 function removeBtn(k, name) {
-  return h("button", { class: "fb-btn fb-remove", title: `remove ${name} from forcing.${k}`, onclick: () => set("forcing", k, asList(val("forcing", k, "")).filter(x => x !== name)) }, "remove");
+  return h("button", { class: "fb-btn fb-remove", title: `remove ${name} from [forcing] ${k}`, onclick: () => set("forcing", k, asList(val("forcing", k, "")).filter(x => x !== name)) }, "remove");
 }
 
 // ------------------------------------------------------------------ timeline
@@ -314,8 +496,8 @@ const atT = (tl, f, t) => f ? interp({ time: tl.t, f }, t) : NaN;
 // ----------------------------------------------------------------- tsgen (JS)
 
 const KINDS = { record: ["series"], constant: ["const"], ramp: ["ramp-slope", "ramp-time", "ramp-time-step", "sin"], controller: ["exp", "PI42", "H312b", "H312PID", "H321PID", "PID1"], derived: ["derived"] };
-const KIND_LABEL = { record: "record (a file)", constant: "constant", ramp: "ramp or wave", controller: "controller (feedback)", derived: "derived (set by the model)" };
-// the kind of a series: tsgen "const" with a rate is a ramp
+const KIND_LABEL = { record: "record (a time series from a file)", constant: "constant", ramp: "ramp or wave", controller: "controller (feedback)", derived: "derived (set by the model)" };
+// the kind of a coefficient: tsgen "const" with a rate is a ramp
 function kindOf(p) {
   const m = String(p.method);
   if (m === "const" && num(p.df_dt_max) > 0) return "ramp";
@@ -345,7 +527,7 @@ function seriesMean(ser, tw) {
 // The parameters of [series_<name>]; normalisation is active when the group
 // itself sets norm_t0 and norm_t1 (the model's rule).
 function seriesPar(name) {
-  const g = "series_" + name, r = grp(g);
+  const g = COEF_PREFIX + name, r = grp(g);
   if (!r) return null;
   const p = {};
   for (const k of schemaKeys(g)) p[k] = val(g, k);
@@ -389,7 +571,7 @@ function applyWindow(p, t, f) {
   const w = taper > 0 ? Math.min(1, (t - t0) / taper, (t1 - t) / taper) : 1;
   return f + w * (num(p.win_fac) - 1) * (f - ref);
 }
-// The series on the run's timeline: {p, ser, f, kind}; derived: f = null.
+// The coefficient on the run's timeline: {p, ser, f, kind}; derived: f = null.
 function seriesOnRun(name, tl) {
   const p = seriesPar(name);
   if (!p) return { p: null, ser: null, f: null, kind: null, missing: true };
@@ -401,7 +583,7 @@ function seriesOnRun(name, tl) {
 }
 function termWeight(t, tl) {
   if (t.series === "") return tl.t.map(() => 1);
-  if (!seriesNames().includes(t.series)) return null;
+  if (!coefNames().includes(t.series)) return null;
   const s = seriesOnRun(t.series, tl);
   return s.f && s.f.some(Number.isFinite) ? s.f : null;
 }
@@ -441,7 +623,19 @@ function details(id, title, ...content) {
 function note(text, cls = "fb-note") { return h("p", { class: cls }, text); }
 function warn(text) { return note(text, "fb-warn"); }
 function vals(text) { return h("div", { class: "fb-vals" }, text); }
-const srcBadge = (g) => { const s = sourceOf(g); return h("span", { class: "fb-src fb-src-" + s, title: s === "base" ? `in ${base().file}` : s === "library" ? `in ${D.library.files.join(", ")}` : "a new group: not yet in the par file or the library" }, s === "base" ? "par file" : s); };
+// Where a group is defined: the badge and its tooltip.
+const SRC_BADGE = {
+  base: ["in par file", () => `defined in ${base().file}`],
+  library: ["in library", () => `defined in ${D.library.files.join(", ")}, shared by every par file`],
+  new: ["new", () => "not defined in the par file or the library yet: the written-out run gives the block to add"],
+};
+const srcBadge = (g) => { const s = sourceOf(g), b = SRC_BADGE[s]; return b ? h("span", { class: "fb-src fb-src-" + s, title: b[1]() }, b[0]) : null; };
+// The legend of the badges, once under the equation.
+function badgeLegend() {
+  const item = (cls, text, what) => h("span", {}, h("span", { class: "fb-src " + cls }, text), " " + what);
+  return h("p", { class: "fb-legend" }, item("fb-src-base", "in par file", base().file.replace(/^yelmox\//, "")), item("fb-src-library", "in library", "forcing_db.nml, shared"),
+    item("fb-src-new", "new", "a block to add"), item("fb-src-override", "changed", "set with -p"));
+}
 function card(head, g, ...content) {
   return h("div", { class: "fb-card" }, h("div", { class: "fb-cardhead" }, h("code", {}, head), g ? srcBadge(g) : null), ...content);
 }
@@ -466,12 +660,12 @@ function topBar() {
 function secTime(tl) {
   const T = tl.T;
   const keys = ["tstep_method", ...(tl.method === "const" ? ["tstep_const"] : []), "time_init", "time_end"];
-  return section("time", "0 · Forcing time", `τ, set by [${T}] tstep_method`,
+  return section("time", "Forcing time", `τ, set by [${T}] tstep_method`,
     h("div", { class: "fb-card" },
       fields(T, keys, { tstep_method: { labels: { const: "const: τ = tstep_const", rel: "rel: τ = t", cal: "cal: τ = t − calendar_ref" } } }),
       tl.method === "cal" ? fields("ctrl", ["calendar_ref"]) : null,
-      note(tl.method === "const" ? `The forcing is held at τ = ${fmtNum(tl.tc)} yr while the model time runs from ${fmtNum(tl.t0)} to ${fmtNum(tl.t1)} yr: every series, time-dependent snapshot and record is read once, at τ.`
-        : tl.method === "rel" ? "The forcing follows the model time: the series and the records are read at τ = t (paleo runs)."
+      note(tl.method === "const" ? `The forcing is held at τ = ${fmtNum(tl.tc)} yr while the model time runs from ${fmtNum(tl.t0)} to ${fmtNum(tl.t1)} yr: every coefficient, time-dependent snapshot and record is read once, at τ.`
+        : tl.method === "rel" ? "The forcing follows the model time: the coefficients and the records are read at τ = t (paleo runs)."
         : `Calendar years: τ = t − ${fmtNum(tl.cref)} (ESM runs).`)));
 }
 
@@ -502,7 +696,7 @@ function derivedEq(name, p) {
   if (from === "obm_north" || from === "obm_south") { const b = from === "obm_north" ? "n" : "s"; return `${a} = \\theta_{${b}}` + (p.anomaly ? ` - \\theta_{${b},\\mathrm{init}}` : ""); }
   return `${a} = \\text{?}\\qquad(\\texttt{from} = ${sub(from || "\"\"")})`;
 }
-// The record F of a series in TeX (the file name, or F when none yet).
+// The record F of a coefficient in TeX (the file name, or F when none yet).
 const recordSym = (p) => p.series_file ? `\\texttt{${String(p.series_file).replace(/^input\//, "").replace(/_/g, "\\_")}}${p.series_var ? ":" + sub(p.series_var) : ""}` : "F";
 function seriesEq(name, p) {
   const a = sym(name) + "(\\tau)", method = String(p.method), kind = kindOf(p);
@@ -512,25 +706,25 @@ function seriesEq(name, p) {
   if (kind === "controller") return `\\dot ${sym(name)} = \\text{${method}}(\\dot V_{\\mathrm{ice}}),\\quad |\\dot ${sym(name)}| \\le ${fmtNum(p.df_dt_max)},\\quad ${sym(name)} \\in [${fmtNum(p.f_min)},\\,${fmtNum(p.f_max)}]`;
   return METHOD_EQ[method] ? METHOD_EQ[method](p, a) : `${a} = \\text{?}`;
 }
-// change the kind of a series: the first method of the kind, a constant with f_min = f_max
+// change the kind of a coefficient: the first method of the kind, a constant with f_min = f_max
 function setKind(g, kind) {
-  const p = seriesPar(g.slice("series_".length));
+  const p = seriesPar(g.slice(COEF_PREFIX.length));
   const kv = { method: KINDS[kind][0] };
   if (kind === "constant") { kv.f_max = p.f_min; kv.df_dt_max = 0; }
   if (kind === "ramp" && num(p.df_dt_max) <= 0 && num(p.f_max) <= num(p.f_min)) { kv.f_max = num(p.f_min) + 1; kv.df_dt_max = 1e-3; }
   setMany(g, kv);
 }
 
-// The card of a series in the equation: its kind and the parameters of the
+// The card of a coefficient in the equation: its kind and the parameters of the
 // equation; a record also where it comes from (the file, the normalisation).
 function seriesCard(name, tl) {
-  const g = "series_" + name;
-  if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}]: no such group and no series template`), removeBtn("series", name));
+  const g = COEF_PREFIX + name;
+  if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}]: no such group and no coefficient template`), removeBtn(COEF_LIST_KEY, name));
   const { p, ser, f, kind } = seriesOnRun(name, tl);
   const method = String(p.method);
   const kindSel = h("select", { onchange: (e) => setKind(g, e.target.value) }, ...Object.keys(KINDS).map(k => h("option", { value: k }, KIND_LABEL[k])));
   kindSel.value = kind;
-  const head = h("div", { class: "fb-cardhead" }, texi(sym(name) + "(\\tau)"), h("code", {}, `[${g}]`), srcBadge(g), kindSel, removeBtn("series", name));
+  const head = h("div", { class: "fb-cardhead" }, texi(sym(name) + "(\\tau)"), h("code", {}, `[${g}]`), srcBadge(g), kindSel, removeBtn(COEF_LIST_KEY, name));
   const content = [head];
   let shown = ["method", "units"];
   if (kind === "derived") {
@@ -539,13 +733,13 @@ function seriesCard(name, tl) {
     content.push(fields(g, ["from", ...dk, "units"]));
     shown.push("from", ...dk);
     content.push(note(from === "air_anomaly" ? `Set by the climate each update, after the atmosphere is composed: ${fmtNum(num(p.factor))} × the mean sea-level air temperature anomaly over ${p.region === "all" ? "the climate grid" : `region ${p.region}`}. Terms on it touch the ocean only.`
-      : from ? `The ${from === "obm_north" ? "northern" : "southern"} box temperature of the ocean box model${p.anomaly ? " minus its initial value" : ""}, set by the yelmox_bipolar bridge each step.` : "Choose what the series is derived from."));
+      : from ? `The ${from === "obm_north" ? "northern" : "southern"} box temperature of the ocean box model${p.anomaly ? " minus its initial value" : ""}, set by the yelmox_bipolar bridge each step.` : "Choose what the coefficient is derived from."));
   } else if (kind === "constant") {
     const r = grp(g), v = num(num(p.df_sign) >= 0 ? p.f_min : p.f_max);
     const input = h("input", { type: "text", class: "fb-num", value: fmtNum(v), onchange: (e) => { const x = num(e.target.value); if (Number.isFinite(x)) setMany(g, { f_min: x, f_max: x }); else render(); } });
-    content.push(h("div", { class: "fb-fields" }, fieldRow(g, "f_min", input, { label: "value", help: "f_min = f_max" }), field(g, "units")));
+    content.push(h("div", { class: "fb-fields" }, fieldRow(g, "f_min", input, { label: "value", help: "The value of the coefficient at every forcing time (written as f_min = f_max)." }), field(g, "units")));
     shown.push("f_min", "f_max", "df_dt_max");
-    if (r.given.has("f_max") && num(p.f_max) !== num(p.f_min) && num(p.df_dt_max) <= 0) content.push(note(`f_min = ${fmtNum(p.f_min)} and f_max = ${fmtNum(p.f_max)} differ; with no rate the series stays at ${fmtNum(v)}.`));
+    if (r.given.has("f_max") && num(p.f_max) !== num(p.f_min) && num(p.df_dt_max) <= 0) content.push(note(`f_min = ${fmtNum(p.f_min)} and f_max = ${fmtNum(p.f_max)} differ; with no rate the coefficient stays at ${fmtNum(v)}.`));
   } else if (kind === "record") {
     content.push(fields(g, ["units"]));
     shown.push("norm_t0", "norm_t1", ...RECORD_KEYS);
@@ -560,7 +754,7 @@ function seriesCard(name, tl) {
     const s = num(p.df_sign) >= 0 ? 1 : -1;
     const v = [`τ_e = max(0, τ − τ(t_init) − dt_init); s = ${s}`];
     if ((method === "const" || method === "ramp-slope") && num(p.df_dt_max) > 0) v.push(`from ${fmtNum(s > 0 ? p.f_min : p.f_max)} to ${fmtNum(s > 0 ? p.f_max : p.f_min)} over ${fmtNum(Math.abs(num(p.f_max) - num(p.f_min)) / num(p.df_dt_max))} yr`);
-    if (tl.method === "const") v.push("the forcing time is constant: τ_e = 0, the series stays at its start (tstep_method = rel advances it)");
+    if (tl.method === "const") v.push("the forcing time is constant: τ_e = 0, the coefficient stays at its start (tstep_method = rel advances it)");
     content.push(h("ul", { class: "fb-list" }, ...v.map(x => h("li", {}, x))));
   }
   if (num(p.win_t1) > num(p.win_t0)) content.push(vals(`window ${fmtNum(p.win_t0)} < τ < ${fmtNum(p.win_t1)}: ${name} → ${fmtNum(p.win_ref)} + ${fmtNum(p.win_fac)}·(${name} − ${fmtNum(p.win_ref)})`));
@@ -575,14 +769,14 @@ function seriesCard(name, tl) {
 }
 // Where a piece of the equation gets its data, below its definition.
 const fromBlock = (...content) => h("div", { class: "fb-from" }, h("div", { class: "fb-from-label" }, "from"), ...content);
-// The record F of a series: the file (and the variable of a netCDF file),
+// The record F of a coefficient: the file (and the variable of a netCDF file),
 // the normalisation on it, the record over its full extent with the run's
 // τ range as a yellow band and t₀/t₁ marked.
 function recordFrom(name, p, ser, tl) {
-  const g = "series_" + name, r = grp(g);
+  const g = COEF_PREFIX + name, r = grp(g);
   const netcdf = !!(p.series_file && D.series[p.series_file] && D.series[p.series_file].kind === "netcdf");
-  const opts = { series_file: { options: ["", ...Object.keys(D.series).sort()], help: "a series file of input/ (table or netCDF)" } };
-  if (netcdf) opts.series_var = { options: Object.keys(D.series[p.series_file].vars), help: "the variable of the netCDF file" };
+  const opts = { series_file: { options: ["", ...Object.keys(D.series).sort()] } };
+  if (netcdf) opts.series_var = { options: Object.keys(D.series[p.series_file].vars) };
   const keys = ["series_file", ...(netcdf ? ["series_var", "series_time_name"] : [])];
   const normGiven = r.given.has("norm_t0") && r.given.has("norm_t1");
   const fixed = sourceDef(g) && sourceDef(g).keys.norm_t0 && sourceDef(g).keys.norm_t1;
@@ -590,10 +784,10 @@ function recordFrom(name, p, ser, tl) {
     onchange: (e) => { if (e.target.checked) setMany(g, { norm_t0: val(g, "norm_t0", 0), norm_t1: num(val(g, "norm_t1", 0)) === num(val(g, "norm_t0", 0)) ? -21000 : val(g, "norm_t1") }); else { unset(g, "norm_t0"); unset(g, "norm_t1"); } } });
   cb.checked = normGiven;
   const content = [h("div", { class: "fb-fields" }, ...keys.map(k => field(g, k, opts[k] || {})),
-    fieldRow(g, "norm", cb, { label: "normalise", help: "0 at t₀, 1 at t₁ (a time, or two: the mean over the window)" }),
+    fieldRow(g, "norm", cb, { label: "normalise", help: "Rescale the record to 0 at t₀ and 1 at t₁ (a time, or two: the mean over the window), so the term adds the full anomaly at t₁." }),
     ...(normGiven ? [field(g, "norm_t0", { label: "t₀ (0)" }), field(g, "norm_t1", { label: "t₁ (1)" })] : []))];
-  if (!p.series_file) content.push(warn("no record: the series has no file"));
-  else if (!ser) content.push(warn(`${p.series_file}${p.series_var ? ":" + p.series_var : ""}: not in the exported series (netCDF: set series_var)`));
+  if (!p.series_file) content.push(warn("no record: the coefficient has no file"));
+  else if (!ser) content.push(warn(`${p.series_file}${p.series_var ? ":" + p.series_var : ""}: not among the files exported to forcing.json (netCDF: set series_var)`));
   else {
     const vr = tl.method === "const" ? [{ x: tl.tc, label: "τ" }] : [];
     if (p.norm) { for (const t of asList(p.norm_t0).map(num)) vr.push({ x: t, label: "t0", stroke: "#393" }); for (const t of asList(p.norm_t1).map(num)) vr.push({ x: t, label: "t1", stroke: "#393" }); }
@@ -609,7 +803,7 @@ function recordFrom(name, p, ser, tl) {
 // One term [term_<name>] as a record.
 function termOf(name) {
   const g = "term_" + name;
-  return { name, g, series: String(val(g, "series", "")), pattern: String(val(g, "pattern", "snapshots")), snap0: String(val(g, "snap0", "")), snap1: String(val(g, "snap1", "")),
+  return { name, g, series: String(val(g, TERM_COEF_KEY, "")), pattern: String(val(g, "pattern", "snapshots")), snap0: String(val(g, "snap0", "")), snap1: String(val(g, "snap1", "")),
     fields: asList(val(g, "fields", "")), gain: { tas: num(val(g, "f_ta", 1)), to: num(val(g, "f_to", 1)), so: num(val(g, "f_so", 1)) } };
 }
 const runTerms = () => termNames().filter(n => grp("term_" + n)).map(termOf);
@@ -621,49 +815,71 @@ function runSnaps() {
 }
 // a snapshot group of the run: named, or created new by the equation
 const snapGroup = (s) => s ? grp("snapshot_" + s) : null;
-const boundFields = (snap) => snapGroup(snap) ? SNAPFIELDS.filter(f => asList(val("snapshot_" + snap, f, "")).length) : [];
+// the fields a snapshot sets
+const setFields = (snap) => snapGroup(snap) ? SNAPFIELDS.filter(f => asList(val("snapshot_" + snap, f, "")).length) : [];
 const climTdep = (b) => { const c = D.climdb[String(b)]; return !!(c && Array.isArray(c.time) && c.time[0] >= 1); };
 const snapTdep = (snap) => SNAPFIELDS.some(f => asList(val("snapshot_" + snap, f, "")).some(climTdep));
 const snapSym = (f, snap) => `${FSYM[f]}_{${sub(snap)}}` + (snapTdep(snap) ? "(\\tau)" : "");
-const wsym = (t) => t.series === "" ? "" : `${sym(t.series)}(\\tau)\\,`;
+// the coefficient of a term in TeX (warn colour when not defined yet); "" = 1
+const coefTex = (t) => t.series === "" ? "" : `${csym(t.series)}(\\tau)`;
+const wsym = (t) => t.series === "" ? "" : coefTex(t) + "\\,";
 const gsym = (x) => x === 1 ? "" : (x === -1 ? "-" : `${fmtNum(x)}\\,`);
 function termRhs(t, f) {
-  if (t.pattern === "replace") return `${FSYM[f]} = ${sym(t.series)}(\\tau)\\quad\\text{at every depth, in place of the reference}`;
+  if (t.pattern === "replace") return `${FSYM[f]} = ${t.series === "" ? "1" : coefTex(t)}\\quad\\text{at every depth, in place of the reference}`;
   return `${FSYM[f]} \\leftarrow ${FSYM[f]}` + termPart(t, f);
 }
 function termPart(t, f) {
   if (t.pattern === "uniform") {
-    if (f === "pr") return `\\,e^{\\beta_p\\,${t.gain.tas === 1 ? "" : "(" + fmtNum(t.gain.tas) + ")\\,"}${sym(t.series)}(\\tau)}`;
+    if (t.series === "") return f === "pr" ? `\\,e^{\\beta_p\\,${fmtNum(t.gain.tas)}}` : ` ${t.gain[f] < 0 ? "-" : "+"} ${fmtNum(Math.abs(t.gain[f]))}`;
+    if (f === "pr") return `\\,e^{\\beta_p\\,${t.gain.tas === 1 ? "" : "(" + fmtNum(t.gain.tas) + ")\\,"}${coefTex(t)}}`;
     const g = t.gain[f];
-    return ` ${g < 0 ? "-" : "+"} ${gsym(Math.abs(g))}${sym(t.series)}(\\tau)`;
+    return ` ${g < 0 ? "-" : "+"} ${gsym(Math.abs(g))}${coefTex(t)}`;
   }
   const s1 = t.snap1 || "?";
   if (f === "pr") return t.snap0 ? `\\,\\Big[1 + ${wsym(t)}\\Big(\\frac{${snapSym(f, s1)}}{${snapSym(f, t.snap0)}} - 1\\Big)\\Big]`
     : (t.series === "" ? `\\,${snapSym(f, s1)}` : `\\,\\big[1 + ${wsym(t)}(${snapSym(f, s1)} - 1)\\big]`);
   return t.snap0 ? ` + ${wsym(t)}\\big[${snapSym(f, s1)} - ${snapSym(f, t.snap0)}\\big]` : ` + ${wsym(t)}${snapSym(f, s1)}`;
 }
-const PATTERN_HELP = { snapshots: "series × (snap1 − snap0)", uniform: "series × a gain, the same everywhere", replace: "the field = the series, in place of the reference" };
+const PATTERN_HELP = { snapshots: "coefficient × (snap1 − snap0)", uniform: "coefficient × a gain, the same everywhere", replace: "the field = the coefficient, in place of the reference" };
 
 // Structural warnings of a term (the equation); the snapshot blocks check the fields.
 function termWarnings(t, tl) {
   const cl = climate();
-  const sinfo = t.series === "" ? null : (seriesNames().includes(t.series) ? seriesOnRun(t.series, tl) : null);
+  const sinfo = t.series === "" ? null : (coefNames().includes(t.series) ? seriesOnRun(t.series, tl) : null);
   const derived = !!(sinfo && sinfo.kind === "derived");
   const w = [];
   if (!t.fields.length) w.push("no fields: the term does nothing");
-  if (t.series !== "" && !seriesNames().includes(t.series)) w.push(`series "${t.series}" is not in the equation (forcing.series)`);
-  if (derived && t.fields.some(f => f === "tas" || f === "pr")) w.push(`the derived series "${t.series}" is set after the atmosphere: this term may touch to and so only`);
+  if (derived && t.fields.some(f => f === "tas" || f === "pr")) w.push(`the derived coefficient "${t.series}" is set after the atmosphere: this term may change to and so only`);
   if (t.pattern === "replace") {
-    if (t.series === "") w.push("replace needs a series");
+    if (t.series === "") w.push("replace needs a coefficient");
     if (t.fields.some(f => f === "tas" || f === "pr")) w.push("replace: to and so only");
   }
   if (t.pattern === "snapshots") {
     if (!t.snap1) w.push("no snap1: name the snapshot the term adds");
-    if (derived) w.push("a derived series cannot drive a snapshot pattern (the snapshots are composed before it is set)");
+    if (derived) w.push("a derived coefficient cannot scale a snapshot pattern (the snapshots are composed before it is set)");
   }
   if (cl === "esm" && String(val("comps", "surface_method")) === "climate" && t.fields.some(f => f === "tas" || f === "pr")) w.push("the ESM supplies the smb (surface_method = climate): terms on tas/pr are refused");
   if (cl === "rembo" && t.fields.some(f => f === "tas" || f === "pr") && t.pattern !== "uniform") w.push("REMBO takes uniform tas terms only (its summer anomaly); snapshot terms on the atmosphere are ignored");
   return w;
+}
+
+// Define a coefficient a term names: the group of the par file or the
+// library when there is one, else a new constant 1; appended to the list.
+function defineCoef(n) {
+  const g = COEF_PREFIX + n;
+  const isnew = sourceOf(g) === "new" && !(S.g.has(g) && S.g.get(g).given.size);
+  grp("forcing");
+  const r = grp(g);
+  if (isnew) { Object.assign(r.k, { method: "const", f_min: 1, f_max: 1 }); for (const k of ["method", "f_min", "f_max"]) r.given.add(k); }
+  set("forcing", COEF_LIST_KEY, [...coefNames(), n]);
+}
+// The line of a term whose coefficient is not defined: what is missing, and
+// the button that defines it.
+function undefinedCoef(n) {
+  const g = COEF_PREFIX + n, s = sourceOf(g);
+  const there = s === "base" ? ` ([${g}] is in the par file)` : s === "library" ? ` ([${g}] is in the library)` : "";
+  return h("div", { class: "fb-warn fb-define" }, `${usym(n)} is not defined yet${there}`,
+    h("button", { class: "fb-btn", title: there ? `add [${g}] to the coefficients` : `a new [${g}]: the constant 1`, onclick: () => defineCoef(n) }, `define ${usym(n)}`));
 }
 
 function termCard(name, tl) {
@@ -671,13 +887,16 @@ function termCard(name, tl) {
   if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}]: no such group and no term template`), removeBtn("terms", name));
   const t = termOf(name);
   const content = [h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), srcBadge(g), h("span", { class: "fb-kind" }, t.pattern), h("span", { class: "fb-help" }, PATTERN_HELP[t.pattern] || ""), removeBtn("terms", name))];
-  content.push(fields(g, ["series", "pattern"], { series: { options: ["", ...seriesNames()], labels: { "": "\"\" (the constant 1)" } } }));
+  content.push(h("div", { class: "fb-fields" }, coefPicker(g, TERM_COEF_KEY, { label: "coefficient" }), field(g, "pattern")));
+  if (t.series !== "" && !coefNames().includes(t.series)) content.push(undefinedCoef(t.series));
   const marks = {};
   if (t.pattern === "snapshots") {
-    content.push(fields(g, ["snap0", "snap1"], { snap0: { list: "fb-snaps", label: "snap0 (at 0)", help: "\"\": none, snap1 is the anomaly or ratio itself" }, snap1: { list: "fb-snaps", label: "snap1 (at 1)", help: "a snapshot of the library, the par file, or a new name" } }));
-    if (t.pattern === "snapshots") for (const f of FIELDS) {
-      const unbound = [t.snap0, t.snap1].filter(s => s && named("snapshot_" + s) && !boundFields(s).includes(f));
-      if (unbound.length) marks[f] = `not bound by ${unbound.join(", ")}`;
+    content.push(h("div", { class: "fb-fields" },
+      snapPicker(g, "snap0", { label: "snap0 (coefficient = 0)", none: "none: snap1 is itself the anomaly or ratio" }),
+      snapPicker(g, "snap1", { label: "snap1 (coefficient = 1)" })));
+    for (const f of FIELDS) {
+      const without = [t.snap0, t.snap1].filter(s => s && named("snapshot_" + s) && !setFields(s).includes(f));
+      if (without.length) marks[f] = `not in snapshot ${without.join(", ")}`;
     }
   }
   if (t.pattern === "replace") for (const f of ["tas", "pr"]) marks[f] = "replace: to and so only";
@@ -685,9 +904,12 @@ function termCard(name, tl) {
   if (t.pattern === "uniform") {
     const gk = ["tas", "to", "so"].filter(f => t.fields.includes(f)).map(f => GAIN[f]);
     if (gk.length) content.push(fields(g, gk));
-    if (t.fields.includes("pr")) content.push(note(`pr follows the tas gain: × exp(β_p f_ta ${t.series || "1"}), β_p = snapshots.f_p (fixed rule); leave pr out for no precipitation response.`));
+    if (t.fields.includes("pr")) content.push(note(`pr follows the tas gain: × exp(β_p f_ta ${t.series ? usym(t.series) : "1"}), β_p = snapshots.f_p (fixed rule); leave pr out for no precipitation response.`));
   }
-  if (t.pattern === "snapshots" && t.fields.length && t.snap1) content.push(tex(FIELDS.filter(f => t.fields.includes(f)).map(f => `${FSYM[f]}\\!:\\ ${f === "pr" ? "\\times" : ""}${termPart(t, f)}`).join(",\\qquad "), false));
+  // the term on its own: what it adds to (or puts in) each field
+  const tf = FIELDS.filter(f => t.fields.includes(f));
+  if (tf.length && (t.pattern !== "snapshots" || t.snap1))
+    content.push(tex(tf.map(f => t.pattern === "replace" ? `${FSYM[f]} = ${t.series === "" ? "1" : coefTex(t)}` : `${FSYM[f]}\\!:\\ ${f === "pr" ? "\\times" : ""}${termPart(t, f)}`).join(",\\qquad "), false));
   content.push(...termWarnings(t, tl).map(warn));
   if (t.pattern === "snapshots") {
     const snaps = [t.snap0, t.snap1].filter((s, i, a) => s && a.indexOf(s) === i);
@@ -697,7 +919,7 @@ function termCard(name, tl) {
   return h("div", { class: "fb-card" }, ...content);
 }
 
-// The fields a snapshot must bind for the equation: the reference the
+// The fields a snapshot must set for the equation: the reference the
 // atmosphere (tas, pr, zs) and every field of the terms on it; snap0/snap1
 // the fields of their terms, plus zs when the pair is reduced to sea level.
 function neededFields(snap) {
@@ -718,46 +940,94 @@ function coverage(c, tl) {
 }
 // The roles of a snapshot in the equation: the reference, snap0/snap1 of a term.
 const snapRoles = (name) => [name === reference() ? "the reference" : null, ...runTerms().filter(t => t.pattern === "snapshots" && (t.snap0 === name || t.snap1 === name)).map(t => `${t.snap0 === name ? "snap0" : "snap1"} of ${t.name}`)].filter(Boolean);
+// The entry of a group of input/clim_db.nml as a namelist block.
+function climEntry(b, c) {
+  const keys = ["filename", "name", "units", "time", ...(c.grid_src ? ["grid_src"] : [])];
+  const w = Math.max(...keys.map(k => k.length));
+  return [h("pre", { class: "fb-cfg" }, `&${b}\n${keys.map(k => `    ${k.padEnd(w)} = ${fmtNml(c[k])}`).join("\n")}\n/`),
+    h("p", { class: "fb-note" }, "defined in input/clim_db.nml; the format: ", h("a", { href: "database-namelists.html" }, "database namelists"))];
+}
+// The clim_db groups of a snapshot as a table: field, group, variable, file,
+// τ range; a click on the group shows its entry in a row below (kept open
+// across redraws, by id).
+function climTable(id, rows) {
+  const body = [];
+  for (const { f, b, c, cov } of rows) {
+    const key = `clim-${id}-${f}-${b}`;
+    const det = h("tr", { class: "fb-tbl-det", hidden: !S.open.has(key) },
+      h("td", { colspan: 5 }, c ? climEntry(b, c) : note(`"${b}" is not a group of input/clim_db.nml`)));
+    const toggle = () => { det.hidden = !det.hidden; if (det.hidden) S.open.delete(key); else S.open.add(key); };
+    body.push(h("tr", {}, h("td", {}, f), h("td", {}, h("button", { class: "fb-link", title: "show the entry in input/clim_db.nml", onclick: toggle }, b)),
+      h("td", {}, c ? String(c.name) : "–"), h("td", { class: "fb-tbl-file" }, c ? c.filename.replace(/^fesmdata\//, "") : "not in input/clim_db.nml"),
+      h("td", {}, !c ? "" : cov ? `${fmtNum(cov.lo)} to ${fmtNum(cov.hi)} yr` : "static")), det);
+  }
+  return h("table", { class: "fb-tbl" }, h("thead", {}, h("tr", {}, ...["field", "group", "variable", "file", "τ range"].map(x => h("th", {}, x)))), h("tbody", {}, ...body));
+}
 // The block of [snapshot_<name>] inside the card that names it (role: what it
-// is there): the clim_db group of each field, ✓/✗ where the equation needs
-// it, the files they resolve to, the coverage in τ, how the fields are read.
+// is there): the clim_db groups of each field as chips, marked where the
+// equation needs it; a table of where each group points (variable, file,
+// τ range) with its clim_db entry on a click; how the fields are read.
 // The same snapshot named twice is the same group: edits apply to both.
 function snapshotBlock(name, role, tl) {
   const g = "snapshot_" + name;
   const roles = snapRoles(name);
-  const head = (...extra) => h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), sourceOf(g) ? srcBadge(g) : null, h("span", { class: "fb-help" }, role, ...extra));
+  const head = (...extra) => h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), srcBadge(g), h("span", { class: "fb-help" }, role, ...extra));
   if (!grp(g)) return h("div", { class: "fb-sub-card" }, head(), warn(`[${g}]: no group and no snapshot template`));
   const need = neededFields(name);
-  const rows = [], resolved = [], warns = [];
+  const rows = [], tbl = [], warns = [];
   for (const f of SNAPFIELDS) {
     const groups = asList(val(g, f, ""));
     const needed = need.includes(f);
     if (!groups.length && !needed) continue;
-    const res = groups.map(b => {
-      const c = D.climdb[b];
-      if (!c) { warns.push(`${f}: "${b}" is not a group of input/clim_db.nml`); return `${b}: unknown`; }
-      const cov = coverage(c, tl);
+    for (const b of groups) {
+      const c = D.climdb[b] || null, cov = c ? coverage(c, tl) : null;
+      if (!c) warns.push(`${f}: "${b}" is not a group of input/clim_db.nml`);
       if (cov && !cov.ok) warns.push(`${f}: ${b} covers τ ∈ [${fmtNum(cov.lo)}, ${fmtNum(cov.hi)}] yr; the run reads τ ∈ [${fmtNum(tl.tfmin)}, ${fmtNum(tl.tfmax)}] yr (held at the end slices outside)`);
-      return `${b}: ${c.filename.replace(/^fesmdata\//, "")}${cov ? `, τ ∈ [${fmtNum(cov.lo)}, ${fmtNum(cov.hi)}]` : ""}`;
-    });
-    rows.push(field(g, f, { list: "fb-climdb", multi: true, label: f + (needed ? (groups.length ? " ✓" : " ✗") : ""), help: "" }));
-    for (const x of res) resolved.push(`${f}: ${x}`);
-    if (needed && !groups.length) warns.push(`${f} is needed (${roles.join(", ")}) but not bound`);
+      tbl.push({ f, b, c, cov });
+    }
+    const label = !needed ? h("span", {}, h("code", {}, f), h("span", { class: "fb-help" }, " (not needed)"))
+      : groups.length ? h("code", {}, f + " ✓") : h("code", { class: "fb-miss" }, f + ": missing");
+    rows.push(chipList(g, f, climdbNames(), { label, help: "" }));
+    if (needed && !groups.length) warns.push(`${f} is needed by ${roles.join(", ")} but not set`);
   }
-  const extraF = SNAPFIELDS.filter(f => !need.includes(f) && asList(val(g, f, "")).length);
+  const placeholders = tbl.some(x => x.c && /\{\w+\}/.test(x.c.filename));
   const uniq = [...new Set(warns)];
   return h("div", { class: "fb-sub-card" },
-    head((snapTdep(name) ? "; depends on τ" : "") + (need.length ? `; needs ${need.join(", ")}` : "")),
+    head(snapTdep(name) ? "; depends on τ" : ""),
     h("div", { class: "fb-fields" }, ...rows),
-    resolved.length ? h("ul", { class: "fb-list" }, ...resolved.map(x => h("li", {}, x))) : note("No fields bound: name a varslice group of input/clim_db.nml per field, or pick a snapshot of the library."),
-    extraF.length ? vals(`also bound, not used by the equation: ${extraF.join(", ")}`) : null,
+    rows.length ? note("Each field names its clim_db group(s): tas one monthly group, or two for annual + summer; pr one, or two summed (snowfall + rainfall); the others one.") : null,
+    tbl.length ? climTable(`${name}-${role}`, tbl) : note("No fields set: add a clim_db group per field, or pick a snapshot of the library."),
+    placeholders ? note("In the file names, {domain} and {grid_name} are filled from the run's domain and grid, {grid_global} from [snapshots] grid_global, {exp} from the snapshot's exp.") : null,
     details(`snap-${name}-${role}`, "how the fields are read (exp, monthly, smoothing)", fields(g, ["exp", "monthly", "clim_sigma", "ocn_sigma"]), alsoSets(g, [...SNAPFIELDS, "exp", "monthly", "clim_sigma", "ocn_sigma"])),
     ...uniq.map(warn));
 }
 
+// The guide at the top of the equation: one example with two terms, its
+// pieces named (KaTeX needs literal colours: the page's muted, accent, base
+// green and warn); open by default, folded state kept in S.open.
+const GUIDE_C = { ref: "#6b6861", coef: "#1f5f8b", pat: "#2a5d24", term: "#9a4b00" };
+function equationGuide() {
+  const c = (k, x) => `\\textcolor{${GUIDE_C[k]}}{${x}}`;
+  const ub = (k, x, lab) => `\\underbrace{${c(k, x)}}_{${c(k, lab)}}`;
+  const ob = (x) => `\\overbrace{${x}}^{${c("term", "\\text{term}")}}`;
+  const T = (n) => `T^{\\mathrm{sl}}_{\\mathrm{${n}}}`;
+  // two lines, so that it fits the left column
+  const eq = `\\begin{aligned} T^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", T("pd"), "\\text{reference}")}`
+    + ` + ${ob(`${ub("coef", "\\alpha(\\tau)", "\\text{coefficient}")}\\,${ub("pat", `\\big[${T("lgm")} - ${T("picontrol")}\\big]`, "\\text{pattern: snapshots}")}`)}`
+    + ` \\\\ &\\quad + ${ob(`\\underbrace{${c("pat", "f")}\\,${c("coef", "\\beta(\\tau)")}}_{${c("pat", "\\text{pattern: uniform (gain }f\\times\\beta\\text{)}")}}`)} \\end{aligned}`;
+  return details("eq-guide", "the equation, its pieces named", h("div", { class: "fb-guide" }, tex(eq)),
+    note("An example with two terms on T: a glacial-index term as in the Greenland paleo setup and a uniform term as in the Pyrenees or hysteresis setups; P follows with the fixed rules."));
+}
 function secEquation(tl) {
   const cl = climate();
   const content = [];
+  content.push(h("p", { class: "fb-note fb-primer" },
+    "A snapshot is a named set of climate fields (tas, pr, zs, to, so), read from files. "
+    + "A term is always coefficient × pattern: the coefficient c(τ) is one number at each forcing time (a constant, a record, a ramp, ...), the pattern a field that carries the spatial structure and the units. "
+    + "In a snapshots pattern the field is S₁ − S₀ in the units of the field, and c has no units (0 at S₀, 1 at S₁); in a uniform pattern the field is a gain f times the unit field, f in units of the field per unit of c, so an offset of c kelvin is c in K times the gain 1; in a replace pattern the ocean field is c itself at every depth. "
+    + "The terms add to the reference (pr multiplies)."
+    + (cl === "esm" ? " With the ESM backend, the climate of the ESM takes the place of the reference." : "")),
+    equationGuide(), badgeLegend());
   if (cl === "esm") {
     content.push(card("[esm]", null, h("span", { class: "fb-help" }, "the ESM supplies the climate; the terms add to it"),
       fields("esm", ["experiment", "esm_name", "use_esm", "use_hist", "use_proj"]),
@@ -765,21 +1035,21 @@ function secEquation(tl) {
       h("p", { class: "fb-note" }, h("a", { href: "climate-esm.html" }, "the ESM backend"))));
   } else {
     content.push(h("div", { class: "fb-card fb-card-flat" },
-      fields("forcing", ["reference"], { reference: { list: "fb-snaps", help: "S₀: the snapshot the terms add to" } }),
-      note(cl === "snapshots" ? "tas, to, so add; pr multiplies (fixed by field). Applied in this order: the snapshot terms, the uniform terms on tas/pr, the derived series, the ocean terms."
+      h("div", { class: "fb-fields" }, snapPicker("forcing", "reference")),
+      note(cl === "snapshots" ? "tas, to, so add; pr multiplies (fixed by field). Applied in this order: the snapshot terms, the uniform terms on tas/pr, the derived coefficients, the ocean terms."
         : "REMBO supplies the atmosphere and takes the uniform tas terms as its summer anomaly (ΔT_sum = Σ f_ta α, ΔT_ann = 1.3 ΔT_sum); the snapshot backend supplies the ocean from the reference and the ocean terms."),
       fromBlock(snapshotBlock(reference(), "the reference", tl),
-        fields("snapshots", ["lapse", "f_p"]), note("Γ (annual, summer) and β_p: the sea-level reduction of every snapshot, the uniform terms and the elevation transform use the same values."))));
+        fields("snapshots", ["lapse", "f_p"], { lapse: { label: "lapse (Γ)" }, f_p: { label: "f_p (β_p)" } }),
+        note("Γ (annual, summer) and β_p: the sea-level reduction of every snapshot, the uniform terms and the elevation transform use the same values."))));
   }
-  const snames = seriesNames();
-  content.push(h("h3", { class: "fb-sub" }, "Scalar series ", h("span", { class: "fb-hint" }, "α_k(τ): a record, a constant, a ramp, a controller, or derived from the model")));
-  content.push(...snames.map(n => seriesCard(n, tl)));
-  content.push(addBox("series", "series_", "series", (g) => { const r = grp(g); r.k.method = "series"; r.given.add("method"); }));
-  content.push(h("h3", { class: "fb-sub" }, "Terms ", h("span", { class: "fb-hint" }, "series × pattern on explicit fields, added to the reference")));
+  const cnames = coefNames();
+  content.push(h("h3", { class: "fb-sub" }, "Terms ", h("span", { class: "fb-hint" }, "coefficient × pattern on explicit fields, added to the reference")));
   content.push(...termNames().map(n => termCard(n, tl)));
-  content.push(addBox("terms", "term_", "term", (g) => { const r = grp(g); r.k.snap0 = "picontrol"; r.k.snap1 = "lgm"; r.k.fields = ["tas", "pr"]; r.k.series = snames[0] || ""; for (const k of ["series", "snap0", "snap1", "fields"]) r.given.add(k); }));
-  content.push(datalist("fb-snaps", namesOf("snapshot_")), datalist("fb-climdb", Object.keys(D.climdb).sort()));
-  return section("equation", "1–3 · The equation", "reference + Σ series × pattern, each piece with its source", ...content);
+  content.push(addBox("terms", "term_", "term", (g) => { const r = grp(g); Object.assign(r.k, { snap0: "picontrol", snap1: "lgm", fields: ["tas", "pr"], [TERM_COEF_KEY]: cnames[0] || "" }); for (const k of [TERM_COEF_KEY, "snap0", "snap1", "fields"]) r.given.add(k); }));
+  content.push(h("h3", { class: "fb-sub" }, "Coefficients ", h("span", { class: "fb-hint" }, "α(τ), one number at each forcing time: a constant, a record, a ramp, a controller, or derived from the model")));
+  content.push(...cnames.map(n => seriesCard(n, tl)));
+  content.push(addBox(COEF_LIST_KEY, COEF_PREFIX, "coefficient", (g) => { const r = grp(g); r.k.method = "series"; r.given.add("method"); }));
+  return section("equation", "The equation", "reference + Σ coefficient × pattern, each piece with its source", ...content);
 }
 
 // ---------------------------------------------- left: after the composition
@@ -788,23 +1058,23 @@ function secAfter() {
   const content = [];
   content.push(
     card("[taper]", null, h("span", { class: "fb-help" }, "the atmosphere towards the reference with a weight field"), fields("taper", ["active", ...(val("taper", "active", false) ? ["weight", "outside"] : [])])),
-    card("[bias]", null, h("span", { class: "fb-help" }, "an additive temperature field and a precipitation factor field"), fields("bias", ["active", ...(val("bias", "active", false) ? ["dtas", "fpr", "f_tas", "f_pr"] : [])], { dtas: { list: "fb-climdb" }, fpr: { list: "fb-climdb" } })));
+    card("[bias]", null, h("span", { class: "fb-help" }, "an additive temperature field and a precipitation factor field"), fields("bias", ["active", ...(val("bias", "active", false) ? ["dtas", "fpr", "f_tas", "f_pr"] : [])], { dtas: { chips: climdbNames(), single: true }, fpr: { chips: climdbNames(), single: true } })));
   const om = String(val("orbit", "method", "fixed_time"));
   content.push(card("[orbit]", null, h("span", { class: "fb-help" }, "insolation of the surface models"), fields("orbit", ["method", ...(om === "fixed_time" ? ["time"] : om === "fixed_orbit" ? ["ecc", "obl", "per"] : [])])));
   const m = String(val("barysealevel", "method", "fastiso"));
   const sl = [fields("barysealevel", ["method", ...(m === "const" ? ["bsl_init"] : m === "file" ? ["sl_path", "sl_name"] : [])], { sl_path: { options: ["none", ...Object.keys(D.series).sort()] } })];
   if (m === "file") {
     const path = String(val("barysealevel", "sl_path", "")), vname = String(val("barysealevel", "sl_name", ""));
-    if (!seriesOf(path, vname)) sl.push(warn(`${path}${vname && vname !== "none" ? ":" + vname : ""}: not in the exported series (netCDF: set sl_name)`));
+    if (!seriesOf(path, vname)) sl.push(warn(`${path}${vname && vname !== "none" ? ":" + vname : ""}: not among the files exported to forcing.json (netCDF: set sl_name)`));
   }
   content.push(card("[barysealevel]", null, h("span", { class: "fb-help" }, "sea level"), ...sl));
   if (inRun("ice_bnd") && sourceOf("ice_bnd")) {
     const im = String(val("ice_bnd", "method")), on = val("ice_bnd", "active", false);
-    const ib = [fields("ice_bnd", ["active", ...(on ? ["method", "H_ice", ...(im === "scaled" ? ["index", "slice_time"] : [])] : [])], { index: { options: ["", ...seriesNames()] }, H_ice: { list: "fb-climdb" } })];
-    if (on && im === "scaled" && !seriesNames().includes(String(val("ice_bnd", "index", "")))) ib.push(warn(`ice_bnd.index = "${val("ice_bnd", "index", "")}" is not a series of the equation`));
+    const ib = [fields("ice_bnd", ["active", ...(on ? ["method", "H_ice", ...(im === "scaled" ? ["index", "slice_time"] : [])] : [])], { index: { options: ["", ...coefNames()] }, H_ice: { chips: climdbNames(), single: true } })];
+    if (on && im === "scaled" && !coefNames().includes(String(val("ice_bnd", "index", "")))) ib.push(warn(`ice_bnd.index = "${val("ice_bnd", "index", "")}" is not a coefficient of the equation`));
     content.push(card("[ice_bnd]", null, h("span", { class: "fb-help" }, "prescribed ice in the fixed and relaxation cells"), ...ib));
   }
-  return section("after", "4–6 · After the composition", "to the surface (always); transforms; also at the forcing time", ...content);
+  return section("after", "After the composition", "to the surface (always); transforms; also at the forcing time", ...content);
 }
 
 // ------------------------------------------------- right: the equation chain
@@ -812,7 +1082,7 @@ function secAfter() {
 function rightEquations(tl) {
   const t = evalTime(tl), tau = tauAt(tl, t);
   const out = [];
-  const cl = climate(), snames = seriesNames(), ref = reference();
+  const cl = climate(), snames = coefNames(), ref = reference();
   const terms = runTerms();
   const sv = {};
   for (const n of snames) { const s = seriesOnRun(n, tl); sv[n] = !s.p || s.kind === "derived" ? null : atT(tl, s.f, t); }
@@ -824,15 +1094,22 @@ function rightEquations(tl) {
   out.push(eqblock("0 · Forcing time",
     tex(`${timeEq},\\qquad t \\in [${fmtK(tl.t0)},\\ ${fmtK(tl.t1)}]\\ \\mathrm{yr}\\quad(\\texttt{${tl.method}})`),
     h("div", { class: "fb-taurow" }, slider, h("span", { class: "fb-tauval" }, `t = ${fmtNum(+t.toPrecision(6))} yr → τ = ${tauS}`)),
-    vals("Every series, time-dependent snapshot, sea-level file and the orbit (forcing_time) read τ. The values below are at this τ.")));
+    vals("Every coefficient, time-dependent snapshot, sea-level file and the orbit (forcing_time) read τ. The values below are at this τ.")));
 
-  if (snames.length) {
-    const b = eqblock("1 · Scalar series");
+  // the coefficients the terms name but the equation does not define
+  const undef = [...new Set(terms.map(x => x.series).filter(n => n !== "" && !snames.includes(n)))];
+  if (snames.length || undef.length) {
+    const b = eqblock("1 · Coefficients");
+    const used = new Set(terms.map(x => x.series));
+    const ibIndex = inRun("ice_bnd") && val("ice_bnd", "active", false) && String(val("ice_bnd", "method")) === "scaled" ? String(val("ice_bnd", "index", "")) : "";
     for (const n of snames) {
       const p = seriesPar(n);
-      if (!p) { b.append(warn(`series "${n}": no group [series_${n}]`)); continue; }
-      b.append(tex(seriesEq(n, p) + (sv[n] === null || !Number.isFinite(sv[n]) ? "" : `\\qquad ${sym(n)}(${fmtK(+tau.toPrecision(6))}) = ${fmtV(sv[n])}`)));
+      if (!p) { b.append(warn(`coefficient "${n}": no group [${COEF_PREFIX}${n}]`)); continue; }
+      const at = sv[n] === null || !Number.isFinite(sv[n]) ? "" : `\\qquad ${sym(n)}(${fmtK(+tau.toPrecision(6))}) = ${fmtV(sv[n])}`;
+      const unused = used.has(n) ? "" : `\\qquad\\text{(used by no term${n === ibIndex ? "; scales ice\\_bnd" : ""})}`;
+      b.append(tex(seriesEq(n, p) + at + unused));
     }
+    for (const n of undef) b.append(tex(`${csym(n)}(\\tau)\\qquad{\\color{${WARN_TEX}}\\text{not defined yet}}`));
     out.push(b);
   }
 
@@ -841,23 +1118,23 @@ function rightEquations(tl) {
     out.push(eqblock("2 · Snapshots, reduced to sea level once",
       tex(`T^{\\mathrm{sl}}_j = T_j + \\Gamma_m z_j,\\qquad P^{\\mathrm{sl}}_j = P_j\\,e^{\\beta_p \\Gamma_m z_j},\\qquad \\Theta_j(z),\\ S_j(z)\\ \\text{as given}`),
       vals(`Γ = ${fmtNum(num(lapse[0]))}, ${fmtNum(num(lapse[1]))} K/m (annual, summer; monthly cosine between them), β_p = ${fmtNum(num(val("snapshots", "f_p", 0.05)))} /K; j ∈ {${runSnaps().map(s => s + (snapTdep(s) ? "(τ)" : "")).join(", ")}}; reference S₀ = ${ref}`)));
-    const b3 = eqblock(cl === "rembo" ? "3 · Composition (REMBO: the atmosphere; the snapshots: the ocean)" : "3 · Composition at sea level: reference + Σ series × pattern");
+    const b3 = eqblock(cl === "rembo" ? "3 · Composition (REMBO: the atmosphere; the snapshots: the ocean)" : "3 · Composition at sea level: reference + Σ coefficient × pattern");
     if (!snapGroup(ref)) b3.append(warn(`the reference snapshot "${ref}" has no group [snapshot_${ref}]`));
     else {
-      const refF = boundFields(ref);
+      const refF = setFields(ref);
       for (const f of FIELDS) {
         const tf = terms.filter(t => t.fields.includes(f));
         if (!refF.includes(f) && !tf.length) continue;
         if (cl === "rembo" && (f === "tas" || f === "pr")) continue;
         const rp = tf.find(t => t.pattern === "replace");
-        let e = `${FSYM[f]}(${f === "tas" || f === "pr" ? "x,m" : "x,z"},\\tau) = ` + (rp ? `${sym(rp.series)}(\\tau)` : snapSym(f, ref));
+        let e = `${FSYM[f]}(${f === "tas" || f === "pr" ? "x,m" : "x,z"},\\tau) = ` + (rp ? (coefTex(rp) || "1") : snapSym(f, ref));
         for (const t of tf) if (t.pattern !== "replace") e += termPart(t, f);
         b3.append(tex(e));
       }
-      if (cl === "rembo") { const u = terms.filter(t => t.pattern === "uniform" && t.fields.includes("tas")); if (u.length) b3.append(tex(`\\Delta T_{\\mathrm{sum}} = ${u.map(t => gsym(t.gain.tas) + sym(t.series) + "(\\tau)").join(" + ")},\\qquad \\Delta T_{\\mathrm{ann}} = 1.3\\,\\Delta T_{\\mathrm{sum}}`)); }
+      if (cl === "rembo") { const u = terms.filter(t => t.pattern === "uniform" && t.fields.includes("tas")); if (u.length) b3.append(tex(`\\Delta T_{\\mathrm{sum}} = ${u.map(t => gsym(t.gain.tas) + (coefTex(t) || "1")).join(" + ")},\\qquad \\Delta T_{\\mathrm{ann}} = 1.3\\,\\Delta T_{\\mathrm{sum}}`)); }
       for (const f of ["to", "so"]) if (terms.filter(t => t.pattern === "replace" && t.fields.includes(f)).length > 1) b3.append(warn(`more than one replace term on ${f}`));
     }
-    const num3 = terms.map(t => t.series === "" ? `${t.name}: weight 1` : sv[t.series] === null || sv[t.series] === undefined ? `${t.name}: ${t.series} set at run time` : `${t.name}: ${t.series} = ${fmtV(sv[t.series])}` + (t.pattern === "uniform" && t.fields.includes("tas") ? ` → ΔT = ${fmtV(t.gain.tas * sv[t.series])} K` : ""));
+    const num3 = terms.map(t => t.series === "" ? `${t.name}: coefficient 1` : !snames.includes(t.series) ? `${t.name}: ${t.series} not defined yet` : sv[t.series] === null ? `${t.name}: ${t.series} set at run time` : `${t.name}: ${t.series} = ${fmtV(sv[t.series])}` + (t.pattern === "uniform" && t.fields.includes("tas") ? ` → ΔT = ${fmtV(t.gain.tas * sv[t.series])} K` : ""));
     if (num3.length) b3.append(vals(`at τ = ${tauS}:  ` + num3.join("  ·  ")));
     out.push(b3);
     if (cl === "snapshots") out.push(eqblock("4 · To the model surface z_s(x,t)", tex(`T(x,m) = T^{\\mathrm{sl}} - \\Gamma_m z_s,\\qquad P(x,m) = P^{\\mathrm{sl}}\\,e^{-\\beta_p \\Gamma_m z_s}`)));
@@ -907,8 +1184,8 @@ function rightRun(tl) {
   const t = evalTime(tl);
   const terms = runTerms();
   const content = [];
-  const ser = seriesNames().map(n => ({ n, s: seriesOnRun(n, tl) })).filter(x => x.s.f && x.s.f.some(Number.isFinite)).map(x => ({ label: x.n, t: tl.t, f: x.s.f }));
-  if (ser.length) content.push(linePlot(ser, { y: "series", tmark: t }));
+  const ser = coefNames().map(n => ({ n, s: seriesOnRun(n, tl) })).filter(x => x.s.f && x.s.f.some(Number.isFinite)).map(x => ({ label: x.n, t: tl.t, f: x.s.f }));
+  if (ser.length) content.push(linePlot(ser, { y: "coefficients", tmark: t }));
   const uni = terms.filter(x => x.pattern === "uniform");
   if (uni.length) {
     const sums = {};
@@ -924,7 +1201,7 @@ function rightRun(tl) {
     const sl = seriesOf(String(val("barysealevel", "sl_path", "")), String(val("barysealevel", "sl_name", "")));
     if (sl) content.push(linePlot([{ label: "η [m]", t: tl.t, f: tl.tf.map(x => interp(sl, x)) }], { y: "sea level [m]", height: 140, tmark: t }));
   }
-  if (!content.length) content.push(vals(tl.method === "const" ? "The forcing time is constant: nothing changes over the run." : "No tabulated series in the run (derived series are set by the model)."));
+  if (!content.length) content.push(vals(tl.method === "const" ? "The forcing time is constant: nothing changes over the run." : "No coefficient with a curve in the run (derived coefficients are set by the model)."));
   return eqblock("Over the run (model time; the line: the evaluation time)", ...content);
 }
 
@@ -943,7 +1220,7 @@ function runGroups() {
   if (climate() === "esm") add("esm");
   add("forcing");
   if (withSnaps()) { add("snapshots"); for (const s of runSnaps()) add("snapshot_" + s); }
-  for (const n of seriesNames()) add("series_" + n);
+  for (const n of coefNames()) add(COEF_PREFIX + n);
   for (const n of termNames()) add("term_" + n);
   for (const g of ["taper", "bias", "orbit", "barysealevel", "ice_bnd"]) add(g, false);
   return order;
@@ -1002,7 +1279,7 @@ function rightOutput() {
   const head = h("div", { class: "fb-tabs" }, ...tabs.map(([k, lab]) => h("button", { class: S.tab === k ? "on" : "", onclick: () => { S.tab = k; renderRight(); } }, lab)));
   const sel = h("select", { onchange: (e) => { S.base = e.target.value; render(); } }, ...Object.keys(D.bases).map(b => h("option", { value: b }, b)));
   sel.value = S.base;
-  const body = [h("div", { class: "fb-fields" }, h("div", { class: "fb-field" }, h("label", {}, h("code", {}, "-n")), sel, h("span", {}), h("span", { class: "fb-help" }, "the base par file the run is written against")))];
+  const body = [h("div", { class: "fb-fields" }, h("div", { class: "fb-field" }, h("label", { title: "runme -n" }, h("code", {}, "base par file (-n)")), h("span", { class: "fb-val" }, sel), h("span", { class: "fb-help" }, "The par file the run is written against: the -p list is what differs from it.")))];
   if (S.tab === "par") {
     body.push(note("The forcing groups of the run as the model reads them: the base par file, the library groups the equation names, new groups. Highlighted: what the builder changed."),
       h("pre", { class: "fb-cfg", html: parFile() }));
@@ -1010,11 +1287,11 @@ function rightOutput() {
     const { out, blocks, problems } = overrides();
     const outdir = S.outdir || `output/${S.preset || S.base.replace(/^yelmox_/, "").toLowerCase() + "-run"}`;
     const cmd = [`runme ${S.runopts} -e yelmox`, `-n ${base().file}`, `-o ${outdir}`, ...(out.length ? ["-p " + out.join(" \\\n      ")] : [])].join(" \\\n   ");
-    const ta = h("textarea", { class: "fb-ta", rows: 3, placeholder: "paste a -p list, e.g. ctrl.tstep_method=rel forcing.series==alpha,dTo,ramp forcing.terms==lgm,ocean,ramp" });
+    const ta = h("textarea", { class: "fb-ta", rows: 3, placeholder: `paste a -p list, e.g. ctrl.tstep_method=rel forcing.${COEF_LIST_KEY}==alpha,dTo,ramp forcing.terms==lgm,ocean,ramp` });
     body.push(note("Only what differs from the base (or the library group, or the schema default); a library group is used by name. Keys outside the forcing groups (from a preset or a pasted list) pass through."),
       h("div", { class: "fb-fields" },
-        h("div", { class: "fb-field" }, h("label", {}, h("code", {}, "runme options")), h("input", { type: "text", class: "fb-text", value: S.runopts, onchange: (e) => { S.runopts = e.target.value; renderRight(); } })),
-        h("div", { class: "fb-field" }, h("label", {}, h("code", {}, "-o")), h("input", { type: "text", class: "fb-text", value: outdir, onchange: (e) => { S.outdir = e.target.value; renderRight(); } }))),
+        h("div", { class: "fb-field" }, h("label", {}, h("code", {}, "runme options")), h("span", { class: "fb-val" }, h("input", { type: "text", class: "fb-text", value: S.runopts, onchange: (e) => { S.runopts = e.target.value; renderRight(); } }))),
+        h("div", { class: "fb-field" }, h("label", {}, h("code", {}, "-o")), h("span", { class: "fb-val" }, h("input", { type: "text", class: "fb-text", value: outdir, onchange: (e) => { S.outdir = e.target.value; renderRight(); } })))),
       h("pre", { class: "fb-cfg" }, h("code", {}, cmd)),
       h("div", {}, h("button", { class: "fb-btn", onclick: () => navigator.clipboard.writeText(cmd.replace(/ \\\n\s+/g, " ")) }, "copy (one line)")),
       ...problems.map(warn),
