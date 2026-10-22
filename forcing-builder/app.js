@@ -1038,15 +1038,15 @@ function guideEquation() {
   const ob = (x) => `\\overbrace{${x}}^{${c("term", "\\text{term}")}}`;
   const T = (n) => `T^{\\mathrm{sl}}_{\\mathrm{${n}}}`, P = (n) => `P^{\\mathrm{sl}}_{\\mathrm{${n}}}`;
   const alpha = ub("coef", "\\alpha(\\tau)", "\\text{coefficient}");
-  // the gain f times β, in the colours of the pattern and the coefficient
-  const fb = `${c("pat", "f")}\\,${c("coef", "\\beta(\\tau)")}`;
+  // the uniform term: the gain f is the pattern, β(τ) the coefficient
+  const fb = `${ub("pat", "f", "\\substack{\\text{pattern:}\\\\\\text{uniform (gain)}}")}\\;${ub("coef", "\\beta(\\tau)", "\\text{coefficient}")}`;
   // one line each: the explainer gives the equations two thirds of the width
   const tas = `T^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", T("pd"), "\\text{reference}")}`
     + ` + ${ob(`${alpha}\\,${ub("pat", `\\big[${T("lgm")} - ${T("picontrol")}\\big]`, "\\text{pattern: snapshots}")}`)}`
-    + ` + ${ob(`\\underbrace{${fb}}_{${c("pat", "\\text{pattern: uniform (gain }f\\times\\beta\\text{)}")}}`)}`;
+    + ` + ${ob(fb)}`;
   const pr = `P^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", P("pd"), "\\text{reference}")}`
     + ` \\cdot ${ob(`\\Big[1 + ${alpha}\\,${ub("pat", `\\Big(\\frac{${P("lgm")}}{${P("picontrol")}} - 1\\Big)`, "\\text{pattern: snapshots (ratio)}")}\\Big]`)}`
-    + ` \\cdot ${ob(`\\underbrace{{${c("pat", "e")}}^{${c("pat", "\\beta_p")}\\,${fb}}}_{${c("pat", "\\text{pattern: uniform (}e^{\\beta_p f \\beta}\\text{)}")}}`)}`;
+    + ` \\cdot ${ob(`${c("pat", "\\exp")}\\!\\big(${c("pat", "\\beta_p")}\\,${fb}\\big)`)}`;
   return `\\begin{aligned} ${tas} \\\\[1.4em] ${pr} \\end{aligned}`;
 }
 function explainer() {
