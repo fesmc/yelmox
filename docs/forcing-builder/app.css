@@ -110,7 +110,15 @@ pre.fb-cfg .ov { background: #fde9b8; }
 .fb-sub-card { background: var(--fb-panel); border: 1px solid var(--fb-line2); border-radius: 5px; padding: 0.4rem 0.65rem; margin: 0.35rem 0 0.35rem 0.6rem; }
 .fb-sub-card .fb-cardhead { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.2rem; }
 
-/* the primer and the legend of the badges, under the equation heading */
+/* the explainer, first on the page: the primer | the example equations (at
+   their own width, braces not clipped); one column under 1000 px */
+.fb-explainer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, max-content); gap: 0.6rem 1.6rem; align-items: start;
+  background: var(--fb-panel); border: 1px solid var(--fb-line); border-radius: 6px; padding: 0.7rem 1rem 0.5rem; margin-bottom: 0.9rem; }
+.fb-explainer .fb-eq { overflow: visible; padding: 0.2rem 0; }
+.fb-explainer .fb-guide > .fb-note { max-width: 62ch; }
+@media (max-width: 1000px) { .fb-explainer { grid-template-columns: minmax(0, 1fr); } .fb-explainer .fb-eq { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.4rem; } }
+
+/* the primer, and the legend of the badges under the equation heading */
 .fb-primer { color: var(--fb-fg); font-size: 0.85rem; max-width: 75ch; margin: 0 0 0.3rem; }
 .fb-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.75rem; color: var(--fb-muted); margin: 0 0 0.6rem; }
 
@@ -142,5 +150,5 @@ pre.fb-cfg .ov { background: #fde9b8; }
 .fb-link { border: none; background: none; padding: 0; cursor: pointer; color: var(--fb-accent); font: inherit; text-decoration: underline dotted; text-align: left; }
 .fb-link:hover { text-decoration: underline; }
 
-/* the guide: the example equation with its pieces named */
+/* the guide: the example equations with their pieces named */
 .fb-guide .fb-eq { font-size: 0.88rem; }

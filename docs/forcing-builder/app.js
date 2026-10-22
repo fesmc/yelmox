@@ -1,5 +1,7 @@
 // Forcing builder: the forcing of one run as the equation of
-// docs/_forcing-terms.md, built in the order of the equation. Left, top to
+// docs/_forcing-terms.md, built in the order of the equation. First, across
+// the page, the explainer (what a snapshot, a term and a coefficient are, and
+// an example), then the presets and the base par file. Left, top to
 // bottom: the forcing time, the equation (the reference, the terms, then the
 // coefficients they name; each with where its data comes from: the record of
 // a coefficient, the fields of each snapshot), what comes after (transforms,
@@ -27,7 +29,7 @@ import katex from "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.mjs";
 const root = document.getElementById("fb");
 let D = null;                       // forcing.json
 let TEMPLATES = [];                 // [regex, template] (series_, term_, snapshot_)
-const S = { base: null, g: new Map(), extra: [], preset: null, presetKey: "", tsel: null, tab: "par", open: new Set(["eq-guide"]), runopts: "-r", outdir: "" };
+const S = { base: null, g: new Map(), extra: [], preset: null, presetKey: "", tsel: null, tab: "par", open: new Set(), runopts: "-r", outdir: "" };
 
 // The namelist names of the coefficients: the group prefix, the list in
 // [forcing], the key of a term. A rename of the namelist changes these three.
@@ -135,7 +137,10 @@ function changed(g, k) {
   const ref = refOf(g, k);
   return !ref || (ref.src === "default" && sourceOf(g) === "new") || !sameValue(r.k[k], ref.v);
 }
-const stateKey = () => JSON.stringify([[...S.g].map(([g, r]) => [g, r.k, [...r.given].sort()]), S.extra]);
+// What the builder changed against the sources, as a string: the preset is
+// "on" while this is what loading it produced (groups created on first use
+// from their source do not count).
+const stateKey = () => JSON.stringify([[...S.g].map(([g, r]) => [g, [...r.given].filter(k => changed(g, k)).sort().map(k => [k, r.k[k]])]).filter(x => x[1].length), S.extra]);
 
 // the lists of the equation
 const coefNames = () => asList(val("forcing", COEF_LIST_KEY, ""));
@@ -212,8 +217,8 @@ const OPTIONS = {
   "ctrl.tstep_method": ["const", "rel", "cal"], "spinup.tstep_method": ["const", "rel", "cal"], "transient.tstep_method": ["const", "rel", "cal"],
   "barysealevel.method": ["const", "file", "fastiso"],
   "orbit.method": ["forcing_time", "fixed_time", "fixed_orbit"], "ice_bnd.method": ["file", "scaled"],
-  [COEF_T + ".from"]: ["", "air_anomaly", "obm_north", "obm_south"],
-  "term.pattern": ["snapshots", "uniform", "replace"],
+  [COEF_T + ".from"]: ["", "air_anomaly"],
+  "term.pattern": ["snapshots", "uniform"],
   "taper.outside": ["ref", "mean"],
 };
 
@@ -232,7 +237,7 @@ const HELP = {
   "snapshots.f_p": "Precipitation sensitivity: P scales by exp(β_p ΔT) with elevation and in uniform terms.",
 
   ["term." + TERM_COEF_KEY]: "The coefficient that scales this term; empty = the constant 1 (the full anomaly of a reconstruction).",
-  "term.pattern": "snapshots: coefficient × (snap1 − snap0); uniform: coefficient × a gain, the same everywhere; replace: the ocean field = the coefficient.",
+  "term.pattern": "snapshots: coefficient × (snap1 − snap0); uniform: coefficient × a gain, the same everywhere.",
   "term.snap0": "The snapshot where the coefficient is 0 (e.g. piControl). Empty: snap1 is itself an anomaly or ratio.",
   "term.snap1": "The snapshot where the coefficient is 1 (e.g. LGM).",
   "term.fields": "The fields the term changes. tas, to, so add; pr multiplies (fixed rule).",
@@ -253,11 +258,11 @@ const HELP = {
   [COEF_T + ".dt_ave"]: "The window [yr] over which the controller averages the ice-volume change.",
   [COEF_T + ".tol"]: "The ice-volume change rate the controller treats as equilibrium.",
   [COEF_T + ".with_kill"]: "Stop the run once the ice sheet is in equilibrium at a limit (f_min or f_max).",
-  [COEF_T + ".from"]: "What the model derives the coefficient from: the mean air temperature anomaly, or a box temperature of the ocean box model.",
+  [COEF_T + ".from"]: "What the model derives the coefficient from: the mean air temperature anomaly (air_anomaly).",
   [COEF_T + ".factor"]: "The coefficient = factor × the mean sea-level air temperature anomaly.",
   [COEF_T + ".region"]: "Where the anomaly is averaged: all = the whole climate grid, or a region, e.g. zone:open_ocean.",
   [COEF_T + ".anomaly"]: "On: the box temperature minus its value at the start; off: the temperature itself.",
-  [COEF_T + ".series_file"]: "The file of the record, in input/: a two-column table or a netCDF time series.",
+  [COEF_T + ".series_file"]: "The file of the record. Not in the list? Any two-column table or netCDF time series in input/ works for the model; the list is what scripts/forcing-builder/export.jl found when the page was built. Put the file in input/ and re-run the export.",
   [COEF_T + ".series_var"]: "The variable of the netCDF file that holds the record.",
   [COEF_T + ".series_time_name"]: "The name of the time variable in the netCDF file.",
   [COEF_T + ".norm_t0"]: "Time where the normalised record is 0; two times = the mean over that window.",
@@ -447,14 +452,20 @@ function gist(c) {
   const t = (cut.length ? s.slice(0, Math.min(...cut)) : s).replace(/[.:]$/, "");
   return t.length > 70 ? t.slice(0, 69).trimEnd() + "…" : t;
 }
+// A key of a library group as a string ("" when the library does not set it).
+const libKey = (g, k) => { const d = D.library.groups[g]; return d && d.keys[k] ? String(d.keys[k].v) : ""; };
+// The library groups of the yelmox_bipolar driver (the ocean box model): not
+// offered here, documented on its page.
+const bipolarOnly = (g) => libKey(g, "from").startsWith("obm_") || libKey(g, "pattern") === "replace";
 const groupGist = (g) => { const s = sourceOf(g); return gist(s === "base" ? base().groups[g].c : s === "library" ? D.library.groups[g].c : ""); };
 
 // The add box under a list of names (the coefficients, the terms of
 // [forcing]): a named group of the par file or the library, each with the
-// gist of its comment, or a new name (from the template).
+// gist of its comment, or a new name (from the template); not the groups of
+// the yelmox_bipolar driver.
 function addBox(k, prefix, what, onnew) {
   const list = asList(val("forcing", k, ""));
-  const cands = namesOf(prefix).filter(c => !list.includes(c));
+  const cands = namesOf(prefix).filter(c => !list.includes(c) && !bipolarOnly(prefix + c));
   const where = (c) => sourceOf(prefix + c) === "library" ? " (in library)" : sourceOf(prefix + c) === "base" ? " (in par file)" : "";
   const sel = h("select", {}, h("option", { value: "" }, "one of the par file or the library…"),
     ...cands.map(c => { const gs = groupGist(prefix + c); return h("option", { value: c, title: prefix + c }, c + (gs ? " — " + gs : "") + where(c)); }));
@@ -623,6 +634,17 @@ function details(id, title, ...content) {
 function note(text, cls = "fb-note") { return h("p", { class: cls }, text); }
 function warn(text) { return note(text, "fb-warn"); }
 function vals(text) { return h("div", { class: "fb-vals" }, text); }
+// The hints where a piece is missing (a clim_db group, a group in no file yet),
+// and the note on what belongs to the yelmox_bipolar driver only.
+function climdbHint() {
+  return h("p", { class: "fb-note" }, "Not in the list? Add a group to input/clim_db.nml (file, variable, units, grid, time axis; the format: ",
+    h("a", { href: "database-namelists.html" }, "database namelists"), "), then re-run the export. The file itself is a FesmData product on the climate grid.");
+}
+const newHint = (g) => sourceOf(g) !== "new" ? null
+  : note("A new group is not yet in any file: the written-out run (right column, par-file tab) gives its block; add it to the par file for this setup or to input/forcing_db.nml to share it.");
+function bipolarNote(text) {
+  return h("p", { class: "fb-note" }, text + "; used by the yelmox_bipolar driver only, see ", h("a", { href: "yelmox-bipolar.html" }, "yelmox_bipolar"), ".");
+}
 // Where a group is defined: the badge and its tooltip.
 const SRC_BADGE = {
   base: ["in par file", () => `defined in ${base().file}`],
@@ -634,7 +656,7 @@ const srcBadge = (g) => { const s = sourceOf(g), b = SRC_BADGE[s]; return b ? h(
 function badgeLegend() {
   const item = (cls, text, what) => h("span", {}, h("span", { class: "fb-src " + cls }, text), " " + what);
   return h("p", { class: "fb-legend" }, item("fb-src-base", "in par file", base().file.replace(/^yelmox\//, "")), item("fb-src-library", "in library", "forcing_db.nml, shared"),
-    item("fb-src-new", "new", "a block to add"), item("fb-src-override", "changed", "set with -p"));
+    item("fb-src-new", "new", "not in any file yet; the written-out run gives the block to add"), item("fb-src-override", "changed", "set with -p"));
 }
 function card(head, g, ...content) {
   return h("div", { class: "fb-card" }, h("div", { class: "fb-cardhead" }, h("code", {}, head), g ? srcBadge(g) : null), ...content);
@@ -725,15 +747,16 @@ function seriesCard(name, tl) {
   const kindSel = h("select", { onchange: (e) => setKind(g, e.target.value) }, ...Object.keys(KINDS).map(k => h("option", { value: k }, KIND_LABEL[k])));
   kindSel.value = kind;
   const head = h("div", { class: "fb-cardhead" }, texi(sym(name) + "(\\tau)"), h("code", {}, `[${g}]`), srcBadge(g), kindSel, removeBtn(COEF_LIST_KEY, name));
-  const content = [head];
+  const content = [head, newHint(g)];
   let shown = ["method", "units"];
   if (kind === "derived") {
     const from = String(p.from || "");
     const dk = DERIVED_KEYS[from] || ["factor", "region", "anomaly"];
     content.push(fields(g, ["from", ...dk, "units"]));
     shown.push("from", ...dk);
-    content.push(note(from === "air_anomaly" ? `Set by the climate each update, after the atmosphere is composed: ${fmtNum(num(p.factor))} × the mean sea-level air temperature anomaly over ${p.region === "all" ? "the climate grid" : `region ${p.region}`}. Terms on it touch the ocean only.`
-      : from ? `The ${from === "obm_north" ? "northern" : "southern"} box temperature of the ocean box model${p.anomaly ? " minus its initial value" : ""}, set by the yelmox_bipolar bridge each step.` : "Choose what the coefficient is derived from."));
+    content.push(from === "air_anomaly" ? note(`Set by the climate each update, after the atmosphere is composed: ${fmtNum(num(p.factor))} × the mean sea-level air temperature anomaly over ${p.region === "all" ? "the climate grid" : `region ${p.region}`}. Terms on it touch the ocean only.`)
+      : from.startsWith("obm_") ? bipolarNote(`${from}: the ${from === "obm_north" ? "northern" : "southern"} box temperature of the ocean box model${p.anomaly ? " minus its initial value" : ""}, set each step`)
+      : note("Choose what the coefficient is derived from."));
   } else if (kind === "constant") {
     const r = grp(g), v = num(num(p.df_sign) >= 0 ? p.f_min : p.f_max);
     const input = h("input", { type: "text", class: "fb-num", value: fmtNum(v), onchange: (e) => { const x = num(e.target.value); if (Number.isFinite(x)) setMany(g, { f_min: x, f_max: x }); else render(); } });
@@ -840,7 +863,7 @@ function termPart(t, f) {
     : (t.series === "" ? `\\,${snapSym(f, s1)}` : `\\,\\big[1 + ${wsym(t)}(${snapSym(f, s1)} - 1)\\big]`);
   return t.snap0 ? ` + ${wsym(t)}\\big[${snapSym(f, s1)} - ${snapSym(f, t.snap0)}\\big]` : ` + ${wsym(t)}${snapSym(f, s1)}`;
 }
-const PATTERN_HELP = { snapshots: "coefficient × (snap1 − snap0)", uniform: "coefficient × a gain, the same everywhere", replace: "the field = the coefficient, in place of the reference" };
+const PATTERN_HELP = { snapshots: "coefficient × (snap1 − snap0)", uniform: "coefficient × a gain, the same everywhere" };
 
 // Structural warnings of a term (the equation); the snapshot blocks check the fields.
 function termWarnings(t, tl) {
@@ -887,7 +910,8 @@ function termCard(name, tl) {
   if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}]: no such group and no term template`), removeBtn("terms", name));
   const t = termOf(name);
   const content = [h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), srcBadge(g), h("span", { class: "fb-kind" }, t.pattern), h("span", { class: "fb-help" }, PATTERN_HELP[t.pattern] || ""), removeBtn("terms", name))];
-  content.push(h("div", { class: "fb-fields" }, coefPicker(g, TERM_COEF_KEY, { label: "coefficient" }), field(g, "pattern")));
+  content.push(newHint(g), h("div", { class: "fb-fields" }, coefPicker(g, TERM_COEF_KEY, { label: "coefficient" }), field(g, "pattern")));
+  if (t.pattern === "replace") content.push(bipolarNote("replace: the ocean field = the coefficient at every depth"));
   if (t.series !== "" && !coefNames().includes(t.series)) content.push(undefinedCoef(t.series));
   const marks = {};
   if (t.pattern === "snapshots") {
@@ -993,41 +1017,53 @@ function snapshotBlock(name, role, tl) {
   const placeholders = tbl.some(x => x.c && /\{\w+\}/.test(x.c.filename));
   const uniq = [...new Set(warns)];
   return h("div", { class: "fb-sub-card" },
-    head(snapTdep(name) ? "; depends on τ" : ""),
+    head(snapTdep(name) ? "; depends on τ" : ""), newHint(g),
     h("div", { class: "fb-fields" }, ...rows),
     rows.length ? note("Each field names its clim_db group(s): tas one monthly group, or two for annual + summer; pr one, or two summed (snowfall + rainfall); the others one.") : null,
+    rows.length ? climdbHint() : null,
     tbl.length ? climTable(`${name}-${role}`, tbl) : note("No fields set: add a clim_db group per field, or pick a snapshot of the library."),
     placeholders ? note("In the file names, {domain} and {grid_name} are filled from the run's domain and grid, {grid_global} from [snapshots] grid_global, {exp} from the snapshot's exp.") : null,
     details(`snap-${name}-${role}`, "how the fields are read (exp, monthly, smoothing)", fields(g, ["exp", "monthly", "clim_sigma", "ocn_sigma"]), alsoSets(g, [...SNAPFIELDS, "exp", "monthly", "clim_sigma", "ocn_sigma"])),
     ...uniq.map(warn));
 }
 
-// The guide at the top of the equation: one example with two terms, its
-// pieces named (KaTeX needs literal colours: the page's muted, accent, base
-// green and warn); open by default, folded state kept in S.open.
+// The explainer at the top of the page: what a snapshot, a term and a
+// coefficient are (left); one example with two terms, its pieces named, on
+// both equations of the atmosphere (right). KaTeX needs literal colours: the
+// page's muted, accent, base green and warn.
 const GUIDE_C = { ref: "#6b6861", coef: "#1f5f8b", pat: "#2a5d24", term: "#9a4b00" };
-function equationGuide() {
+function guideEquation() {
   const c = (k, x) => `\\textcolor{${GUIDE_C[k]}}{${x}}`;
   const ub = (k, x, lab) => `\\underbrace{${c(k, x)}}_{${c(k, lab)}}`;
   const ob = (x) => `\\overbrace{${x}}^{${c("term", "\\text{term}")}}`;
-  const T = (n) => `T^{\\mathrm{sl}}_{\\mathrm{${n}}}`;
-  // two lines, so that it fits the left column
-  const eq = `\\begin{aligned} T^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", T("pd"), "\\text{reference}")}`
-    + ` + ${ob(`${ub("coef", "\\alpha(\\tau)", "\\text{coefficient}")}\\,${ub("pat", `\\big[${T("lgm")} - ${T("picontrol")}\\big]`, "\\text{pattern: snapshots}")}`)}`
-    + ` \\\\ &\\quad + ${ob(`\\underbrace{${c("pat", "f")}\\,${c("coef", "\\beta(\\tau)")}}_{${c("pat", "\\text{pattern: uniform (gain }f\\times\\beta\\text{)}")}}`)} \\end{aligned}`;
-  return details("eq-guide", "the equation, its pieces named", h("div", { class: "fb-guide" }, tex(eq)),
-    note("An example with two terms on T: a glacial-index term as in the Greenland paleo setup and a uniform term as in the Pyrenees or hysteresis setups; P follows with the fixed rules."));
+  const T = (n) => `T^{\\mathrm{sl}}_{\\mathrm{${n}}}`, P = (n) => `P^{\\mathrm{sl}}_{\\mathrm{${n}}}`;
+  const alpha = ub("coef", "\\alpha(\\tau)", "\\text{coefficient}");
+  // the gain f times β, in the colours of the pattern and the coefficient
+  const fb = `${c("pat", "f")}\\,${c("coef", "\\beta(\\tau)")}`;
+  // two lines each, so that it fits its column
+  const tas = `T^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", T("pd"), "\\text{reference}")}`
+    + ` + ${ob(`${alpha}\\,${ub("pat", `\\big[${T("lgm")} - ${T("picontrol")}\\big]`, "\\text{pattern: snapshots}")}`)}`
+    + ` \\\\ &\\quad + ${ob(`\\underbrace{${fb}}_{${c("pat", "\\text{pattern: uniform (gain }f\\times\\beta\\text{)}")}}`)}`;
+  const pr = `P^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", P("pd"), "\\text{reference}")}`
+    + ` \\cdot ${ob(`\\Big[1 + ${alpha}\\,${ub("pat", `\\Big(\\frac{${P("lgm")}}{${P("picontrol")}} - 1\\Big)`, "\\text{pattern: snapshots (ratio)}")}\\Big]`)}`
+    + ` \\\\ &\\quad \\cdot ${ob(`\\underbrace{{${c("pat", "e")}}^{${c("pat", "\\beta_p")}\\,${fb}}}_{${c("pat", "\\text{pattern: uniform (}e^{\\beta_p f \\beta}\\text{)}")}}`)}`;
+  return `\\begin{aligned} ${tas} \\\\[1.4em] ${pr} \\end{aligned}`;
+}
+function explainer() {
+  return h("div", { class: "fb-explainer" },
+    h("p", { class: "fb-note fb-primer" },
+      "A snapshot is a named set of climate fields (tas, pr, zs, to, so), read from files. "
+      + "A term is always coefficient × pattern: the coefficient c(τ) is one number at each forcing time (a constant, a record, a ramp, ...), the pattern a field that carries the spatial structure and the units. "
+      + "In a snapshots pattern the field is S₁ − S₀ in the units of the field, and c has no units (0 at S₀, 1 at S₁); in a uniform pattern the field is a gain f times the unit field, f in units of the field per unit of c, so an offset of c kelvin is c in K times the gain 1. "
+      + "The terms add to the reference (pr multiplies)."
+      + (climate() === "esm" ? " With the ESM backend, the climate of the ESM takes the place of the reference." : "")),
+    h("div", { class: "fb-guide" }, tex(guideEquation()),
+      note("An example with two terms: a glacial-index term as in the Greenland paleo setup and a uniform term as in the Pyrenees or hysteresis setups. One term sets both equations: tas adds, pr multiplies, by the fixed rule.")));
 }
 function secEquation(tl) {
   const cl = climate();
   const content = [];
-  content.push(h("p", { class: "fb-note fb-primer" },
-    "A snapshot is a named set of climate fields (tas, pr, zs, to, so), read from files. "
-    + "A term is always coefficient × pattern: the coefficient c(τ) is one number at each forcing time (a constant, a record, a ramp, ...), the pattern a field that carries the spatial structure and the units. "
-    + "In a snapshots pattern the field is S₁ − S₀ in the units of the field, and c has no units (0 at S₀, 1 at S₁); in a uniform pattern the field is a gain f times the unit field, f in units of the field per unit of c, so an offset of c kelvin is c in K times the gain 1; in a replace pattern the ocean field is c itself at every depth. "
-    + "The terms add to the reference (pr multiplies)."
-    + (cl === "esm" ? " With the ESM backend, the climate of the ESM takes the place of the reference." : "")),
-    equationGuide(), badgeLegend());
+  content.push(badgeLegend());
   if (cl === "esm") {
     content.push(card("[esm]", null, h("span", { class: "fb-help" }, "the ESM supplies the climate; the terms add to it"),
       fields("esm", ["experiment", "esm_name", "use_esm", "use_hist", "use_proj"]),
@@ -1058,7 +1094,8 @@ function secAfter() {
   const content = [];
   content.push(
     card("[taper]", null, h("span", { class: "fb-help" }, "the atmosphere towards the reference with a weight field"), fields("taper", ["active", ...(val("taper", "active", false) ? ["weight", "outside"] : [])])),
-    card("[bias]", null, h("span", { class: "fb-help" }, "an additive temperature field and a precipitation factor field"), fields("bias", ["active", ...(val("bias", "active", false) ? ["dtas", "fpr", "f_tas", "f_pr"] : [])], { dtas: { chips: climdbNames(), single: true }, fpr: { chips: climdbNames(), single: true } })));
+    card("[bias]", null, h("span", { class: "fb-help" }, "an additive temperature field and a precipitation factor field"), fields("bias", ["active", ...(val("bias", "active", false) ? ["dtas", "fpr", "f_tas", "f_pr"] : [])], { dtas: { chips: climdbNames(), single: true }, fpr: { chips: climdbNames(), single: true } }),
+      val("bias", "active", false) ? climdbHint() : null));
   const om = String(val("orbit", "method", "fixed_time"));
   content.push(card("[orbit]", null, h("span", { class: "fb-help" }, "insolation of the surface models"), fields("orbit", ["method", ...(om === "fixed_time" ? ["time"] : om === "fixed_orbit" ? ["ecc", "obl", "per"] : [])])));
   const m = String(val("barysealevel", "method", "fastiso"));
@@ -1071,6 +1108,7 @@ function secAfter() {
   if (inRun("ice_bnd") && sourceOf("ice_bnd")) {
     const im = String(val("ice_bnd", "method")), on = val("ice_bnd", "active", false);
     const ib = [fields("ice_bnd", ["active", ...(on ? ["method", "H_ice", ...(im === "scaled" ? ["index", "slice_time"] : [])] : [])], { index: { options: ["", ...coefNames()] }, H_ice: { chips: climdbNames(), single: true } })];
+    if (on) ib.push(climdbHint());
     if (on && im === "scaled" && !coefNames().includes(String(val("ice_bnd", "index", "")))) ib.push(warn(`ice_bnd.index = "${val("ice_bnd", "index", "")}" is not a coefficient of the equation`));
     content.push(card("[ice_bnd]", null, h("span", { class: "fb-help" }, "prescribed ice in the fixed and relaxation cells"), ...ib));
   }
@@ -1079,6 +1117,31 @@ function secAfter() {
 
 // ------------------------------------------------- right: the equation chain
 
+// The evaluation time: one slider and its readout, created once and kept
+// across renders, so that a drag survives the redraw of the blocks below it.
+let SLIDER = null, TAUVAL = null;
+const tauText = (tl, t) => `t = ${fmtNum(+t.toPrecision(6))} yr → τ = ${fmtNum(+tauAt(tl, t).toPrecision(6))} yr`;
+function timeSlider(tl) {
+  if (!SLIDER) {
+    SLIDER = h("input", { type: "range" });
+    TAUVAL = h("span", { class: "fb-tauval" });
+    SLIDER.addEventListener("input", () => { S.tsel = Number(SLIDER.value); renderBelow(); });
+  }
+  const lo = Math.min(tl.t0, tl.t1), hi = Math.max(tl.t0, tl.t1), t = evalTime(tl);
+  Object.assign(SLIDER, { min: lo, max: hi, step: (hi - lo) / 400 || 1 });
+  SLIDER.value = t;
+  TAUVAL.textContent = tauText(tl, t);
+  return h("div", { class: "fb-taurow" }, SLIDER, TAUVAL);
+}
+// Block 0: the forcing time and the slider of the evaluation time.
+function rightTime(tl) {
+  const timeEq = tl.method === "const" ? `\\tau = t_{\\mathrm{const}} = ${fmtK(tl.tc)}` : tl.method === "rel" ? `\\tau = t` : `\\tau = t_{\\mathrm{cal}} - ${fmtNum(tl.cref)}`;
+  return eqblock("0 · Forcing time",
+    tex(`${timeEq},\\qquad t \\in [${fmtK(tl.t0)},\\ ${fmtK(tl.t1)}]\\ \\mathrm{yr}\\quad(\\texttt{${tl.method}})`),
+    timeSlider(tl),
+    vals("Every coefficient, time-dependent snapshot, sea-level file and the orbit (forcing_time) read τ. The values below are at this τ."));
+}
+// Blocks 1 to 6: the equation chain at the evaluation time.
 function rightEquations(tl) {
   const t = evalTime(tl), tau = tauAt(tl, t);
   const out = [];
@@ -1087,14 +1150,6 @@ function rightEquations(tl) {
   const sv = {};
   for (const n of snames) { const s = seriesOnRun(n, tl); sv[n] = !s.p || s.kind === "derived" ? null : atT(tl, s.f, t); }
   const tauS = `${fmtNum(+tau.toPrecision(6))} yr`;
-
-  const timeEq = tl.method === "const" ? `\\tau = t_{\\mathrm{const}} = ${fmtK(tl.tc)}` : tl.method === "rel" ? `\\tau = t` : `\\tau = t_{\\mathrm{cal}} - ${fmtNum(tl.cref)}`;
-  const lo = Math.min(tl.t0, tl.t1), hi = Math.max(tl.t0, tl.t1);
-  const slider = h("input", { type: "range", min: lo, max: hi, step: (hi - lo) / 400 || 1, value: t, oninput: (e) => { S.tsel = Number(e.target.value); renderRight(); } });
-  out.push(eqblock("0 · Forcing time",
-    tex(`${timeEq},\\qquad t \\in [${fmtK(tl.t0)},\\ ${fmtK(tl.t1)}]\\ \\mathrm{yr}\\quad(\\texttt{${tl.method}})`),
-    h("div", { class: "fb-taurow" }, slider, h("span", { class: "fb-tauval" }, `t = ${fmtNum(+t.toPrecision(6))} yr → τ = ${tauS}`)),
-    vals("Every coefficient, time-dependent snapshot, sea-level file and the orbit (forcing_time) read τ. The values below are at this τ.")));
 
   // the coefficients the terms name but the equation does not define
   const undef = [...new Set(terms.map(x => x.series).filter(n => n !== "" && !snames.includes(n)))];
@@ -1304,11 +1359,22 @@ function rightOutput() {
 
 // --------------------------------------------------------------------- render
 
-let LEFT = null, RIGHT = null;
+// The right column: block 0 (the time slider) and BELOW, the rest; a move of
+// the slider redraws BELOW only.
+let LEFT = null, RIGHT = null, BELOW = null;
+function renderBelow() {
+  const tl = timeline();
+  const y = RIGHT.scrollTop;
+  TAUVAL.textContent = tauText(tl, evalTime(tl));
+  BELOW.replaceChildren(...rightEquations(tl), rightRun(tl), rightOutput());
+  RIGHT.scrollTop = y;
+}
 function renderRight() {
   const tl = timeline();
   const y = RIGHT.scrollTop;
-  RIGHT.replaceChildren(...rightEquations(tl), rightRun(tl), rightOutput());
+  BELOW = BELOW || h("div", { class: "fb-below" });
+  RIGHT.replaceChildren(rightTime(tl), BELOW);
+  renderBelow();
   RIGHT.scrollTop = y;
 }
 function render() {
@@ -1318,7 +1384,7 @@ function render() {
   LEFT = h("div", { class: "fb-left" }, secTime(tl), secEquation(tl), secAfter(),
     h("p", { class: "fb-help" }, `Data: forcing.json generated ${D.generated}${D.commit ? " from " + D.commit : ""} (scripts/forcing-builder/export.jl).`));
   RIGHT = RIGHT || h("div", { class: "fb-right" });
-  root.append(topBar(), h("div", { class: "fb-cols" }, LEFT, RIGHT));
+  root.append(explainer(), topBar(), h("div", { class: "fb-cols" }, LEFT, RIGHT));
   renderRight();
   window.scrollTo(0, y);
 }
