@@ -21,7 +21,7 @@ across both domains plus the OBM.
   `atm2obm`, `ism2obm` = False). `[ctrl]`, `[barysealevel]` and the Yelmo
   physics groups (`ydyn`, `ytopo`, ...) are shared (no suffix).
 - **Tests:** `yelmox_bipolar/run_tests.sh` (local runs under `tmp/`): coupling
-  off; the box model on (`atm2obm` + the `obm_north`/`obm_south` series and
+  off; the box model on (`atm2obm` + the `obm_north`/`obm_south` coefficients and
   terms in place of the `ocean` term);
   with `RUN_FWF=1` also `ism2obm` (needs the hydrographic masks).
 
@@ -30,7 +30,7 @@ across both domains plus the OBM.
 - **Two `kryos_domain`s** (`dom_north`, `dom_south`), each set up via `setup_domain`
   → `domain_startup`. Either can be individually deactivated (`active_north` /
   `active_south`); with neither, the ocean box model runs alone (`active_obm`,
-  forced by `atm2obm` or not; `ism2obm` off, no terms on the box series).
+  forced by `atm2obm` or not; `ism2obm` off, no terms on the box coefficients).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup
   (`bsl_startup`) and written to the run restart bundle.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
@@ -40,7 +40,7 @@ across both domains plus the OBM.
   `[tm_1D]` cadence; its restart (`obm_restart.nc`) goes into the run restart
   bundle next to `bsl_restart.nc`.
 - **One restart bundle per run** — `restart-<kyr>-kyr/` holds the shared
-  `bsl_restart.nc`, `obm_restart.nc` and the series (`series_<name>_restart.nc`),
+  `bsl_restart.nc`, `obm_restart.nc` and the coefficients (`coef_<name>_restart.nc`),
   and each domain in a subfolder named after it (`Greenland/`, `Antarctica/`).
   `[ctrl] restart` is the bundle to start from. The output of each domain goes
   to the same subfolder of the run folder.
@@ -48,7 +48,7 @@ across both domains plus the OBM.
 Climate/SMB per domain is **snapshots + chion** (`[chion_north] model = "itm"`,
 `[chion_south] model = "pdd"`), as in the single-domain driver;
 the OBM's contribution is folded into the ocean forcing — `obm_exchange` sets
-the derived series `obm_north`/`obm_south` (the box temperatures) and re-applies
+the derived coefficients `obm_north`/`obm_south` (the box temperatures) and re-applies
 each domain's ocean terms (e.g. the `replace` terms `term_obm_north`/`_south`:
 the box temperature into `to_ann`) before the marine-shelf step reads it.
 
@@ -58,7 +58,7 @@ Main loop (per timestep):
 
 ```fortran
 call bsl_update(bsl, ts%time_rel)              ! shared sea level, once
-call indices_update(idx, ts%time_rel, var=fvar) ! shared series, once (fvar: ice volume of the active domains [Gt])
+call coefs_update(coefs, ts%time_rel, var=fvar) ! shared coefficients, once (fvar: ice volume of the active domains [Gt])
 
 if (active_north) then                         ! relaxation + optimization + isostasy, per domain
     call step_relax(dom_north, ts)
@@ -71,16 +71,16 @@ if (oc%active_obm) call obm_update(obox, real(dtt,wp), oc%obm_name)   ! ocean bo
 
 if (active_north) then                         ! ice sheet, hub, climate + smb, per domain
     call couple_to_yelmo(dom_north)
-    call step_ice_bnd(dom_north, ts, idx)
+    call step_ice_bnd(dom_north, ts, coefs)
     call step_icesheet(dom_north, ts)
     call couple_yelmo_to_htopo(dom_north)
-    call step_climate(dom_north, ts, idx)
+    call step_climate(dom_north, ts, coefs)
     call step_surface(dom_north, ts)
 end if
 (same for dom_south)
 
-call obm_exchange(oc, obox, idx, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
-                                                            ! hysteresis forcing, obm->ism (the obm_* series, ocean terms)
+call obm_exchange(oc, obox, coefs, dom_north, dom_south, ...)  ! atm->obm, ism->obm freshwater,
+                                                              ! hysteresis forcing, obm->ism (the obm_* coefficients, ocean terms)
 
 if (active_north) call step_shelf(dom_north, ts)  ! reads the obm-updated to_ann
 if (active_south) call step_shelf(dom_south, ts)
@@ -98,37 +98,37 @@ Key ordering points:
 
 ## Forcing
 
-One global series drives the box model and, with regional gains, the domains
+One global coefficient drives the box model and, with regional gains, the domains
 (`yelmox_bipolar_Bipolar.nml`):
 
-- **Series** (`[forcing] series`, `[series_<name>]`) are shared by both
+- **Coefficients** (`[forcing] coefs`, `[coef_<name>]`) are shared by both
   domains and the OBM: advanced once per step, written to each domain's 1D
-  file, restarted from the run bundle (`series_<name>_restart.nc`), with the
+  file, restarted from the run bundle (`coef_<name>_restart.nc`), with the
   kill switch and `restart_every_df` bundles as in `yelmox`. Here `alpha`
   (the orbital record r2020, normalised, of the north's term `lgm`), `gmt` (global mean air
-  temperature anomaly [K], `const` 0; a file series instead for a transient)
+  temperature anomaly [K], `const` 0; `method = "series"` from a file instead for a transient)
   and `dTo` (derived, the north's ocean anomaly). The reference and the
   terms of each domain are `[forcing_north]` and `[forcing_south]`.
 - **`atm2obm`** (`[ctrl]`): the box air temperatures from `[obm_forcing]`,
-  `theta_i = theta_i_init + ampl_i × gain × index` for north, tropics and south
+  `theta_i = theta_i_init + ampl_i × gain × f` (f the coefficient `[obm_forcing] coef`, here `gmt`) for north, tropics and south
   (`ampl_i`: `[nautilus] thermal_ampl_*`, Zickfeld et al., 2004) and the vapour
-  fluxes `phin`, `phit` linear in it. It needs no ice-sheet domain; the series
+  fluxes `phin`, `phit` linear in it. It needs no ice-sheet domain; the coefficient
   must be in the registry (checked at init).
 - **Domains**: the uniform terms `regional_north`/`regional_south` on `gmt`
   with `f_ta` the regional amplification (north 1.07, south 0.86): explicit in
   the par file, zero while `gmt` = 0. North: `pd_grl` plus the term `lgm`
-  (picontrol -> lgm) and the term `ocean` (the derived series `dTo`); south:
+  (picontrol -> lgm) and the term `ocean` (the derived coefficient `dTo`); south:
   `pd_ant` only.
-- **`obm2ism`**: per domain, a series derived from the box
-  (`[series_obm_north]`, `[series_obm_south]` of the library: `method =
+- **`obm2ism`**: per domain, a coefficient derived from the box
+  (`[coef_obm_north]`, `[coef_obm_south]` of the library: `method =
   "derived"`, `from = "obm_north"`/`"obm_south"`, the box temperature, or its
   anomaly to the initial value with `anomaly = True`) with a term on `to`
   (`[term_obm_north]`/`[term_obm_south]`: `replace`, `to_ann` = the box
-  temperature; a `uniform` term with the anomaly series for the reference +
-  the box anomaly). `obm_exchange` sets the series and re-applies the ocean
+  temperature; a `uniform` term with the anomaly coefficient for the reference +
+  the box anomaly). `obm_exchange` sets the coefficients and re-applies the ocean
   terms after both climate steps. At the start the box model is initialized
-  (cold start or restart) and the series set before the domains, so their
-  startup climate, shelf and ice state already see the box. It needs `active_obm`; the series replace `dTo`
+  (cold start or restart) and the coefficients set before the domains, so their
+  startup climate, shelf and ice state already see the box. It needs `active_obm`; the coefficients replace `dTo`
   (`forcing_north.terms==lgm,regional_north,obm_north`, see
   `run_tests.sh`).
 - **`ism2obm`**: freshwater flux of each domain into the boxes (`fn`, `fs`),

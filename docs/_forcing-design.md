@@ -5,6 +5,7 @@ nothing implemented. The leading `_` keeps quarto from rendering it. Merges
 and supersedes the open parts of `_snapclim-retirement-plan.md` and
 `_grl-paleo-plan.md`, and takes in the LIS work (`paper-lis-dynamics`, on
 2.4-beta).
+Names since renamed (2026-10-22): series → coef (`[forcing] coefs`, `[coef_<name>]`, `[term] coef`).
 
 Review outcome (2026-10-18): the architecture stands; the core decisions match
 seams already in the code (`climate_out_class` as the only consumer, the

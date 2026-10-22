@@ -15,31 +15,35 @@ annotated git tag. Dates are release (tag) dates.
   via `nc_set_lossless`, e.g. for bit-for-bit comparisons). Needs fesm-utils with
   `nc_set_lossless`.
 - The forcing as terms (`docs/_forcing-terms.md`; docs `yelmox.md`, `climate-snapshots.md`):
-  the climate at the forcing time is a reference snapshot plus terms, each a scalar series
-  times a pattern. `[forcing]`: `reference`, `series`, `terms`, one `var_defs` list for every
-  named group (default `"input/clim_db.nml" "input/forcing_db.nml"`; the par file first).
-  `[series_<name>]` (template `[series]`): a tsgen series, or `method = "derived"`, set by
+  the climate at the forcing time is a reference snapshot plus terms, each a coefficient (a
+  scalar of the forcing time) times a pattern; the fixed numbers of the par file (the gains,
+  beta_p, the lapse rates) are its parameters. `[forcing]`: `reference`, `coefs`, `terms`,
+  one `var_defs` list for every named group (default `"input/clim_db.nml"
+  "input/forcing_db.nml"`; the par file first). `[coef_<name>]` (template `[coef]`): a
+  tsgen coefficient (`method = "series"` a time series from a file, `const`, ramps,
+  controllers), or `method = "derived"`, set by
   the model each update (`from = "air_anomaly"`: `factor` x the mean sea-level air anomaly
   over `region`; `"obm_north"`/`"obm_south"`: a box temperature of the bipolar ocean box
   model, its anomaly with `anomaly = True`); ocean fields only. `[term_<name>]` (template
-  `[term]`): `series` (`""` = 1), `pattern` (`snapshots`: `snap0` -> `snap1`, or `snap1`
+  `[term]`): `coef` (`""` = 1), `pattern` (`snapshots`: `snap0` -> `snap1`, or `snap1`
   alone as a given anomaly or ratio; `uniform`: `f_ta`, `f_to`, `f_so`; `replace`: the
-  ocean field = the series), explicit `fields`; the rule fixed by field (tas, to, so add;
-  pr a ratio, exp(beta_p f_ta f) in a uniform term). Contracts checked at init (series and
-  snapshots exist, fields bound, replace once per field, derived series on the ocean,
+  ocean field = the coefficient), explicit `fields`; the rule fixed by field (tas, to, so add;
+  pr a ratio, exp(beta_p f_ta f) in a uniform term). Contracts checked at init (coefficients and
+  snapshots exist, fields bound, replace once per field, derived coefficients on the ocean,
   esm with its smb refuses atmosphere terms). `libs/climate_terms.f90`; the ocean terms
   idempotent (re-applied by `yelmox_bipolar` after the box model). Output `term_<name>`
-  (2D), `series_<name>` (1D), restart `series_<name>_restart.nc`. `test_indices` covers
-  the derived series. Series are named by their symbol in the equation (`alpha`, `beta`,
-  ...); the record a symbol loads is the setup's, in its par file (`[series_alpha]`:
+  (2D), `coef_<name>` (1D), restart `coef_<name>_restart.nc`. `test_coefs` covers
+  the derived coefficients. Coefficients are named by their symbol in the equation (`alpha`,
+  `beta`, ...); the record a symbol loads is the setup's, in its par file (`[coef_alpha]`:
   `alpha_orbital_r2020` normalised in `yelmox_Greenland.nml` and the bipolar north,
   `alpha_combined_125kyr` in the paleo bases, `alpha_orbital_t2018` normalised in
   `yelmox_Pyrenees.nml`, constant 1 in LIS and North). Terms are named by what they add.
   Library (`input/forcing_db.nml`): `snapshot_picontrol`, `_lgm`, `_b18_base`, `_b18`,
-  `_b20`; `series_alpha` (the default record, combined), `_dTo`, `_ramp`, `_hyst`, `_dT`,
+  `_b20`; `coef_alpha` (the default record, combined), `_dTo`, `_ramp`, `_hyst`, `_dT`,
   `_obm_north`, `_obm_south`; `term_lgm` (lgm - picontrol on alpha), `_b18`, `_b20`,
   `_ocean`, `_ramp`, `_hyst`, `_dT`, `_obm_north`, `_obm_south`. Experiments select with
-  `-p forcing.series==... forcing.terms==...`.
+  `-p forcing.coefs==... forcing.terms==...`. `[ice_bnd] coef` and `[obm_forcing] coef`
+  name the coefficient they take.
 - `[bias]` groups with a time axis: sliced at the forcing time at every climate update
   (`bias_dtas_ann_now` in the 2D output).
 - `input/forcing_db.nml`: one library of the named forcing groups that par files share:
@@ -158,21 +162,31 @@ annotated git tag. Dates are release (tag) dates.
   so `var_defs` groups can be remapped online (`remap`, `grid_src`).
 
 ### Changed
+- Coefficient vocabulary: what the forcing-as-terms work on dev first called a series is a
+  coefficient. `[forcing] series` -> `coefs`, `[series_<name>]` -> `[coef_<name>]`
+  (template `[series]` -> `[coef]`; the keys inside and tsgen's `method = "series"` kept),
+  `[term] series` -> `coef`, `[ice_bnd] index` and `[obm_forcing] index` -> `coef`. The
+  old keys are errors: `scripts/check_par_nml.py` and `nml_validate` report `series` (and
+  `index`) as unknown. The 1D output variables are `coef_<name>` (`_df_dt`, `_dv_dt`); the
+  restart file is `coef_<name>_restart.nc`, and an older bundle's
+  `series_<name>_restart.nc` is still read, with a note. Fortran: `indices_*` ->
+  `coefs_*`; `tests/test_indices.f90` -> `tests/test_coefs.f90`. Scripts, the forcing
+  builder and the docs follow.
 - Forcing groups renamed and merged into the terms: `[indices] names`/`var_defs` ->
-  `[forcing] series`/`var_defs`; `[idx_<name>]` -> `[series_<name>]`; `[snap]` ->
+  `[forcing] coefs`/`var_defs`; `[idx_<name>]` -> `[coef_<name>]`; `[snap]` ->
   `[snapshots]` (`lapse`, `f_p`, `grid_global`, `combine`, `fields`; `ref_name` ->
   `[forcing] reference`; `snapshots`, `axes` dropped: the snapshots of a run are the
   reference and the `snap0`/`snap1` of its terms); `[snap_<name>]` -> `[snapshot_<name>]`;
   `[snap_axis_<name>]` (`lo`, `hi`, `index`) -> `[term_<name>]` (`snap0`, `snap1`,
-  `series`, `fields`); `[snap_field_<name>]` dropped (the rule is fixed by field);
+  `coef`, `fields`); `[snap_field_<name>]` dropped (the rule is fixed by field);
   `[anom]` -> a `uniform` term (rembo: the uniform `tas` terms are its summer anomaly, its
   ocean anomaly `1.3 f_ta f_to f` is gone, a term on `to` instead); `[ocn_fraction]` ->
-  the derived series `dTo` + `term_ocean`; `[ocn_obm]` -> the derived series
+  the derived coefficient `dTo` + `term_ocean`; `[ocn_obm]` -> the derived coefficients
   `obm_north`/`obm_south` + the `replace` terms; `[taper]`, `[bias]`, `[ice_bnd]`
-  `var_defs` removed (`[forcing] var_defs`); `[ice_bnd] index` is a series. Output:
-  `idx_<name>` -> `series_<name>`, `axis_<name>` -> `term_<name>`, `ocn_fraction_dto`,
-  `ocn_obm_*`, rembo `dT_ocn` gone; restart files `series_<name>_restart.nc`. In
-  `yelmox_bipolar`, `[forcing]` holds the series, `[forcing_north]`/`[forcing_south]` the
+  `var_defs` removed (`[forcing] var_defs`); `[ice_bnd] index` -> `coef`, a coefficient;
+  `[obm_forcing] index` -> `coef`. Output: `idx_<name>` -> `coef_<name>`, `axis_<name>` ->
+  `term_<name>`, `ocn_fraction_dto`, `ocn_obm_*`, rembo `dT_ocn` gone; restart files
+  `coef_<name>_restart.nc`. In `yelmox_bipolar`, `[forcing]` holds the coefficients, `[forcing_north]`/`[forcing_south]` the
   reference and terms (`snapshot_pd_grl`, `snapshot_pd_ant`), `[snapshots_north]`/`_south`
   the rules. `scripts/check_par_nml.py`, the bases, the bipolar par file and every script
   converted; `.runme/info.json` unchanged. Breaking for external par files (convert with

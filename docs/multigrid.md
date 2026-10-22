@@ -56,9 +56,9 @@ yelmox/libs/
   kryos_startup.f90     cold start, restart bundles (domain_startup, ...)
   kryos_output.f90      per-module 2D/1D output, CMIP output
   kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
-  kryos_forcing.f90     driver-owned series registry (tsgen, derived)
+  kryos_forcing.f90     driver-owned coefficient registry (tsgen, derived)
   yelmox_climate.f90    climate backends behind one interface (climate_out)
-  climate_terms.f90     the terms of the forcing (series x pattern) on the climate
+  climate_terms.f90     the terms of the forcing (coefficient x pattern) on the climate
   climate_mods.f90      climate transforms after the terms (taper, bias)
         │
         ▼
@@ -265,7 +265,7 @@ reallocation cost is negligible against the physics.
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
-- `step_climate` — climate on `grid_clim` from the backend, with the series registry and the terms of the forcing, on the `dt_clim` cadence.
+- `step_climate` — climate on `grid_clim` from the backend, with the coefficient registry and the terms of the forcing, on the `dt_clim` cadence.
 - `step_surface` — surface mass balance on `grid_surface` (`surface_method`: chion, smbpal, smb_simple, or the climate's own, `climate`).
 
 The hub geometry reaches `grid_clim` and `grid_surface` averaged over the target
@@ -310,7 +310,7 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
   give `cal` / `time_ref` (calendar years, e.g. ESM runs). `domain_init` takes
   the same group name (`timeline_group`) and reads the values the domain needs
   (`tstep_method`, `dtt`) itself.
-- **`domain_startup(dom, ts, bsl, restart, idx [, restore_bsl, tsf])`**
+- **`domain_startup(dom, ts, bsl, restart, coefs [, restore_bsl, tsf])`**
   (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
   restore of the domain bundle `restart` + hub rebuild, continuing the
   restored state: only the climate (and a stateless `smb_simple` surface) is
@@ -318,12 +318,12 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
   `[ctrl] restart`. `yelmox` restores the shared bsl from the same bundle;
   `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
   each domain its subfolder of the bundle and `restore_bsl=.false.`.
-- **`domain_init_ice(dom, ts, idx)`** — the cold-start ice state after
+- **`domain_init_ice(dom, ts, coefs)`** — the cold-start ice state after
   `yelmo_init_state` (`[sim]` `init_kill_shelves`, `init_marine_H`,
   `init_method`, `init_time_thrm`; see [yelmox](yelmox.md#configuration)).
-- **`run_restart_write(dom, bsl, time, idx [, fldr])`** — the single-domain
+- **`run_restart_write(dom, bsl, time, coefs [, fldr])`** — the single-domain
   restart bundle (domain sub-models + `bsl_restart.nc` + one
-  `series_<name>_restart.nc` per tsgen series, one auto-named folder).
+  `coef_<name>_restart.nc` per tsgen coefficient, one auto-named folder).
 - **`cadence_due(time, dt)`** (`kryos`) — the cadence predicate for `dt_clim`,
   `dt_isos` and `dt_cmip`; `dt <= 0` disables a cadence. Output and restart bundles follow
   fesm-utils `timeout` schedules (`[tm_1D]`, `[tm_2D]`, `[tm_2Dsm]`, `[tm_rst]`);
