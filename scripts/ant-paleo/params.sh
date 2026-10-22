@@ -1,6 +1,6 @@
 # Antarctic paleo setup on the base yelmox/yelmox_Antarctica.nml, as runme -p
 # arrays. Sourced by the run_*.sh scripts of this folder and by
-# scripts/docs-figures/run.sh. The named groups (series_*, term_*, snapshot_*)
+# scripts/docs-figures/run.sh. The named groups (coef_*, term_*, snapshot_*)
 # come from input/forcing_db.nml (docs/_forcing-terms.md).
 
 # 32 km physics and data of the spin-up and the transient.
@@ -8,7 +8,7 @@ antpal_physics=(
     "domain.grid_hub=ANT-32KM"          # single-grid setup: the hub on the Yelmo grid
     "domain.grid_shelf=ANT-32KM"        # marine shelf on the Yelmo grid
     "ctrl.dtt=5.0"                      # [yr] main loop timestep
-    "forcing.series==dTo"               # dTo: the mean sea-level air anomaly x series_dTo.factor (derived)
+    "forcing.coefs==dTo"                # dTo: the mean sea-level air anomaly x coef_dTo.factor (derived)
     "forcing.terms==ocean"              # the ocean profiles plus dTo
     # surface: chion with the ITM (group [itm], shared with smbpal)
     "chion.model=itm"                   # snowpack model (parameters: [itm], the chion default nml_itm)
@@ -60,7 +60,7 @@ antpal_physics=(
 # the glacial index input/alpha_combined_125kyr_interp.dat; Antarctic summer
 # (DJF) as the second temperature of the PMIP3 snapshots.
 antpal_lgp=(
-    "forcing.series==alpha,dTo"         # alpha: the glacial index ([series_alpha] of the base par file); dTo as in antpal_physics
+    "forcing.coefs==alpha,dTo"          # alpha: the glacial index ([coef_alpha] of the base par file); dTo as in antpal_physics
     "forcing.terms==lgm,ocean"          # lgm: lgm - picontrol (PMIP3) weighted by alpha, on tas and pr
     "snapshot_picontrol.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"   # summer: DJF
     "snapshot_lgm.tas==pmip3_mean_tas_ann,pmip3_mean_tas_djf"         # summer: DJF

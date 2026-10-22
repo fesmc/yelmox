@@ -3,7 +3,7 @@
 # Greenland paleo transient, last glacial period (-130 kyr to 0, GRL-PAL,
 # 16 km), restarting from the spin-up bundle at 20 kyr (run_spinup.sh pd 0).
 # Climate follows the glacial index input/alpha_combined_125kyr_interp.dat
-# (index "a"); forcing grlpal_lgp of params.sh. Base
+# (coefficient alpha); forcing grlpal_lgp of params.sh. Base
 # yelmox/yelmox_GreenlandPaleo.nml. Run from the yelmox root.
 
 source "$(dirname "$0")/params.sh"

@@ -14,7 +14,7 @@
 #   --at   forcing times to show minus the reference
 #   --abs  show the reference climate itself (no --at)
 #   --ref-run RUN0  take the reference from another run (e.g. the same par file
-#          with the index at present day)
+#          with the coefficient at present day)
 
 using NCDatasets
 using CairoMakie
