@@ -10,18 +10,18 @@ module obm_coupling
     ! without kind conversion.
     !
     ! The three exchanges:
-    !   atm2obm  : global mean air temperature anomaly ([obm_forcing], an index
-    !              of the driver's registry) -> obm box air temperatures/vapor
+    !   atm2obm  : global mean air temperature anomaly ([obm_forcing], a
+    !              coefficient of the driver's registry) -> obm box air temperatures/vapor
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
     !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
-    !              to_ann (marine-shelf forcing), through the series derived
-    !              from the boxes (obm_north, obm_south) and the domains' ocean
+    !              to_ann (marine-shelf forcing), through the coefficients
+    !              derived from the boxes (obm_north, obm_south) and the domains' ocean
     !              terms on them (climate_terms), applied here
     !
     ! The module owns its whole configuration (obm_coupling_ctl: exchange
     ! switches, the atmospheric forcing, freshwater-flux masks, nautilus
     ! hysteresis forcing), loaded by obm_ctl_load from [ctrl] and
-    ! [obm_forcing]. obm2ism is on when a series is derived from a box.
+    ! [obm_forcing]. obm2ism is on when a coefficient is derived from a box.
     ! The driver calls obm_ctl_load, then coupling_obm2ism once the box model
     ! is initialized (cold start or restart) and before the domains, so their
     ! startup climate sees the box, then obm_coupling_init once the domains are
@@ -33,8 +33,8 @@ module obm_coupling
     use precision,     only : dp
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
-    use kryos_forcing, only : indices_class, indices_has, indices_value, indices_uses_derived, &
-                              indices_set_obm
+    use kryos_forcing, only : coefs_class, coefs_has, coefs_value, coefs_uses_derived, &
+                              coefs_set_obm
     use yelmox_climate, only : climate_apply_ocean
     use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
@@ -45,14 +45,14 @@ module obm_coupling
     private
 
     type obm_coupling_ctl
-        ! Which exchanges are active ([ctrl]; obm2ism: a series derived from a box).
+        ! Which exchanges are active ([ctrl]; obm2ism: a coefficient derived from a box).
         logical :: active_obm = .false.
         logical :: ism2obm    = .false.
         logical :: atm2obm    = .false.
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus"/"stommel")
-        ! atm2obm: the global mean air temperature anomaly dT_glob = gain * index
-        ! ([obm_forcing]).
-        character(len=64)  :: forcing_index = ""
+        ! atm2obm: the global mean air temperature anomaly dT_glob = gain * coef
+        ! ([obm_forcing], a coefficient).
+        character(len=64)  :: forcing_coef  = ""
         real(wp)           :: forcing_gain  = 1.0_wp
         ! ism2obm: freshwater-flux definition + per-hemisphere hydrographic masks.
         logical            :: couple_fwf_north = .false.
@@ -91,7 +91,7 @@ contains
 
         if (oc%atm2obm) then
             call nml_validate(path_par, def_file, "obm_forcing")
-            call nml_read(path_par, "obm_forcing", "index", oc%forcing_index, defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef",  oc%forcing_coef, defaults_file=def_file)
             call nml_read(path_par, "obm_forcing", "gain",  oc%forcing_gain,  defaults_file=def_file)
         end if
 
@@ -114,33 +114,33 @@ contains
         end if
     end subroutine obm_ctl_load
 
-    subroutine obm_coupling_init(oc, idx, dom_north, dom_south, active_north, active_south)
+    subroutine obm_coupling_init(oc, coefs, dom_north, dom_south, active_north, active_south)
         ! Check the exchanges against what the run holds, then load the
         ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
         ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
-        ! the index of [obm_forcing] in the registry; ism2obm an ice-sheet
+        ! the coefficient of [obm_forcing] in the registry; ism2obm an ice-sheet
         ! domain. Only touches a domain when it is active, so an inactive domain
-        ! may be uninitialized. Call after the indices and the domains.
+        ! may be uninitialized. Call after the coefficients and the domains.
         type(obm_coupling_ctl), intent(inout) :: oc
-        type(indices_class),    intent(in)    :: idx
+        type(coefs_class),      intent(in)    :: coefs
         type(kryos_domain),     intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
 
         logical :: obm2ism
 
-        ! obm2ism: a series derived from a box (obm_north, obm_south), used by
+        ! obm2ism: a coefficient derived from a box (obm_north, obm_south), used by
         ! the ocean terms of a domain.
-        obm2ism = indices_uses_derived(idx, "obm_north") .or. indices_uses_derived(idx, "obm_south")
+        obm2ism = coefs_uses_derived(coefs, "obm_north") .or. coefs_uses_derived(coefs, "obm_south")
 
         if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%ism2obm .or. obm2ism)) then
-            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and the series derived &
+            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and the coefficients derived &
                        &from the boxes (obm_north, obm_south) need the ocean box model &
                        &([ctrl] active_obm = True)."
             error stop 1
         end if
-        if (oc%atm2obm .and. .not. indices_has(idx, oc%forcing_index)) then
-            write(*,*) "obm_coupling_init:: error: [obm_forcing] index = '"// &
-                       trim(oc%forcing_index)//"' is not in [forcing] series (needed by atm2obm)."
+        if (oc%atm2obm .and. .not. coefs_has(coefs, oc%forcing_coef)) then
+            write(*,*) "obm_coupling_init:: error: [obm_forcing] coef = '"// &
+                       trim(oc%forcing_coef)//"' is not in [forcing] coefs (needed by atm2obm)."
             error stop 1
         end if
         if (oc%ism2obm .and. .not. (active_north .or. active_south)) then
@@ -149,7 +149,7 @@ contains
         end if
 
         if (oc%atm2obm) &
-            write(*,*) "obm_coupling_init:: atm2obm from index "//trim(oc%forcing_index)// &
+            write(*,*) "obm_coupling_init:: atm2obm from coefficient "//trim(oc%forcing_coef)// &
                        ", gain =", oc%forcing_gain
 
         if (.not. oc%ism2obm) return
@@ -170,23 +170,23 @@ contains
         end if
     end subroutine obm_coupling_init
 
-    subroutine obm_exchange(oc, obm, idx, dom_north, dom_south, active_north, active_south, &
+    subroutine obm_exchange(oc, obm, coefs, dom_north, dom_south, active_north, active_south, &
                             time, time_init, dtt)
         ! One coupling pass, in the yelmox_bipolar order: atmosphere -> obm,
         ! ice-sheet freshwater flux -> obm, hysteresis forcing (nautilus), then
         ! obm ocean temperature -> ice sheets (read by the marine-shelf step).
         ! Call after the domains' dynamics/climate have advanced and before
-        ! their marine-shelf steps. idx: the driver's registry, advanced to
+        ! their marine-shelf steps. coefs: the driver's registry, advanced to
         ! this step.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(obm_class),        intent(inout) :: obm
-        type(indices_class),    intent(inout) :: idx
+        type(coefs_class),      intent(inout) :: coefs
         type(kryos_domain),     intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
         real(dp),               intent(in)    :: time, time_init, dtt
 
         if (oc%atm2obm) &
-            call coupling_atm2obm(obm, oc%forcing_gain*indices_value(idx, oc%forcing_index))
+            call coupling_atm2obm(obm, oc%forcing_gain*coefs_value(coefs, oc%forcing_coef))
 
         if (oc%ism2obm) then
             if (oc%couple_fwf_north .and. active_north) &
@@ -200,11 +200,11 @@ contains
                     oc%hyster_positive_branch_time, oc%hyster_rate, &
                     oc%hyster_forcing, oc%hyster_forcing_method)
 
-        ! obm2ism: the series derived from the boxes, then the ocean terms of
+        ! obm2ism: the coefficients derived from the boxes, then the ocean terms of
         ! each domain re-applied (idempotent; a no-op without ocean terms).
-        call coupling_obm2ism(obm, oc%obm_name, idx)
-        if (active_north) call climate_apply_ocean(dom_north%cl, dom_north%clim, idx)
-        if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, idx)
+        call coupling_obm2ism(obm, oc%obm_name, coefs)
+        if (active_north) call climate_apply_ocean(dom_north%cl, dom_north%clim, coefs)
+        if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, coefs)
     end subroutine obm_exchange
 
     subroutine coupling_atm2obm(obm, dT_glob)
@@ -256,20 +256,20 @@ contains
         end select
     end subroutine coupling_ism2obm
 
-    subroutine coupling_obm2ism(obm, obm_name, idx)
+    subroutine coupling_obm2ism(obm, obm_name, coefs)
         ! OBM -> ice sheets: the box-model ocean temperatures of the
         ! hemispheres (northern box tn, southern box ts) and their initial
-        ! values, in K, into the series derived from them (obm_north,
+        ! values, in K, into the coefficients derived from them (obm_north,
         ! obm_south: the temperature, or its anomaly), which the ocean terms of
         ! the domains read (climate_apply_ocean) to set the ocean temperature
         ! that marine_shelf then reads as its forcing.
         type(obm_class),     intent(in)    :: obm
         character(len=*),    intent(in)    :: obm_name
-        type(indices_class), intent(inout) :: idx
+        type(coefs_class),   intent(inout) :: coefs
 
-        call indices_set_obm(idx, "obm_north", obm_temperature_kelvin(obm%tn, obm_name), &
+        call coefs_set_obm(coefs, "obm_north", obm_temperature_kelvin(obm%tn, obm_name), &
                                                obm_temperature_kelvin(obm%par%tn_init, obm_name))
-        call indices_set_obm(idx, "obm_south", obm_temperature_kelvin(obm%ts, obm_name), &
+        call coefs_set_obm(coefs, "obm_south", obm_temperature_kelvin(obm%ts, obm_name), &
                                                obm_temperature_kelvin(obm%par%ts_init, obm_name))
     end subroutine coupling_obm2ism
 

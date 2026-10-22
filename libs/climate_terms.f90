@@ -1,13 +1,14 @@
 module climate_terms
     ! The terms of the climate forcing (docs/_forcing-terms.md): each term is
-    ! one series of the driver's registry (kryos_forcing) times one pattern,
+    ! one coefficient of the driver's registry (kryos_forcing) times one pattern,
     ! added to the reference climate on an explicit list of fields:
     !   snapshots -- the difference of two snapshots, snap1 - snap0 (or snap1
     !                itself without snap0), applied by the snapshot backend
     !                at sea level (snapshots.f90 reads these terms);
     !   uniform   -- a constant pattern: tas + f_ta*f (and pr * exp(beta_p*
-    !                f_ta*f)), to + f_to*f, so + f_so*f, applied here;
-    !   replace   -- the field takes the value of the series at every depth
+    !                f_ta*f)), to + f_to*f, so + f_so*f, applied here (f is
+    !                the value of the coefficient, f_ta/f_to/f_so the gains);
+    !   replace   -- the field takes the value of the coefficient at every depth
     !                in place of the reference (to, so); the other terms on
     !                the field add to it.
     ! The terms are the list [forcing<sfx>] terms, each a group [term_<name>]
@@ -17,11 +18,11 @@ module climate_terms
     !
     ! Order within a climate update (yelmox_climate): the backend (with the
     ! snapshot terms) -> the uniform terms on the atmosphere (terms_apply_atm)
-    ! -> the derived series (indices_set by the climate, from the composed
+    ! -> the derived coefficients (coefs_set by the climate, from the composed
     ! atmosphere) -> the ocean terms (terms_apply_ocn) -> taper -> bias. The
     ! ocean application is idempotent: it rebuilds the ocean from a copy of
     ! the backend's (terms_save_ocean, after the backend), so a driver that
-    ! sets a derived series later in the step (the bipolar bridge, the OBM
+    ! sets a derived coefficient later in the step (the bipolar bridge, the OBM
     ! box temperatures) re-applies it.
     !
     ! Contracts, checked at init (terms_check) against what the backend
@@ -33,7 +34,7 @@ module climate_terms
     !     surface mass balance (esm with its smb), which a post-hoc anomaly
     !     cannot reach; rembo takes the uniform tas terms as its input
     !     (dT_sum, terms_uniform_dT) and refuses pr;
-    !   - a derived series is computed after the atmosphere, so its term may
+    !   - a derived coefficient is computed after the atmosphere, so its term may
     !     touch to and so only;
     !   - a replace term: to or so only, one per field, ocean profiles (not
     !     the esm ocean at the shelf base);
@@ -44,7 +45,7 @@ module climate_terms
     use nml,           only : nml_read, nml_validate
     use ncio,          only : nc_write
     use climate_out,   only : climate_out_class
-    use kryos_forcing, only : indices_class, indices_value, indices_has, indices_is_derived
+    use kryos_forcing, only : coefs_class, coefs_value, coefs_has, coefs_is_derived
     use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
 
     implicit none
@@ -65,21 +66,21 @@ module climate_terms
         logical :: has_ref_atm   = .true.        ! a reference atmosphere (ref%tas, ...)
     end type climate_caps_class
 
-    ! One term: series x pattern on a list of fields.
+    ! One term: coefficient x pattern on a list of fields.
     type term_class
         character(len=64) :: name    = ""
         character(len=64) :: group   = ""
-        character(len=64) :: series  = ""          ! "" = the constant 1
+        character(len=64) :: coef    = ""          ! the coefficient; "" = the constant 1
         character(len=16) :: pattern = "snapshots" ! snapshots | uniform | replace
-        character(len=64) :: snap0   = ""          ! snapshots: the snapshot at index 0 ("" = none)
-        character(len=64) :: snap1   = ""          ! snapshots: the snapshot at index 1
+        character(len=64) :: snap0   = ""          ! snapshots: the snapshot at coefficient 0 ("" = none)
+        character(len=64) :: snap1   = ""          ! snapshots: the snapshot at coefficient 1
         character(len=8)  :: fields(FLD_MAX) = ""
         logical  :: on_tas = .false., on_pr = .false., on_to = .false., on_so = .false.
         real(wp) :: f_ta = 1.0_wp                  ! [K]   uniform: tas + f_ta*f (pr * exp(beta_p*f_ta*f))
         real(wp) :: f_to = 1.0_wp                  ! [K]   uniform: to + f_to*f
         real(wp) :: f_so = 1.0_wp                  ! [psu] uniform: so + f_so*f
-        logical  :: derived = .false.              ! the series is derived (set by the model)
-        real(wp) :: f = 0.0_wp                     ! the series value at the last application
+        logical  :: derived = .false.              ! the coefficient is derived (set by the model)
+        real(wp) :: f = 0.0_wp                     ! the coefficient value at the last application
     end type term_class
 
     type terms_class
@@ -94,18 +95,18 @@ module climate_terms
 
     public :: climate_caps_class, term_class, terms_class
     public :: terms_init, terms_check, terms_save_ocean, terms_apply_atm, terms_apply_ocn
-    public :: terms_uniform_dT, terms_has_pattern, terms_write_step, series_label
+    public :: terms_uniform_dT, terms_has_pattern, terms_write_step, coef_label
 
 contains
 
-    subroutine terms_init(terms, filename, sfx, var_defs, idx)
-        ! Read [forcing<sfx>] terms and each [term_<name>]; resolve the series
+    subroutine terms_init(terms, filename, sfx, var_defs, coefs)
+        ! Read [forcing<sfx>] terms and each [term_<name>]; resolve the coefficients
         ! against the registry; the backend-dependent contracts follow in
         ! terms_check once the backend is initialised.
         type(terms_class),   intent(inout) :: terms
         character(len=*),    intent(in)    :: filename, sfx
         character(len=*),    intent(in)    :: var_defs(:)
-        type(indices_class), intent(in)    :: idx
+        type(coefs_class),   intent(in)    :: coefs
 
         character(len=64)  :: names(TERMS_MAX)
         character(len=512) :: gfile
@@ -127,7 +128,7 @@ contains
             t%group = "term_"//trim(t%name)
             gfile = var_defs_find(var_defs, filename, trim(t%group), "&"//trim(terms%group)//" terms")
             call nml_validate(trim(gfile), def_file, trim(t%group), defaults_group="term")
-            call nml_read(trim(gfile), trim(t%group), "series",  t%series,  init=.true., &
+            call nml_read(trim(gfile), trim(t%group), "coef",    t%coef,    init=.true., &
                           defaults_file=def_file, defaults_group="term")
             call nml_read(trim(gfile), trim(t%group), "pattern", t%pattern, init=.true., &
                           defaults_file=def_file, defaults_group="term")
@@ -164,10 +165,10 @@ contains
                 end select
             end do
 
-            if (len_trim(t%series) > 0) then
-                if (.not. indices_has(idx, t%series)) &
-                    call term_error(t, "series = '"//trim(t%series)//"' is not in [forcing] series.")
-                t%derived = indices_is_derived(idx, t%series)
+            if (len_trim(t%coef) > 0) then
+                if (.not. coefs_has(coefs, t%coef)) &
+                    call term_error(t, "coef = '"//trim(t%coef)//"' is not in [forcing] coefs.")
+                t%derived = coefs_is_derived(coefs, t%coef)
             end if
 
             if (trim(t%pattern) == "snapshots") then
@@ -179,13 +180,13 @@ contains
             if (trim(t%pattern) == "replace" .and. (t%on_tas .or. t%on_pr)) &
                 call term_error(t, "pattern replace is for the ocean (to, so) only.")
             if (t%derived .and. (t%on_tas .or. t%on_pr)) &
-                call term_error(t, "its series "//trim(t%series)//" is derived (computed after &
+                call term_error(t, "its coefficient "//trim(t%coef)//" is derived (computed after &
                                    &the atmosphere), so it can only drive to or so.")
-            if (len_trim(t%series) == 0 .and. trim(t%pattern) /= "snapshots") &
-                call term_error(t, "a "//trim(t%pattern)//" term needs a series.")
+            if (len_trim(t%coef) == 0 .and. trim(t%pattern) /= "snapshots") &
+                call term_error(t, "a "//trim(t%pattern)//" term needs a coefficient.")
 
             write(*,*) "terms_init:: "//trim(t%group)//": "//trim(t%pattern)// &
-                       ", series "//trim(series_label(t%series))//", fields "//trim(fields_list(t))
+                       ", coefficient "//trim(coef_label(t%coef))//", fields "//trim(fields_list(t))
             end associate
         end do
 
@@ -249,12 +250,12 @@ contains
 
     ! ===== application ======================================================
 
-    subroutine terms_apply_atm(terms, out, idx)
+    subroutine terms_apply_atm(terms, out, coefs)
         ! The uniform terms on the atmosphere: tas, ta_ann, tsl_ann + f_ta*f;
         ! pr, pr_ann * exp(beta_p*f_ta*f) (beta_p: the backend's sensitivity).
         type(terms_class),       intent(inout) :: terms
         type(climate_out_class), intent(inout) :: out
-        type(indices_class),     intent(in)    :: idx
+        type(coefs_class),       intent(in)    :: coefs
 
         real(wp) :: f, dTa
         integer  :: k, m
@@ -263,7 +264,7 @@ contains
             associate(t => terms%term(k), now => out%now)
             if (trim(t%pattern) /= "uniform") cycle
             if (.not. (t%on_tas .or. t%on_pr)) cycle
-            f   = indices_value(idx, t%series)
+            f   = coefs_value(coefs, t%coef)
             t%f = f
             dTa = t%f_ta*f
             if (t%on_tas) then
@@ -301,14 +302,14 @@ contains
 
     end subroutine terms_save_ocean
 
-    subroutine terms_apply_ocn(terms, out, idx)
+    subroutine terms_apply_ocn(terms, out, coefs)
         ! The ocean terms on the saved base: a replace term sets the field to
-        ! its series at every depth, the uniform ones add f_to*f / f_so*f; the
+        ! its coefficient at every depth, the uniform ones add f_to*f / f_so*f; the
         ! profiles to_ann/so_ann, or at the shelf base T_shlf/S_shlf and
         ! dT_shlf/dS_shlf. Idempotent (see the header).
         type(terms_class),       intent(inout) :: terms
         type(climate_out_class), intent(inout) :: out
-        type(indices_class),     intent(in)    :: idx
+        type(coefs_class),       intent(in)    :: coefs
 
         real(wp) :: f
         logical  :: any_ocn
@@ -346,7 +347,7 @@ contains
         do k = 1, terms%n
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "replace") cycle
-            f   = indices_value(idx, t%series)
+            f   = coefs_value(coefs, t%coef)
             t%f = f
             if (t%on_to) call need(allocated(out%now%to_ann), t, "to")
             if (t%on_so) call need(allocated(out%now%so_ann), t, "so")
@@ -360,7 +361,7 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "uniform") cycle
             if (.not. (t%on_to .or. t%on_so)) cycle
-            f   = indices_value(idx, t%series)
+            f   = coefs_value(coefs, t%coef)
             t%f = f
             if (out%has_ocn_shelf) then
                 if (t%on_to) then
@@ -392,12 +393,12 @@ contains
 
     end subroutine terms_apply_ocn
 
-    real(wp) function terms_uniform_dT(terms, idx, field) result(dT)
-        ! The sum of gain*series over the uniform terms on `field` (tas: f_ta,
+    real(wp) function terms_uniform_dT(terms, coefs, field) result(dT)
+        ! The sum of gain*coefficient over the uniform terms on `field` (tas: f_ta,
         ! to: f_to, so: f_so): the anomaly a backend takes as its input (rembo
         ! dT_sum from tas).
         type(terms_class),   intent(in) :: terms
-        type(indices_class), intent(in) :: idx
+        type(coefs_class),   intent(in) :: coefs
         character(len=*),    intent(in) :: field
         integer :: k
         dT = 0.0_wp
@@ -405,9 +406,9 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "uniform") cycle
             select case(trim(field))
-                case("tas"); if (t%on_tas) dT = dT + t%f_ta*indices_value(idx, t%series)
-                case("to");  if (t%on_to)  dT = dT + t%f_to*indices_value(idx, t%series)
-                case("so");  if (t%on_so)  dT = dT + t%f_so*indices_value(idx, t%series)
+                case("tas"); if (t%on_tas) dT = dT + t%f_ta*coefs_value(coefs, t%coef)
+                case("to");  if (t%on_to)  dT = dT + t%f_to*coefs_value(coefs, t%coef)
+                case("so");  if (t%on_so)  dT = dT + t%f_so*coefs_value(coefs, t%coef)
             end select
             end associate
         end do
@@ -415,7 +416,7 @@ contains
 
     subroutine terms_write_step(terms, filename, ncid, n)
         ! Record n of the uniform and replace terms into an open 2D output
-        ! file: the series value applied, term_<name> (the snapshot terms are
+        ! file: the coefficient value applied, term_<name> (the snapshot terms are
         ! written by the backend).
         type(terms_class), intent(in) :: terms
         character(len=*),  intent(in) :: filename
@@ -426,7 +427,7 @@ contains
             if (trim(t%pattern) == "snapshots") cycle
             call nc_write(filename, "term_"//trim(t%name), t%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Series "//trim(t%series)//" of the "//trim(t%pattern)// &
+                          long_name="Coefficient "//trim(t%coef)//" of the "//trim(t%pattern)// &
                                     " term "//trim(t%name))
             end associate
         end do
@@ -445,13 +446,13 @@ contains
         s = adjustl(s)
     end function fields_list
 
-    function series_label(name) result(s)
-        ! The series name, or "1" for none.
+    function coef_label(name) result(s)
+        ! The coefficient name, or "1" for none.
         character(len=*), intent(in) :: name
         character(len=64) :: s
         s = "1"
         if (len_trim(name) > 0) s = name
-    end function series_label
+    end function coef_label
 
     subroutine term_error(t, msg)
         type(term_class), intent(in) :: t

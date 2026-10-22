@@ -17,8 +17,8 @@ script reproduces that check offline, with more:
   3. var_defs: a snapshot (or an active [bias], [taper] or [ice_bnd]) binds a
      varslice group that is in neither the par file nor the [forcing] var_defs
      files (the par file is searched first); such groups in the par file are
-     not reported by --dead. The series, term and snapshot groups
-     [series_<name>], [term_<name>], [snapshot_<name>] are looked up the same
+     not reported by --dead. The coefficient, term and snapshot groups
+     [coef_<name>], [term_<name>], [snapshot_<name>] are looked up the same
      way: a listed group found in neither is an error, one found in a var_defs
      file is checked there.
   4. dead (only with --dead): keys in the other groups (ctrl, smbpal, isos,
@@ -37,17 +37,17 @@ files (see below).
 
 The yelmox forcing groups, with <sfx> the same domain suffixes, and their
 group in yelmox_defaults.nml:
-  [forcing<sfx>] -> forcing, [series_<name>] -> series, [term_<name>] -> term,
+  [forcing<sfx>] -> forcing, [coef_<name>] -> coef, [term_<name>] -> term,
   [snapshots<sfx>] -> snapshots, [snapshot_<name>] -> snapshot, [obm_forcing] -> obm_forcing,
   [taper<sfx>], [bias<sfx>], [orbit<sfx>] -> taper, bias, orbit, [ice_bnd<sfx>] -> ice_bnd;
-  the series of [forcing] series, the terms of [forcing<sfx>] terms, the
+  the coefficients of [forcing] coefs, the terms of [forcing<sfx>] terms, the
   reference and the snap0/snap1 of the snapshot terms (with [comps<sfx>]
   climate = snapshots or rembo); unset lists from the defaults.
 
 A library file has no control block and holds only named groups
-(snapshot_*, series_*, term_*, elsa_*), shared by par files through the
+(snapshot_*, coef_*, term_*, elsa_*), shared by par files through the
 [forcing] var_defs list. Each group is checked against its template by prefix:
-snapshot_* -> snapshot, series_* -> series, term_* -> term; elsa_*
+snapshot_* -> snapshot, coef_* -> coef, term_* -> term; elsa_*
 groups (read by elsa) are skipped. Duplicates are reported as in item 2.
 
 Usage:
@@ -76,7 +76,7 @@ SKIP_DIRS = {".git", ".claude", "output", "logs", "tmp"}
 
 # Group prefixes of a library file -> template group of yelmox_defaults.nml
 # (None: not checked here). First match wins.
-LIBRARY_PREFIX = [("series_", "series"), ("term_", "term"), ("snapshot_", "snapshot"),
+LIBRARY_PREFIX = [("coef_", "coef"), ("term_", "term"), ("snapshot_", "snapshot"),
                   ("elsa_", None)]
 
 # nml_* key of the control block -> group of the defaults file it maps to.
@@ -184,7 +184,7 @@ def domain_suffixes(groups):
 
 def yelmox_groups(groups, ydefaults):
     """User group -> template group of yelmox_defaults.nml for the forcing
-    groups of a file ([forcing<sfx>], the series and terms they list, the
+    groups of a file ([forcing<sfx>], the coefficients and terms they list, the
     snapshot backend [snapshots<sfx>], the transforms), and the named groups
     looked up through the one var_defs list ([forcing] var_defs) -> "forcing".
     The snapshot groups follow once the terms are resolved
@@ -197,9 +197,9 @@ def yelmox_groups(groups, ydefaults):
         if tmpl:
             out[g] = tmpl
     forcing = groups.get("forcing", {})
-    for n in listval(forcing.get("series", ydefaults["forcing"].get("series", ""))):
-        out.setdefault("series_" + n, "series")
-        owner["series_" + n] = "forcing"
+    for n in listval(forcing.get("coefs", ydefaults["forcing"].get("coefs", ""))):
+        out.setdefault("coef_" + n, "coef")
+        owner["coef_" + n] = "forcing"
     for sfx in domain_suffixes(groups):
         fg = "forcing" + sfx
         if fg in groups:

@@ -7,7 +7,7 @@
 # forcings:
 #   - ctrl  : present-day climate held fixed (dT = 0);
 #   - warm  : uniform +2 K atmosphere and +2 K ocean anomaly (dT = +2, f_to = 1).
-# The anomaly is the uniform term_dT driven by the constant series dT ([series_dT] of
+# The anomaly is the uniform term_dT driven by the constant coefficient dT ([coef_dT] of
 # input/forcing_db.nml, copied into the staged par file by runme on -p):
 # dTa = dT, dTo = f_to*dT.
 #
@@ -66,8 +66,8 @@ run_fwd() {
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \
            tm_2D.dt=100 ytopo.gz_Hg1=100 \
-           forcing.series=dT forcing.terms=dT term_dT.fields==tas,pr,to \
-           term_dT.f_to="$f_to" series_dT.f_min="$dT" series_dT.f_max="$dT"
+           forcing.coefs=dT forcing.terms=dT term_dT.fields==tas,pr,to \
+           term_dT.f_to="$f_to" coef_dT.f_min="$dT" coef_dT.f_max="$dT"
 }
 
 # For each completed spin-up: a ctrl run and a +2/+2 warming run.

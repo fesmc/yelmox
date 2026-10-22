@@ -23,16 +23,16 @@ module snapshots
     ! (checked at init).
     !
     ! Terms (climate_terms, pattern snapshots): each spans two snapshots
-    ! (snap0 -> snap1) and names a series of the driver's registry
-    ! ([forcing] series, kryos_forcing), or none (the constant 1); the value
-    ! of the series is the position between them (0 at snap0, 1 at snap1).
+    ! (snap0 -> snap1) and names a coefficient of the driver's registry
+    ! ([forcing] coefs, kryos_forcing), or none (the constant 1); the value
+    ! of the coefficient is the position between them (0 at snap0, 1 at snap1).
     ! The reference is [forcing<sfx>] reference; the snapshots of a run are
     ! the reference and the snap0/snap1 of its terms. A field sums the terms
     ! that list it on top of the reference (Banderas et al., 2018, for two),
     ! additively (tas, to, so) or as a ratio (pr), fixed by field. With
     ! snap0 = "", snap1 is itself the anomaly or the ratio: such a snapshot
     ! binds no zs, its fields are taken as given, at sea level (no elevation
-    ! correction of their own). The series restart with the registry, so
+    ! correction of their own). The coefficients restart with the registry, so
     ! snapshots holds no state of its own. The uniform and replace terms are
     ! applied by climate_terms after the backend.
 
@@ -40,8 +40,8 @@ module snapshots
     use ncio
     use nml
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
-    use kryos_forcing, only : indices_class, indices_value, indices_has
-    use climate_terms, only : terms_class, term_class, series_label
+    use kryos_forcing, only : coefs_class, coefs_value, coefs_has
+    use climate_terms, only : terms_class, term_class, coef_label
     use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, forcing_var_defs, def_file => yelmox_defaults_file
     use gaussian_filter, only : filter_gaussian
     use coordinates, only : grid_class
@@ -53,7 +53,7 @@ module snapshots
     private
 
     integer, parameter :: SNP_MAX = 32   ! max snapshots / fields
-    integer, parameter :: AXS_MAX = 16   ! max terms of one field
+    integer, parameter :: TERM_MAX = 16  ! max terms of one field
     integer, parameter :: NMONTH   = 12
 
     ! =====================================================================
@@ -73,8 +73,8 @@ module snapshots
         character(len=16) :: kind           ! from the name: "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
         character(len=16) :: combine        ! "anomaly" | "absolute"
         character(len=16) :: blend          ! "linear" | "ratio" | "const", fixed by the field name
-        integer           :: n_axis         ! number of terms on this field
-        integer           :: axis_k(AXS_MAX) ! their positions in snapshots_class%axis
+        integer           :: n_term          ! number of terms on this field
+        integer           :: term_k(TERM_MAX) ! their positions in snapshots_class%term
         logical           :: enabled        ! off by default for exotic fields
         logical           :: apply_lapse
         logical           :: precip_scaling
@@ -150,17 +150,17 @@ module snapshots
         ! precip sensitivity parameters
         real(wp)           :: f_p           ! precip-temperature Clausius factor -> beta_p [1/K]
         real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (not active)
-        integer            :: n_snap, n_field, n_axis
+        integer            :: n_snap, n_field, n_term
     end type
 
-    ! One snapshot term: two snapshots and the registry series giving the
-    ! position between them.
-    type axis_class
+    ! One snapshot term: two snapshots and the registry coefficient giving
+    ! the position between them.
+    type snap_term_class
         character(len=64) :: name           ! the term's name
-        character(len=64) :: index          ! its series (kryos_forcing); "" = the constant 1
-        integer           :: lo, hi         ! snap0 and snap1 (positions in snap;
-                                            ! lo = 0: none, hi is the anomaly/ratio)
-        real(wp)          :: f              ! position at the last update (output)
+        character(len=64) :: coef           ! its coefficient (kryos_forcing); "" = the constant 1
+        integer           :: snap0, snap1   ! positions in snap (snap0 = 0: none,
+                                            ! snap1 is the anomaly/ratio)
+        real(wp)          :: f              ! the coefficient value at the last update (output)
     end type
 
     ! The object callers hold.
@@ -168,7 +168,7 @@ module snapshots
         type(snapshots_param_class)        :: par
         type(field_spec_class),  allocatable :: registry(:)  ! field definitions
         type(snapshot_class),    allocatable :: snap(:)      ! was clim0..clim3
-        type(axis_class),        allocatable :: axis(:)      ! the snapshot terms
+        type(snap_term_class),   allocatable :: term(:)      ! the snapshot terms
         type(climate_state_class)            :: now          ! current output
         type(climate_state_class)            :: ref          ! distinguished reference (was clim0)
     end type
@@ -188,11 +188,11 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapshots_init(sc, filename, domain, grid, time, south, idx, terms, group, reference)
+    subroutine snapshots_init(sc, filename, domain, grid, time, south, coefs, terms, group, reference)
         ! `grid` is the climate grid: the snapshot fields are read on it, or
         ! remapped onto it online (var_defs groups with remap/grid_src). `time`
-        ! primes the time-varying snapshots. `idx` is the driver's registry
-        ! (the series of the terms were checked against it by terms_init);
+        ! primes the time-varying snapshots. `coefs` is the driver's registry
+        ! (the coefficients of the terms were checked against it by terms_init);
         ! `terms` the domain's terms, of which those with the snapshots
         ! pattern are read here; `group` the backend group ([snapshots<sfx>])
         ! and `reference` the reference snapshot ([forcing<sfx>] reference).
@@ -203,7 +203,7 @@ contains
         type(grid_class),      intent(IN)    :: grid
         real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
-        type(indices_class),   intent(IN)    :: idx
+        type(coefs_class),     intent(IN)    :: coefs
         type(terms_class),     intent(IN)    :: terms
         character(len=*),      intent(IN)    :: group, reference
 
@@ -224,7 +224,7 @@ contains
         return
     end subroutine snapshots_init
 
-    subroutine snapshots_update(sc, z_srf, time, idx, dx)
+    subroutine snapshots_update(sc, z_srf, time, coefs, dx)
         ! Pipeline: term positions from the registry (advanced by the driver
         ! to `time`) -> refresh loads -> combine -> transform (the atmosphere,
         ! if bound). The uniform and replace terms are applied by the caller
@@ -233,15 +233,15 @@ contains
         type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(dp),              intent(IN)    :: time
-        type(indices_class),   intent(IN)    :: idx
+        type(coefs_class),     intent(IN)    :: coefs
         real(wp),              intent(IN), optional :: dx
 
         integer :: k
 
-        ! 1. The position on each term: the current value of its series (1 without).
-        do k = 1, sc%par%n_axis
-            sc%axis(k)%f = 1.0_wp
-            if (len_trim(sc%axis(k)%index) > 0) sc%axis(k)%f = indices_value(idx, sc%axis(k)%index)
+        ! 1. The position on each term: the current value of its coefficient (1 without).
+        do k = 1, sc%par%n_term
+            sc%term(k)%f = 1.0_wp
+            if (len_trim(sc%term(k)%coef) > 0) sc%term(k)%f = coefs_value(coefs, sc%term(k)%coef)
         end do
 
         ! 2. Refresh time-varying loads and re-reduce those snapshots.
@@ -294,7 +294,7 @@ contains
     subroutine snapshots_combine(sc)
         ! Blend the reduced snapshot states into `now`, per field bound in the
         ! reference, from the reference baseline. Each term k on a field
-        ! (snap0_k -> snap1_k) adds with weight a_k = the value of its series:
+        ! (snap0_k -> snap1_k) adds with weight a_k = the value of its coefficient:
         !   linear (tas, to, so): now = ref + sum_k a_k*(snap1_k - snap0_k)
         !   ratio  (pr):          now = ref * prod_k (a_k*(snap1_k/snap0_k - 1) + 1)
         !   const  (zs):          now = ref
@@ -304,9 +304,9 @@ contains
         ! (snapshots_check_bindings).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
-        integer  :: f, j, k, lo, hi
+        integer  :: f, j, k, s0, s1
         logical  :: blended
-        type(climate_state_class) :: none   ! the lo of a lo = "" axis
+        type(climate_state_class) :: none   ! the snap0 of a term with snap0 = ""
 
         do f = 1, sc%par%n_field
             if (.not. sc%registry(f)%enabled) cycle
@@ -332,16 +332,16 @@ contains
                       trim(sc%registry(f)%blend) == "ratio"
             if (.not. blended) cycle
 
-            do j = 1, sc%registry(f)%n_axis
-                k  = sc%registry(f)%axis_k(j)
-                lo = sc%axis(k)%lo
-                hi = sc%axis(k)%hi
-                if (lo > 0) then
-                    call add_axis(sc%registry(f), sc%now, sc%snap(lo)%state, sc%snap(hi)%state, &
-                                  sc%axis(k)%f, anomaly=.FALSE.)
+            do j = 1, sc%registry(f)%n_term
+                k  = sc%registry(f)%term_k(j)
+                s0 = sc%term(k)%snap0
+                s1 = sc%term(k)%snap1
+                if (s0 > 0) then
+                    call add_term(sc%registry(f), sc%now, sc%snap(s0)%state, sc%snap(s1)%state, &
+                                  sc%term(k)%f, anomaly=.FALSE.)
                 else
-                    call add_axis(sc%registry(f), sc%now, none, sc%snap(hi)%state, &
-                                  sc%axis(k)%f, anomaly=.TRUE.)
+                    call add_term(sc%registry(f), sc%now, none, sc%snap(s1)%state, &
+                                  sc%term(k)%f, anomaly=.TRUE.)
                 end if
             end do
         end do
@@ -349,8 +349,8 @@ contains
         return
     end subroutine snapshots_combine
 
-    subroutine add_axis(fs, now, x0, x1, aa, anomaly)
-        ! Add one axis (x0 -> x1, weight aa; anomaly: x1 alone) to the field fs
+    subroutine add_term(fs, now, x0, x1, aa, anomaly)
+        ! Add one term (x0 -> x1, weight aa; anomaly: x1 alone) to the field fs
         ! of `now`.
         implicit none
         type(field_spec_class),    intent(IN)    :: fs
@@ -361,21 +361,21 @@ contains
 
         select case(trim(fs%kind))
             case("atm_temp")
-                call blend_axis(fs%blend, now%tsl,    x0%tsl,    x1%tsl,    aa, anomaly)
+                call blend_term(fs%blend, now%tsl,    x0%tsl,    x1%tsl,    aa, anomaly)
             case("atm_precip")
-                call blend_axis(fs%blend, now%prcor,  x0%prcor,  x1%prcor,  aa, anomaly)
+                call blend_term(fs%blend, now%prcor,  x0%prcor,  x1%prcor,  aa, anomaly)
             case("ocn")
-                call blend_axis(fs%blend, now%to_ann, x0%to_ann, x1%to_ann, aa, anomaly)
+                call blend_term(fs%blend, now%to_ann, x0%to_ann, x1%to_ann, aa, anomaly)
             case("ocn_salt")
-                call blend_axis(fs%blend, now%so_ann, x0%so_ann, x1%so_ann, aa, anomaly)
+                call blend_term(fs%blend, now%so_ann, x0%so_ann, x1%so_ann, aa, anomaly)
         end select
 
         return
-    end subroutine add_axis
+    end subroutine add_term
 
-    subroutine blend_axis(mode, dst, x0, x1, aa, anomaly)
-        ! Add one axis (x0 -> x1, weight aa) to dst, which holds the reference
-        ! plus the axes added so far. anomaly (lo = ""): x1 is the anomaly
+    subroutine blend_term(mode, dst, x0, x1, aa, anomaly)
+        ! Add one term (x0 -> x1, weight aa) to dst, which holds the reference
+        ! plus the terms added so far. anomaly (snap0 = ""): x1 is the anomaly
         ! (linear) or the ratio (ratio) itself, x0 is not used.
         implicit none
         character(len=*),      intent(IN)    :: mode
@@ -401,7 +401,7 @@ contains
         end if
 
         return
-    end subroutine blend_axis
+    end subroutine blend_term
 
     subroutine snapshots_transform(sc, z_srf)
         ! Inflate the blended sea-level fields to the current model elevation and
@@ -496,7 +496,7 @@ contains
                 end do
             end do
         end do
-        deallocate(sc%snap, sc%axis, sc%registry)
+        deallocate(sc%snap, sc%term, sc%registry)
 
         sc%now = empty
         sc%ref = empty
@@ -532,11 +532,11 @@ contains
 
         integer :: k
 
-        do k = 1, sc%par%n_axis
-            call nc_write(filename, "term_"//trim(sc%axis(k)%name), sc%axis(k)%f, dim1="time", &
+        do k = 1, sc%par%n_term
+            call nc_write(filename, "term_"//trim(sc%term(k)%name), sc%term(k)%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Position on the snapshot term "//trim(sc%axis(k)%name)// &
-                                    " (series "//trim(series_label(sc%axis(k)%index))//")")
+                          long_name="Position on the snapshot term "//trim(sc%term(k)%name)// &
+                                    " (coefficient "//trim(coef_label(sc%term(k)%coef))//")")
         end do
 
         associate(now => sc%now)
@@ -569,7 +569,7 @@ contains
         ! Read the full configuration: the top-level knobs ([snapshots<sfx>],
         ! template snapshots), the field registry (the fields a snapshot may
         ! bind, fixed blend rule by name), the snapshot terms of `terms`
-        ! (pattern snapshots: snap0, snap1, series, fields), and the snapshot
+        ! (pattern snapshots: snap0, snap1, coef, fields), and the snapshot
         ! specs and their field bindings (&snapshot_<name>, template snapshot)
         ! of the reference and the terms' snapshots. The snapshot groups are
         ! read from the par file if it has them, else from the first
@@ -624,9 +624,9 @@ contains
         do k = 1, terms%n
             if (trim(terms%term(k)%pattern) == "snapshots") n = n + 1
         end do
-        sc%par%n_axis = n
-        if (allocated(sc%axis)) deallocate(sc%axis)
-        allocate(sc%axis(n))
+        sc%par%n_term = n
+        if (allocated(sc%term)) deallocate(sc%term)
+        allocate(sc%term(n))
         names    = ""
         names(1) = reference
         sc%par%n_snap = 1
@@ -635,9 +635,9 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "snapshots") cycle
             i = i + 1
-            sc%axis(i)%name  = t%name
-            sc%axis(i)%index = t%series
-            sc%axis(i)%f     = 0.0_wp
+            sc%term(i)%name  = t%name
+            sc%term(i)%coef  = t%coef
+            sc%term(i)%f     = 0.0_wp
             if (len_trim(t%snap0) > 0) call add_name(t%snap0)
             call add_name(t%snap1)
             end associate
@@ -661,19 +661,19 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "snapshots") cycle
             i = i + 1
-            sc%axis(i)%lo = 0
-            if (len_trim(t%snap0) > 0) sc%axis(i)%lo = snapshot_position(sc, t%snap0, "snap0 of &"//trim(t%group))
-            sc%axis(i)%hi = snapshot_position(sc, t%snap1, "snap1 of &"//trim(t%group))
+            sc%term(i)%snap0 = 0
+            if (len_trim(t%snap0) > 0) sc%term(i)%snap0 = snapshot_position(sc, t%snap0, "snap0 of &"//trim(t%group))
+            sc%term(i)%snap1 = snapshot_position(sc, t%snap1, "snap1 of &"//trim(t%group))
             do j = 1, size(t%fields)
                 if (len_trim(t%fields(j)) == 0) cycle
                 f = field_position(sc, t%fields(j), "field of &"//trim(t%group))
-                if (sc%registry(f)%n_axis >= AXS_MAX) then
-                    write(*,*) "snapshots:: Error: more than ", AXS_MAX, " terms on field "// &
+                if (sc%registry(f)%n_term >= TERM_MAX) then
+                    write(*,*) "snapshots:: Error: more than ", TERM_MAX, " terms on field "// &
                                trim(t%fields(j))//"."
                     stop 1
                 end if
-                sc%registry(f)%n_axis = sc%registry(f)%n_axis + 1
-                sc%registry(f)%axis_k(sc%registry(f)%n_axis) = i
+                sc%registry(f)%n_term = sc%registry(f)%n_term + 1
+                sc%registry(f)%term_k(sc%registry(f)%n_term) = i
             end do
             end associate
         end do
@@ -757,8 +757,8 @@ contains
 
             ! A state: the reference, or a snapshot of a term with a snap0.
             state = (s == iref)
-            do k = 1, sc%par%n_axis
-                if (sc%axis(k)%lo > 0 .and. (sc%axis(k)%lo == s .or. sc%axis(k)%hi == s)) &
+            do k = 1, sc%par%n_term
+                if (sc%term(k)%snap0 > 0 .and. (sc%term(k)%snap0 == s .or. sc%term(k)%snap1 == s)) &
                     state = .TRUE.
             end do
             if (state .and. (binds(sc, s, "tas") .or. binds(sc, s, "pr")) .and. &
@@ -783,10 +783,10 @@ contains
         do f = 1, sc%par%n_field
             if (sc%snap(iref)%spec%nsrc(f) == 0) cycle
             if (trim(sc%registry(f)%blend) /= "linear" .and. trim(sc%registry(f)%blend) /= "ratio") cycle
-            do j = 1, sc%registry(f)%n_axis
-                k = sc%registry(f)%axis_k(j)
-                if (sc%axis(k)%lo > 0) call check_axis_snapshot(sc%axis(k)%lo, "snap0")
-                call check_axis_snapshot(sc%axis(k)%hi, "snap1")
+            do j = 1, sc%registry(f)%n_term
+                k = sc%registry(f)%term_k(j)
+                if (sc%term(k)%snap0 > 0) call check_term_snapshot(sc%term(k)%snap0, "snap0")
+                call check_term_snapshot(sc%term(k)%snap1, "snap1")
             end do
         end do
 
@@ -794,14 +794,14 @@ contains
 
     contains
 
-        subroutine check_axis_snapshot(s, end_name)
+        subroutine check_term_snapshot(s, end_name)
             integer,          intent(IN) :: s
             character(len=*), intent(IN) :: end_name
             if (sc%snap(s)%spec%nsrc(f) == 0) &
-                call binding_error("term "//trim(sc%axis(k)%name)//" lists the field "// &
+                call binding_error("term "//trim(sc%term(k)%name)//" lists the field "// &
                                    trim(sc%registry(f)%name)//", but its "//end_name// &
                                    " snapshot "//trim(sc%snap(s)%spec%name)//" does not bind it.")
-        end subroutine check_axis_snapshot
+        end subroutine check_term_snapshot
 
         subroutine binding_error(msg)
             character(len=*), intent(IN) :: msg
@@ -845,8 +845,8 @@ contains
 
         fs%name           = name
         fs%combine        = combine_default
-        fs%n_axis         = 0
-        fs%axis_k         = 0
+        fs%n_term         = 0
+        fs%term_k         = 0
         fs%enabled        = .TRUE.
         fs%apply_lapse    = .FALSE.
         fs%precip_scaling = .FALSE.
@@ -1019,7 +1019,7 @@ contains
         ! sources, sf+rf). Annual snapshots: tas = cosine-synthesized from
         ! [ta_ann, ta_seas] (tas_season); pr from pr_ann.
         ! A snapshot with its elevation zs is then reduced to sea level (lapse
-        ! rates, beta_p); one without (the anomaly snapshot of a lo = "" axis) is
+        ! rates, beta_p); one without (the snap1 of a term with snap0 = "") is
         ! taken as given, a sea-level anomaly (tas) or ratio (pr).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc

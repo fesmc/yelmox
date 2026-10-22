@@ -3,7 +3,7 @@
 ! ============================================================
 !
 ! The schema of the forcing groups (docs/_forcing-terms.md): the forcing
-! ([forcing], its series [series_<name>] and terms [term_<name>]), the
+! ([forcing], its coefficients [coef_<name>] and terms [term_<name>]), the
 ! snapshot backend ([snapshots], [snapshot_<name>]), the climate transforms
 ! ([taper], [bias]), the orbit of the insolation ([orbit]), the prescribed ice
 ! ([ice_bnd]) and the forcing of the bipolar ocean box model ([obm_forcing]).
@@ -14,7 +14,7 @@
 !
 ! Named groups fall back to a template group (defaults_group):
 !   forcing<sfx>                  -> forcing
-!   series_<name>                 -> series
+!   coef_<name>                   -> coef
 !   term_<name>                   -> term
 !   snapshots<sfx>                -> snapshots
 !   snapshot_<name>               -> snapshot
@@ -22,7 +22,7 @@
 !                                 -> taper, bias, orbit, ice_bnd
 ! (<sfx>: the domain suffix of a multi-domain driver, e.g. _north). An absent
 ! group takes every default: a transform without its group is inactive.
-! Named groups (series_, term_, snapshot_, and the varslice groups of the
+! Named groups (coef_, term_, snapshot_, and the varslice groups of the
 ! fields) are read from the par file if it has them, else from the first of
 ! the [forcing] var_defs files that does.
 !
@@ -32,21 +32,23 @@
 ! ===== Forcing =====
 
 &forcing
-    ! The forcing of a run: its scalar series (shared by every domain, driver-
-    ! owned), and per domain (forcing<sfx>) the reference snapshot and the terms
-    ! added to it (series x pattern, docs/_forcing-terms.md).
+    ! The forcing of a run: its coefficients, scalars of the forcing time
+    ! (shared by every domain, driver-owned), and per domain (forcing<sfx>) the
+    ! reference snapshot and the terms added to it (coefficient x pattern,
+    ! docs/_forcing-terms.md).
     reference = "pd"               ! the reference snapshot, a group [snapshot_<name>]
-    series    = ""                 ! the series, each a group [series_<name>]; "" = none
+    coefs     = ""                 ! the coefficients, each a group [coef_<name>]; "" = none
     terms     = ""                 ! the terms, each a group [term_<name>]; "" = none
     var_defs  = "input/clim_db.nml" "input/forcing_db.nml"   ! files of the named groups not in the par file, searched in order
 /
 
-&series
-    ! A tsgen series (fesm-utils tsgen), advanced on the forcing time time_rel,
-    ! or a derived series (method = "derived"), set each step by the model.
+&coef
+    ! A coefficient: tsgen (fesm-utils tsgen), advanced on the forcing time
+    ! time_rel, or derived (method = "derived"), set each step by the model.
+    ! method = "series" reads it from a time series file (series_file).
     method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1|derived
-    sigma            = 0.0           ! [f] std. dev. of gaussian noise added to the series
-    ! series
+    sigma            = 0.0           ! [f] std. dev. of gaussian noise added to the coefficient
+    ! method series
     series_file      = ""            ! table (time, f) or netcdf file of the series
     series_var       = ""            ! variable of a netcdf series_file
     series_time_name = "time"        ! its time variable
@@ -71,7 +73,7 @@
     region           = "all"         ! air_anomaly: cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
     anomaly          = True          ! obm_*: the box temperature minus its initial value (False: the temperature itself)
     ! yelmox
-    units            = "1"           ! units label of series_<name> in the 1D output
+    units            = "1"           ! units label of coef_<name> in the 1D output
     restart_every_df = 0.0           ! [f] write a restart each time f moves by this much; 0 = off
     ! window modifier (tsgen): inside win_t0 < t < win_t1, f = win_ref + win_fac*(f - win_ref)
     ! (only where f > win_ref if win_above), with linear ramps of win_taper at the edges;
@@ -86,15 +88,15 @@
 /
 
 &term
-    ! One term of the forcing: a series times a pattern, on the fields listed.
+    ! One term of the forcing: a coefficient times a pattern, on the fields listed.
     ! By field, fixed: tas, to, so add; pr multiplies (the ratio of the
     ! snapshots, or exp(beta_p*f_ta*f) in a uniform term, beta_p = [snapshots] f_p).
-    series  = ""                  ! the series ([forcing] series); "" = the constant 1 (snapshots pattern)
+    coef    = ""                  ! the coefficient ([forcing] coefs); "" = the constant 1 (snapshots pattern)
     pattern = "snapshots"         ! snapshots: f*(snap1 - snap0), or f*snap1 without snap0 (a given anomaly / ratio);
                                   ! uniform: tas + f_ta*f, pr * exp(beta_p*f_ta*f), to + f_to*f, so + f_so*f;
                                   ! replace: to or so = f at every depth, in place of the reference (one per field)
-    snap0   = ""                  ! snapshots: the snapshot at index 0 ([snapshot_<name>]); "" = none
-    snap1   = ""                  ! snapshots: the snapshot at index 1
+    snap0   = ""                  ! snapshots: the snapshot at coefficient 0 ([snapshot_<name>]); "" = none
+    snap1   = ""                  ! snapshots: the snapshot at coefficient 1
     fields  = ""                  ! the fields the term touches: tas, pr, to, so (explicit, all bound by its snapshots and the reference)
     f_ta    = 1.0                 ! [K]   uniform: gain on tas (and the pr factor)
     f_to    = 1.0                 ! [K]   uniform: gain on to
@@ -172,9 +174,9 @@
     ! an ice history at the forcing time; the interior keeps its H_ice_ref.
     active     = False                ! apply it?
     method     = "file"               ! file: H_ice at the forcing time (clamped to the file's range);
-                                      ! scaled: H = f*H_ice(slice_time), f a series
+                                      ! scaled: H = f*H_ice(slice_time), f a coefficient
     H_ice      = "paleomist_H_ice"    ! group of the ice thickness [m] (the par file, then [forcing] var_defs)
-    index      = ""                   ! scaled: the series f ([forcing] series)
+    coef       = ""                   ! scaled: the coefficient f ([forcing] coefs)
     slice_time = -21e3                ! [yr] scaled: time of the slice H_ice(slice_time)
 /
 
@@ -183,6 +185,6 @@
 &obm_forcing
     ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init +
     ! ampl_i * gain * f (north, tropics, south) and the vapour fluxes.
-    index = ""          ! the global mean air temperature anomaly [K] ([forcing] series)
+    coef  = ""          ! the global mean air temperature anomaly [K], a coefficient ([forcing] coefs)
     gain  = 1.0         ! [1] dT_glob = gain * f
 /

@@ -16,12 +16,12 @@ program yelmox_bipolar
     ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
     ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
     !
-    ! Per-step coupling order: shared sea level and series ([forcing] series,
+    ! Per-step coupling order: shared sea level and coefficients ([forcing] coefs,
     ! read by the climate of both domains and the OBM forcing), then per domain
     ! relaxation, optimization + isostasy, then one OBM step, then per domain
     ! ice sheet + climate + smb, then the ocean exchanges (atm->obm from the
-    ! global series of [obm_forcing], ism->obm freshwater flux, hysteresis
-    ! forcing, obm->ism ocean temperature through the derived series obm_north/
+    ! global coefficient of [obm_forcing], ism->obm freshwater flux, hysteresis
+    ! forcing, obm->ism ocean temperature through the derived coefficients obm_north/
     ! obm_south and each domain's terms on them),
     ! then per domain marine shelf (which reads the obm-updated ocean
     ! temperature). Per-domain physics live in the
@@ -46,9 +46,9 @@ program yelmox_bipolar
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D
-    use kryos_forcing,  only : indices_class, indices_init, indices_update, indices_kill, &
-                               indices_restart_due, indices_restart_fldr, &
-                               indices_restart_read, indices_restart_write, indices_write_step
+    use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
+                               coefs_restart_due, coefs_restart_fldr, &
+                               coefs_restart_read, coefs_restart_write, coefs_write_step
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
@@ -62,8 +62,8 @@ program yelmox_bipolar
     character(len=512) :: path_par
     type(tstep_class)  :: ts
     type(bsl_class)    :: bsl                 ! shared, driver-owned sea level
-    type(indices_class) :: idx                ! shared, driver-owned series ([forcing] series)
-    real(wp)           :: fvar                ! response variable of the series: ice volume [Gt]
+    type(coefs_class)  :: coefs               ! shared, driver-owned coefficients ([forcing] coefs)
+    real(wp)           :: fvar                ! response variable of the coefficients: ice volume [Gt]
     character(len=512) :: restart             ! run restart bundle ([ctrl]), or "None"
     logical            :: write_lossless      ! write all output lossless ([ctrl])
 
@@ -127,14 +127,14 @@ program yelmox_bipolar
     call nml_read(path_par, "ctrl", "restart", restart)
     call bsl_startup(bsl, restart)
 
-    ! === Shared, driver-owned series on the forcing time (both domains read
+    ! === Shared, driver-owned coefficients on the forcing time (both domains read
     !     them), restored from the run restart bundle. Before the domains: their
-    !     climate checks the series it names. ===
-    call indices_init(idx, path_par, ts%time_rel)
-    if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
+    !     climate checks the coefficients it names. ===
+    call coefs_init(coefs, path_par, ts%time_rel)
+    if (trim(restart) /= "None") call coefs_restart_read(coefs, trim(restart))
 
     ! === Ocean box model init (from the run-level bundle when restarting) +
-    !     output file, then the series derived from its boxes (obm_north,
+    !     output file, then the coefficients derived from its boxes (obm_north,
     !     obm_south). Before the domains: their startup climate (and the shelf
     !     and ice state built on it) sees the box ocean. ===
     if (oc%active_obm) then
@@ -143,18 +143,18 @@ program yelmox_bipolar
         if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
         call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
-        call coupling_obm2ism(obox, oc%obm_name, idx)
+        call coupling_obm2ism(obox, oc%obm_name, coefs)
     end if
 
     ! === Per-domain initialization ===
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
     if (active_south) call setup_domain(dom_south, "_south", outfldr_south)
 
-    ! The ocean couplings checked against the series and the domains (the
-    ! derived series obm_north/obm_south and the terms on them), and the
-    ! hydrographic masks (Yelmo grid) restricting the
-    ! freshwater flux per domain.
-    call obm_coupling_init(oc, idx, dom_north, dom_south, active_north, active_south)
+    ! The ocean couplings checked against the coefficients and the domains
+    ! (the derived coefficients obm_north/obm_south and the terms on them),
+    ! and the hydrographic masks (Yelmo grid) restricting the freshwater flux
+    ! per domain.
+    call obm_coupling_init(oc, coefs, dom_north, dom_south, active_north, active_south)
 
     ! === Output + restart schedules (shared cadence, from [tm_2D]/[tm_2Dsm]/
     !     [tm_1D]/[tm_rst]; a restart bundle is always written at time_end) ===
@@ -201,14 +201,14 @@ program yelmox_bipolar
         call tstep_update(ts, dtt)
         call tstep_print(ts)
 
-        ! Shared sea level and indices: update once per step, before either
-        ! domain advances. Response variable of the indices: the ice volume of
+        ! Shared sea level and coefficients: update once per step, before either
+        ! domain advances. Response variable of the coefficients: the ice volume of
         ! the active domains [Gt].
         call bsl_update(bsl, ts%time_rel)
         fvar = 0.0_wp
         if (active_north) fvar = fvar + dom_north%yelmo%reg%V_ice * dom_north%yelmo%bnd%c%rho_ice * 1e-3_wp
         if (active_south) fvar = fvar + dom_south%yelmo%reg%V_ice * dom_south%yelmo%bnd%c%rho_ice * 1e-3_wp
-        call indices_update(idx, ts%time_rel, var=fvar)
+        call coefs_update(coefs, ts%time_rel, var=fvar)
         call timer_step(tmr, tt_forcing)
 
         ! Relaxation + optimization + isostasy (each domain), before the OBM step.
@@ -236,35 +236,35 @@ program yelmox_bipolar
         ! Ice sheet, hub refresh, climate + surface mass balance (each domain).
         if (active_north) then
             call couple_to_yelmo(dom_north)   ! bedrock now; smb + shelf melt lag one step
-            call step_ice_bnd(dom_north, ts, idx)
+            call step_ice_bnd(dom_north, ts, coefs)
             call timer_step(tmr, tt_couple_yelmo)
             call step_icesheet(dom_north, ts)
             call timer_step(tmr, tt_icesheet)
             call couple_yelmo_to_htopo(dom_north)
             call timer_step(tmr, tt_couple_htopo)
-            call step_climate(dom_north, ts, idx)
+            call step_climate(dom_north, ts, coefs)
             call timer_step(tmr, tt_climate)
             call step_surface(dom_north, ts)
             call timer_step(tmr, tt_surface)
         end if
         if (active_south) then
             call couple_to_yelmo(dom_south)
-            call step_ice_bnd(dom_south, ts, idx)
+            call step_ice_bnd(dom_south, ts, coefs)
             call timer_step(tmr, tt_couple_yelmo)
             call step_icesheet(dom_south, ts)
             call timer_step(tmr, tt_icesheet)
             call couple_yelmo_to_htopo(dom_south)
             call timer_step(tmr, tt_couple_htopo)
-            call step_climate(dom_south, ts, idx)
+            call step_climate(dom_south, ts, coefs)
             call timer_step(tmr, tt_climate)
             call step_surface(dom_south, ts)
             call timer_step(tmr, tt_surface)
         end if
 
-        ! Inter-domain ocean coupling (shared obm): atm->obm (global series),
+        ! Inter-domain ocean coupling (shared obm): atm->obm (global coefficient),
         ! ism->obm freshwater flux, hysteresis forcing, obm->ism ocean
-        ! temperature (the obm_* series and the ocean terms).
-        call obm_exchange(oc, obox, idx, dom_north, dom_south, active_north, active_south, &
+        ! temperature (the obm_* coefficients and the ocean terms).
+        call obm_exchange(oc, obox, coefs, dom_north, dom_south, active_north, active_south, &
                           ts%time, ts%time_init, dtt)
         call timer_step(tmr, tt_obm_exchange)
 
@@ -273,18 +273,18 @@ program yelmox_bipolar
         if (active_south) call step_shelf(dom_south, ts)
         call timer_step(tmr, tt_shelf)
 
-        ! Forcing-increment restart each time an index moves by more than its
+        ! Forcing-increment restart each time a coefficient moves by more than its
         ! restart_every_df (folders restart-<n>).
-        if (indices_restart_due(idx)) then
+        if (coefs_restart_due(coefs)) then
             write(*,*) "yelmox_bipolar: forcing-increment restart "// &
-                       trim(indices_restart_fldr(idx))//" at time =", ts%time
-            call write_run_restart(indices_restart_fldr(idx))
+                       trim(coefs_restart_fldr(coefs))//" at time =", ts%time
+            call write_run_restart(coefs_restart_fldr(coefs))
         end if
 
         ! Kill switch: stop once the response has equilibrated at a forcing
-        ! bound (any index). The top of the loop then writes the final state and exits.
-        if (indices_kill(idx)) then
-            write(*,*) "yelmox_bipolar: index kill switch tripped at time =", ts%time
+        ! bound (any coefficient). The top of the loop then writes the final state and exits.
+        if (coefs_kill(coefs)) then
+            write(*,*) "yelmox_bipolar: coefficient kill switch tripped at time =", ts%time
             ts%is_finished = .TRUE.
         end if
     end do
@@ -314,7 +314,7 @@ contains
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(out)   :: outfldr
 
-        call domain_init(dom, path_par, ts%time, idx, group_suffix=suffix)
+        call domain_init(dom, path_par, ts%time, coefs, group_suffix=suffix)
 
         ! Each domain writes to a subfolder named after its domain.
         outfldr = trim(dom%ctl%domain)//"/"
@@ -327,9 +327,9 @@ contains
         ! bsl was already initialized/restored once by the driver (bsl_startup
         ! above).
         if (trim(restart) == "None") then
-            call domain_startup(dom, ts, bsl, "None", idx, restore_bsl=.false.)
+            call domain_startup(dom, ts, bsl, "None", coefs, restore_bsl=.false.)
         else
-            call domain_startup(dom, ts, bsl, trim(restart)//"/"//trim(dom%ctl%domain), idx, &
+            call domain_startup(dom, ts, bsl, trim(restart)//"/"//trim(dom%ctl%domain), coefs, &
                                 restore_bsl=.false.)
         end if
 
@@ -354,7 +354,7 @@ contains
     end subroutine write_domain_init
 
     subroutine write_domain_step(dom, outfldr)
-        ! Append 2D/1D records (the shared indices in each domain's 1D file) on
+        ! Append 2D/1D records (the shared coefficients in each domain's 1D file) on
         ! the shared cadence (do_2D/do_2Dsm/do_1D, set by the driver at the top
         ! of the loop).
         type(kryos_domain), intent(inout) :: dom
@@ -363,17 +363,17 @@ contains
         if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)
         if (do_2Dsm) call domain_write_step_sm(dom, trim(outfldr), ts%time)
         if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time)
-        if (do_1D)   call indices_write_step(idx, dom%yelmo%reg%fnm, ts%time)
+        if (do_1D)   call coefs_write_step(coefs, dom%yelmo%reg%fnm, ts%time)
     end subroutine write_domain_step
 
     subroutine write_run_restart(bundle)
-        ! Run restart bundle in the folder `bundle`: the shared bsl, indices and
+        ! Run restart bundle in the folder `bundle`: the shared bsl, coefficients and
         ! obm, and each active domain in its subfolder named after the domain.
         character(len=*), intent(in) :: bundle
 
         call execute_command_line('mkdir -p "'//trim(bundle)//'"')
         call bsl_restart_write(bsl, trim(bundle)//"/bsl_restart.nc", ts%time)
-        call indices_restart_write(idx, trim(bundle), ts%time)
+        call coefs_restart_write(coefs, trim(bundle), ts%time)
         if (oc%active_obm) call write_obm_restart(obox, trim(bundle)//"/obm_restart.nc", &
                                                   ts%time, "years")
         if (active_north) call domain_restart_write(dom_north, ts%time, &

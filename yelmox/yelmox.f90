@@ -21,9 +21,9 @@ program yelmox
                                step_ice_bnd, step_icesheet, couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf
     use kryos_startup,  only : domain_startup, run_restart_write
-    use kryos_forcing,  only : indices_class, indices_init, indices_update, indices_kill, &
-                               indices_restart_due, indices_restart_fldr, &
-                               indices_restart_read, indices_write_step
+    use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
+                               coefs_restart_due, coefs_restart_fldr, &
+                               coefs_restart_read, coefs_write_step
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
@@ -54,12 +54,12 @@ program yelmox
     ! Write all output lossless ([ctrl]), ignoring the precision of each field.
     logical            :: write_lossless
 
-    ! Series ([forcing] series, one group [series_<name>] each: tsgen, or
+    ! Coefficients ([forcing] coefs, one group [coef_<name>] each: tsgen, or
     ! derived and set by the model), owned by the driver and advanced once per
     ! step on the forcing time time_rel; read by name by the climate (the
     ! terms) and the prescribed ice. The registry also owns the kill switch
     ! and the forcing-increment restarts (see libs/kryos_forcing.f90).
-    type(indices_class)   :: idx
+    type(coefs_class)   :: coefs
     real(wp) :: fvar
 
     ! Wall time of each part of the time loop (fesm-utils timer), accumulated
@@ -92,16 +92,16 @@ program yelmox
     call bsl_init(bsl, path_par, ts%time_rel)
     call bsl_update(bsl, ts%time_rel)
 
-    ! Series on the forcing time, before the domain (its climate checks the
-    ! series it names) and the startup (the initial climate carries the same
-    ! series values as the time loop). On a restart run, resume them from the
+    ! Coefficients on the forcing time, before the domain (its climate checks
+    ! the coefficients it names) and the startup (the initial climate carries
+    ! the same coefficient values as the time loop). On a restart run, resume them from the
     ! bundle.
-    call indices_init(idx, path_par, ts%time_rel)
-    if (trim(restart) /= "None") call indices_restart_read(idx, trim(restart))
+    call coefs_init(coefs, path_par, ts%time_rel)
+    if (trim(restart) /= "None") call coefs_restart_read(coefs, trim(restart))
 
     ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
     ! reads the timeline values it needs from the same [run_step] group.
-    call domain_init(dom, path_par, ts%time, idx, timeline_group=trim(run_step))
+    call domain_init(dom, path_par, ts%time, coefs, timeline_group=trim(run_step))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
@@ -110,7 +110,7 @@ program yelmox
     ! (incl. the shared bsl) and continue its state: the hi-res hub rebuilt
     ! from the restored models, the climate (and a stateless surface)
     ! re-derived from it (see domain_startup).
-    call domain_startup(dom, ts, bsl, trim(restart), idx)
+    call domain_startup(dom, ts, bsl, trim(restart), coefs)
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"
@@ -156,7 +156,7 @@ program yelmox
 
         if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
             call domain_write_1D(dom, trim(outfldr), ts%time)
-            call indices_write_step(idx, dom%yelmo%reg%fnm, ts%time)
+            call coefs_write_step(coefs, dom%yelmo%reg%fnm, ts%time)
             call timer_write_totals(tmr, ts%time, "s", trim(outfldr)//"timing.txt", &
                                     init=timing_init)
             timing_init = .FALSE.
@@ -165,9 +165,9 @@ program yelmox
         ! CMIP-formatted output ([output] write_cmip, every dt_cmip).
         call domain_write_cmip(dom, trim(outfldr), ts)
 
-        ! Restart bundle (domain + shared bsl + indices).
+        ! Restart bundle (domain + shared bsl + coefficients).
         if (timeout_check(tm_rst, ts%time) .or. ts%is_finished) then
-            call run_restart_write(dom, bsl, ts%time, idx)
+            call run_restart_write(dom, bsl, ts%time, coefs)
         end if
 
         call timer_step(tmr, tt_output)
@@ -180,11 +180,11 @@ program yelmox
         ! Shared sea level: update once per step, before the domain advances.
         call bsl_update(bsl, ts%time_rel)
 
-        ! Series: advance every tsgen series once per step on the forcing time
+        ! Coefficients: advance every tsgen coefficient once per step on the forcing time
         ! (feedback methods need the response-derivative window); response
         ! variable = ice volume [Gt].
         fvar = dom%yelmo%reg%V_ice * dom%yelmo%bnd%c%rho_ice * 1e-3_wp
-        call indices_update(idx, ts%time_rel, var=fvar)
+        call coefs_update(coefs, ts%time_rel, var=fvar)
         call timer_step(tmr, tt_forcing)
 
         ! === coupling sequence ===
@@ -195,32 +195,32 @@ program yelmox
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call timer_step(tmr, tt_isostasy)
         call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
-        call step_ice_bnd(dom, ts, idx)   ! prescribed ice in the fixed/relaxation cells
+        call step_ice_bnd(dom, ts, coefs)   ! prescribed ice in the fixed/relaxation cells
         call timer_step(tmr, tt_couple_yelmo)
         call step_icesheet(dom, ts)       ! yelmo_update
         call timer_step(tmr, tt_icesheet)
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call timer_step(tmr, tt_couple_htopo)
-        call step_climate(dom, ts, idx)        ! climate (dt_clim cadence)
+        call step_climate(dom, ts, coefs)        ! climate (dt_clim cadence)
         call timer_step(tmr, tt_climate)
         call step_surface(dom, ts)        ! surface mass balance + temperature
         call timer_step(tmr, tt_surface)
         call step_shelf(dom, ts)          ! shelf-base melt + temperature
         call timer_step(tmr, tt_shelf)
 
-        ! Forcing-increment restart each time an index moves by more than its
+        ! Forcing-increment restart each time a coefficient moves by more than its
         ! restart_every_df (folders restart-<n>), so a ramp can be branched at
         ! fixed forcing levels.
-        if (indices_restart_due(idx)) then
-            write(*,*) "yelmox: forcing-increment restart "//trim(indices_restart_fldr(idx))// &
+        if (coefs_restart_due(coefs)) then
+            write(*,*) "yelmox: forcing-increment restart "//trim(coefs_restart_fldr(coefs))// &
                        " at time =", ts%time
-            call run_restart_write(dom, bsl, ts%time, idx, fldr=trim(indices_restart_fldr(idx)))
+            call run_restart_write(dom, bsl, ts%time, coefs, fldr=trim(coefs_restart_fldr(coefs)))
         end if
 
         ! Kill switch: stop once the response has equilibrated at a forcing
-        ! bound (any index). The top of the loop then writes the final state and exits.
-        if (indices_kill(idx)) then
-            write(*,*) "yelmox: index kill switch tripped at time =", ts%time
+        ! bound (any coefficient). The top of the loop then writes the final state and exits.
+        if (coefs_kill(coefs)) then
+            write(*,*) "yelmox: coefficient kill switch tripped at time =", ts%time
             ts%is_finished = .TRUE.
         end if
     end do

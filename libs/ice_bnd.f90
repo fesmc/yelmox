@@ -15,8 +15,8 @@ module ice_bnd
     !           between the slices of the group, the first or last slice
     !           outside its time range (varslice "extrap")
     !   scaled  H = f * H_slice: the slice of the group at slice_time times the
-    !           value f of an index of the registry (e.g. before the file
-    !           starts: the LGM slice times a glacial index)
+    !           value f of a coefficient of the registry (e.g. before the file
+    !           starts: the LGM slice times a glacial coefficient)
     !
     ! The group is read on the Yelmo grid ({grid_name} = the ice grid; remap
     ! and grid_src in the group for a product on another grid).
@@ -27,7 +27,7 @@ module ice_bnd
     use constants,     only : mv
     use varslice,      only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use yelmo_defs,    only : MASK_ICE_FIXED
-    use kryos_forcing, only : indices_class, indices_value, indices_has
+    use kryos_forcing, only : coefs_class, coefs_value, coefs_has
     use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
 
     implicit none
@@ -39,7 +39,7 @@ module ice_bnd
         character(len=64)  :: group      = ""
         character(len=16)  :: method     = "file"     ! file | scaled
         character(len=256) :: H_ice      = ""         ! var_defs group of the ice thickness [m]
-        character(len=64)  :: index      = ""         ! scaled: the index f
+        character(len=64)  :: coef       = ""         ! scaled: the coefficient f
         real(dp)           :: slice_time = 0.0_dp     ! [yr] scaled: time of H_slice
         type(varslice_class)  :: vs                   ! file: the ice history
         real(wp), allocatable :: H_slice(:,:)         ! scaled: the slice at slice_time [m]
@@ -51,14 +51,14 @@ module ice_bnd
 
 contains
 
-    subroutine ice_bnd_init(ibnd, filename, group, domain, grid, idx)
+    subroutine ice_bnd_init(ibnd, filename, group, domain, grid, coefs)
         ! Read [ice_bnd<sfx>] (group; optional, inactive without it) and open
-        ! the ice history on the Yelmo grid (grid). idx: the driver's indices
-        ! registry (scaled: the index must be in it).
+        ! the ice history on the Yelmo grid (grid). coefs: the driver's
+        ! coefficient registry (scaled: the coefficient must be in it).
         type(ice_bnd_class), intent(inout) :: ibnd
         character(len=*),    intent(in)    :: filename, group, domain
         type(grid_class),    intent(in)    :: grid
-        type(indices_class), intent(in)    :: idx
+        type(coefs_class),   intent(in)    :: coefs
 
         character(len=256) :: var_defs(VAR_DEFS_MAX)
         character(len=1024) :: vdb
@@ -72,7 +72,7 @@ contains
                       defaults_file=def_file, defaults_group="ice_bnd")
         call nml_read(filename, group, "method",     ibnd%method,     defaults_file=def_file, defaults_group="ice_bnd")
         call nml_read(filename, group, "H_ice",      ibnd%H_ice,      defaults_file=def_file, defaults_group="ice_bnd")
-        call nml_read(filename, group, "index",      ibnd%index,      defaults_file=def_file, defaults_group="ice_bnd")
+        call nml_read(filename, group, "coef",       ibnd%coef,       defaults_file=def_file, defaults_group="ice_bnd")
         call nml_read(filename, group, "slice_time", ibnd%slice_time, defaults_file=def_file, defaults_group="ice_bnd")
 
         select case(trim(ibnd%method))
@@ -83,9 +83,9 @@ contains
                            &scaled; got '"//trim(ibnd%method)//"'."
                 error stop 1
         end select
-        if (trim(ibnd%method) == "scaled" .and. .not. indices_has(idx, ibnd%index)) then
-            write(*,*) "ice_bnd_init:: error: ["//trim(group)//"] method = scaled: index = '"// &
-                       trim(ibnd%index)//"' is not in [forcing] series."
+        if (trim(ibnd%method) == "scaled" .and. .not. coefs_has(coefs, ibnd%coef)) then
+            write(*,*) "ice_bnd_init:: error: ["//trim(group)//"] method = scaled: coef = '"// &
+                       trim(ibnd%coef)//"' is not in [forcing] coefs."
             error stop 1
         end if
 
@@ -97,8 +97,8 @@ contains
             call read_slice(ibnd, ibnd%slice_time)
             ibnd%H_slice = ibnd%vs%var(:,:,1,1)
             call varslice_end(ibnd%vs)
-            write(*,*) "ice_bnd_init:: "//trim(group)//" active, method scaled: index "// &
-                       trim(ibnd%index)//" times "//trim(ibnd%H_ice)//" at ", ibnd%slice_time, &
+            write(*,*) "ice_bnd_init:: "//trim(group)//" active, method scaled: coefficient "// &
+                       trim(ibnd%coef)//" times "//trim(ibnd%H_ice)//" at ", ibnd%slice_time, &
                        " yr; range [m]: ", minval(ibnd%H_slice), maxval(ibnd%H_slice)
         else
             write(*,*) "ice_bnd_init:: "//trim(group)//" active, method file: "//trim(ibnd%H_ice)
@@ -106,16 +106,16 @@ contains
 
     end subroutine ice_bnd_init
 
-    subroutine ice_bnd_update(ibnd, H_ice_ref, mask_ice, tau_relax, time, idx)
+    subroutine ice_bnd_update(ibnd, H_ice_ref, mask_ice, tau_relax, time, coefs)
         ! H_ice_ref = the prescribed thickness at the forcing time `time` in the
         ! fixed (mask_ice = MASK_ICE_FIXED) and relaxation (tau_relax > 0)
-        ! cells; elsewhere unchanged. idx: the registry, advanced to `time`.
+        ! cells; elsewhere unchanged. coefs: the registry, advanced to `time`.
         type(ice_bnd_class), intent(inout) :: ibnd
         real(wp),            intent(inout) :: H_ice_ref(:,:)
         integer,             intent(in)    :: mask_ice(:,:)
         real(wp),            intent(in)    :: tau_relax(:,:)
         real(dp),            intent(in)    :: time
-        type(indices_class), intent(in)    :: idx
+        type(coefs_class),   intent(in)    :: coefs
 
         real(wp), allocatable :: H(:,:)
         logical,  allocatable :: strip(:,:)
@@ -127,10 +127,10 @@ contains
                 call read_slice(ibnd, time)
                 H = ibnd%vs%var(:,:,1,1)
             case("scaled")
-                H = indices_value(idx, ibnd%index) * ibnd%H_slice
+                H = coefs_value(coefs, ibnd%coef) * ibnd%H_slice
         end select
 
-        ! (scaled: no negative thickness for an index below 0)
+        ! (scaled: no negative thickness for a coefficient below 0)
         strip = (mask_ice == MASK_ICE_FIXED .or. tau_relax > 0.0_wp)
         where (strip) H_ice_ref = max(H, 0.0_wp)
 

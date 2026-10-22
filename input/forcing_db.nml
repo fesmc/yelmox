@@ -1,12 +1,12 @@
 ! =====================================================================
 ! forcing_db.nml — shared library of named forcing groups: snapshots
-! [snapshot_<name>], series [series_<name>], terms [term_<name>] and elsa
+! [snapshot_<name>], coefficients [coef_<name>], terms [term_<name>] and elsa
 ! layer settings [elsa_<name>]. The forcing as terms: docs/_forcing-terms.md.
 !
 ! Lookup: a named group is read from the par file if it has it, else from the
 ! first [forcing] var_defs file that does (this file is in the default list).
 ! A par file uses the library by selecting groups by name:
-!     &forcing  reference = "pd"  series = "alpha" "dTo"  terms = "lgm" "ocean"
+!     &forcing  reference = "pd"  coefs = "alpha" "dTo"  terms = "lgm" "ocean"
 ! elsa groups are read by yelmo straight from the file [ytrc] elsa_nml names,
 ! selected by [ytrc] elsa_group:
 !     &ytrc     elsa_nml = "input/forcing_db.nml"  elsa_group = "elsa_grl_lgp"
@@ -18,7 +18,7 @@
 !
 ! The present-day snapshot_pd stays in each par file (domain-specific), as do
 ! [forcing] (the per-run selection) and [snapshots] (the backend's rules).
-! Unset keys: the templates snapshot, series and term of
+! Unset keys: the templates snapshot, coef and term of
 ! input/yelmox_defaults.nml.
 ! =====================================================================
 
@@ -67,19 +67,19 @@
     pr  = "b20_pr_frac"  ! or b20_pr_frac_low, b20_pr_frac_high
 /
 
-! ===== Series (tsgen groups, or derived; units and restart_every_df optional) =====
+! ===== Coefficients (tsgen groups, or derived; units and restart_every_df optional) =====
 
-&series_alpha
-    ! The default alpha, read when the par file has no [series_alpha]: the
+&coef_alpha
+    ! The default alpha, read when the par file has no [coef_alpha]: the
     ! glacial index alpha_combined_125kyr_interp (0 at present, ~0.9 at 21 ka),
-    ! as is (not normalised). The series are named by their symbol in the
+    ! as is (not normalised). The coefficients are named by their symbol in the
     ! equation (alpha, beta, gamma, ...); a setup sets the record of each in
     ! its par file (yelmox_Greenland.nml: alpha_orbital_r2020, normalised).
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
 /
 
-&series_dTo
+&coef_dTo
     ! The ocean temperature anomaly from the atmosphere: 0.25 times the mean
     ! sea-level air temperature anomaly of the climate update over the
     ! climate grid [K] (derived, set by the climate); added to the ocean
@@ -91,7 +91,7 @@
     units  = "K"
 /
 
-&series_ramp
+&coef_ramp
     ! Functionality test: ramp + noise, a uniform anomaly (term_ramp).
     method     = "ramp-slope"  ! constant-rate ramp (df_dt_max), clamped to [f_min,f_max]
     with_kill  = False      ! stop the run once the response equilibrates at a bound
@@ -109,8 +109,8 @@
     units      = "K"
 /
 
-&series_hyst
-    ! Hysteresis: series "hyst" with the uniform term_hyst.
+&coef_hyst
+    ! Hysteresis: coefficient "hyst" with the uniform term_hyst.
     method     = "PI42"     ! const|ramp-slope|ramp-time|ramp-time-step|sin|exp|PI42|H312b|H312PID|H321PID|PID1
     with_kill  = True       ! stop the run once the response equilibrates at a bound
     dt_init    = 200.0      ! [yr]  hold forcing flat during this initial interval
@@ -127,8 +127,8 @@
     units      = "K"
 /
 
-&series_dT
-    ! Sensitivity anomaly for run_mg_forward.sh (series "dT", term_dT): a
+&coef_dT
+    ! Sensitivity anomaly for run_mg_forward.sh (coefficient "dT", term_dT): a
     ! constant [K], set there with f_min = f_max.
     method = "const"
     f_min  = 0.0
@@ -136,7 +136,7 @@
     units  = "K"
 /
 
-&series_obm_north
+&coef_obm_north
     ! yelmox_bipolar: the northern box temperature of the ocean box model [K]
     ! (derived, set by the bridge after the box model), the ocean of the
     ! northern domain with term_obm_north.
@@ -146,7 +146,7 @@
     units   = "K"
 /
 
-&series_obm_south
+&coef_obm_south
     ! yelmox_bipolar: the southern box temperature [K] (term_obm_south).
     method  = "derived"
     from    = "obm_south"
@@ -154,12 +154,12 @@
     units   = "K"
 /
 
-! ===== Terms (series x pattern on explicit fields) =====
+! ===== Terms (coefficient x pattern on explicit fields) =====
 
 &term_lgm
     ! The LGM anomaly (PMIP3 lgm - piControl) weighted by alpha:
     ! tas + alpha*(lgm - picontrol), pr * (1 + alpha*(lgm/picontrol - 1)).
-    series = "alpha"
+    coef   = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"
     fields = "tas" "pr"
@@ -167,7 +167,7 @@
 
 &term_b18
     ! The Buizert et al. (2018) temperature reconstruction in time, as its
-    ! anomaly to its own 1981-2010 baseline, in full (no series).
+    ! anomaly to its own 1981-2010 baseline, in full (no coefficient).
     snap0  = "b18_base"
     snap1  = "b18"
     fields = "tas"
@@ -181,47 +181,47 @@
 /
 
 &term_ocean
-    ! The ocean temperature profiles plus the derived anomaly series_dTo
+    ! The ocean temperature profiles plus the derived anomaly coef_dTo
     ! (0.25 x the mean sea-level air temperature anomaly).
-    series  = "dTo"
+    coef    = "dTo"
     pattern = "uniform"
     fields  = "to"
 /
 
 &term_ramp
-    ! A uniform anomaly from series_ramp: tas + f, pr * exp(beta_p*f).
-    series  = "ramp"
+    ! A uniform anomaly from coef_ramp: tas + f, pr * exp(beta_p*f).
+    coef    = "ramp"
     pattern = "uniform"
     fields  = "tas" "pr"
 /
 
 &term_hyst
-    ! A uniform anomaly from the hysteresis series.
-    series  = "hyst"
+    ! A uniform anomaly from the hysteresis coefficient.
+    coef    = "hyst"
     pattern = "uniform"
     fields  = "tas" "pr"
 /
 
 &term_dT
-    ! A uniform anomaly of series_dT [K].
-    series  = "dT"
+    ! A uniform anomaly of coef_dT [K].
+    coef    = "dT"
     pattern = "uniform"
     fields  = "tas" "pr"
 /
 
 &term_obm_north
     ! yelmox_bipolar: the ocean temperature profiles replaced by the northern
-    ! box temperature at every depth (series_obm_north); with anomaly = True
-    ! in the series and pattern = "uniform" here, the reference plus the box
-    ! anomaly instead.
-    series  = "obm_north"
+    ! box temperature at every depth (coef_obm_north); with anomaly = True
+    ! in the coefficient and pattern = "uniform" here, the reference plus the
+    ! box anomaly instead.
+    coef    = "obm_north"
     pattern = "replace"
     fields  = "to"
 /
 
 &term_obm_south
     ! yelmox_bipolar: the ocean of the southern domain from the southern box.
-    series  = "obm_south"
+    coef    = "obm_south"
     pattern = "replace"
     fields  = "to"
 /

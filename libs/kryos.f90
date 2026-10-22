@@ -18,7 +18,7 @@ module kryos
     !   kryos_coupling  the per-step coupling primitives (step_*, couple_*)
     !   kryos_startup   initial state (cold start) and restart bundles
     !   kryos_output    per-module 2D/1D output
-    !   kryos_forcing   driver-owned indices registry
+    !   kryos_forcing   driver-owned coefficient registry
 
     use precision,    only : dp
     use nml,          only : nml_read, nml_replace
@@ -30,7 +30,7 @@ module kryos
     use fastisostasy, only : isos_class, isos_init
     use climate_out,    only : climate_out_class
     use yelmox_climate, only : yelmox_climate_class, climate_init
-    use kryos_forcing,  only : indices_class
+    use kryos_forcing,  only : coefs_class
     use ice_bnd,        only : ice_bnd_class, ice_bnd_init
     use smbpal,       only : smbpal_class, smbpal_init
     use smb_simple_m, only : smb_simple_class, smb_simple_init, smb_simple_set_mask
@@ -216,7 +216,7 @@ contains
         if (dt > 0.0_dp) due = (mod(nint(time*100), nint(dt*100)) == 0)
     end function cadence_due
 
-    subroutine domain_init(dom, path_par, time, idx, group_suffix, timeline_group)
+    subroutine domain_init(dom, path_par, time, coefs, group_suffix, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
@@ -239,12 +239,12 @@ contains
         ! run's shared timeline -- the same group the driver passes to
         ! tstep_init -- from which the domain reads tstep_method/dtt itself.
         !
-        ! idx is the driver's indices registry (shared by every domain); the
-        ! climate checks the indices it names against it.
+        ! coefs is the driver's coefficient registry (shared by every domain);
+        ! the climate checks the coefficients it names against it.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
         real(dp),         intent(in)    :: time       ! model time
-        type(indices_class), intent(in) :: idx
+        type(coefs_class),   intent(in) :: coefs
         character(len=*), intent(in), optional :: group_suffix
         character(len=*), intent(in), optional :: timeline_group
 
@@ -309,7 +309,7 @@ contains
 
         ! Prescribed ice in Yelmo's fixed and relaxation cells ([ice_bnd]),
         ! read on the Yelmo grid; no-op unless active.
-        call ice_bnd_init(dom%ibnd, path_par, "ice_bnd"//trim(sfx), domain, grid_y, idx)
+        call ice_bnd_init(dom%ibnd, path_par, "ice_bnd"//trim(sfx), domain, grid_y, coefs)
 
         ! NEGIS cb_ref modification: its parameters and the masks of its parts,
         ! loaded when enabled, so it cannot silently run with defaults.
@@ -349,7 +349,7 @@ contains
         call climate_init(dom%cl, dom%ctl%climate, path_par, domain, grid_c, &
                           time, reg_c, dom%ctl%south, sfx=trim(sfx), &
                           timeline_group=trim(tgroup), &
-                          smb_direct=(trim(dom%ctl%surface_method) == "climate"), idx=idx)
+                          smb_direct=(trim(dom%ctl%surface_method) == "climate"), coefs=coefs)
         call regions_end(reg_c)
 
         ! --- smb on its configured grid (grid_surface) ---

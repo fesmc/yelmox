@@ -1,8 +1,8 @@
 module yelmox_nml
-    ! Namelist helpers shared by the yelmox forcing modules (series, terms,
-    ! snapshots, the climate transforms): the defaults file of their groups,
+    ! Namelist helpers shared by the yelmox forcing modules (coefficients,
+    ! terms, snapshots, the climate transforms): the defaults file of their groups,
     ! the run's database list ([forcing] var_defs) and the lookup of a named
-    ! group (varslice, snapshot, term, series) in the par file, then in that
+    ! group (varslice, snapshot, term, coef) in the par file, then in that
     ! list.
 
     use nml, only : nml_has_group, nml_read
@@ -25,7 +25,7 @@ contains
     function forcing_var_defs(par_file) result(var_defs)
         ! The run's database list, [forcing] var_defs (the one list every
         ! named group is looked up in after the par file: varslice groups,
-        ! snapshots, terms, series); the default of the template when the
+        ! snapshots, terms, coefficients); the default of the template when the
         ! group or the key is absent.
         character(len=*), intent(in) :: par_file
         character(len=256) :: var_defs(VAR_DEFS_MAX)
