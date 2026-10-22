@@ -1,11 +1,13 @@
 # forcing-builder
 
 The data and the command-line side of the forcing builder page
-(`docs/forcing-builder.md`, published with the docs): a run's configuration is
-its base par file plus runme `-p` overrides, resolved against the forcing
-library (`input/forcing_db.nml`) and the schema defaults
-(`input/yelmox_defaults.nml`; the forcing as terms: `docs/_forcing-terms.md`),
-and the forcing it imposes is drawn on the run's timeline.
+(`docs/forcing-builder.md`, published with the docs). The page builds the
+forcing in the order of its equation (`docs/_forcing-terms.md`) from the
+forcing groups of a run, taken from the base par file, the forcing library
+(`input/forcing_db.nml`) or the schema templates (`input/yelmox_defaults.nml`),
+and writes the run out against a base as a par file and a runme `-p` list;
+`explain.jl` resolves a base plus `-p` the same way on the command line and
+draws the forcing on the run's timeline.
 
 Files:
 

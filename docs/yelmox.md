@@ -462,9 +462,12 @@ commented `-p` arrays (in `scripts/<exp>/params.sh` when several scripts share
 them); run control goes in the invocation (run step, times, restart, grid,
 output intervals, queue).
 
-The [forcing builder](forcing-builder.md) resolves a base plus `-p` overrides
-the same way, draws the forcing the run will see and writes the `runme`
-command; `scripts/forcing-builder/explain.jl` does it on the command line.
+The [forcing builder](forcing-builder.md) builds the forcing in the order of
+its equation (time, reference and terms, the records and fields that populate
+them, the transforms), checks that every piece is there, and writes the run
+out as the par-file groups and as the `-p` list with the `runme` command
+against a base; `scripts/forcing-builder/explain.jl` resolves a base plus
+`-p` the same way on the command line.
 
 ### `[ctrl]`
 

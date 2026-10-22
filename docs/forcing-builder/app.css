@@ -39,7 +39,11 @@
 .fb-sym { font-weight: 400; color: var(--fb-accent); }
 .fb-kind { font-size: 0.72rem; font-weight: 500; padding: 0.05rem 0.45rem; border-radius: 8px; background: var(--fb-accent-soft); color: var(--fb-accent); }
 .fb-fields { display: grid; grid-template-columns: 1fr; gap: 0.15rem; margin: 0.3rem 0; }
-.fb-field { display: grid; grid-template-columns: 9.5rem 11rem 4.2rem minmax(0, 1fr); align-items: center; gap: 0.45rem; font-size: 0.85rem; }
+/* a field: label | widget and badge, then the help in full under the widget */
+.fb-field { display: grid; grid-template-columns: 10rem minmax(0, 1fr); align-items: center; column-gap: 0.45rem; row-gap: 0.05rem; font-size: 0.85rem; }
+.fb-val { display: flex; flex-wrap: wrap; gap: 0.25rem 0.45rem; align-items: center; min-width: 0; }
+.fb-field > .fb-help { grid-column: 2 / -1; font-size: 0.75rem; line-height: 1.35; margin-bottom: 0.25rem; }
+.fb-miss { color: var(--fb-warn); font-weight: 600; }
 .fb-field label code { font-size: 0.82rem; }
 .fb-field input[type=text], .fb-field select, .fb-names select, .fb-names input, .fb-toprow select { font-size: 0.82rem; padding: 0.1rem 0.3rem; max-width: 11rem; font-family: var(--bs-font-monospace, monospace);
   border: 1px solid var(--fb-line); border-radius: 4px; background: var(--fb-panel); color: var(--fb-fg); }
@@ -47,7 +51,6 @@
 .fb-field input.fb-text { width: 11rem; }
 .fb-field input.fb-num { width: 7rem; }
 .fb-help { color: var(--fb-muted); font-size: 0.78rem; font-weight: 400; }
-.fb-field .fb-help { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fb-note { color: var(--fb-muted); font-size: 0.8rem; margin: 0.25rem 0; }
 .fb-warn { color: var(--fb-warn); background: var(--fb-warn-soft); font-size: 0.8rem; padding: 0.25rem 0.5rem; border-radius: 4px; margin: 0.3rem 0; }
 .fb-src { font-size: 0.68rem; padding: 0.05rem 0.35rem; border-radius: 0.6rem; background: #eee; color: #555; white-space: nowrap; justify-self: start; font-weight: 400; }
@@ -94,4 +97,58 @@ pre.fb-cfg .c { color: var(--fb-muted); }
 pre.fb-cfg .g { color: var(--fb-accent); font-weight: 600; }
 pre.fb-cfg .ov { background: #fde9b8; }
 .fb-ta { width: 100%; font-family: var(--bs-font-monospace, monospace); font-size: 0.8rem; }
-@media (max-width: 640px) { .fb-field { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .fb-field .fb-help { grid-column: 1 / -1; white-space: normal; } }
+@media (max-width: 640px) { .fb-field { grid-template-columns: minmax(0, 1fr); } .fb-field > .fb-help { grid-column: 1 / -1; } }
+
+/* equation-first layout: subheadings inside a section, inline equations in a card */
+.fb-sub { font-size: 0.85rem; font-weight: 600; margin: 0.9rem 0 0.35rem; color: var(--fb-fg); border: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: baseline; }
+.fb-eq-inline { font-size: 0.9rem; margin: 0.25rem 0 0.1rem; overflow-x: auto; }
+.fb-cardhead select { font-size: 0.8rem; padding: 0.1rem 0.3rem; border: 1px solid var(--fb-line); border-radius: 4px; background: var(--fb-panel); color: var(--fb-fg); }
+
+/* each piece with its source: "from" below a definition, a snapshot as a sub-card of the term or reference that names it */
+.fb-from { border-top: 1px solid var(--fb-line2); margin-top: 0.5rem; padding-top: 0.3rem; }
+.fb-from-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fb-muted); margin-bottom: 0.15rem; }
+.fb-sub-card { background: var(--fb-panel); border: 1px solid var(--fb-line2); border-radius: 5px; padding: 0.4rem 0.65rem; margin: 0.35rem 0 0.35rem 0.6rem; }
+.fb-sub-card .fb-cardhead { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.2rem; }
+
+/* the explainer, first on the page: the primer | the example equations (at
+   their own width, braces not clipped); one column under 1000 px */
+.fb-explainer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 0.6rem 1.6rem; align-items: start;
+  background: var(--fb-panel); border: 1px solid var(--fb-line); border-radius: 6px; padding: 0.7rem 1rem 0.5rem; margin-bottom: 0.9rem; }
+.fb-explainer .fb-eq { overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0 0.5rem; }
+.fb-explainer .fb-guide > .fb-note { max-width: 62ch; }
+@media (max-width: 1000px) { .fb-explainer { grid-template-columns: minmax(0, 1fr); } .fb-explainer .fb-eq { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.4rem; } }
+
+/* the primer, and the legend of the badges under the equation heading */
+.fb-primer { color: var(--fb-fg); font-size: 0.85rem; max-width: 75ch; margin: 0 0 0.3rem; }
+.fb-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.75rem; color: var(--fb-muted); margin: 0 0 0.6rem; }
+
+/* pickers: a select of names, a text input for a new name */
+.fb-picker { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.fb-field .fb-picker select { max-width: 16rem; }
+.fb-field input.fb-newname { width: 8rem; }
+
+/* chips: the clim_db groups of a key */
+.fb-chips { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; min-width: 0; }
+.fb-chip { display: inline-flex; align-items: center; font-family: var(--bs-font-monospace, monospace); font-size: 0.76rem; background: var(--fb-code); border: 1px solid var(--fb-line); border-radius: 4px; padding: 0 0 0 0.35rem; }
+.fb-chip-bad { background: var(--fb-warn-soft); color: var(--fb-warn); }
+.fb-chip-x { border: none; background: none; cursor: pointer; color: var(--fb-muted); padding: 0 0.3rem; font-size: 0.85rem; line-height: 1.2; }
+.fb-chip-x:hover { color: var(--fb-warn); }
+.fb-field select.fb-chip-add { max-width: 9rem; color: var(--fb-muted); }
+
+/* an undefined coefficient of a term, with its define button */
+.fb-define { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.fb-define .fb-btn { padding: 0.05rem 0.5rem; }
+
+/* the clim_db groups of a snapshot */
+.fb-tbl { width: 100%; border-collapse: collapse; font-size: 0.74rem; margin: 0.3rem 0; table-layout: auto; }
+.fb-tbl th { text-align: left; font-weight: 600; color: var(--fb-muted); border-bottom: 1px solid var(--fb-line); padding: 0.1rem 0.35rem; }
+.fb-tbl td { border-bottom: 1px solid var(--fb-line2); padding: 0.1rem 0.35rem; vertical-align: top; font-family: var(--bs-font-monospace, monospace); }
+.fb-tbl td.fb-tbl-file { word-break: break-all; }
+/* max-width 0: the entry does not widen the table, its pre scrolls instead */
+.fb-tbl tr.fb-tbl-det > td { background: var(--fb-bg); font-family: inherit; max-width: 0; }
+.fb-tbl tr.fb-tbl-det pre.fb-cfg { margin: 0.2rem 0; }
+.fb-link { border: none; background: none; padding: 0; cursor: pointer; color: var(--fb-accent); font: inherit; text-decoration: underline dotted; text-align: left; }
+.fb-link:hover { text-decoration: underline; }
+
+/* the guide: the example equations with their pieces named */
+.fb-guide .fb-eq { font-size: 0.88rem; }
