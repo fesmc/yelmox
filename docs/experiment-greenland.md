@@ -52,7 +52,7 @@ glacial cycle.
 - **All:** cold start on the present-day topography (`[sim] init_method =
   "none"`), no relaxation, no optimization (`[sim] relax = False`, `opt =
   False`; `[relax]` and `[opt]` are unused). Present-day insolation (`[orbit]
-  method = "time"`, `time = 0`); the sea level follows the model's own
+  method = "fixed_time"`, `time = 0`); the sea level follows the model's own
   ice-volume change (`[barysealevel] method = "fastiso"`).
 - **Output:** 1D every year; 2D every 200 yr (ramp: 50 yr; pd: 500 yr), small
   2D every 50 yr (pd: 500 yr).

@@ -310,7 +310,7 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
   give `cal` / `time_ref` (calendar years, e.g. ESM runs). `domain_init` takes
   the same group name (`timeline_group`) and reads the values the domain needs
   (`tstep_method`, `dtt`) itself.
-- **`domain_startup(dom, ts, bsl, restart, coefs [, restore_bsl, tsf])`**
+- **`domain_startup(dom, ts, bsl, restart, coefs [, restore_bsl])`**
   (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
   restore of the domain bundle `restart` + hub rebuild, continuing the
   restored state: only the climate (and a stateless `smb_simple` surface) is
