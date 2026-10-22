@@ -114,7 +114,7 @@ pre.fb-cfg .ov { background: #fde9b8; }
    their own width, braces not clipped); one column under 1000 px */
 .fb-explainer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 0.6rem 1.6rem; align-items: start;
   background: var(--fb-panel); border: 1px solid var(--fb-line); border-radius: 6px; padding: 0.7rem 1rem 0.5rem; margin-bottom: 0.9rem; }
-.fb-explainer .fb-eq { overflow: visible; padding: 0.2rem 0; }
+.fb-explainer .fb-eq { overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0 0.5rem; }
 .fb-explainer .fb-guide > .fb-note { max-width: 62ch; }
 @media (max-width: 1000px) { .fb-explainer { grid-template-columns: minmax(0, 1fr); } .fb-explainer .fb-eq { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.4rem; } }
 
