@@ -623,43 +623,44 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f a series, e.g. before the file st
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    calendar        <span class="kw">=</span> False</span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    calendar_ref    <span class="kw">=</span> <span class="fl">1950.0</span></span>
 <span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    restart         <span class="kw">=</span> <span class="st">"None"</span>            <span class="co">! restart bundle folder, or "None" for a cold start</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    tstep_method    <span class="kw">=</span> <span class="st">"const"</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    tstep_const     <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    time_init       <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    time_<span class="kw">end</span>        <span class="kw">=</span> <span class="fl">15e3</span></span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    dtt             <span class="kw">=</span> <span class="fl">10.0</span></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>comps</span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    with_ice_sheet  <span class="kw">=</span> True</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    with_isostasy   <span class="kw">=</span> True</span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    with_climate    <span class="kw">=</span> True</span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    with_surface    <span class="kw">=</span> True</span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    with_shelf      <span class="kw">=</span> True</span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>    climate         <span class="kw">=</span> <span class="st">"snapshots"</span></span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>    surface_method  <span class="kw">=</span> <span class="st">"chion"</span></span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>    dt_clim         <span class="kw">=</span> <span class="fl">10.0</span></span>
-<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>    dt_isos         <span class="kw">=</span> <span class="fl">10.0</span></span>
-<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
-<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>sim</span>
-<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>    init_method       <span class="kw">=</span> <span class="st">"none"</span></span>
-<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    init_marine_H     <span class="kw">=</span> False</span>
-<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>    init_kill_shelves <span class="kw">=</span> False</span>
-<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>    init_time_thrm    <span class="kw">=</span> <span class="fl">0.0</span></span>
-<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>    relax             <span class="kw">=</span> True            <span class="co">! uses [relax]</span></span>
-<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>    opt               <span class="kw">=</span> True            <span class="co">! uses [opt]</span></span>
-<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>    use_negis         <span class="kw">=</span> False</span>
-<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>    scale_glacial_smb <span class="kw">=</span> False</span>
-<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>    lim_pd_ice        <span class="kw">=</span> False</span>
-<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    write_lossless  <span class="kw">=</span> False             <span class="co">! all output lossless (ignore per-field precision)</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    tstep_method    <span class="kw">=</span> <span class="st">"const"</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    tstep_const     <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    time_init       <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    time_<span class="kw">end</span>        <span class="kw">=</span> <span class="fl">15e3</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    dtt             <span class="kw">=</span> <span class="fl">10.0</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>comps</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    with_ice_sheet  <span class="kw">=</span> True</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    with_isostasy   <span class="kw">=</span> True</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    with_climate    <span class="kw">=</span> True</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    with_surface    <span class="kw">=</span> True</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>    with_shelf      <span class="kw">=</span> True</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>    climate         <span class="kw">=</span> <span class="st">"snapshots"</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>    surface_method  <span class="kw">=</span> <span class="st">"chion"</span></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>    dt_clim         <span class="kw">=</span> <span class="fl">10.0</span></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>    dt_isos         <span class="kw">=</span> <span class="fl">10.0</span></span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a><span class="kw">&amp;</span>sim</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    init_method       <span class="kw">=</span> <span class="st">"none"</span></span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>    init_marine_H     <span class="kw">=</span> False</span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>    init_kill_shelves <span class="kw">=</span> False</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>    init_time_thrm    <span class="kw">=</span> <span class="fl">0.0</span></span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>    relax             <span class="kw">=</span> True            <span class="co">! uses [relax]</span></span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>    opt               <span class="kw">=</span> True            <span class="co">! uses [opt]</span></span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>    use_negis         <span class="kw">=</span> False</span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>    scale_glacial_smb <span class="kw">=</span> False</span>
+<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a>    lim_pd_ice        <span class="kw">=</span> False</span>
+<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a><span class="kw">/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <section id="forcing-library" class="level3">
 <h3 class="anchored" data-anchor-id="forcing-library">Forcing library</h3>
 <p><code>input/forcing_db.nml</code> holds the named forcing groups that several par files share: snapshots <code>[snapshot_&lt;name&gt;]</code> (PMIP3 <code>picontrol</code>, <code>lgm</code>; the Greenland reconstructions <code>b18_base</code>, <code>b18</code>, <code>b20</code>), series <code>[series_&lt;name&gt;]</code> (<code>alpha</code>, the default record, read when the par file has none; <code>dTo</code>, <code>ramp</code>, <code>hyst</code>, <code>dT</code>, <code>obm_north</code>, <code>obm_south</code>), terms <code>[term_&lt;name&gt;]</code> (<code>lgm</code>, <code>b18</code>, <code>b20</code>, <code>ocean</code>, <code>ramp</code>, <code>hyst</code>, <code>dT</code>, <code>obm_north</code>, <code>obm_south</code>) and elsa layer settings (<code>elsa_grl_lgp</code>, <code>elsa_grl_deglac</code>, <code>elsa_ant_paleo</code>). <code>[forcing]</code> (the per-run selection), <code>[snapshots]</code> (the backend’s rules) and <code>[snapshot_pd]</code> (domain-specific) stay in the par file.</p>
 <p>A named group is read from the par file if it has it, else from the first <code>[forcing] var_defs</code> file that does (default <code>"input/clim_db.nml" "input/forcing_db.nml"</code>: the fields, then the library). elsa reads its group from the file <code>[ytrc] elsa_nml</code> names (<code>input/forcing_db.nml</code>), selected by <code>elsa_group</code>. A listed group found nowhere stops the run.</p>
 <p>To change a library group for one run, define it in the par file (it wins; LIS and North redefine <code>series_alpha</code> as the constant 1), or set one of its keys with <code>-p</code> (e.g.&nbsp;<code>-p series_alpha.f_min=0</code>): runme copies the whole group into the staged par file, then applies the override (<code>par_library</code> in <code>.runme/info.json</code>). <code>par_defaults</code> (<code>input/yelmo_defaults.nml</code>, <code>input/yelmox_defaults.nml</code>) lets <code>-p</code> set a key of a group the par file lacks, e.g.&nbsp;<code>-p bias.active=True</code> or <code>-p ytrc.use_elsa=True</code>. <code>-p</code> on a library group needs runme 0.5.26 or later.</p>
 <p>Scripts follow one rule: the settings that define the experiment go in commented <code>-p</code> arrays (in <code>scripts/&lt;exp&gt;/params.sh</code> when several scripts share them); run control goes in the invocation (run step, times, restart, grid, output intervals, queue).</p>
-<p>The <a href="./forcing-builder.html">forcing builder</a> resolves a base plus <code>-p</code> overrides the same way, draws the forcing the run will see and writes the <code>runme</code> command; <code>scripts/forcing-builder/explain.jl</code> does it on the command line.</p>
+<p>The <a href="./forcing-builder.html">forcing builder</a> builds the forcing in the order of its equation (time, reference and terms, the records and fields that populate them, the transforms), checks that every piece is there, and writes the run out as the par-file groups and as the <code>-p</code> list with the <code>runme</code> command against a base; <code>scripts/forcing-builder/explain.jl</code> resolves a base plus <code>-p</code> the same way on the command line.</p>
 </section>
 <section id="ctrl" class="level3">
 <h3 class="anchored" data-anchor-id="ctrl"><code>[ctrl]</code></h3>
@@ -691,6 +692,11 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f a series, e.g. before the file st
 <td><code>restart</code></td>
 <td>folder, <code>"None"</code></td>
 <td>the restart bundle to start from; <code>"None"</code> = cold start</td>
+</tr>
+<tr class="even">
+<td><code>write_lossless</code></td>
+<td>bool</td>
+<td>optional (default <code>False</code>): write all output lossless, ignoring the per-field precision (e.g.&nbsp;for bit-for-bit comparisons of runs)</td>
 </tr>
 </tbody>
 </table>
@@ -949,6 +955,7 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f a series, e.g. before the file st
 </tr>
 </tbody>
 </table>
+<p>The 2D fields are written at a fixed precision (ncio bit rounding, attributes <code>precision_abs</code>/<code>precision_rel</code>), so that they compress well: 1e-3 m for elevations, 1e-3 K for temperatures, 1e-3 m/yr (or 1e-4 relative) for velocities, 1e-4 m/yr for mass balance rates, 1e-4 for fractions, 1e-4 relative for stresses, precipitation and the other fields; masks, time series, restarts and the static fields are lossless. <code>[ctrl] write_lossless = True</code> writes everything lossless.</p>
 </section>
 </section>
 <section id="also-built-from-this-driver" class="level2">
