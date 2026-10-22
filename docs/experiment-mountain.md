@@ -58,7 +58,7 @@ Pyrenees on 2 km.
   (`[sim] init_method = "equil"`, `init_equil_time = 10`).
 - **Climate:** the reference (`snapshot_pd`, ERA5 1981--2010: `tas`, `pr`,
   `zs`) plus the term `uniform` (`[term_uniform]`, a uniform anomaly on `tas` and `pr`,
-  `f_ta = -10` K) on the series `alpha` (`[series_alpha]
+  `f_ta = -10` K) on the coefficient `alpha` (`[coef_alpha]
   method = "series"`, `input/alpha_orbital_t2018.dat`, 1 at present and 0 at
   21 ka, normalised with `norm_t0 = 0`, `norm_t1 = -21e3` to 0 at present and
   1 at 21 ka): `dTa = f_ta * alpha`, the precipitation times `exp(f_p dTa)`
@@ -79,7 +79,7 @@ initializes the marine shelf (no data files are read).
 ## SRG
 
 - **Timeline:** `[ctrl]` 0 to 200 yr, `dtt = 5` yr, constant forcing time
-  (`tstep_method = "const"`). No series or terms (`[forcing] series = ""`,
+  (`tstep_method = "const"`). No coefficients or terms (`[forcing] coefs = ""`,
   `terms = ""`), present-day orbit and constant sea level (`[barysealevel]
   method = "const"`): the climate is the reference throughout.
 - **Initial state:** present-day topography (`TOPO-GLO90-GEBCO2026`, with

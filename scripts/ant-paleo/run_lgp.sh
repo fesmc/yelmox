@@ -2,7 +2,7 @@
 #
 # Antarctic paleo transient, last glacial period (-130 kyr to +10 kyr, 32 km),
 # restarting from the spin-up bundle at 15 kyr. Climate follows the glacial
-# index input/alpha_combined_125kyr_interp.dat (index "a"). Base
+# index input/alpha_combined_125kyr_interp.dat (coefficient alpha). Base
 # yelmox/yelmox_Antarctica.nml with antpal_physics and the forcing antpal_lgp
 # of params.sh. Run from the yelmox root.
 

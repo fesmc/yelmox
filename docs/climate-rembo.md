@@ -36,17 +36,17 @@ the surface mass balance; the ocean comes from the snapshot backend.
   `oras5_1981_2010_so` of `input/clim_db.nml`). The reference must bind `to`
   and no atmosphere (checked at start-up); `so` is optional (salinity 0
   without it). The ocean takes the ocean terms of `[forcing]` as for the
-  snapshots backend (a uniform term on `to`, e.g. `series = "hyst"`,
+  snapshots backend (a uniform term on `to`, e.g. `coef = "hyst"`,
   `f_to = 0.25`).
 - **Transient forcing.** The uniform terms on `tas` (`[term_<name>]
   pattern = "uniform"`) are an input of REMBO, not applied after it: their
   sum `f_ta·f` is REMBO's summer air temperature anomaly `dT_sum`, the annual
   `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6); `pr` in their fields has
   no effect (REMBO computes the precipitation). Snapshot terms on the
-  atmosphere are refused. Off in the par file (`[forcing] series = ""`,
+  atmosphere are refused. Off in the par file (`[forcing] coefs = ""`,
   `terms = ""`).
 - **Transforms.** `[taper]` and `[bias]` are refused at start-up (no reference
-  atmosphere, annual fields only); so is a derived `air_anomaly` series (no
+  atmosphere, annual fields only); so is a derived `air_anomaly` coefficient (no
   sea-level air temperature).
 - **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
@@ -55,10 +55,10 @@ the surface mass balance; the ocean comes from the snapshot backend.
 The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, ...), plus, with
 `[output] write_clim`, `rembo.nc` (annual and summer air temperature,
 precipitation, smb, surface temperature, ocean profiles) and `rembo_ts.nc` (the applied anomalies, the smb integrated
-over the ice sheet and the accumulation-area ratio). The series go to
-the Yelmo 1D file (`series_<name>`), as for the other climates. The library
-holds the hysteresis setup, `series_hyst` (PI42 with kill switch) and the
-uniform `term_hyst` on `tas` and `pr`: `-p forcing.series=hyst
+over the ice sheet and the accumulation-area ratio). The coefficients go to
+the Yelmo 1D file (`coef_<name>`), as for the other climates. The library
+holds the hysteresis setup, `coef_hyst` (PI42 with kill switch) and the
+uniform `term_hyst` on `tas` and `pr`: `-p forcing.coefs=hyst
 forcing.terms=hyst` runs it (a second uniform term on `to` for the ocean).
 Restart bundles hold REMBO's
 `rembo_restart.nc`; REMBO reads its restart as set in `rembo_Greenland.nml`.

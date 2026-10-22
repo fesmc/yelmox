@@ -127,18 +127,18 @@
 
 &forcing
     ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
-    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
-    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! the coefficients [coef_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (coefficient x pattern) added to the reference. Named groups: this
     ! file, then the var_defs files (input/forcing_db.nml: the shared library;
     ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
     reference = "pd"
-    series    = ""
+    coefs     = ""
     terms     = ""
-    ! A (lgp): series alpha, dTo; terms lgm, ocean. B (recon): series dTo; terms
+    ! A (lgp): coefs alpha, dTo; terms lgm, ocean. B (recon): coefs dTo; terms
     ! b18, b20, ocean (scripts/grl-paleo/params.sh).
 /
 
-&series_alpha
+&coef_alpha
     ! alpha of this setup: the glacial index alpha_combined_125kyr_interp (0 at
     ! present, ~0.9 at 21 ka), as is (not normalised), the weight of the LGM
     ! anomaly (term_lgm) when the forcing names it (see [forcing]).
@@ -178,9 +178,9 @@
     ! strip of yelmo_masks border_width) from an ice history at the forcing time.
     ! Off with the "infinite" borders (yelmo experiment).
     active     = False
-    method     = "file"               ! file: H_ice at the forcing time; scaled: H = f(index)*H_ice(slice_time)
+    method     = "file"               ! file: H_ice at the forcing time; scaled: H = f(coef)*H_ice(slice_time)
     H_ice      = "paleomist_H_ice"    ! input/clim_db.nml: PaleoMIST 1.0, 80-0 ka (glac1d_H_ice: GLAC-1D, 26-0 ka)
-    index      = ""                   ! scaled: the series f ([forcing] series)
+    coef       = ""                   ! scaled: the coefficient f ([forcing] coefs)
     slice_time = -21e3                ! [yr] scaled: time of the slice
 /
 

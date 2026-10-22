@@ -6,10 +6,10 @@ aliases:
 
 The snapshot backend `snapshots` builds the climate from a reference
 **snapshot** (e.g. present day) plus the **terms** of `[forcing]`: each a
-scalar **series** on the forcing time (e.g. a glacial index) times a pattern,
-the difference of two snapshots (e.g. LGM minus pre-industrial) or a uniform
-anomaly (see [yelmox](yelmox.md#forcing)),
-on the fesm-utils `varslice` reader and `tsgen` series. It supplies the
+**coefficient**, a scalar of the forcing time (e.g. a glacial index), times a
+pattern, the difference of two snapshots (e.g. LGM minus pre-industrial) or a
+uniform anomaly (see [yelmox](yelmox.md#forcing)),
+on the fesm-utils `varslice` reader and `tsgen`. It supplies the
 atmosphere (monthly `tas`, `pr`, lapse-rate corrected to the current surface)
 and the ocean as depth profiles (`to_ann`, `so_ann`), which the marine shelf
 interpolates to the shelf base. It runs on `grid_clim`, reads `[snapshots]`
@@ -22,7 +22,7 @@ climate (an ocean-only reference snapshot).
 - **Output:** with `[output] write_clim`, `snap.nc`, the climate as applied
   (after the transforms): the annual air temperature and its summer mean
   (`t2m_ann`, `t2m_sum`), the annual precipitation, the ocean profiles
-  (`to_ann`, `so_ann` on `depth`), the value of each term's series
+  (`to_ann`, `so_ann` on `depth`), the value of each term's coefficient
   (`term_<name>`), the surface elevation, the monthly atmosphere (`tas`,
   `pr`), `tsl_ann` and the diagnostics of the active transforms.
 
@@ -33,12 +33,12 @@ the terms, in this order.
 
 Example: `yelmox/yelmox_Greenland.nml`, present day plus the PMIP3 LGM minus
 piControl anomaly weighted by `alpha` (here the orbital record r2020), the ocean plus a quarter of
-the mean air temperature anomaly (the derived series `dTo`):
+the mean air temperature anomaly (the derived coefficient `dTo`):
 
 ```fortran
 &forcing
     reference = "pd"                  ! [snapshot_pd], in the par file
-    series    = "alpha" "dTo"         ! [series_alpha] (par file: alpha_orbital_r2020), [series_dTo] (library)
+    coefs     = "alpha" "dTo"         ! [coef_alpha] (par file: alpha_orbital_r2020), [coef_dTo] (library)
     terms     = "lgm" "ocean"         ! [term_lgm]: picontrol -> lgm on tas, pr; [term_ocean]: dTo on to
 /
 
@@ -70,7 +70,7 @@ The snapshots bind varslice groups (see [Database namelists](database-namelists.
 by name, from the par file itself if it has the group (searched implicitly
 first, so it never has to name itself and its groups win), else from the
 files listed in `[forcing] var_defs`, searched in order (first file that has
-the group). The snapshot groups `[snapshot_<name>]`, the series and the terms
+the group). The snapshot groups `[snapshot_<name>]`, the coefficients and the terms
 are looked up the same way. The shared database `input/clim_db.nml` holds one
 group per product field; a par file can add run-specific groups:
 
@@ -153,7 +153,7 @@ without a time axis (`time = 0 ...`) is read once at the start.
 ### Defaults
 
 `input/yelmox_defaults.nml` declares every key of `[snapshots]` and
-`[snapshot_<name>]`, of the forcing (`[forcing]`, the series, the terms) and
+`[snapshot_<name>]`, of the forcing (`[forcing]`, the coefficients, the terms) and
 of the transforms, with its default. The named groups fall back to a template
 group: `[snapshot_<name>]` to `[snapshot]`, `[snapshots<sfx>]` to
 `[snapshots]` with the domain suffix of a multi-domain driver
@@ -195,7 +195,7 @@ the CLIMBER ocean products, or one record) is taken as is. Without `so`, the
 salinity is 0.
 
 **Composition.** Each term with the `snapshots` pattern adds to the reference
-with the weight `a_k`, the value of its series; the rule is fixed by field:
+with the weight `a_k`, the value of its coefficient; the rule is fixed by field:
 
 | field | now |
 |---|---|
@@ -214,65 +214,65 @@ level like any other snapshot.
 &term_b20                     ! input/forcing_db.nml
     snap0  = ""
     snap1  = "b20"            ! snapshot binding tas (anomaly) and pr (ratio), no zs
-    fields = "pr"             ! series = "": the constant 1
+    fields = "pr"             ! coef = "": the constant 1
 /
 ```
 
 Two terms give the orbital + millennial decomposition of Banderas et al.
 (2018), e.g. `lgm` on `picontrol` -> `lgm` and `millennial` on
-`lgm_weak` -> `lgm_strong`, each on its own series; several terms may share
-one series:
+`lgm_weak` -> `lgm_strong`, each on its own coefficient; several terms may share
+one coefficient:
 
 ```fortran
 &forcing
     reference = "pd"
-    series    = "alpha" "beta"
+    coefs     = "alpha" "beta"
     terms     = "lgm" "millennial"
 /
 
-&series_alpha
+&coef_alpha
     method      = "series"
     series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0             ! [yr] series 0 here
-    norm_t1     = -21e3           ! [yr] series 1 here (or a window, e.g. -23e3 -19e3: the mean)
+    norm_t0     = 0.0             ! [yr] alpha = 0 here
+    norm_t1     = -21e3           ! [yr] alpha = 1 here (or a window, e.g. -23e3 -19e3: the mean)
 /
 
-&series_beta
+&coef_beta
     method      = "series"
     series_file = "input/beta_ngrip_millennial.dat"
 /
 
 &term_lgm
-    series = "alpha"
+    coef   = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"
     fields = "tas" "pr"
 /
 
 &term_millennial
-    series = "beta"
+    coef   = "beta"
     snap0  = "lgm_weak"
     snap1  = "lgm_strong"
     fields = "tas" "pr"
 /
 ```
 
-Turning a proxy series into an index is done by tsgen (`norm_t0`/`norm_t1`,
-see the fesm-utils tsgen docs); a steady state is a `const` series
+Turning a proxy record into a coefficient is done by tsgen (`norm_t0`/`norm_t1`,
+see the fesm-utils tsgen docs); a steady state is a `const` coefficient
 (`df_dt_max = 0`, value `f_min`), independent of the model time.
 
 **Uniform terms** (`pattern = "uniform"`) add `f_ta a` to `tas` (and multiply
 `pr` by exp(β_p f_ta a)), `f_to a` to `to` and `f_so a` to `so` on the fields
-they list. **The ocean anomaly from the atmosphere** is a derived series
+they list. **The ocean anomaly from the atmosphere** is a derived coefficient
 (`method = "derived"`, `from = "air_anomaly"`: `factor` times the mean
 sea-level air temperature anomaly of the same update over `region`, without
 lag and without the lapse-rate cooling of the ice sheet) with a uniform term
-on `to`, the library `series_dTo` + `term_ocean`; `to` without terms stays at
+on `to`, the library `coef_dTo` + `term_ocean`; `to` without terms stays at
 the reference. The ocean terms are applied after the atmosphere (a derived
-series may drive ocean fields only).
+coefficient may drive ocean fields only).
 
-The backend holds no state of its own: the series restart with the driver
-(`series_<name>_restart.nc`). The climate output carries the value of each
-term's series, `term_<name>`.
+The backend holds no state of its own: the coefficients restart with the
+driver (`coef_<name>_restart.nc`). The climate output carries the value of each
+term's coefficient, `term_<name>`.
 
 The transient forcing is added on top in every configuration.

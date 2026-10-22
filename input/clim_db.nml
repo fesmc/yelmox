@@ -247,7 +247,7 @@
 
 ! Badgeley et al. (2020): annual tas anomaly [K] and precipitation fraction
 ! relative to 1850-2000 CE (moderate, low, high accumulation), 50-yr means,
-! 20 ka to 0 BP (oldest first): the hi of an axis with lo = "".
+! 20 ka to 0 BP (oldest first): the snap1 of a term with snap0 = "".
 
 &b20_tas_anom
     filename = "fesmdata/Greenland/GRL-16KM/GRL-16KM_Paleoclimate-Badgeley2020.nc"
@@ -529,7 +529,7 @@
 
 ! ---- CLIMBER-X (Willeit et al., 2025), {exp} = piControl | interstadial |
 ! stadial | heinrich. Monthly and annual means; the _anom fields are the
-! anomalies to piControl (the hi of a lo = "" axis; pr_mon_anom is a
+! anomalies to piControl (the snap1 of a term with snap0 = ""; pr_mon_anom is a
 ! difference in mm d-1, not a ratio); the ocean (to, so, annual) in the
 ! -ocean file.
 

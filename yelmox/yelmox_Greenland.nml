@@ -115,18 +115,18 @@
 
 &forcing
     ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
-    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
-    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! the coefficients [coef_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (coefficient x pattern) added to the reference. Named groups: this
     ! file, then the var_defs files (input/forcing_db.nml: the shared library;
     ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
     reference = "pd"
-    series    = "alpha" "dTo"
+    coefs     = "alpha" "dTo"
     terms     = "lgm" "ocean"
     ! lgm: PMIP3 lgm - picontrol weighted by alpha (0 at present, 1 at 21 ka);
-    ! ocean: the profiles plus 0.25 x the mean sea-level air anomaly (series dTo).
+    ! ocean: the profiles plus 0.25 x the mean sea-level air anomaly (coefficient dTo).
 /
 
-&series_alpha
+&coef_alpha
     ! alpha of this setup: the orbital record alpha_orbital_r2020 normalised to
     ! 0 at present (piControl) and 1 at 21 ka (LGM), the weight of the LGM
     ! anomaly (term_lgm).

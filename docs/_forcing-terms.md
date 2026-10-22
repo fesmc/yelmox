@@ -1,12 +1,13 @@
-# Forcing as terms: series × pattern
+# Forcing as terms: coefficient × pattern
 
 Status: design agreed 2026-10-21 on the interactive mock-up
-`docs/_forcing-terms-mockup.html` (open it in a browser; the series are the
+`docs/_forcing-terms-mockup.html` (open it in a browser; the records are the
 real files of `input/`); phases 2-4 implemented on the branch `forcing-terms`
 (2026-10-21, not yet verified on Levante). The leading `_` keeps quarto
 from rendering it. Supersedes sections 3, 4, 6, 7 and 8 of
 `_forcing-design.md` (indices, axes, modifiers, OBM); the rest of that doc
 (insolation, database, retirement of snapclim, phases 0-6 done) stands.
+2026-10-22: series → coefficient (`[forcing] coefs`, `[coef_<name>]`, `[term] coef`), the vocabulary coefficient / pattern / parameter / term agreed on the forcing builder.
 
 State checked: yelmox dev 54d9ee6 (`libs/snapshots.f90`, `libs/climate_mods.f90`,
 `libs/kryos_forcing.f90`, `input/forcing_db.nml`, `input/yelmox_defaults.nml`).
@@ -24,8 +25,8 @@ their own vocabulary. Names such as `a`, `at`, `one` carry assumptions
 (orbital, temperature) that the equation does not.
 
 The fix: write the forcing as one equation, and make the par file a
-transcription of it. The names are mathematical (a series α(τ), a term, a
-pattern), the user decides what α is.
+transcription of it. The names are mathematical (a coefficient α(τ), a
+term, a pattern, a parameter), the user decides what α is.
 
 ## 2. The equations
 
@@ -37,8 +38,8 @@ t model time.
    τ(t)  = time_rel, set by [ctrl] tstep_method:
            const: τ = tstep_const      rel: τ = t      cal: calendar(t)
 
-1. Scalar series  α_k(τ), named by the user (alpha, beta, gmt, dTo, ...)
-   file         a table or netcdf series, optionally normalised:
+1. Coefficients  α_k(τ), scalars named by the user (alpha, beta, gmt, dTo, ...)
+   series       a table or netcdf time series, optionally normalised:
                 α = (F(τ) − F̄[t0]) / (F̄[t1] − F̄[t0]),  t0, t1 a time or a window (mean)
    const        α = f_min
    generated    ramp-slope, ramp-time, sin, ... (tsgen)
@@ -51,19 +52,19 @@ t model time.
    Θ_j(x,z), S_j(x,z) as given.        S_j may depend on τ (a reconstruction in time).
    S_0 is the reference.
 
-3. Composition at sea level: reference + Σ_k series × pattern
+3. Composition at sea level: reference + Σ_k coefficient × pattern
    T^sl(x,m,τ) = T_0^sl + Σ_k α_k(τ) [T_{k1}^sl − T_{k0}^sl]  + Σ_u f_ta,u α_u(τ)
    P^sl(x,m,τ) = P_0^sl · Π_k [1 + α_k(τ) (P_{k1}^sl / P_{k0}^sl − 1)] · Π_u exp(β_p f_ta,u α_u(τ))
-   Θ(x,z,τ)    = Θ_0 (or the series of a replace term) + Σ_k α_k [Θ_{k1} − Θ_{k0}] + Σ_u f_to,u α_u
+   Θ(x,z,τ)    = Θ_0 (or the coefficient of a replace term) + Σ_k α_k [Θ_{k1} − Θ_{k0}] + Σ_u f_to,u α_u
    S(x,z,τ)    = S_0 (or ...)                          + Σ_k α_k [S_{k1} − S_{k0}] + Σ_u f_so,u α_u
    k: terms with a snapshot pattern; u: terms with a uniform pattern.
    A term without snap0 adds snap1 itself (a given anomaly or ratio).
-   Order: the atmosphere, then the derived series, then the ocean.
+   Order: the atmosphere, then the derived coefficients, then the ocean.
 
 4. To the model surface z_s(x,t)
    T(x,m) = T^sl − Γ_m z_s            P(x,m) = P^sl · exp(−β_p Γ_m z_s)
 
-5. Static transforms (no series)
+5. Static transforms (no coefficient)
    taper:  X ← X_0(z_s) + w(x) (X − X_0(z_s)) [+ (1−w) ⟨X − X_0⟩_{w=1}],  X ∈ {T, P}
    bias:   T ← T + f_tas b_T(x,m[,τ]),   P ← P (1 + f_pr (b_P(x,m[,τ]) − 1))
 
@@ -79,7 +80,9 @@ Rules fixed by field, not configurable: `tas`, `to`, `so` compose additively;
 `pr` as a ratio, and in a uniform term follows the term's `f_ta` as
 exp(β_p ΔT). Γ (annual, summer; a monthly cosine between them) and β_p are
 `[snapshots] lapse` and `f_p`, the same values in the sea-level reduction,
-the uniform term and the elevation transform. A user who wants no
+the uniform term and the elevation transform. These and the gains `f_ta`,
+`f_to`, `f_so` of a uniform term are the parameters: fixed numbers set in the
+par file. A user who wants no
 precipitation response to a uniform term leaves `pr` out of its fields.
 
 Backend variants. **esm** replaces 2-3 by its own calendar-time anomaly and
@@ -90,30 +93,33 @@ the snapshot backend as now.
 
 ## 3. Concepts and contracts
 
-### 3.1 Series
+### 3.1 Coefficients
 
-A named scalar on the forcing time, owned by the driver (`indices_class`
-today), advanced once per step, restarted from `series_<name>_restart.nc`,
-written to the 1D output. Shared by every domain of a multi-domain driver.
-`with_kill` and `restart_every_df` per series as now. The same series may
-drive several terms.
+A named scalar on the forcing time, owned by the driver (`coefs_class`),
+advanced once per step, restarted from `coef_<name>_restart.nc` (an older
+`series_<name>_restart.nc` is still read, with a note), written to the 1D
+output as `coef_<name>`. Shared by every domain of a multi-domain driver.
+`with_kill` and `restart_every_df` per coefficient as now. The same
+coefficient may drive several terms. Its kind is the tsgen `method`: `series`
+(a time series from a file), `const`, a ramp or wave, a controller, or
+`derived`.
 
-### 3.2 Derived series
+### 3.2 Derived coefficients
 
-A series computed each step by the climate step, not advanced by tsgen:
+A coefficient computed each step by the climate step, not advanced by tsgen:
 
 | `from` | value | keys |
 |---|---|---|
 | `air_anomaly` | factor × mean over `region` of (T^sl_ann − T^sl_ann,0) of this update | `factor`, `region` |
 | `obm_north`, `obm_south` | the box temperature θ, or θ − θ_init with `anomaly = True` | `anomaly` |
 
-Contract: a derived series is evaluated after the atmosphere is composed,
+Contract: a derived coefficient is evaluated after the atmosphere is composed,
 so a term driven by it may touch `to` and `so` only (an error at init
 otherwise). `air_anomaly` needs a backend with `tsl_ann` (snapshots); the
-OBM series exist in `yelmox_bipolar` only, their value set by the bridge
+OBM coefficients exist in `yelmox_bipolar` only, their value set by the bridge
 where `obm2ism` runs today. No lag: the anomaly of the same update (as
-decided in `_forcing-design.md` section 7). A derived series is not
-restarted (recomputed) and is written to the 1D output like any series.
+decided in `_forcing-design.md` section 7). A derived coefficient is not
+restarted (recomputed) and is written to the 1D output like any coefficient.
 
 ### 3.3 Snapshots
 
@@ -125,7 +131,7 @@ snapshots loaded is derived from the reference and the terms; no list.
 
 ### 3.4 Terms
 
-One term = one series × one pattern, on an explicit list of fields:
+One term = one coefficient × one pattern, on an explicit list of fields:
 
 | `pattern` | adds | keys |
 |---|---|---|
@@ -133,11 +139,11 @@ One term = one series × one pattern, on an explicit list of fields:
 | `uniform` | f_ta α to `tas` (and exp(β_p f_ta α) to `pr`), f_to α to `to`, f_so α to `so` | `fields`, `f_ta`, `f_to`, `f_so` (default 1) |
 | `replace` | the field = α at every depth, in place of the reference; other terms add to it | `fields` (`to`, `so` only), one per field |
 
-`series = ""` means the constant 1 (the full anomaly of a reconstruction).
+`coef = ""` means the constant 1 (the full anomaly of a reconstruction).
 Contracts, checked at init with an error naming the term: every field is
 bound by `snap0` (if given), `snap1` and the reference; `snap1` of a term
 without `snap0` is a sea-level anomaly or ratio (no `zs`); `replace` once
-per field; a derived series on the ocean only.
+per field; a derived coefficient on the ocean only.
 
 ### 3.5 Transforms and other consumers
 
@@ -152,15 +158,15 @@ which stays as it is (it defines what time means; the forcing then uses it).
 ## 4. The par file
 
 One database list, `[forcing] var_defs`, searched by every consumer
-(series, terms, snapshots and their fields, taper, bias, ice_bnd): the par
+(coefficients, terms, snapshots and their fields, taper, bias, ice_bnd): the par
 file first, then the files in order (the lookup rule of
 `_par-files-plan.md`); default `"input/clim_db.nml" "input/forcing_db.nml"`.
-Unset keys from `input/yelmox_defaults.nml` (templates `forcing`, `series`,
+Unset keys from `input/yelmox_defaults.nml` (templates `forcing`, `coef`,
 `term`, `snapshots`, `snapshot`).
 
-The series are driver-owned and shared by every domain, the reference and
+The coefficients are driver-owned and shared by every domain, the reference and
 the terms belong to a domain: in `yelmox` all four keys sit in one
-`[forcing]`; in `yelmox_bipolar` `[forcing]` holds `series` and `var_defs`,
+`[forcing]`; in `yelmox_bipolar` `[forcing]` holds `coefs` and `var_defs`,
 `[forcing_north]` and `[forcing_south]` hold `reference` and `terms`, and
 the snapshots are named by content (`snapshot_pd_grl`, `snapshot_pd_ant`)
 since the library has no domain suffix.
@@ -173,17 +179,17 @@ since the library has no domain suffix.
 
 &forcing
     reference = "pd"
-    series    = "alpha" "dTo"
+    coefs     = "alpha" "dTo"
     terms     = "lgm" "ocean"
     var_defs  = "input/forcing_db.nml" "input/clim_db.nml"
 /
 
-&series_alpha
+&coef_alpha
     method      = "series"
     series_file = "input/alpha_combined_125kyr_interp.dat"
 /
 
-&series_dTo
+&coef_dTo
     method = "derived"
     from   = "air_anomaly"
     factor = 0.25
@@ -192,14 +198,14 @@ since the library has no domain suffix.
 /
 
 &term_lgm
-    series = "alpha"
+    coef   = "alpha"
     snap0  = "picontrol"
     snap1  = "lgm"
     fields = "tas" "pr"
 /
 
 &term_ocean
-    series  = "dTo"
+    coef    = "dTo"
     pattern = "uniform"
     fields  = "to"
 /
@@ -208,7 +214,7 @@ since the library has no domain suffix.
 GRL paleo A reads: T = T_pd + α (T_lgm − T_pic), P = P_pd [1 + α (P_lgm/P_pic − 1)],
 Θ = Θ_pd + 0.25 ⟨T^sl − T^sl_pd⟩. The other cases (the mock-up presets):
 
-| Case | series | terms |
+| Case | coefficients | terms |
 |---|---|---|
 | GRL paleo B | `dTo` | `buizert` (1, b18_base → b18(τ), tas); `badgeley` (1, "" → b20(τ), pr); `ocean` |
 | LIS, Banderas 2018 | `alpha` const 0.87, `beta` const 0.48 (or NGRIP), `dTo` | `lgm` (α, picontrol → lgm), `millennial` (β, lgmweak → lgmstrong), `ocean` |
@@ -226,35 +232,35 @@ par-files plan's `-p` arrays shrink to.
 
 | today | new |
 |---|---|
-| `[indices] names`, `var_defs` | `[forcing] series`, `[forcing] var_defs` (the one list) |
-| `[idx_<name>]` | `[series_<name>]` (+ `method = "derived"`, `from`, `factor`, `region`, `anomaly`) |
+| `[indices] names`, `var_defs` | `[forcing] coefs`, `[forcing] var_defs` (the one list) |
+| `[idx_<name>]` | `[coef_<name>]` (+ `method = "derived"`, `from`, `factor`, `region`, `anomaly`) |
 | `[snap]` | `[snapshots]`: `lapse`, `f_p`, `grid_global`, `combine`; `ref_name` → `[forcing] reference`; `snapshots`, `axes`, `fields` dropped (derived from the terms) |
 | `[snap_<name>]` | `[snapshot_<name>]` |
-| `[snap_axis_<name>]` `lo`, `hi`, `index` | `[term_<name>]` `snap0`, `snap1`, `series`, `fields` |
+| `[snap_axis_<name>]` `lo`, `hi`, `index` | `[term_<name>]` `snap0`, `snap1`, `coef`, `fields` |
 | `[snap_field_<name>]` `blend`, `axes` | dropped: the rule is fixed by field, the fields are listed by the term |
 | `[anom]` | a `uniform` term; rembo takes the uniform `tas` terms as ΔT_sum (its ocean anomaly `1.3 f_ta f_to α` is gone: a uniform term on `to` instead) |
-| `[ocn_fraction]` | a derived series `air_anomaly` + a `uniform` term on `to` |
-| `[ocn_obm]` absolute / anomaly | the library series `obm_north`/`obm_south` (derived, `anomaly = False`) + the `replace` terms `term_obm_north`/`_south` (`uniform` with `anomaly = True` for the anomaly mode); the bridge sets the series and re-applies the ocean terms (idempotent) |
-| `[obm_forcing]` | unchanged (a consumer of a series, as `[ice_bnd]`) |
-| `[taper]`, `[bias]`, `[orbit]`, `[barysealevel]`, `[ice_bnd]` | unchanged; `[bias]` groups may have a time axis; `[orbit] method` renamed |
-| `idx_one` | gone (`series = ""`) |
+| `[ocn_fraction]` | a derived coefficient `air_anomaly` + a `uniform` term on `to` |
+| `[ocn_obm]` absolute / anomaly | the library coefficients `obm_north`/`obm_south` (derived, `anomaly = False`) + the `replace` terms `term_obm_north`/`_south` (`uniform` with `anomaly = True` for the anomaly mode); the bridge sets the coefficients and re-applies the ocean terms (idempotent) |
+| `[obm_forcing]` | `index` → `coef` (a consumer of a coefficient, as `[ice_bnd]`) |
+| `[taper]`, `[bias]`, `[orbit]`, `[barysealevel]`, `[ice_bnd]` | unchanged; `[bias]` groups may have a time axis; `[orbit] method` renamed; `[ice_bnd] index` → `coef` |
+| `idx_one` | gone (`coef = ""`) |
 | bipolar `snap_north_pd`, `snap_north_axis_at`, ... | `[forcing_north]` selecting library snapshots by content name (`pd_grl`, `pd_ant`); `[snapshots_north]` |
 
-Series are named by their symbol in the equation (`alpha`, `beta`, `gamma`,
-...), never by an interpretation of the record; which record a symbol loads
-is the setup's, in its par file: `[series_alpha]` is `alpha_combined_125kyr`
+Coefficients are named by their symbol in the equation (`alpha`, `beta`,
+`gamma`, ...), never by an interpretation of the record; which record a
+symbol loads is the setup's, in its par file: `[coef_alpha]` is `alpha_combined_125kyr`
 (as is) in the paleo bases, `alpha_orbital_r2020` (normalised 0 at 0, 1 at
 21 ka) in `yelmox_Greenland.nml` and the bipolar north, `alpha_orbital_t2018`
 (normalised) in `yelmox_Pyrenees.nml`, the constant 1 in LIS and North. The
-library keeps a default `series_alpha` (combined) for a par file without one,
-and the physical or shaped series `series_dTo` (derived, 0.25),
-`series_ramp`, `series_hyst`, `series_dT`, `series_obm_north/south`. Terms
+library keeps a default `coef_alpha` (combined) for a par file without one,
+and the physical or shaped coefficients `coef_dTo` (derived, 0.25),
+`coef_ramp`, `coef_hyst`, `coef_dT`, `coef_obm_north/south`. Terms
 are named by what they add: `term_lgm` (lgm − picontrol on α), `term_b18`,
 `term_b20`, `term_ocean`, `term_ramp`, `term_hyst`, `term_dT`,
 `term_obm_north/south`. A par file redefines a library group to change it for
 its run.
 
-The `-p` arrays of the experiments shrink to `forcing.series==...` and
+The `-p` arrays of the experiments shrink to `forcing.coefs==...` and
 `forcing.terms==...` plus the transforms (scripts/grl-paleo/params.sh,
 scripts/ant-paleo/params.sh).
 
@@ -262,7 +268,7 @@ scripts/ant-paleo/params.sh).
 
 ```fortran
 &forcing
-    series = "alpha" "beta"
+    coefs  = "alpha" "beta"
     tas    = "pd + alpha*(lgm - picontrol) + beta*(lgmstrong - lgmweak)"
     pr     = "pd * (1 + alpha*(lgm/picontrol - 1)) * (1 + beta*(lgmstrong/lgmweak - 1))"
     to     = "pd + dTo"
@@ -279,16 +285,16 @@ can produce the same term structure.
 
 | File | Change |
 |---|---|
-| `libs/kryos_forcing.f90` | `indices_class` → `series_class`: `[forcing] series`, `[series_<name>]`; kind `derived` (no tsgen; value set by `series_set(name, value)`), restart and output as now |
+| `libs/kryos_forcing.f90` | `indices_class` → `coefs_class`: `[forcing] coefs`, `[coef_<name>]`; kind `derived` (no tsgen; value set by `coefs_set(coefs, name, value)`), restart and output as now |
 | `libs/snapshots.f90` | `[snapshots]`, `[forcing] reference`, terms read from `[term_<name>]` (snapshot pattern); the snapshot set derived from the terms; `combine` per field by the fixed rule; `snap_field` registry → the term's field list |
 | `libs/climate_mods.f90` | `anom`, `ocn_fraction`, `ocn_obm` removed; `terms_apply_uniform` (uniform and replace terms on `climate_out`), `taper`, `bias` (time axis) stay; `derived_update` computes `air_anomaly` after the atmosphere |
-| `libs/yelmox_climate.f90` | step order: backend (snapshot terms) → uniform `tas`/`pr` terms → derived series → ocean terms → taper → bias; contract checks at init |
-| `yelmox_bipolar/obm_coupling.f90` | sets the `obm_*` derived series from the boxes where `obm2ism` ran; `[ocn_obm_<sfx>]` removed |
+| `libs/yelmox_climate.f90` | step order: backend (snapshot terms) → uniform `tas`/`pr` terms → derived coefficients → ocean terms → taper → bias; contract checks at init |
+| `yelmox_bipolar/obm_coupling.f90` | sets the `obm_*` derived coefficients from the boxes where `obm2ism` ran; `[ocn_obm_<sfx>]` removed |
 | `libs/climate_rembo.f90` | reads the uniform `tas` term instead of `[anom]` |
-| `input/yelmox_defaults.nml` | templates `series`, `term`, `snapshot`, `snapshots`, `forcing`; the old groups removed |
-| `input/forcing_db.nml` | `snapshot_*`, `series_*`, `term_*` with descriptive names |
+| `input/yelmox_defaults.nml` | templates `coef`, `term`, `snapshot`, `snapshots`, `forcing`; the old groups removed |
+| `input/forcing_db.nml` | `snapshot_*`, `coef_*`, `term_*` with descriptive names |
 | `yelmox/*.nml`, `yelmox_bipolar/*.nml`, `scripts/*/params.sh` | converted; the `-p` arrays shrink to `forcing.terms` plus run control |
-| `scripts/check_par_nml.py` | templates by prefix `series_`, `term_`, `snapshot_` |
+| `scripts/check_par_nml.py` | templates by prefix `coef_`, `term_`, `snapshot_` |
 | `scripts/forcing-builder/`, `docs/forcing-builder/` | export the new groups; the builder rebuilt in the order of the equation (time, equation, pieces, after), the run's forcing groups as its state, the par file and `-p` as its export (done 2026-10-21) |
 | docs | `yelmox.md`, `climate-snapshots.md`, experiment pages, CHANGELOG; "forcing time" wording |
 
@@ -299,8 +305,8 @@ All on dev, one branch `forcing-terms`, merged when the whole chain passes.
 | # | Content | Check |
 |---|---|---|
 | 1 | this doc, the mock-up in `docs/` | |
-| 2 | series registry: the `derived` kind, `indices_set` (internal names kept; done, `tests/test_indices.f90`) | unit: a derived series set and read |
-| 3 | `libs/climate_terms.f90`; terms in the snapshot backend, uniform and replace terms, derived `air_anomaly`, bridge sets the OBM series; `anom`/`ocn_fraction`/`ocn_obm` removed; new keys, library, defaults, bases, bipolar and checker converted in the same commit (every commit runs) | `check_par_nml` clean, both drivers build |
+| 2 | coefficient registry: the `derived` kind, `coefs_set` (done; `indices_*` renamed `coefs_*` on 2026-10-22, `tests/test_coefs.f90`) | unit: a derived coefficient set and read |
+| 3 | `libs/climate_terms.f90`; terms in the snapshot backend, uniform and replace terms, derived `air_anomaly`, bridge sets the OBM coefficients; `anom`/`ocn_fraction`/`ocn_obm` removed; new keys, library, defaults, bases, bipolar and checker converted in the same commit (every commit runs) | `check_par_nml` clean, both drivers build |
 | 4 | scripts (`-p` arrays, docs-figures, run_mg_forward, bipolar tests) | |
 | 5 | docs-figures 18 cases + the bipolar case on Levante | bit-identical to dev 54d9ee6 (the same operations in the same order) |
 | 6 | forcing builder on the new groups, equation first (the state the forcing groups, import from a base plus `-p`, export the difference); docs; CHANGELOG | done |
@@ -308,15 +314,16 @@ All on dev, one branch `forcing-terms`, merged when the whole chain passes.
 ## 9. Decisions taken (2026-10-21)
 
 Encoding (a), one group per term; (b) recorded in section 6. The uniform
-anomaly is a term. Derived series as a series kind, with the factor in the
-series. Fields always explicit. Precipitation by the fixed rule, nothing to
+anomaly is a term. Derived coefficients as a coefficient kind, with the factor in
+the coefficient group. Fields always explicit. Precipitation by the fixed rule, nothing to
 set. `snap0`/`snap1` for the two snapshots of a pattern (0 and 1 as the
-index values, tied to `norm_t0`/`norm_t1`); `f_ta/f_to/f_so` kept;
+coefficient values, tied to `norm_t0`/`norm_t1`); `f_ta/f_to/f_so` kept;
 `tstep_method` kept; `forcing_time` wording, `clock` dropped. OBM absolute
 mode as the `replace` pattern. Time-dependent bias through the varslice time
 axis, not as a term. Normalisation windows kept (`norm_t0 = t` or `t_a t_b`).
 Taper, bias, orbit, sea level, border ice stay outside the sum.
 
-Open: the group names `[forcing]`, `[snapshots]`, prefixes `series_`,
-`term_`, `snapshot_` (as on the mock-up unless changed); whether
+Open: the group names `[forcing]`, `[snapshots]`, prefixes `term_`,
+`snapshot_` (as on the mock-up unless changed; `series_` became `coef_` on
+2026-10-22); whether
 `[snapshots] combine` keeps a use.

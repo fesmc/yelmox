@@ -9,7 +9,7 @@ source "$(dirname "$0")/params.sh"
 output_path=${1:-output/ant-paleo/spinup}
 
 spinup_params=(
-    "series_dTo.factor=0.40"    # [1] ocean anomaly: fraction of the air temperature anomaly
+    "coef_dTo.factor=0.40"      # [1] ocean anomaly: fraction of the air temperature anomaly
     "tm_1D.dt=100"              # [yr] 1D output
     "tm_2D.dt=5000"             # [yr] 2D output
     "tm_2Dsm.dt=300e3"          # [yr] small 2D output (off in practice)

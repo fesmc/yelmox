@@ -67,7 +67,7 @@ the Yelmo grid; the hub and the marine shelf on the shelf grid.
   Yelmo-32KM spin-ups in `output/mg_opt` (a missing bundle is skipped), with
   `sim.relax=False`, `sim.opt=False`, `yelmo.restart_relax=0`: `ctrl` (no
   anomaly) and `warm` (+2 K air and ocean temperature: the uniform term
-  `[term_dT]` on the constant series `[series_dT]`, `f_ta = 1`, `f_to = 1`),
+  `[term_dT]` on the constant coefficient `[coef_dT]`, `f_ta = 1`, `f_to = 1`),
   into `output/mg_fwd/<case>_<ctrl|warm>`;
   `compute` queue, 4 h.
 
@@ -93,10 +93,10 @@ the Yelmo grid; the hub and the marine shelf on the shelf grid.
 
 ## Climate
 
-Present day only (`[forcing] series = ""`, `terms = ""`).
-`run_mg_forward.sh` adds the constant series `[series_dT]` (`method =
+Present day only (`[forcing] coefs = ""`, `terms = ""`).
+`run_mg_forward.sh` adds the constant coefficient `[coef_dT]` (`method =
 "const"`, 0) and the uniform term `[term_dT]` of `input/forcing_db.nml`
-(`forcing.series=dT forcing.terms=dT`): it sets `series_dT.f_min` and
+(`forcing.coefs=dT forcing.terms=dT`): it sets `coef_dT.f_min` and
 `f_max` and the term's fields with `-p`, so runme copies the groups into the
 staged par file.
 

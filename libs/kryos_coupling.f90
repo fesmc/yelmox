@@ -18,7 +18,7 @@ module kryos_coupling
                                  optimize_tf_corr_basin
     use kryos,        only : kryos_domain, remap, remap_method_smooth, cadence_due
     use kryos_regions, only : negis_update_cb_ref, calc_glacial_smb
-    use kryos_forcing, only : indices_class
+    use kryos_forcing, only : coefs_class
     use ice_bnd,      only : ice_bnd_update
 
     implicit none
@@ -345,18 +345,18 @@ contains
         dom%yelmo%bnd%T_shlf   = Tshlf_y
     end subroutine couple_shelf_to_yelmo
 
-    subroutine step_ice_bnd(dom, ts, idx)
+    subroutine step_ice_bnd(dom, ts, coefs)
         ! Prescribed ice ([ice_bnd]): Yelmo's reference ice thickness H_ice_ref
         ! in its fixed and relaxation cells from the ice history at the forcing
         ! time (time_rel), before step_icesheet, which holds the fixed cells at
-        ! it and relaxes the others towards it. idx: the driver's indices
+        ! it and relaxes the others towards it. coefs: the driver's coefficient
         ! registry, advanced to this step (method scaled). No-op unless active.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class),   intent(in)    :: ts
-        type(indices_class), intent(in)    :: idx
+        type(coefs_class),   intent(in)    :: coefs
 
         call ice_bnd_update(dom%ibnd, dom%yelmo%bnd%H_ice_ref, dom%yelmo%bnd%mask_ice, &
-                            dom%yelmo%bnd%tau_relax, ts%time_rel, idx)
+                            dom%yelmo%bnd%tau_relax, ts%time_rel, coefs)
     end subroutine step_ice_bnd
 
     subroutine step_icesheet(dom, ts)
@@ -375,18 +375,19 @@ contains
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, idx, init)
+    subroutine step_climate(dom, ts, coefs, init)
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend and its
         ! terms into dom%clim, read by step_surface, step_shelf and
-        ! couple_climate_to_yelmo. idx is the driver-owned series registry
-        ! (advanced to this step; the climate sets its derived series in it).
+        ! couple_climate_to_yelmo. coefs is the driver-owned coefficient
+        ! registry (advanced to this step; the climate sets its derived
+        ! coefficients in it).
         ! init=.true. marks the cold start: the update runs regardless of the
         ! cadence.
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
-        type(indices_class),   intent(inout) :: idx
+        type(coefs_class),     intent(inout) :: coefs
         logical,               intent(in), optional :: init
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
@@ -417,7 +418,7 @@ contains
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
                             z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
-                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, idx=idx, init=is_init)
+                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)

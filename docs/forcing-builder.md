@@ -27,11 +27,10 @@ as it is.
 
 <details class="fb-about"><summary>How it is built, and its limits</summary>
 
-The page holds the forcing groups of the run (`[forcing]`, `[series_*]`,
+The page holds the forcing groups of the run (`[forcing]`, `[coef_*]`,
 `[term_*]`, `[snapshot_*]`, `[snapshots]`, the transforms, the time group).
-The page says "coefficient" for the scalar α(τ) of a term; in the par file it
-stays a group `[series_<name>]`, listed in `[forcing] series` and named by
-the key `series` of a term.
+A coefficient, the scalar α(τ) of a term, is a group `[coef_<name>]` in the
+par file, listed in `[forcing] coefs` and named by the key `coef` of a term.
 A group is taken from the base par file (`yelmox/yelmox_<domain>.nml`), else
 from the forcing library (`input/forcing_db.nml`), else created new from its
 template in `input/yelmox_defaults.nml` when the equation names it, and edited

@@ -57,15 +57,15 @@ The reference `pd` plus the term `lgm` (`[term_lgm]`, `picontrol`
 -> `lgm` on `tas` and `pr`): ERA5 1981--2010 plus the PMIP3 LGM -- piControl
 anomaly, additive for the temperature, as a ratio for the precipitation. The
 PMIP3 snapshots are annual and JJA means (`monthly = False`), smoothed over
-50 km (`clim_sigma`). The series is constant at the LGM (the par file
-redefines `[series_alpha]` as `method = "const"`, `f_min = 1`), so the
+50 km (`clim_sigma`). The coefficient `alpha` is constant at the LGM (the par file
+redefines `[coef_alpha]` as `method = "const"`, `f_min = 1`), so the
 climate does not depend on the forcing time. The ocean is ORAS5 1981--2010
 plus the term `ocean`, 0.25 times the mean sea-level air temperature anomaly
-over the domain (the derived series `dTo`, `region = "all"`).
+over the domain (the derived coefficient `dTo`, `region = "all"`).
 
-![Forcing of yelmox_LIS.nml at the LGM (series glacial = 1) minus present day (0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/lis.png)
+![Forcing of yelmox_LIS.nml at the LGM (alpha = 1) minus present day (alpha = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/lis.png)
 
-![Forcing of yelmox_North.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/north.png)
+![Forcing of yelmox_North.nml at the LGM (alpha = 1) minus present day (alpha = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/north.png)
 
 ## Initial state
 

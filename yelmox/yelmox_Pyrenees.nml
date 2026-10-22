@@ -117,16 +117,16 @@
 
 &forcing
     ! The forcing (docs/_forcing-terms.md): the reference snapshot [snapshot_<name>],
-    ! the scalar series [series_<name>] on the forcing time time_rel, and the terms
-    ! [term_<name>] (series x pattern) added to the reference. Named groups: this
+    ! the coefficients [coef_<name>] on the forcing time time_rel, and the terms
+    ! [term_<name>] (coefficient x pattern) added to the reference. Named groups: this
     ! file, then the var_defs files (input/forcing_db.nml: the shared library;
     ! input/clim_db.nml: the fields); unset keys: input/yelmox_defaults.nml.
     reference = "pd"
-    series    = "alpha"
+    coefs     = "alpha"
     terms     = "uniform"
 /
 
-&series_alpha
+&coef_alpha
     ! alpha of this setup: the orbital record alpha_orbital_t2018 (1 at
     ! present, 0 at 21 ka) normalised to 0 at present and 1 at 21 ka.
     method      = "series"
@@ -138,7 +138,7 @@
 &term_uniform
     ! A uniform anomaly: -10 K at 21 ka, scaled by alpha (0 at present, 1 at
     ! 21 ka): tas - 10*alpha, pr * exp(-beta_p*10*alpha).
-    series  = "alpha"
+    coef    = "alpha"
     pattern = "uniform"
     fields  = "tas" "pr"
     f_ta    = -10.0           ! [K]

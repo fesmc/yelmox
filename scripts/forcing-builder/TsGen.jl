@@ -1,6 +1,6 @@
-# TsGen.jl — the series methods of fesm-utils tsgen (src/tsgen.f90) as pure
-# functions, to tabulate a series [series_<name>] on the forcing time without
-# running the model (a derived series is set by the model: not here). Same
+# TsGen.jl — the methods of fesm-utils tsgen (src/tsgen.f90) as pure
+# functions, to tabulate a coefficient [coef_<name>] on the forcing time without
+# running the model (a derived coefficient is set by the model: not here). Same
 # formulas as docs/forcing-builder (app.js).
 #
 # Open-loop methods (eval_open), with tau = max(0, t_elapsed - dt_init) and
@@ -154,7 +154,7 @@ function apply_window(par::AbstractDict, t::Real, f::Real)
 end
 
 """
-The series on the forcing time: `times` the forcing times of the run and
+The coefficient on the forcing time: `times` the forcing times of the run and
 `t_init` the forcing time at initialisation (the elapsed time of the open-loop
 methods counts from it). `ser` is the loaded (normalised) series for "series".
 Returns the mean value (no noise), windowed.

@@ -116,7 +116,7 @@ rates and `f_p` are written as attributes: remake the file when `[snapshots] lap
   (`[orbit] method = "fixed_time"`, `time = 0`), sea level from file at 0 ka.
 - **No optimization** (`[sim] opt = False`); the ice thickness relaxes towards
   the observations until 6 kyr (`[sim] relax = True`, `[relax] time2`).
-- **Climate:** present day (`forcing.series=""`, `forcing.terms=""`) with the MAR -- ERA5 bias.
+- **Climate:** present day (`forcing.coefs=""`, `forcing.terms=""`) with the MAR -- ERA5 bias.
 - **Output:** restart bundles at 0 and 15 kyr; 2D output every 1 kyr.
 
 ## A. Transient
@@ -125,10 +125,10 @@ rates and `f_p` are written as attributes: remake the file when `[snapshots] lap
   (`tstep_method = "rel"`). `[sim] relax = False`, `opt = False`.
 - **Climate:** the present-day reference plus the term `lgm`
   (`[term_lgm]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
-  piControl anomaly scaled by the series `alpha` (`[series_alpha]`,
+  piControl anomaly scaled by the coefficient `alpha` (`[coef_alpha]`,
   `input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, ~0.9 at
   21 ka, -0.2 in the last interglacial). The term `ocean` adds the derived
-  series `dTo`, 0.25 times the mean sea-level air temperature anomaly.
+  coefficient `dTo`, 0.25 times the mean sea-level air temperature anomaly.
   Insolation varies in time (`[orbit] method = "forcing_time"`).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_spratt2016.dat`.
 
@@ -140,7 +140,7 @@ rates and `f_p` are written as attributes: remake the file when `[snapshots] lap
 
 ## B. Reconstruction forcing
 
-The reference `pd` plus two terms without a series (the constant 1), one per
+The reference `pd` plus two terms without a coefficient (the constant 1), one per
 field (`forcing.terms==b18,b20,ocean`):
 
 - **Temperature**, term `b18` (`[term_b18]` on `tas`): the Buizert et al.
@@ -169,7 +169,7 @@ cosine to 0 over 100 km (hand-built file
 the climate is the present-day reference plus that mean anomaly.
 
 The ocean anomaly is the term `ocean`, 0.25 times the mean sea-level air
-temperature anomaly (the derived series `dTo`); sea level from
+temperature anomaly (the derived coefficient `dTo`); sea level from
 `input/sealevel_spratt2016.dat` (as A); insolation at the forcing time
 (`[orbit] method = "forcing_time"`). The
 climate is updated every 100 yr (`dt_clim`; the reconstructions are read and

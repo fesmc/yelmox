@@ -46,8 +46,8 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
   (`cf_init = -1`); the ice relaxes towards the observations at the grounding
   line and grounding zone (`[relax] topo_rel = 4`) until 3 kyr (`[sim] relax =
   True`, `[relax] time2`).
-- **Climate:** present day (`forcing.series==dTo`, `forcing.terms==ocean`);
-  the term `ocean` (`series_dTo.factor=0.40`) is active but sees no anomaly
+- **Climate:** present day (`forcing.coefs==dTo`, `forcing.terms==ocean`);
+  the term `ocean` (`coef_dTo.factor=0.40`) is active but sees no anomaly
   (the sea-level air temperature is the reference's).
 - **Output:** restart bundles every 15 kyr, so `restart-0.000-kyr` and
   `restart-15.000-kyr`; 2D output every 5 kyr, 1D every 100 yr.
@@ -55,16 +55,16 @@ the bundle is missing) and writes to `output/ant-paleo/lgp`. Both submit to the
 ## Transient
 
 - **Timeline:** `[ctrl]` -130 kyr to +10 kyr, `dtt = 5` yr, on relative time
-  (`tstep_method = "rel"`), so that the sea level and the index follow the
+  (`tstep_method = "rel"`), so that the sea level and `alpha` follow the
   records. `[sim] relax = False`, `opt = False`: `cb_ref` and `tf_corr` come
   from the restart.
 - **Climate:** the present-day reference plus the term `lgm`
   (`[term_lgm]`, `picontrol` -> `lgm` on `tas` and `pr`): the PMIP3 LGM --
   piControl anomaly of the air temperature and ratio of the precipitation,
-  scaled by the series `alpha` (`[series_alpha]`, `method = "series"`,
+  scaled by the coefficient `alpha` (`[coef_alpha]`, `method = "series"`,
   `input/alpha_combined_125kyr_interp.dat`, as is: 0 = present day, 0.92 at
   21 ka, -0.2 in the last interglacial). The term `ocean` adds the derived
-  series `dTo`, 0.25 times the mean sea-level air temperature anomaly.
+  coefficient `dTo`, 0.25 times the mean sea-level air temperature anomaly.
   Insolation varies in time (`[orbit] method = "forcing_time"`, the orbit at
   the forcing time, for chion and smbpal).
 - **Sea level:** `[barysealevel] method = "file"`, `input/sealevel_rohling_450kyr.dat`.
