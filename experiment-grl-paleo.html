@@ -319,7 +319,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> 0 to 15 kyr, <code>dtt = 10</code> yr, present-day insolation (<code>[orbit] method = "fixed_time"</code>, <code>time = 0</code>), sea level from file at 0 ka.</li>
 <li><strong>No optimization</strong> (<code>[sim] opt = False</code>); the ice thickness relaxes towards the observations until 6 kyr (<code>[sim] relax = True</code>, <code>[relax] time2</code>).</li>
-<li><strong>Climate:</strong> present day (<code>forcing.series=""</code>, <code>forcing.terms=""</code>) with the MAR – ERA5 bias.</li>
+<li><strong>Climate:</strong> present day (<code>forcing.coefs=""</code>, <code>forcing.terms=""</code>) with the MAR – ERA5 bias.</li>
 <li><strong>Output:</strong> restart bundles at 0 and 15 kyr; 2D output every 1 kyr.</li>
 </ul>
 </section>
@@ -327,7 +327,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="a.-transient">A. Transient</h2>
 <ul>
 <li><strong>Timeline:</strong> <code>[ctrl]</code> -130 kyr to 0, <code>dtt = 10</code> yr, on relative time (<code>tstep_method = "rel"</code>). <code>[sim] relax = False</code>, <code>opt = False</code>.</li>
-<li><strong>Climate:</strong> the present-day reference plus the term <code>lgm</code> (<code>[term_lgm]</code>, <code>picontrol</code> -&gt; <code>lgm</code> on <code>tas</code> and <code>pr</code>): the PMIP3 LGM – piControl anomaly scaled by the series <code>alpha</code> (<code>[series_alpha]</code>, <code>input/alpha_combined_125kyr_interp.dat</code>, as is: 0 = present day, ~0.9 at 21 ka, -0.2 in the last interglacial). The term <code>ocean</code> adds the derived series <code>dTo</code>, 0.25 times the mean sea-level air temperature anomaly. Insolation varies in time (<code>[orbit] method = "forcing_time"</code>).</li>
+<li><strong>Climate:</strong> the present-day reference plus the term <code>lgm</code> (<code>[term_lgm]</code>, <code>picontrol</code> -&gt; <code>lgm</code> on <code>tas</code> and <code>pr</code>): the PMIP3 LGM – piControl anomaly scaled by the coefficient <code>alpha</code> (<code>[coef_alpha]</code>, <code>input/alpha_combined_125kyr_interp.dat</code>, as is: 0 = present day, ~0.9 at 21 ka, -0.2 in the last interglacial). The term <code>ocean</code> adds the derived coefficient <code>dTo</code>, 0.25 times the mean sea-level air temperature anomaly. Insolation varies in time (<code>[orbit] method = "forcing_time"</code>).</li>
 <li><strong>Sea level:</strong> <code>[barysealevel] method = "file"</code>, <code>input/sealevel_spratt2016.dat</code>.</li>
 </ul>
 <div class="quarto-figure quarto-figure-center">
@@ -343,7 +343,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="b.-reconstruction-forcing" class="level2">
 <h2 class="anchored" data-anchor-id="b.-reconstruction-forcing">B. Reconstruction forcing</h2>
-<p>The reference <code>pd</code> plus two terms without a series (the constant 1), one per field (<code>forcing.terms==b18,b20,ocean</code>):</p>
+<p>The reference <code>pd</code> plus two terms without a coefficient (the constant 1), one per field (<code>forcing.terms==b18,b20,ocean</code>):</p>
 <ul>
 <li><strong>Temperature</strong>, term <code>b18</code> (<code>[term_b18]</code> on <code>tas</code>): the Buizert et al.
 <ol start="2018" type="1">
@@ -353,7 +353,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <p>Swapping the fields of the two terms gives the other combinations (Badgeley temperature: its annual anomaly in every month). The time-varying groups are read in time at the forcing time (<code>extrap</code>: the first slice before the record starts, e.g.&nbsp;Badgeley at 20 ka during the LGM spin-up).</p>
 <p>The reconstructions are GRL-16KM products, remapped online onto GRL-PAL and filled from the nearest cell outside the GRL box. <code>[taper]</code> with <code>outside = "mean"</code> replaces the anomaly there by the mean anomaly of the coverage (per month: the temperature difference and the precipitation ratio of the totals, recomputed at every climate update): <code>w = 1</code> in the coverage of both, a cosine to 0 over 100 km (hand-built file <code>ice_data/GreenlandPaleo/GRL-PAL-16KM/GRL-PAL-16KM_TAPER-Buizert2018-Badgeley2020.nc</code>, <code>clim_db.nml</code> group <code>taper_b18_b20</code>, made by <code>scripts/grl-paleo/make_taper_recon.jl</code>). West of it (Ellesmere, Baffin Bay) the climate is the present-day reference plus that mean anomaly.</p>
-<p>The ocean anomaly is the term <code>ocean</code>, 0.25 times the mean sea-level air temperature anomaly (the derived series <code>dTo</code>); sea level from <code>input/sealevel_spratt2016.dat</code> (as A); insolation at the forcing time (<code>[orbit] method = "forcing_time"</code>). The climate is updated every 100 yr (<code>dt_clim</code>; the reconstructions are read and remapped from GRL-16KM at each update, which made 10 yr six times slower).</p>
+<p>The ocean anomaly is the term <code>ocean</code>, 0.25 times the mean sea-level air temperature anomaly (the derived coefficient <code>dTo</code>); sea level from <code>input/sealevel_spratt2016.dat</code> (as A); insolation at the forcing time (<code>[orbit] method = "forcing_time"</code>). The climate is updated every 100 yr (<code>dt_clim</code>; the reconstructions are read and remapped from GRL-16KM at each update, which made 10 yr six times slower).</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/grlpal_b.png" class="img-fluid figure-img"></p>

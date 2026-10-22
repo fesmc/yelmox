@@ -296,17 +296,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="climate" class="level2">
 <h2 class="anchored" data-anchor-id="climate">Climate</h2>
-<p>The reference <code>pd</code> plus the term <code>lgm</code> (<code>[term_lgm]</code>, <code>picontrol</code> -&gt; <code>lgm</code> on <code>tas</code> and <code>pr</code>): ERA5 1981–2010 plus the PMIP3 LGM – piControl anomaly, additive for the temperature, as a ratio for the precipitation. The PMIP3 snapshots are annual and JJA means (<code>monthly = False</code>), smoothed over 50 km (<code>clim_sigma</code>). The series is constant at the LGM (the par file redefines <code>[series_alpha]</code> as <code>method = "const"</code>, <code>f_min = 1</code>), so the climate does not depend on the forcing time. The ocean is ORAS5 1981–2010 plus the term <code>ocean</code>, 0.25 times the mean sea-level air temperature anomaly over the domain (the derived series <code>dTo</code>, <code>region = "all"</code>).</p>
+<p>The reference <code>pd</code> plus the term <code>lgm</code> (<code>[term_lgm]</code>, <code>picontrol</code> -&gt; <code>lgm</code> on <code>tas</code> and <code>pr</code>): ERA5 1981–2010 plus the PMIP3 LGM – piControl anomaly, additive for the temperature, as a ratio for the precipitation. The PMIP3 snapshots are annual and JJA means (<code>monthly = False</code>), smoothed over 50 km (<code>clim_sigma</code>). The coefficient <code>alpha</code> is constant at the LGM (the par file redefines <code>[coef_alpha]</code> as <code>method = "const"</code>, <code>f_min = 1</code>), so the climate does not depend on the forcing time. The ocean is ORAS5 1981–2010 plus the term <code>ocean</code>, 0.25 times the mean sea-level air temperature anomaly over the domain (the derived coefficient <code>dTo</code>, <code>region = "all"</code>).</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/lis.png" class="img-fluid figure-img"></p>
-<figcaption>Forcing of yelmox_LIS.nml at the LGM (series glacial = 1) minus present day (0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
+<figcaption>Forcing of yelmox_LIS.nml at the LGM (alpha = 1) minus present day (alpha = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
 </figure>
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/north.png" class="img-fluid figure-img"></p>
-<figcaption>Forcing of yelmox_North.nml at the LGM (index a = 1) minus present day (a = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
+<figcaption>Forcing of yelmox_North.nml at the LGM (alpha = 1) minus present day (alpha = 0), climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.</figcaption>
 </figure>
 </div>
 </section>
