@@ -1031,22 +1031,24 @@ function snapshotBlock(name, role, tl) {
 // coefficient are (left); one example with two terms, its pieces named, on
 // both equations of the atmosphere (right). KaTeX needs literal colours: the
 // page's muted, accent, base green and warn.
-const GUIDE_C = { ref: "#6b6861", coef: "#1f5f8b", pat: "#2a5d24", term: "#9a4b00" };
+const GUIDE_C = { ref: "#6b6861", coef: "#1f5f8b", pat: "#2a5d24", par: "#6250d6", term: "#9a4b00" };
 function guideEquation() {
   const c = (k, x) => `\\textcolor{${GUIDE_C[k]}}{${x}}`;
   const ub = (k, x, lab) => `\\underbrace{${c(k, x)}}_{${c(k, lab)}}`;
-  const ob = (x) => `\\overbrace{${x}}^{${c("term", "\\text{term}")}}`;
+  const ob = (x, lab = "\\text{term}") => `\\overbrace{${x}}^{${c("term", lab)}}`;
   const T = (n) => `T^{\\mathrm{sl}}_{\\mathrm{${n}}}`, P = (n) => `P^{\\mathrm{sl}}_{\\mathrm{${n}}}`;
   const alpha = ub("coef", "\\alpha(\\tau)", "\\text{coefficient}");
-  // the uniform term: the gain f is the pattern, β(τ) the coefficient
-  const fb = `${ub("pat", "f", "\\substack{\\text{pattern:}\\\\\\text{uniform (gain)}}")}\\;${ub("coef", "\\beta(\\tau)", "\\text{coefficient}")}`;
+  // the uniform term: the gain f (and β_p) are parameters, β(τ) the coefficient,
+  // the pattern the unit field (named on the term's brace)
+  const beta = ub("coef", "\\beta(\\tau)", "\\text{coefficient}");
+  const uni = "\\text{term (pattern: uniform)}";
   // one line each: the explainer gives the equations two thirds of the width
   const tas = `T^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", T("pd"), "\\text{reference}")}`
     + ` + ${ob(`${alpha}\\,${ub("pat", `\\big[${T("lgm")} - ${T("picontrol")}\\big]`, "\\text{pattern: snapshots}")}`)}`
-    + ` + ${ob(fb)}`;
+    + ` + ${ob(`${ub("par", "f", "\\text{parameter}")}\\;${beta}`, uni)}`;
   const pr = `P^{\\mathrm{sl}}(x,m,\\tau) &= ${ub("ref", P("pd"), "\\text{reference}")}`
     + ` \\cdot ${ob(`\\Big[1 + ${alpha}\\,${ub("pat", `\\Big(\\frac{${P("lgm")}}{${P("picontrol")}} - 1\\Big)`, "\\text{pattern: snapshots (ratio)}")}\\Big]`)}`
-    + ` \\cdot ${ob(`${c("pat", "\\exp")}\\!\\big(${c("pat", "\\beta_p")}\\,${fb}\\big)`)}`;
+    + ` \\cdot ${ob(`\\exp\\!\\big(${ub("par", "\\beta_p\\, f", "\\text{parameters}")}\\;${beta}\\big)`, uni)}`;
   return `\\begin{aligned} ${tas} \\\\[1.4em] ${pr} \\end{aligned}`;
 }
 function explainer() {
@@ -1054,7 +1056,8 @@ function explainer() {
     h("p", { class: "fb-note fb-primer" },
       "A snapshot is a named set of climate fields (tas, pr, zs, to, so), read from files. "
       + "A term is always coefficient × pattern: the coefficient c(τ) is one number at each forcing time (a constant, a record, a ramp, ...), the pattern a field that carries the spatial structure and the units. "
-      + "In a snapshots pattern the field is S₁ − S₀ in the units of the field, and c has no units (0 at S₀, 1 at S₁); in a uniform pattern the field is a gain f times the unit field, f in units of the field per unit of c, so an offset of c kelvin is c in K times the gain 1. "
+      + "A parameter is a fixed number set in the par file (the gain f of a uniform term, β_p, the lapse rates); it does not change with τ. "
+      + "In a snapshots pattern the field is S₁ − S₀ in the units of the field, and c has no units (0 at S₀, 1 at S₁); in a uniform pattern the field is the unit field times the gain f, f in units of the field per unit of c, so an offset of c kelvin is c in K times the gain 1. "
       + "The terms add to the reference (pr multiplies)."
       + (climate() === "esm" ? " With the ESM backend, the climate of the ESM takes the place of the reference." : "")),
     h("div", { class: "fb-guide" }, tex(guideEquation()),
