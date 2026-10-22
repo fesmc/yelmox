@@ -10,9 +10,9 @@
 // forcing groups as a par file; the -p list against a base par file with the
 // runme command).
 //
-// Words: the UI calls the scalar α(τ) a coefficient; in the namelist it is a
-// group [series_<name>], listed in [forcing] series and named by the key
-// series of a term (the three constants below).
+// Words: the scalar α(τ) is a coefficient; in the namelist it is a group
+// [coef_<name>], listed in [forcing] coefs and named by the key coef of a
+// term (the three constants below).
 //
 // State: the forcing groups of the run, materialised (S.g). A group is
 // created from its source on first use (the base par file, the library
@@ -20,7 +20,7 @@
 // for a new name) and edited in place; the run is written out by comparing
 // each group with its source. A preset or a base par file plus -p is read
 // into the groups (import); the -p list is the difference (export).
-// Data: forcing.json (scripts/forcing-builder/export.jl). The series formulas
+// Data: forcing.json (scripts/forcing-builder/export.jl). The coefficient formulas
 // mirror fesm-utils tsgen (TsGen.jl).
 
 import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/+esm";
@@ -28,12 +28,12 @@ import katex from "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.mjs";
 
 const root = document.getElementById("fb");
 let D = null;                       // forcing.json
-let TEMPLATES = [];                 // [regex, template] (series_, term_, snapshot_)
+let TEMPLATES = [];                 // [regex, template] (coef_, term_, snapshot_)
 const S = { base: null, g: new Map(), extra: [], preset: null, presetKey: "", tsel: null, tab: "par", open: new Set(), runopts: "-r", outdir: "" };
 
 // The namelist names of the coefficients: the group prefix, the list in
 // [forcing], the key of a term. A rename of the namelist changes these three.
-const COEF_PREFIX = "series_", COEF_LIST_KEY = "series", TERM_COEF_KEY = "series";
+const COEF_PREFIX = "coef_", COEF_LIST_KEY = "coefs", TERM_COEF_KEY = "coef";
 // the template of the coefficient groups in input/yelmox_defaults.nml
 const COEF_T = COEF_PREFIX.replace(/_$/, "");
 
@@ -304,7 +304,7 @@ const HELP = {
   "ice_bnd.active": "Prescribe the ice thickness in the fixed and relaxation cells at the domain border.",
   "ice_bnd.method": "file: the ice thickness at τ from the file; scaled: a coefficient × one slice of it.",
   "ice_bnd.H_ice": "The clim_db group of the prescribed ice thickness [m].",
-  "ice_bnd.index": "scaled: the coefficient that scales the slice.",
+  "ice_bnd.coef": "scaled: the coefficient that scales the slice.",
   "ice_bnd.slice_time": "scaled: the time [yr] of the slice.",
 };
 // the help of a key: HELP, else the namelist comment in full
@@ -507,7 +507,7 @@ const atT = (tl, f, t) => f ? interp({ time: tl.t, f }, t) : NaN;
 // ----------------------------------------------------------------- tsgen (JS)
 
 const KINDS = { record: ["series"], constant: ["const"], ramp: ["ramp-slope", "ramp-time", "ramp-time-step", "sin"], controller: ["exp", "PI42", "H312b", "H312PID", "H321PID", "PID1"], derived: ["derived"] };
-const KIND_LABEL = { record: "record (a time series from a file)", constant: "constant", ramp: "ramp or wave", controller: "controller (feedback)", derived: "derived (set by the model)" };
+const KIND_LABEL = { record: "series (a time series from a file)", constant: "constant", ramp: "ramp or wave", controller: "controller (feedback)", derived: "derived (set by the model)" };
 // the kind of a coefficient: tsgen "const" with a rate is a ramp
 function kindOf(p) {
   const m = String(p.method);
@@ -535,9 +535,9 @@ function seriesMean(ser, tw) {
   const sel = ser.f.filter((f, i) => ser.time[i] >= lo && ser.time[i] <= hi);
   return sel.length ? sel.reduce((a, b) => a + b, 0) / sel.length : interp(ser, (lo + hi) / 2);
 }
-// The parameters of [series_<name>]; normalisation is active when the group
+// The parameters of [coef_<name>]; normalisation is active when the group
 // itself sets norm_t0 and norm_t1 (the model's rule).
-function seriesPar(name) {
+function coefPar(name) {
   const g = COEF_PREFIX + name, r = grp(g);
   if (!r) return null;
   const p = {};
@@ -583,8 +583,8 @@ function applyWindow(p, t, f) {
   return f + w * (num(p.win_fac) - 1) * (f - ref);
 }
 // The coefficient on the run's timeline: {p, ser, f, kind}; derived: f = null.
-function seriesOnRun(name, tl) {
-  const p = seriesPar(name);
+function coefOnRun(name, tl) {
+  const p = coefPar(name);
   if (!p) return { p: null, ser: null, f: null, kind: null, missing: true };
   const kind = kindOf(p);
   if (kind === "derived") return { p, ser: null, f: null, kind, missing: false };
@@ -593,9 +593,9 @@ function seriesOnRun(name, tl) {
   return { p, ser, f, kind, missing: false };
 }
 function termWeight(t, tl) {
-  if (t.series === "") return tl.t.map(() => 1);
-  if (!coefNames().includes(t.series)) return null;
-  const s = seriesOnRun(t.series, tl);
+  if (t.coef === "") return tl.t.map(() => 1);
+  if (!coefNames().includes(t.coef)) return null;
+  const s = coefOnRun(t.coef, tl);
   return s.f && s.f.some(Number.isFinite) ? s.f : null;
 }
 
@@ -720,7 +720,7 @@ function derivedEq(name, p) {
 }
 // The record F of a coefficient in TeX (the file name, or F when none yet).
 const recordSym = (p) => p.series_file ? `\\texttt{${String(p.series_file).replace(/^input\//, "").replace(/_/g, "\\_")}}${p.series_var ? ":" + sub(p.series_var) : ""}` : "F";
-function seriesEq(name, p) {
+function coefEq(name, p) {
   const a = sym(name) + "(\\tau)", method = String(p.method), kind = kindOf(p);
   if (kind === "derived") return derivedEq(name, p) + `\\qquad\\text{(derived: set by the model each step)}`;
   if (kind === "constant") return `${a} = ${fmtNum(num(num(p.df_sign) >= 0 ? p.f_min : p.f_max))}`;
@@ -730,7 +730,7 @@ function seriesEq(name, p) {
 }
 // change the kind of a coefficient: the first method of the kind, a constant with f_min = f_max
 function setKind(g, kind) {
-  const p = seriesPar(g.slice(COEF_PREFIX.length));
+  const p = coefPar(g.slice(COEF_PREFIX.length));
   const kv = { method: KINDS[kind][0] };
   if (kind === "constant") { kv.f_max = p.f_min; kv.df_dt_max = 0; }
   if (kind === "ramp" && num(p.df_dt_max) <= 0 && num(p.f_max) <= num(p.f_min)) { kv.f_max = num(p.f_min) + 1; kv.df_dt_max = 1e-3; }
@@ -739,10 +739,10 @@ function setKind(g, kind) {
 
 // The card of a coefficient in the equation: its kind and the parameters of the
 // equation; a record also where it comes from (the file, the normalisation).
-function seriesCard(name, tl) {
+function coefCard(name, tl) {
   const g = COEF_PREFIX + name;
   if (!grp(g)) return h("div", { class: "fb-card" }, warn(`[${g}]: no such group and no coefficient template`), removeBtn(COEF_LIST_KEY, name));
-  const { p, ser, f, kind } = seriesOnRun(name, tl);
+  const { p, ser, f, kind } = coefOnRun(name, tl);
   const method = String(p.method);
   const kindSel = h("select", { onchange: (e) => setKind(g, e.target.value) }, ...Object.keys(KINDS).map(k => h("option", { value: k }, KIND_LABEL[k])));
   kindSel.value = kind;
@@ -826,7 +826,7 @@ function recordFrom(name, p, ser, tl) {
 // One term [term_<name>] as a record.
 function termOf(name) {
   const g = "term_" + name;
-  return { name, g, series: String(val(g, TERM_COEF_KEY, "")), pattern: String(val(g, "pattern", "snapshots")), snap0: String(val(g, "snap0", "")), snap1: String(val(g, "snap1", "")),
+  return { name, g, coef: String(val(g, TERM_COEF_KEY, "")), pattern: String(val(g, "pattern", "snapshots")), snap0: String(val(g, "snap0", "")), snap1: String(val(g, "snap1", "")),
     fields: asList(val(g, "fields", "")), gain: { tas: num(val(g, "f_ta", 1)), to: num(val(g, "f_to", 1)), so: num(val(g, "f_so", 1)) } };
 }
 const runTerms = () => termNames().filter(n => grp("term_" + n)).map(termOf);
@@ -844,23 +844,23 @@ const climTdep = (b) => { const c = D.climdb[String(b)]; return !!(c && Array.is
 const snapTdep = (snap) => SNAPFIELDS.some(f => asList(val("snapshot_" + snap, f, "")).some(climTdep));
 const snapSym = (f, snap) => `${FSYM[f]}_{${sub(snap)}}` + (snapTdep(snap) ? "(\\tau)" : "");
 // the coefficient of a term in TeX (warn colour when not defined yet); "" = 1
-const coefTex = (t) => t.series === "" ? "" : `${csym(t.series)}(\\tau)`;
-const wsym = (t) => t.series === "" ? "" : coefTex(t) + "\\,";
+const coefTex = (t) => t.coef === "" ? "" : `${csym(t.coef)}(\\tau)`;
+const wsym = (t) => t.coef === "" ? "" : coefTex(t) + "\\,";
 const gsym = (x) => x === 1 ? "" : (x === -1 ? "-" : `${fmtNum(x)}\\,`);
 function termRhs(t, f) {
-  if (t.pattern === "replace") return `${FSYM[f]} = ${t.series === "" ? "1" : coefTex(t)}\\quad\\text{at every depth, in place of the reference}`;
+  if (t.pattern === "replace") return `${FSYM[f]} = ${t.coef === "" ? "1" : coefTex(t)}\\quad\\text{at every depth, in place of the reference}`;
   return `${FSYM[f]} \\leftarrow ${FSYM[f]}` + termPart(t, f);
 }
 function termPart(t, f) {
   if (t.pattern === "uniform") {
-    if (t.series === "") return f === "pr" ? `\\,e^{\\beta_p\\,${fmtNum(t.gain.tas)}}` : ` ${t.gain[f] < 0 ? "-" : "+"} ${fmtNum(Math.abs(t.gain[f]))}`;
+    if (t.coef === "") return f === "pr" ? `\\,e^{\\beta_p\\,${fmtNum(t.gain.tas)}}` : ` ${t.gain[f] < 0 ? "-" : "+"} ${fmtNum(Math.abs(t.gain[f]))}`;
     if (f === "pr") return `\\,e^{\\beta_p\\,${t.gain.tas === 1 ? "" : "(" + fmtNum(t.gain.tas) + ")\\,"}${coefTex(t)}}`;
     const g = t.gain[f];
     return ` ${g < 0 ? "-" : "+"} ${gsym(Math.abs(g))}${coefTex(t)}`;
   }
   const s1 = t.snap1 || "?";
   if (f === "pr") return t.snap0 ? `\\,\\Big[1 + ${wsym(t)}\\Big(\\frac{${snapSym(f, s1)}}{${snapSym(f, t.snap0)}} - 1\\Big)\\Big]`
-    : (t.series === "" ? `\\,${snapSym(f, s1)}` : `\\,\\big[1 + ${wsym(t)}(${snapSym(f, s1)} - 1)\\big]`);
+    : (t.coef === "" ? `\\,${snapSym(f, s1)}` : `\\,\\big[1 + ${wsym(t)}(${snapSym(f, s1)} - 1)\\big]`);
   return t.snap0 ? ` + ${wsym(t)}\\big[${snapSym(f, s1)} - ${snapSym(f, t.snap0)}\\big]` : ` + ${wsym(t)}${snapSym(f, s1)}`;
 }
 const PATTERN_HELP = { snapshots: "coefficient × (snap1 − snap0)", uniform: "coefficient × a gain, the same everywhere" };
@@ -868,13 +868,13 @@ const PATTERN_HELP = { snapshots: "coefficient × (snap1 − snap0)", uniform: "
 // Structural warnings of a term (the equation); the snapshot blocks check the fields.
 function termWarnings(t, tl) {
   const cl = climate();
-  const sinfo = t.series === "" ? null : (coefNames().includes(t.series) ? seriesOnRun(t.series, tl) : null);
+  const sinfo = t.coef === "" ? null : (coefNames().includes(t.coef) ? coefOnRun(t.coef, tl) : null);
   const derived = !!(sinfo && sinfo.kind === "derived");
   const w = [];
   if (!t.fields.length) w.push("no fields: the term does nothing");
-  if (derived && t.fields.some(f => f === "tas" || f === "pr")) w.push(`the derived coefficient "${t.series}" is set after the atmosphere: this term may change to and so only`);
+  if (derived && t.fields.some(f => f === "tas" || f === "pr")) w.push(`the derived coefficient "${t.coef}" is set after the atmosphere: this term may change to and so only`);
   if (t.pattern === "replace") {
-    if (t.series === "") w.push("replace needs a coefficient");
+    if (t.coef === "") w.push("replace needs a coefficient");
     if (t.fields.some(f => f === "tas" || f === "pr")) w.push("replace: to and so only");
   }
   if (t.pattern === "snapshots") {
@@ -912,7 +912,7 @@ function termCard(name, tl) {
   const content = [h("div", { class: "fb-cardhead" }, h("code", {}, `[${g}]`), srcBadge(g), h("span", { class: "fb-kind" }, t.pattern), h("span", { class: "fb-help" }, PATTERN_HELP[t.pattern] || ""), removeBtn("terms", name))];
   content.push(newHint(g), h("div", { class: "fb-fields" }, coefPicker(g, TERM_COEF_KEY, { label: "coefficient" }), field(g, "pattern")));
   if (t.pattern === "replace") content.push(bipolarNote("replace: the ocean field = the coefficient at every depth"));
-  if (t.series !== "" && !coefNames().includes(t.series)) content.push(undefinedCoef(t.series));
+  if (t.coef !== "" && !coefNames().includes(t.coef)) content.push(undefinedCoef(t.coef));
   const marks = {};
   if (t.pattern === "snapshots") {
     content.push(h("div", { class: "fb-fields" },
@@ -928,12 +928,12 @@ function termCard(name, tl) {
   if (t.pattern === "uniform") {
     const gk = ["tas", "to", "so"].filter(f => t.fields.includes(f)).map(f => GAIN[f]);
     if (gk.length) content.push(fields(g, gk));
-    if (t.fields.includes("pr")) content.push(note(`pr follows the tas gain: × exp(β_p f_ta ${t.series ? usym(t.series) : "1"}), β_p = snapshots.f_p (fixed rule); leave pr out for no precipitation response.`));
+    if (t.fields.includes("pr")) content.push(note(`pr follows the tas gain: × exp(β_p f_ta ${t.coef ? usym(t.coef) : "1"}), β_p = snapshots.f_p (fixed rule); leave pr out for no precipitation response.`));
   }
   // the term on its own: what it adds to (or puts in) each field
   const tf = FIELDS.filter(f => t.fields.includes(f));
   if (tf.length && (t.pattern !== "snapshots" || t.snap1))
-    content.push(tex(tf.map(f => t.pattern === "replace" ? `${FSYM[f]} = ${t.series === "" ? "1" : coefTex(t)}` : `${FSYM[f]}\\!:\\ ${f === "pr" ? "\\times" : ""}${termPart(t, f)}`).join(",\\qquad "), false));
+    content.push(tex(tf.map(f => t.pattern === "replace" ? `${FSYM[f]} = ${t.coef === "" ? "1" : coefTex(t)}` : `${FSYM[f]}\\!:\\ ${f === "pr" ? "\\times" : ""}${termPart(t, f)}`).join(",\\qquad "), false));
   content.push(...termWarnings(t, tl).map(warn));
   if (t.pattern === "snapshots") {
     const snaps = [t.snap0, t.snap1].filter((s, i, a) => s && a.indexOf(s) === i);
@@ -1086,7 +1086,7 @@ function secEquation(tl) {
   content.push(...termNames().map(n => termCard(n, tl)));
   content.push(addBox("terms", "term_", "term", (g) => { const r = grp(g); Object.assign(r.k, { snap0: "picontrol", snap1: "lgm", fields: ["tas", "pr"], [TERM_COEF_KEY]: cnames[0] || "" }); for (const k of [TERM_COEF_KEY, "snap0", "snap1", "fields"]) r.given.add(k); }));
   content.push(h("h3", { class: "fb-sub" }, "Coefficients ", h("span", { class: "fb-hint" }, "α(τ), one number at each forcing time: a constant, a record, a ramp, a controller, or derived from the model")));
-  content.push(...cnames.map(n => seriesCard(n, tl)));
+  content.push(...cnames.map(n => coefCard(n, tl)));
   content.push(addBox(COEF_LIST_KEY, COEF_PREFIX, "coefficient", (g) => { const r = grp(g); r.k.method = "series"; r.given.add("method"); }));
   return section("equation", "The equation", "reference + Σ coefficient × pattern, each piece with its source", ...content);
 }
@@ -1110,9 +1110,9 @@ function secAfter() {
   content.push(card("[barysealevel]", null, h("span", { class: "fb-help" }, "sea level"), ...sl));
   if (inRun("ice_bnd") && sourceOf("ice_bnd")) {
     const im = String(val("ice_bnd", "method")), on = val("ice_bnd", "active", false);
-    const ib = [fields("ice_bnd", ["active", ...(on ? ["method", "H_ice", ...(im === "scaled" ? ["index", "slice_time"] : [])] : [])], { index: { options: ["", ...coefNames()] }, H_ice: { chips: climdbNames(), single: true } })];
+    const ib = [fields("ice_bnd", ["active", ...(on ? ["method", "H_ice", ...(im === "scaled" ? ["coef", "slice_time"] : [])] : [])], { coef: { options: ["", ...coefNames()] }, H_ice: { chips: climdbNames(), single: true } })];
     if (on) ib.push(climdbHint());
-    if (on && im === "scaled" && !coefNames().includes(String(val("ice_bnd", "index", "")))) ib.push(warn(`ice_bnd.index = "${val("ice_bnd", "index", "")}" is not a coefficient of the equation`));
+    if (on && im === "scaled" && !coefNames().includes(String(val("ice_bnd", "coef", "")))) ib.push(warn(`ice_bnd.coef = "${val("ice_bnd", "coef", "")}" is not a coefficient of the equation`));
     content.push(card("[ice_bnd]", null, h("span", { class: "fb-help" }, "prescribed ice in the fixed and relaxation cells"), ...ib));
   }
   return section("after", "After the composition", "to the surface (always); transforms; also at the forcing time", ...content);
@@ -1151,21 +1151,21 @@ function rightEquations(tl) {
   const cl = climate(), snames = coefNames(), ref = reference();
   const terms = runTerms();
   const sv = {};
-  for (const n of snames) { const s = seriesOnRun(n, tl); sv[n] = !s.p || s.kind === "derived" ? null : atT(tl, s.f, t); }
+  for (const n of snames) { const s = coefOnRun(n, tl); sv[n] = !s.p || s.kind === "derived" ? null : atT(tl, s.f, t); }
   const tauS = `${fmtNum(+tau.toPrecision(6))} yr`;
 
   // the coefficients the terms name but the equation does not define
-  const undef = [...new Set(terms.map(x => x.series).filter(n => n !== "" && !snames.includes(n)))];
+  const undef = [...new Set(terms.map(x => x.coef).filter(n => n !== "" && !snames.includes(n)))];
   if (snames.length || undef.length) {
     const b = eqblock("1 · Coefficients");
-    const used = new Set(terms.map(x => x.series));
-    const ibIndex = inRun("ice_bnd") && val("ice_bnd", "active", false) && String(val("ice_bnd", "method")) === "scaled" ? String(val("ice_bnd", "index", "")) : "";
+    const used = new Set(terms.map(x => x.coef));
+    const ibCoef = inRun("ice_bnd") && val("ice_bnd", "active", false) && String(val("ice_bnd", "method")) === "scaled" ? String(val("ice_bnd", "coef", "")) : "";
     for (const n of snames) {
-      const p = seriesPar(n);
+      const p = coefPar(n);
       if (!p) { b.append(warn(`coefficient "${n}": no group [${COEF_PREFIX}${n}]`)); continue; }
       const at = sv[n] === null || !Number.isFinite(sv[n]) ? "" : `\\qquad ${sym(n)}(${fmtK(+tau.toPrecision(6))}) = ${fmtV(sv[n])}`;
-      const unused = used.has(n) ? "" : `\\qquad\\text{(used by no term${n === ibIndex ? "; scales ice\\_bnd" : ""})}`;
-      b.append(tex(seriesEq(n, p) + at + unused));
+      const unused = used.has(n) ? "" : `\\qquad\\text{(used by no term${n === ibCoef ? "; scales ice\\_bnd" : ""})}`;
+      b.append(tex(coefEq(n, p) + at + unused));
     }
     for (const n of undef) b.append(tex(`${csym(n)}(\\tau)\\qquad{\\color{${WARN_TEX}}\\text{not defined yet}}`));
     out.push(b);
@@ -1192,7 +1192,7 @@ function rightEquations(tl) {
       if (cl === "rembo") { const u = terms.filter(t => t.pattern === "uniform" && t.fields.includes("tas")); if (u.length) b3.append(tex(`\\Delta T_{\\mathrm{sum}} = ${u.map(t => gsym(t.gain.tas) + (coefTex(t) || "1")).join(" + ")},\\qquad \\Delta T_{\\mathrm{ann}} = 1.3\\,\\Delta T_{\\mathrm{sum}}`)); }
       for (const f of ["to", "so"]) if (terms.filter(t => t.pattern === "replace" && t.fields.includes(f)).length > 1) b3.append(warn(`more than one replace term on ${f}`));
     }
-    const num3 = terms.map(t => t.series === "" ? `${t.name}: coefficient 1` : !snames.includes(t.series) ? `${t.name}: ${t.series} not defined yet` : sv[t.series] === null ? `${t.name}: ${t.series} set at run time` : `${t.name}: ${t.series} = ${fmtV(sv[t.series])}` + (t.pattern === "uniform" && t.fields.includes("tas") ? ` → ΔT = ${fmtV(t.gain.tas * sv[t.series])} K` : ""));
+    const num3 = terms.map(t => t.coef === "" ? `${t.name}: coefficient 1` : !snames.includes(t.coef) ? `${t.name}: ${t.coef} not defined yet` : sv[t.coef] === null ? `${t.name}: ${t.coef} set at run time` : `${t.name}: ${t.coef} = ${fmtV(sv[t.coef])}` + (t.pattern === "uniform" && t.fields.includes("tas") ? ` → ΔT = ${fmtV(t.gain.tas * sv[t.coef])} K` : ""));
     if (num3.length) b3.append(vals(`at τ = ${tauS}:  ` + num3.join("  ·  ")));
     out.push(b3);
     if (cl === "snapshots") out.push(eqblock("4 · To the model surface z_s(x,t)", tex(`T(x,m) = T^{\\mathrm{sl}} - \\Gamma_m z_s,\\qquad P(x,m) = P^{\\mathrm{sl}}\\,e^{-\\beta_p \\Gamma_m z_s}`)));
@@ -1229,7 +1229,7 @@ function rightEquations(tl) {
   else if (m === "fastiso") b6.append(tex(`\\eta(t) = \\eta_0 - \\Delta V_{\\mathrm{ice}}(t)/A_{\\mathrm{ocean}}\\quad\\text{(the FastIsostasy domains)}`));
   else if (m === "file") { const ser = seriesOf(String(val("barysealevel", "sl_path", "")), String(val("barysealevel", "sl_name", ""))); b6.append(tex(`\\eta = \\eta_{\\mathrm{file}}(\\tau)` + (ser ? `\\qquad \\eta(${fmtK(+tau.toPrecision(6))}) = ${fmtV(interp(ser, tau))}\\ \\mathrm{m}` : ""))); }
   if (inRun("ice_bnd") && val("ice_bnd", "active", false)) {
-    const im = String(val("ice_bnd", "method")), s = String(val("ice_bnd", "index", ""));
+    const im = String(val("ice_bnd", "method")), s = String(val("ice_bnd", "coef", ""));
     b6.append(im === "scaled" ? tex(`H_b(x) = ${s ? sym(s) + "(\\tau)" : "?"}\\,H(x, ${fmtK(num(val("ice_bnd", "slice_time")))})`) : tex(`H_b(x) = H(x, \\tau)`));
   }
   out.push(b6);
@@ -1242,7 +1242,7 @@ function rightRun(tl) {
   const t = evalTime(tl);
   const terms = runTerms();
   const content = [];
-  const ser = coefNames().map(n => ({ n, s: seriesOnRun(n, tl) })).filter(x => x.s.f && x.s.f.some(Number.isFinite)).map(x => ({ label: x.n, t: tl.t, f: x.s.f }));
+  const ser = coefNames().map(n => ({ n, s: coefOnRun(n, tl) })).filter(x => x.s.f && x.s.f.some(Number.isFinite)).map(x => ({ label: x.n, t: tl.t, f: x.s.f }));
   if (ser.length) content.push(linePlot(ser, { y: "coefficients", tmark: t }));
   const uni = terms.filter(x => x.pattern === "uniform");
   if (uni.length) {

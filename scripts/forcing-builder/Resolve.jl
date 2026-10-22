@@ -10,7 +10,7 @@ using JSON
 export Config, load_config, resolve, parse_overrides, template, RGroup, Entry, value_of
 
 const TEMPLATES = [
-    (r"^series_\w+$", "series"),
+    (r"^coef_\w+$", "coef"),
     (r"^term_\w+$", "term"),
     (r"^snapshot_\w+$", "snapshot"),
 ]
@@ -117,7 +117,7 @@ end
 """
 Resolve `base_path` with `overrides` (from parse_overrides). Returns the groups
 (Dict name => RGroup) and their order: the base's groups, then the named groups
-the configuration references (the series, the terms, the reference snapshot
+the configuration references (the coefficients, the terms, the reference snapshot
 and the snap0/snap1 of the terms), from the base, the library, or new from the
 template. A multi-domain base ([forcing_<sfx>] with reference and terms) is
 followed too; the page shows the single-domain groups.
@@ -176,7 +176,7 @@ function resolve(cfg::Config, base_path::AbstractString, overrides=Tuple{String,
         rg.entries[kname] = Entry(format_value(v), v, "override", e.comment, e.pre)
     end
     for f in filter(g -> occursin(r"^forcing(_\w+)?$", g), copy(order))
-        for n in names_of(out[f], "series"); group!("series_" * n); end
+        for n in names_of(out[f], "coefs"); group!("coef_" * n); end
         for n in names_of(out[f], "reference"); group!("snapshot_" * n); end
         for n in names_of(out[f], "terms")
             t = group!("term_" * n)

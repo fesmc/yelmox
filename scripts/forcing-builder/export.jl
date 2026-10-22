@@ -22,7 +22,7 @@ const OUT = length(ARGS) >= 1 ? ARGS[1] : joinpath(ROOT, "docs", "forcing-builde
 const NMAX = 800          # points per exported series
 
 # The groups of a base exported: run control, components, forcing, transforms.
-const BASE_GROUPS = r"^(ctrl|comps|sim|output|tm_\w+|forcing|series_\w+|term_\w+|snapshots|snapshot_\w+|taper|bias|orbit|ice_bnd|barysealevel|esm|obm_forcing|domain|spinup|transient)$"
+const BASE_GROUPS = r"^(ctrl|comps|sim|output|tm_\w+|forcing|coef_\w+|term_\w+|snapshots|snapshot_\w+|taper|bias|orbit|ice_bnd|barysealevel|esm|obm_forcing|domain|spinup|transient)$"
 
 jkey(k::Key) = Dict("raw" => k.raw, "v" => parse_value(k.raw), "c" => k.comment, "pre" => k.pre)
 jgroup(g::Group) = Dict("c" => g.comment, "order" => [k.name for k in g.keys],
