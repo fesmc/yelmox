@@ -157,8 +157,8 @@ contains
 
         ! Climate on grid_clim (init: snapshots at time_rel), then the
         ! surface mass balance on grid_surface (init=.true. runs the snowpack
-        ! spin-up before the first update: chion's time_equil years, or
-        ! smbpal's ITM equilibration).
+        ! spin-up before the first update: [surface_chion] time_equil years,
+        ! or for smbpal's ITM [smbpal] time_equil years).
         call step_climate(dom, ts, dtt, coefs, init=.true.)
         call step_surface(dom, ts, init=.true.)
 
