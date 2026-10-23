@@ -4,6 +4,10 @@ module sediments
 
     use nml 
     use ncio 
+    use interp2D, only : fill_nearest
+    use coordinates, only : grid_class
+    use mapping,  only : map_class
+    use fesmdata, only : fesmdata_map_init, fesmdata_read_field
 
     implicit none 
 
@@ -18,11 +22,9 @@ module sediments
         integer            :: method
         character(len=512) :: obs_path
         character(len=56)  :: obs_name 
-        real(wp)           :: sed_limit
     end type 
 
     type sediments_state_class
-        real(wp), allocatable :: cb(:,:)        ! [deg] Till strength
         real(wp), allocatable :: H(:,:)         ! [m] Sediment thickness
     end type 
 
@@ -34,12 +36,10 @@ module sediments
     private
     public :: sediments_class
     public :: sediments_init 
-    public :: sediments_update
-    public :: sediments_end 
 
 contains 
 
-    subroutine sediments_init(sed,filename,nx,ny,domain,grid_name,group)
+    subroutine sediments_init(sed,filename,grid,domain,group)
         ! Eventually interface should use 'sed' object directly
         ! instead of input/output arrays 
 
@@ -47,12 +47,17 @@ contains
 
         type(sediments_class), intent(INOUT) :: sed  
         character(len=*),      intent(IN)    :: filename 
-        integer,               intent(IN)    :: nx, ny 
-        character(len=*),      intent(IN)    :: domain, grid_name
+        type(grid_class),      intent(IN)    :: grid        ! Yelmo grid
+        character(len=*),      intent(IN)    :: domain
         character(len=*),      intent(IN), optional :: group
 
         ! Local variables
         character(len=32) :: nml_group
+        integer :: nx, ny
+        type(map_class) :: map
+        logical :: remap
+        real(wp), allocatable :: H(:,:)
+        real(wp), parameter :: H_mv = -9999.0_wp   ! missing value marker
         
         ! Make sure we know the namelist group for the sediments block
         if (present(group)) then
@@ -62,7 +67,10 @@ contains
         end if
 
         ! Load sediments parameters
-        call sediments_par_load(sed%par,filename,domain,grid_name,init=.TRUE.,group=nml_group)
+        call sediments_par_load(sed%par,filename,domain,grid%name,init=.TRUE.,group=nml_group)
+
+        nx = grid%G%nx
+        ny = grid%G%ny
 
         ! Allocate the sediments object 
         call sediments_allocate(sed%now,nx,ny)
@@ -81,8 +89,17 @@ contains
 
             case(1) ! Read in observations from file
 
-                ! Load sediment data from file 
-                call nc_read(sed%par%obs_path,sed%par%obs_name,sed%now%H)
+                ! Load sediment data from file, remapped (bilinear) from the grid
+                ! of the file (FesmData global attribute grid_name) if not the
+                ! Yelmo grid; missing values from the nearest valid value
+                call fesmdata_map_init(map,remap,nx,ny,sed%par%obs_path,sed%par%obs_name,"bilin",grid=grid)
+                call fesmdata_read_field(sed%par%obs_path,sed%par%obs_name,H,nx,ny,remap,map)
+                if (any(H .lt. 0.0_wp)) then
+                    where (H .lt. 0.0_wp) H = H_mv
+                    call fill_nearest(H,H_mv)
+                end if
+                sed%now%H = H
+                if (remap) write(*,*) "sediments_init:: "//trim(sed%par%obs_name)//" remapped onto "//trim(grid%name)
                 write(*,*) "sediments_init:: Sediments loaded from: "
                 write(*,*) trim(sed%par%obs_path)//" : "//trim(sed%par%obs_name)
 
@@ -116,36 +133,6 @@ contains
     end subroutine sediments_init
 
 
-    subroutine sediments_update(sed,year_bp)
-
-        implicit none 
-
-        type(sediments_class) :: sed 
-
-        real(wp) :: year_bp 
-
-        ! === To do ====
-
-
-        return 
-
-    end subroutine sediments_update
-
-
-    subroutine sediments_end(sed)
-
-        implicit none 
-
-        type(sediments_class) :: sed
-
-        ! Deallocate sediments state object
-        call sediments_deallocate(sed%now)
-
-        return 
-
-    end subroutine sediments_end
-
-
     subroutine sediments_par_load(par,filename,domain,grid_name,init,group)
 
         type(sediments_param_class), intent(OUT) :: par
@@ -166,8 +153,9 @@ contains
         end if
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
+        if (present(init)) init_pars = init
         
+        call nml_read(filename,nml_group,"method",     par%method,      init=init_pars)
         call nml_read(filename,nml_group,"obs_path",   par%obs_path,    init=init_pars)
         call nml_read(filename,nml_group,"obs_name",   par%obs_name,    init=init_pars)
 

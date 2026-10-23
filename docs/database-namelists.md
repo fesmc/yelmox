@@ -6,8 +6,8 @@ Most forcing in YelmoX is now loaded through the shared
 [`varslice`](https://github.com/fesmc/fesm-utils) reader. A **database namelist**
 is a small, static description of a dataset on disk: where the file lives, which
 variable to read, how to convert its units, and how its records map onto a time
-axis. The consuming modules — `varslice` itself, `esm_forcing`, `snapesm`,
-`ismip6` — all read the *same* group layout, so once you understand one group you
+axis. The consuming modules — `varslice` itself, `esm_forcing`, `snapshots`, the
+climate transforms `[taper]`/`[bias]` and `[ice_bnd]` — all read the *same* group layout, so once you understand one group you
 understand them all.
 
 The point of these files is to keep the *provenance* of every forcing field
@@ -127,6 +127,11 @@ How the reader interprets these:
   time = 0, 1961, 1990, 0, 12     ! 12-month climatology, averaged over 1961–1990
   ```
 
+  The last dimension of the variable is the cycle: `t2m(x,y,month)` or, with
+  depth, `to(x,y,depth,month)`. An update with `method = "range_mean"` and
+  `rep = 1` gives its mean over the cycle (e.g. the annual-mean reference ocean
+  of `esm_forcing`); any other update keeps the cycle.
+
 - **Collapse to a single slice.** For a *time-varying* field, setting `dx = 0`
   collapses `x1` to `x0`, i.e. read exactly one record at `x0`. (For a static
   field, `dx = 0` is normal and `x0..x1` are left untouched.)
@@ -152,7 +157,10 @@ dimension, or the reader stops with an error — a useful check that `x0`, `x1`,
   ```
 
   and the same namelist serves every GCM/experiment combination — you select the
-  concrete values in the driver's `[esm]` configuration, not here.
+  concrete values in the driver's `[esm]` configuration, not here. snapshots
+  supplies `{grid_global}` (`[snapshots] grid_global`) and `{exp}` (the snapshot's
+  `exp`) for its database `input/clim_db.nml` (see
+  [Snapshots](climate-snapshots.md)).
 
 **Wildcards** (shell globs, `*` and `?`) are also allowed. The reader expands the
 pattern with `ls -1 … | sort`, so a dataset split across many files is matched
@@ -194,7 +202,7 @@ Static surface elevation (single slice, no unit change):
 
 ```fortran
 &gcm_zs_ref
-    filename    = "ice_data/{domain}/{grid_name}/RACMO2.3/{grid_name}_ERA5-3H_RACMO2.3p2_1979-2022_monthly.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-RACMO2.3p2-1985-2014.nc"
     name        = "z_srf"
     units       = "m" "m"
     scaling     = 1.0 0.0
@@ -226,9 +234,10 @@ not in the namelist.
 - **`esm_forcing`** groups the atmosphere/ocean database groups into reference,
   variability, ESM-reference, historical, and projection periods
   (`&gcm_ts_ref`, `&gcm_to_proj`, …) and supplies `{gcm}`/`{experiment}`. See
-  [yelmox_esm](flavor-esm.md).
-- **`snapesm`** uses the same reader for its snapshot climate database.
-- **`ismip6`** uses it for the ISMIP6 atmosphere/ocean forcing files.
+  [ESM forcing](climate-esm.md).
+- **`snapshots`** uses the same reader for its snapshot climate database.
+- **`[taper]`, `[bias]`** and **`[ice_bnd]`** read their fields (weights, bias
+  fields, ice thickness) as groups of the same databases.
 
 Because they share the reader, the layout documented here is identical across all
 of them — a group is a group regardless of which module owns it.
@@ -236,6 +245,9 @@ of them — a group is a group regardless of which module owns it.
 ## Quick reference
 
 - All five keys are mandatory; always write them for provenance.
+- Optional: `fill` (`"none"`, `"nearest"`: each level from the nearest valid cell,
+  a level without data from the level above, or `"const"` with `fill_value`), and
+  `remap` (kernel) with `grid_src` (the file's grid) to read a field on another grid.
 - `units` = two documentation labels; `scaling` = `[scale, offset]` does the real
   `out = in*scale + offset` conversion.
 - `time = [active, x0, x1, dx, sub]`:

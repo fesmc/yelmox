@@ -5,6 +5,8 @@ module pico
     use ncio 
     use pico_geometry
     use pico_physics
+    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get, &
+                              sec_year_tropical
 
     implicit none 
 
@@ -15,17 +17,11 @@ module pico
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: wp  = sp 
 
-    ! Physical constants 
-    real(wp), parameter :: rho_ice =  917.d0        ! Density ice           [kg/m^3] 
-    real(wp), parameter :: rho_w   = 1000.d0        ! Density water         [kg/m^3] 
-    real(wp), parameter :: rho_sw  = 1028.d0        ! Density seawater      [kg/m^3] 
-    real(wp), parameter :: g       = 9.81d0         ! Gravitational accel.  [m/s^2]
-    real(wp), parameter :: cp_o    = 3974.d0        ! Specific heat capacity of ocean mixed layer [J/kg*ºC]
-    real(wp), parameter :: L_ice   = 3.34e5         ! Latent heat of fusion of ice [J/kg] 
- 
-    real(wp), parameter :: year_to_sec = 365.0*24.0*60.0*60.0
-    real(wp), parameter :: lambda      = L_ice/cp_o ! K
-    real(wp), parameter :: rho_ice_sw  = rho_ice / rho_sw 
+    ! This module declared its own copy of the physical constants, shadowing
+    ! pico_physics' (private) set; only year_to_sec was ever used. The physical
+    ! constants now live in pico_param_class, set by pico_init. The year is the
+    ! CF/UDUNITS one from fesm-utils rather than a local 365 d.
+    real(wp), parameter :: year_to_sec = real(sec_year_tropical, wp)
 
     type pico_param_class
 
@@ -36,6 +32,12 @@ module pico
         real(wp) :: gamma_tstar
         real(wp) :: C_over
 
+        ! Physical constants, from the phys_const_class given to pico_init
+        ! (Earth values as the standalone fallback). Only the two groupings the
+        ! physics uses are kept, so they cannot drift from each other.
+        real(wp) :: rho_ice_g  = 910.0_wp*9.81_wp          ! [Pa/m] rho_ice*g
+        real(wp) :: lambda_rho = (333500.0_wp/3974.0_wp)*(910.0_wp/1028.0_wp) ! [K]
+
         character(len=512) :: domain
 
     end type
@@ -45,11 +47,10 @@ module pico
         real(wp), allocatable   :: d_shlf(:,:)          ! Shelf distance to grl
         real(wp), allocatable   :: d_if(:,:)            ! Shelf distance to ice front
         real(wp), allocatable   :: r_shlf(:,:)          ! Relative ice shelf position
-        real(wp), allocatable   :: n_shlf(:,:)          ! Max number of boxes per basin
         real(wp), allocatable   :: A_box(:,:)           ! Area of box
         real(wp), allocatable   :: boxes(:,:)           ! Box number of ice shelf
         real(wp), allocatable   :: bmb_shlf(:,:)        ! Shelf basal mass balance [m/a]
-        real(wp), allocatable   :: T_box(:,:)           ! Temperature of box [ºC]
+        real(wp), allocatable   :: T_box(:,:)           ! Temperature of box [K]
         real(wp), allocatable   :: S_box(:,:)           ! Salinity of box [PSU]
         real(wp), allocatable   :: CC(:,:)              ! Overtuning strength
        
@@ -68,96 +69,168 @@ module pico
 
 contains
     
-    subroutine pico_update(pico,to,so,H_ice,z_bed,f_grnd,z_sl,basins,mask_ocn,dx)
-        
+    subroutine pico_update(pico,to,so,H_ice,f_grnd,basins,is_ocn,dx)
+        ! PICO (Reese et al., 2018): the ice shelves of each basin are divided
+        ! into boxes from the grounding line (box 1) to the calving front
+        ! (pico_update_geometry). The ocean input (box 0: to, so, the basin
+        ! means in front of the shelves) drives the overturning into box 1;
+        ! box k>1 of a basin is fed by the mean temperature and salinity of
+        ! the box before it in that basin (Reese et al., 2018), with the
+        ! overturning of box 1. Temperature and salinity of a box are
+        ! computed per cell, with the cell's pressure (as in PISM), and the
+        ! melt from them. Partially grounded cells (0 < f_grnd < 1, H_ice > 0)
+        ! get the box-1 melt of their basin (box-1 mean T/S, the cell's
+        ! pressure), for the grounding-line melt of the ice-sheet model.
+        !
+        ! to, so : box-0 temperature [K] and salinity [PSU]
+        ! is_ocn : cells connected to the open ocean (no land, no lakes)
+
         implicit none
         
         type(pico_class), intent(INOUT) :: pico
         real(wp), intent(IN) :: to(:,:)
         real(wp), intent(IN) :: so(:,:)
         real(wp), intent(IN) :: H_ice(:,:) 
-        real(wp), intent(IN) :: z_bed(:,:) 
         real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: z_sl(:,:) 
         real(wp), intent(IN) :: basins(:,:)
-        integer,  intent(IN) :: mask_ocn(:,:) 
+        logical,  intent(IN) :: is_ocn(:,:) 
         real(wp), intent(IN) :: dx
 
         ! Local variables
-        integer :: m, i, j, k, l, nx, ny, ngr
-
-        real(wp) :: bmb_floating, pm_point, pm_point_box0
-        real(wp), allocatable :: T_star(:,:)
-        logical,  allocatable :: is_grline(:,:)
+        integer  :: m, i, j, k, nx, ny, n_box_basin
+        logical  :: first_box, is_box1
+        real(wp) :: T_prev, S_prev, CC_basin, T_star, pm_point, bmb_floating
+        real(wp), allocatable :: T0(:,:), S0(:,:)
+        real(wp), allocatable :: T1_basin(:,:), S1_basin(:,:)
+        logical,  allocatable :: in_box(:,:)
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
-        allocate(is_grline(nx,ny))
-        allocate(T_star(nx,ny))
+        allocate(T0(nx,ny))
+        allocate(S0(nx,ny))
+        allocate(T1_basin(nx,ny))
+        allocate(S1_basin(nx,ny))
+        allocate(in_box(nx,ny))
 
         ! First, update the geometry 
         call pico_update_geometry(pico,H_ice,f_grnd,basins,dx)
 
-        ! Determine location of grounding line 
-        is_grline = calc_grline(f_grnd,H_ice)
- 
-        ! Initialize Tstar, Tbox, Sbox
-        T_star = 0.0
-        pico%now%T_box  = to
-        pico%now%S_box  = so
-
-        ! PISM condition in PICO. Box 0 temperature cannot be below the pressure-melting point.
-        do l = 1, ny
-        do k = 1, nx
-            pm_point_box0 = calc_theta_pm(pico%now%S_box(k,l),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico,H_ice(k,l))
-            if (pico%now%T_box(k,l) .lt. pm_point_box0) pico%now%T_box(k,l) = pm_point_box0 + 0.001
+        ! Box 0: the ocean input. PISM condition in PICO: the box-0 temperature
+        ! cannot be below the pressure-melting point at the ice base.
+        T0 = to
+        S0 = so
+        do j = 1, ny
+        do i = 1, nx
+            pm_point = calc_theta_pm(S0(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                     H_ice(i,j),pico%par%rho_ice_g)
+            if (T0(i,j) .lt. pm_point) T0(i,j) = pm_point + 0.001_wp
         end do
         end do
 
-        where(f_grnd .eq. 1.0)
-            pico%now%T_box = 0.0
-            pico%now%S_box = 0.0
-        end where
+        ! Cells outside the boxes keep the box-0 values
+        pico%now%T_box = T0
+        pico%now%S_box = S0
+        pico%now%CC    = 0.0_wp
 
-        ! 1. Calculate current ice shelf bmb field (grounded-ice bmb is
-        ! calculated in ice-sheet model separately) ========
+        ! Box-1 mean T/S of each basin; box 0 where a basin has no boxes
+        T1_basin = T0
+        S1_basin = S0
+
+        ! 1. Box chain of each basin =====================================
+
+        do m = 1, int(maxval(basins))
+            if (.not. any(basins .eq. m .and. pico%now%boxes .gt. 0.0)) cycle
+
+            n_box_basin = int(maxval(pico%now%boxes, mask=(basins .eq. m)))
+
+            ! Empty boxes are skipped: the first box with cells takes the
+            ! box-1 equations, every later box the box-n equations fed by the
+            ! box before it.
+            first_box = .TRUE.
+            CC_basin  = 0.0_wp
+            T_prev    = 0.0_wp
+            S_prev    = 0.0_wp
+
+            do k = 1, n_box_basin
+
+                in_box = (basins .eq. m .and. pico%now%boxes .eq. real(k,wp))
+                if (.not. any(in_box)) cycle
+
+                is_box1 = first_box
+
+                if (first_box) then
+                    ! Box 1: from the box-0 input, solving for the overturning
+                    do j = 1, ny
+                    do i = 1, nx
+                        if (.not. in_box(i,j)) cycle
+                        T_star = calc_Tstar(T0(i,j),S0(i,j),H_ice(i,j),pico%par%a_pico,pico%par%b_pico, &
+                                            pico%par%c_pico,pico%par%rho_ice_g)
+                        pico%now%T_box(i,j) = calc_shelf_Tbox_1(T0(i,j),S0(i,j),pico%now%A_box(i,j),T_star, &
+                                                    pico%par%C_over,pico%par%rho_star,pico%par%gamma_tstar, &
+                                                    pico%par%alpha_pico,pico%par%beta_pico, &
+                                                    pico%par%lambda_rho)
+                        pico%now%S_box(i,j) = calc_shelf_Sbox_1(T0(i,j),S0(i,j),pico%now%T_box(i,j), &
+                                                    pico%par%lambda_rho)
+                        pico%now%CC(i,j)    = calc_overtuning(T0(i,j),S0(i,j),pico%now%T_box(i,j), &
+                                                    pico%now%S_box(i,j),pico%par%C_over,pico%par%rho_star, &
+                                                    pico%par%alpha_pico,pico%par%beta_pico)
+                    end do
+                    end do
+
+                    ! Overturning of the basin: its mean over box 1
+                    CC_basin  = sum(pico%now%CC, mask=in_box) / real(count(in_box),wp)
+                    first_box = .FALSE.
+
+                else
+                    ! Box k>1: fed by the mean of the box before it
+                    do j = 1, ny
+                    do i = 1, nx
+                        if (.not. in_box(i,j)) cycle
+                        T_star = calc_Tstar(T_prev,S_prev,H_ice(i,j),pico%par%a_pico,pico%par%b_pico, &
+                                            pico%par%c_pico,pico%par%rho_ice_g)
+                        pico%now%T_box(i,j) = T_prev
+                        pico%now%S_box(i,j) = S_prev
+                        call calc_shelf_TS_box_n(pico%now%T_box(i,j),pico%now%S_box(i,j),pico%now%A_box(i,j), &
+                                                 T_star,CC_basin,pico%par%a_pico, &
+                                                 pico%par%gamma_tstar,pico%par%lambda_rho)
+                    end do
+                    end do
+
+                end if
+
+                ! Mean temperature and salinity of this box, the input of the next
+                T_prev = sum(pico%now%T_box, mask=in_box) / real(count(in_box),wp)
+                S_prev = sum(pico%now%S_box, mask=in_box) / real(count(in_box),wp)
+
+                ! Keep the box-1 means for the partially grounded cells
+                if (is_box1) then
+                    where (basins .eq. m)
+                        T1_basin = T_prev
+                        S1_basin = S_prev
+                    end where
+                end if
+
+            end do
+
+            where (basins .eq. m) pico%now%CC = CC_basin
+
+        end do
+
+        ! 2. Ice-shelf bmb field (grounded-ice bmb is calculated in the
+        ! ice-sheet model separately); every cell is set each update ======
         
         do j = 1, ny
         do i = 1, nx
 
-            if (mask_ocn(i,j) .gt. 0) then
-                do m = 1, int(pico%par%n_box)
-                    ! jablasco: test box 1 -> .eq. -> .ge. la m
-                    if (m .eq. 1.0 .and. pico%now%boxes(i,j) .ge. 1.0) then
-                        ! 1. Compute box 1
-                        T_star(i,j) = calc_Tstar(to(i,j),so(i,j),H_ice(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico)
-                        pico%now%T_box(i,j) = calc_shelf_Tbox_1(to(i,j),so(i,j),pico%now%A_box(i,j),T_star(i,j), &
-                                                                pico%par%C_over,pico%par%rho_star,pico%par%gamma_tstar, &
-                                                                pico%par%alpha_pico,pico%par%beta_pico)
-                        pico%now%S_box(i,j) = calc_shelf_Sbox_1(to(i,j),so(i,j),pico%now%T_box(i,j))
-                        ! Compute overtuning
-                        pico%now%CC(i,j) = calc_overtuning(to(i,j),so(i,j),pico%now%T_box(i,j),pico%now%S_box(i,j), &
-                                                           pico%par%C_over,pico%par%rho_star,pico%par%alpha_pico,pico%par%beta_pico)             
+            if (is_ocn(i,j) .and. f_grnd(i,j) .eq. 0.0) then
+                ! Fully floating ice or open ocean connected to the open ocean
 
-                    ! jablasco:test box 1. 1.0 -> n_box
-                    else if (m .gt. 1.0 .and. pico%now%boxes(i,j) .ge. m) then
-                        ! Compute rest boxes
-                        T_star(i,j) = calc_Tstar(pico%now%T_box(i,j),pico%now%S_box(i,j),H_ice(i,j), &
-                                                 pico%par%a_pico,pico%par%b_pico,pico%par%c_pico)
-                        call calc_shelf_TS_box_n(pico%now%T_box(i,j), pico%now%S_box(i,j), pico%now%A_box(i,j), &
-                                                 T_star(i,j), pico%now%CC(i,j), pico%par%a_pico, pico%par%gamma_tstar)
-
-                    end if
-
-                end do
-
-                ! Compute melting
-                pm_point = calc_theta_pm(pico%now%S_box(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico,H_ice(i,j))
-                bmb_floating = calc_melt_rate_pico(pico%now%T_box(i,j),pm_point,pico%par%gamma_tstar)
-               
-                ! Apply melting to purely floating points or ocean
-                if(f_grnd(i,j) .eq. 0.0) pico%now%bmb_shlf(i,j) = bmb_floating
+                pm_point = calc_theta_pm(pico%now%S_box(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                         H_ice(i,j),pico%par%rho_ice_g)
+                bmb_floating = calc_melt_rate_pico(pico%now%T_box(i,j),pm_point,pico%par%gamma_tstar, &
+                                                   pico%par%lambda_rho)
+                pico%now%bmb_shlf(i,j) = bmb_floating
 
                 ! Ensure that ice accretion only occurs where ice exists 
                 if (pico%now%bmb_shlf(i,j) .gt. 0.0 .and. H_ice(i,j) .eq. 0.0) pico%now%bmb_shlf(i,j) = 0.0 
@@ -165,9 +238,18 @@ contains
                 ! No accretion allowed in  Box 1
                 if (pico%now%bmb_shlf(i,j) .gt. 0.0 .and. pico%now%boxes(i,j) .eq. 1.0) pico%now%bmb_shlf(i,j) = 0.0
 
+            else if (is_ocn(i,j) .and. f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0) then
+                ! Partially grounded ice connected to the open ocean: the box-1
+                ! melt of the basin at the cell's pressure (no accretion, as in box 1)
+
+                pm_point = calc_theta_pm(S1_basin(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                         H_ice(i,j),pico%par%rho_ice_g)
+                bmb_floating = calc_melt_rate_pico(T1_basin(i,j),pm_point,pico%par%gamma_tstar, &
+                                                   pico%par%lambda_rho)
+                pico%now%bmb_shlf(i,j) = min(bmb_floating,0.0_wp)
+
             else 
-                ! Grounded point, or floating point not connected to the ocean 
-                ! Set bmb_shlf to zero 
+                ! Fully grounded point, land, lake, or ice-free partially grounded point: no shelf melt
 
                 pico%now%bmb_shlf(i,j) = 0.0
                 
@@ -175,6 +257,12 @@ contains
  
         end do
         end do  
+
+        ! Grounded points carry no box values
+        where (f_grnd .eq. 1.0)
+            pico%now%T_box = 0.0
+            pico%now%S_box = 0.0
+        end where
 
         return
         
@@ -209,6 +297,7 @@ contains
         d_max = maxval(pico%now%d_shlf)
 
         do m = 1 , int(maxval(basins))
+            if (.not. any(basins .eq. m)) cycle   ! basin ids need not be consecutive
             d_max_basin = maxval(pico%now%d_shlf,basins .eq. m)
             boxes_basin = 0.0
             where(basins .eq. m)
@@ -229,18 +318,38 @@ contains
     ! 
     ! =================
 
-    subroutine pico_init(pico,filename,nx,ny,domain)
-        ! Initialize pico object 
+    subroutine pico_init(pico,filename,group,nx,ny,domain,cnst)
+        ! Initialize pico object (parameters from the par-file group, e.g.
+        ! "pico" or the domain-suffixed "pico_south")
 
         implicit none
 
         type(pico_class), intent(OUT)     :: pico
         character(len=*), intent(IN)      :: filename
+        character(len=*), intent(IN)      :: group
         integer,          intent(IN)      :: nx, ny 
         character(len=*), intent(IN)      :: domain
+        type(phys_const_class), intent(IN), optional :: cnst
+
+        ! Local variables
+        real(wp) :: rho_ice, rho_sw, rho_ice_sw, cp_ocn, L_ice, g
 
         ! Load parameters
-        call pico_par_load(pico%par,domain,filename)
+        call pico_par_load(pico%par,filename,group,domain)
+
+        ! Physical constants: form the two groupings the physics needs.
+        if (present(cnst)) then
+            call phys_const_require(cnst, "pico_init")
+            call phys_const_get(cnst, "rho_ice",    rho_ice)
+            call phys_const_get(cnst, "rho_sw",     rho_sw)
+            call phys_const_get(cnst, "rho_ice_sw", rho_ice_sw)
+            call phys_const_get(cnst, "cp_ocn",     cp_ocn)
+            call phys_const_get(cnst, "L_ice",      L_ice)
+            call phys_const_get(cnst, "g",          g)
+
+            pico%par%rho_ice_g  = rho_ice*g
+            pico%par%lambda_rho = (L_ice/cp_ocn)*rho_ice_sw
+        end if
 
         ! Allocate the object 
         call pico_allocate(pico%now,nx,ny)
@@ -254,26 +363,26 @@ contains
 
     end subroutine pico_init
     
-    subroutine pico_par_load(par,domain,filename,init)
+    subroutine pico_par_load(par,filename,group,domain,init)
         ! Load PICO parameters
 
         type(pico_param_class), intent(OUT) :: par
-        character(len=*), intent(IN) :: domain,filename
+        character(len=*), intent(IN) :: filename,group,domain
         logical, optional :: init
         logical :: init_pars
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE.
 
-        call nml_read(filename,"pico","n_box",       par%n_box,       init=init_pars)
-        call nml_read(filename,"pico","a_pico",      par%a_pico,      init=init_pars)
-        call nml_read(filename,"pico","b_pico",      par%b_pico,      init=init_pars)
-        call nml_read(filename,"pico","c_pico",      par%c_pico,      init=init_pars)
-        call nml_read(filename,"pico","alpha_pico",  par%alpha_pico,  init=init_pars)
-        call nml_read(filename,"pico","beta_pico",   par%beta_pico,   init=init_pars)
-        call nml_read(filename,"pico","rho_star",    par%rho_star,    init=init_pars)
-        call nml_read(filename,"pico","gamma_tstar", par%gamma_tstar, init=init_pars)
-        call nml_read(filename,"pico","C_over",      par%C_over,      init=init_pars)
+        call nml_read(filename,group,"n_box",       par%n_box,       init=init_pars)
+        call nml_read(filename,group,"a_pico",      par%a_pico,      init=init_pars)
+        call nml_read(filename,group,"b_pico",      par%b_pico,      init=init_pars)
+        call nml_read(filename,group,"c_pico",      par%c_pico,      init=init_pars)
+        call nml_read(filename,group,"alpha_pico",  par%alpha_pico,  init=init_pars)
+        call nml_read(filename,group,"beta_pico",   par%beta_pico,   init=init_pars)
+        call nml_read(filename,group,"rho_star",    par%rho_star,    init=init_pars)
+        call nml_read(filename,group,"gamma_tstar", par%gamma_tstar, init=init_pars)
+        call nml_read(filename,group,"C_over",      par%C_over,      init=init_pars)
 
         ! Determine derived parameters
         par%domain = trim(domain)
@@ -315,7 +424,6 @@ contains
         allocate(now%T_box(nx,ny))
         allocate(now%S_box(nx,ny))
         allocate(now%d_shlf(nx,ny))
-        allocate(now%n_shlf(nx,ny))
         allocate(now%d_if(nx,ny))
         allocate(now%r_shlf(nx,ny))
         allocate(now%A_box(nx,ny))
@@ -329,7 +437,6 @@ contains
         now%d_shlf   = 0.0
         now%d_if     = 0.0
         now%r_shlf   = 0.0
-        now%n_shlf   = 0.0
         now%A_box    = 0.0
         now%bmb_shlf = 0.0
         now%CC       = 0.0
@@ -351,7 +458,6 @@ contains
         if (allocated(now%d_shlf))   deallocate(now%d_shlf)
         if (allocated(now%d_if))     deallocate(now%d_if)
         if (allocated(now%r_shlf))   deallocate(now%r_shlf)
-        if (allocated(now%n_shlf))   deallocate(now%n_shlf)
         if (allocated(now%A_box))    deallocate(now%A_box)
         if (allocated(now%bmb_shlf)) deallocate(now%bmb_shlf)
         if (allocated(now%CC))       deallocate(now%CC)

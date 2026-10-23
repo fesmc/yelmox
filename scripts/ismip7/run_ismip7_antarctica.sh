@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# ISMIP7 workflow for Antarctica (yelmox, climate = esm).
+#
+#   Step 1  spinup     20-kyr present-day OPTIMIZED ice-sheet spin-up
+#                      (sim.opt=True) -> writes a restart bundle
+#   Step 2  scenarios  ssp585, branched off that bundle
+#
+# Base yelmox/yelmox_esm_Antarctica.nml with the ISMIP7 setup ismip7_ant of
+# params.sh. The ice sheet + isostasy are ACTIVE (comps.with_ice_sheet/with_isostasy=True).
+# The spin-up optimizes basal friction + thermal forcing to present day (&opt
+# cf/tf_time_end=20e3), and the scenarios evolve the ice sheet under ISMIP7
+# climate/ocean forcing.
+#
+# Run the steps in order on the cluster; let the spin-up finish before launching
+# the scenarios (they read its restart bundle):
+#
+#   scripts/ismip7/run_ismip7_antarctica.sh spinup
+#   scripts/ismip7/run_ismip7_antarctica.sh scenarios
+#
+# Stage only -- create the run dirs + SLURM submit script but do NOT submit
+# (a dry run to inspect everything first): set STAGE=1
+#
+#   STAGE=1 scripts/ismip7/run_ismip7_antarctica.sh spinup
+#   STAGE=1 scripts/ismip7/run_ismip7_antarctica.sh scenarios
+#
+# NOTE: large grids need a large stack. The SLURM submit script sets it, but for
+# a local run first do:  ulimit -s unlimited
+#
+set -euo pipefail
+cd "$(dirname "$0")/../.." || exit 1               # repo root
+
+source scripts/ismip7/params.sh                    # ismip7_ant
+
+# ---- configuration ---------------------------------------------------------
+EXE="yelmox"                                       # -> libyelmox/bin/yelmox.x (climate = esm)
+NML="yelmox/yelmox_esm_Antarctica.nml"
+OUTROOT="output/ismip7_ant"
+GCM="CESM2-WACCM"
+GRID="ANT-16KM"
+SCENARIOS=(ssp585)                                 # only ssp585 present on Levante
+
+SPINUP_YEARS=20000                                 # ice-sheet opt spin-up (matches &opt cf/tf_time_end=20e3)
+PROJ_END=2300                                      # scenario end year (CE)
+
+# runme submit options. STAGE=1 writes the submit script without submitting.
+if [ "${STAGE:-0}" = 1 ]; then SUBMIT="-s"; else SUBMIT="-rs"; fi
+# HPCOPT_SPINUP / HPCOPT_SCEN can be set in the environment (other queues, e.g. on
+# albedo: HPCOPT_SPINUP="-q 48h -w 48:00:00 --omp 8").
+# Walltimes differ hugely: the 20-kyr opt spin-up is the long job (ANT-16KM, 16
+# threads: ~3 model-yr/min at the start, i.e. several days; shared queue, up to 7
+# days); the ~285-yr projection is short.
+HPCOPT_SPINUP="${HPCOPT_SPINUP:--q shared -w 7-00:00:00 -m 20G --omp 16}"
+HPCOPT_SCEN="${HPCOPT_SCEN:--q compute -w 08:00:00 --omp 16}"
+
+SPINUP_OUT="$OUTROOT/spinup"
+# The spin-up's final restart bundle. yelmox names it restart-<time/1e3 %.3f>-kyr.
+# Absolute path: the executable runs from inside the scenario's run dir, so a
+# repo-root-relative path would not resolve.
+BUNDLE="$(pwd)/$SPINUP_OUT/restart-$(awk "BEGIN{printf \"%.3f\", $SPINUP_YEARS/1000}")-kyr"
+
+# ---- steps -----------------------------------------------------------------
+case "${1:-}" in
+  spinup)
+    runme $SUBMIT $HPCOPT_SPINUP -e "$EXE" -n "$NML" -o "$SPINUP_OUT" \
+      -p "${ismip7_ant[@]}" \
+         ctrl.run_step=spinup comps.dt_clim=10 sim.relax=True sim.opt=True \
+         domain.grid_hub="$GRID" \
+         spinup.time_init=0 spinup.time_end="$SPINUP_YEARS"
+    ;;
+  scenarios)
+    for exp in "${SCENARIOS[@]}"; do
+      runme $SUBMIT $HPCOPT_SCEN -e "$EXE" -n "$NML" -o "$OUTROOT/$exp" \
+        -p "${ismip7_ant[@]}" \
+           ctrl.run_step=transient esm.experiment="$exp" esm.esm_name="$GCM" \
+           esm.use_esm=True esm.use_hist=True esm.use_proj=True \
+           domain.grid_hub="$GRID" \
+           ctrl.restart="$BUNDLE" \
+           transient.time_init=2015 transient.time_end="$PROJ_END"
+    done
+    ;;
+  *)
+    echo "usage: $0 {spinup|scenarios}   (prefix STAGE=1 to stage without submitting)" >&2
+    exit 1
+    ;;
+esac

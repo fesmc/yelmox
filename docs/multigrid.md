@@ -1,29 +1,12 @@
-# Multigrid coupling (`yelmox`)
+# Multigrid coupling
 
-Design doc for a multigrid rewrite of the yelmox driver. Status: **implemented**
-(`yelmox.f90` + `libs/yelmox_domain.f90`); single-domain parity with
-`yelmox.f90` validated, multi-domain (bipolar) runs, optimization + smb_simple +
-domain-specific startups ported. The bipolar driver (`yelmox_bipolar.f90`) also
-carries the full `yelmox_bipolar` ocean coupling: a shared barystatic sea level
-and a shared Ocean Box Model exchanging freshwater flux / ocean temperature
-between hemispheres (`yelmox_bipolar/obm_coupling.f90`). A third driver (`yelmox_esm.f90`)
-swaps snapclim for ESM climatic forcing (`libs/esm.f90`), running esm as a
-first-class component on its own grid (`grid_clim`) and remapping its outputs to
-the consumer grids, just like snapclim (see Drivers). Remaining: FastIsostasy
-hi-res output (below).
+Architecture of the two YelmoX programs, `yelmox` and `yelmox_bipolar`. Each
+component of a domain (Yelmo, isostasy, climate, smb, marine shelf) runs on its
+own grid, and fields are remapped between grids at the moment of coupling. The
+domain is defined around a hi-resolution geometry hub (htopo), the finest grid of
+the setup, from which every component, Yelmo included, is populated.
 
-## Motivation
-
-Today every helper module (`marine_shelf`, `snapclim`, `smbpal`, FastIsostasy)
-is initialized on, and operates on, the Yelmo grid. Fields are passed between
-modules as bare `(nx,ny)` 2D arrays shaped to that single grid. There is no
-inter-module remapping in the main loop — remapping (`map_class` from the
-`coords` library in fesm-utils) is used only for restart I/O.
-
-We want each module to be able to work on its own grid/resolution and be
-remapped to Yelmo (or any other module) at the moment of coupling. Example
-workflow for Antarctica with Yelmo on `ANT-16KM` and a hi-res topo/working grid
-`ANT-2KM`:
+Example for Antarctica with Yelmo on `ANT-16KM` and a hi-res hub on `ANT-2KM`:
 
 - `H_ice` (Yelmo `ANT-16KM`) → bilin → `ANT-2KM` for the marine-shelf calc.
 - `z_bed`/`z_ss` from FastIsostasy → conservatively aggregated to Yelmo's grid,
@@ -31,15 +14,15 @@ workflow for Antarctica with Yelmo on `ANT-16KM` and a hi-res topo/working grid
 - marine_shelf computed at `ANT-2KM`; `bmb_shlf`/`T_shlf` → conservatively
   aggregated → `ANT-16KM` → passed to Yelmo as forcing.
 
-The bookkeeping of many remapping steps is the thing to tame.
+The bookkeeping of the remapping steps lives in a coupler (fesm-utils) and in
+the domain's coupling steps (yelmox), not in the component modules.
 
-## Key observations from the current code
+## Building blocks
 
-- **Helper modules are already grid-agnostic.** `marshelf_update`,
-  `isos_update`, `snapclim_update`, `smbpal_update` all take/return plain
-  `(nx,ny)` arrays. They are tied to the Yelmo grid only because the *caller*
-  feeds them Yelmo-shaped arrays. Moving a module onto another grid is a
-  caller-side change, not a module change.
+- **Component modules are grid-agnostic.** `marshelf_update`,
+  `isos_update`, `snapshots_update`, `smbpal_update` all take/return plain
+  `(nx,ny)` arrays; the grid is the caller's choice. Moving a module onto
+  another grid is a caller-side change, not a module change.
 - **`map_class` self-identifies and self-caches.** It stores `name1`, `name2`,
   `method`, and `map_init` loads from / saves to a `maps/` folder on disk. A map
   object already carries its own identity key; disk caching across runs is free.
@@ -64,256 +47,207 @@ hi-res target map is both expensive to build and large in memory.
 ## Layering
 
 ```
-fesm-utils/utils/src/coords/coupler.f90    coupler_class + remap
-        │  use coords  (grid_class, grid_init, map_class, map_init, map_field)
+fesm-utils/src/coupler.f90        coupler_class + remap (grids, map cache)
+        │
         ▼
-yelmox/libs/yelmox_domain.f90              ice_domain + step_* + yelmox_step
-        │  use coupler, yelmo, marine_shelf, fastisostasy, snapclim, smbpal, bsl
+yelmox/libs/
+  kryos.f90             kryos_domain, domain_ctl, domain_init, remap
+  kryos_coupling.f90    step_* and couple_* primitives
+  kryos_startup.f90     cold start, restart bundles (domain_startup, ...)
+  kryos_output.f90      per-module 2D/1D output, CMIP output
+  kryos_regions.f90     named regions, marine-ice start, NEGIS, glacial smb
+  kryos_forcing.f90     driver-owned coefficient registry (tsgen, derived)
+  yelmox_climate.f90    climate backends behind one interface (climate_out)
+  climate_terms.f90     the terms of the forcing (coefficient x pattern) on the climate
+  climate_mods.f90      climate transforms after the terms (taper, bias)
+        │
         ▼
-yelmox/yelmox.f90                        thin driver: init → time loop → I/O
+yelmox/yelmox.f90                 single domain
+yelmox_bipolar/yelmox_bipolar.f90 north + south, shared sea level + OBM
 ```
 
 Dependency flow is one-directional. The coupler is pure grid/map machinery and
-knows nothing about yelmox. `step_*` and `ice_domain` know the physics modules
-but stay flavor-agnostic, so other yelmox variants can reuse them.
+knows nothing about yelmox. The Kryos modules know the physics modules but no
+driver, so both programs share them.
 
-## Coupler (in fesm-utils, `coords` library)
+## Coupler (fesm-utils)
+
+```fortran
+call coupler_init(cpl, map_fldr, gen)               ! map folder, default map generator
+call coupler_add_grid(cpl, name, grid)              ! optional in-memory grid
+call coupler_prime(cpl, src, dst, method, gen)      ! build a map up front
+call remap(cpl, var_src, src, var_dst, dst, method, stat)
+```
 
 Grids are identified by **string name** in every `remap` call. A name resolves to
 its grid definition **from disk by default** — `grid_<name>.txt` in the map
-folder, read via `grid_cdo_read_desc` (extended to parse both the fesm-utils `#`
-header and cdo-native CF projection keys, so the existing `maps/grid_*.txt` are
-used directly). An in-memory registry (`coupler_add_grid`) is an optional
-override that wins when a name is registered. So nothing is hardcoded (no
-`grid_select`): the available grids are whatever `grid_*.txt` files live in
-`maps/`.
+folder (`maps/`), read via `grid_cdo_read_desc` (both the fesm-utils `#` header
+and cdo-native CF projection keys). `coupler_add_grid` registers an in-memory
+grid that wins over the disk definition. Nothing is hardcoded: the available
+grids are the `grid_*.txt` files in `maps/`.
 
-Fixed-capacity arrays + counters (not growable allocatables): appending to an
-allocatable array of `map_class` would deep-copy every existing (large) map on
-each add. Fixed shells cost nothing until `map_init` fills a map's allocatable
-weight components.
+`remap` finds the map for `(src, dst, method)` in the cache, or builds it (from
+its disk cache when present) and stores it. `method` is `"con"` (conservative,
+the default) or a distance kernel (`"nn"`, `"shepard"`, `"quadrant"`,
+`"bilin"`); `stat` (`mean`/`count`/`stdev`) is forwarded per call. `gen`
+(`"coords"`, the default, or `"cdo"`) only selects how the weights are built.
+`remap` covers `dp`/`sp`/`int` × 2D/3D, and sizes the destination itself. The
+maps live in fixed-capacity storage, so adding a map never deep-copies the
+(large) maps already built.
 
-```fortran
-module coupler
+The domain wraps it as `remap(dom, var_src, src, var_dst, dst, method)`
+(`kryos`), which copies when `src == dst`, so a component on Yelmo's grid costs
+nothing.
 
-    use coords, only : grid_class, map_class, map_init, map_field, grid_cdo_read_desc
-    ! remap mirrors map_field's kind coverage (dp/sp/int); no wp<->dp conversion
+## The domain (`kryos_domain`)
 
-    implicit none
-    private
-
-    integer, parameter :: GRID_MAX = 16, MAP_MAX = 64
-
-    type grid_entry
-        character(len=256) :: name
-        type(grid_class)   :: grid          ! coords grid, what map_init consumes
-    end type
-
-    type coupler_class
-        type(grid_entry) :: grids(GRID_MAX);  integer :: ngrids = 0
-        type(map_class)  :: maps(MAP_MAX);     integer :: nmaps  = 0
-        character(len=512) :: map_fldr = "maps"   ! disk cache dir for map_init
-    end type
-
-    interface remap
-        ! mirror map_field's kind coverage; each wrapper allocates var_dst and
-        ! calls the generic map_field (which dispatches by kind).
-        module procedure remap_2d_dp, remap_2d_sp, remap_2d_int
-        module procedure remap_3d_dp, remap_3d_sp, remap_3d_int
-    end interface
-
-    public :: coupler_class, coupler_init, coupler_add_grid, coupler_prime, remap
-
-contains
-
-    subroutine coupler_init(cpl, map_fldr)
-        ! reset counters, set map_fldr
-    end subroutine
-
-    subroutine coupler_add_grid(cpl, name, grid)
-        ! cpl%ngrids += 1; cpl%grids(cpl%ngrids) = grid_entry(name, grid)
-        ! error on duplicate name or capacity overflow
-        type(coupler_class), intent(inout) :: cpl
-        character(len=*),    intent(in)    :: name
-        type(grid_class),    intent(in)    :: grid
-    end subroutine
-
-    subroutine coupler_prime(cpl, src, dst, method)
-        ! eager warm-up: force-build a map up front (fail fast, cost up front).
-        ! integer :: im; im = get_map(cpl, src, dst, method)   ! discard index
-    end subroutine
-
-    ! --- private: find-or-build the directed, method-typed map ---
-    function get_map(cpl, src, dst, method) result(im)
-        ! 1. linear-search cpl%maps(1:nmaps) for (name1==src, name2==dst, method)
-        ! 2. on miss: resolve src/dst grids (in-memory registry, else read
-        !    grid_<name>.txt from cpl%map_fldr); nmaps += 1;
-        !    call map_init(cpl%maps(nmaps), grid_src, grid_dst, method=method,
-        !                  fldr=cpl%map_fldr, load=.true.)   ! hits disk cache
-        !    return nmaps
-        integer :: im
-    end function
-
-    ! One wrapper per (kind x rank); dp shown, sp/int identical bar the type.
-    subroutine remap_2d_dp(cpl, var_src, src, var_dst, dst, method, stat)
-        type(coupler_class),   intent(inout) :: cpl
-        real(dp),              intent(in)    :: var_src(:,:)
-        character(len=*),      intent(in)    :: src, dst
-        real(dp), allocatable, intent(inout) :: var_dst(:,:)     ! sized here
-        character(len=*), optional, intent(in) :: method         ! default "con"
-        character(len=*), optional, intent(in) :: stat           ! e.g. "mean"
-        ! im = get_map(cpl, src, dst, method_or_default)
-        ! allocate/re-shape var_dst to (nx_dst,ny_dst) if needed
-        ! call map_field(cpl%maps(im), name, var_src, var_dst, stat=stat, method=method)
-    end subroutine
-
-    subroutine remap_3d_dp(cpl, var_src, src, var_dst, dst, method, stat)
-        real(dp),              intent(in)    :: var_src(:,:,:)
-        real(dp), allocatable, intent(inout) :: var_dst(:,:,:)   ! (nx,ny,nz_src)
-        ! reshape var_dst to (nx_dst,ny_dst,size(var_src,3));
-        ! loop trailing dim, apply the same 2D map per level
-    end subroutine
-
-end module coupler
-```
-
-`method` defaults to `"con"`; `"bilin"` is passed explicitly (CDO-consistent
-spelling). `stat` is optional and forwarded to `map_field`.
-
-## Domain + coupling steps (in `yelmox/libs`)
-
-The whole state of one region is bundled into `ice_domain`. This makes the two
-awkward requirements fall out naturally:
-
-- **Coupling strategies** (which components are on/off): each component update is
-  a reusable `step_*` primitive guarded internally by its `ctl` flag; the
-  sequence is thin composition in `yelmox_step`.
-- **Bipolar** (north + south): two explicit `type(ice_domain) :: dom_north,
-  dom_south`. Each domain carries its own coupler/grids, so north and south never
-  collide. Buffers are step-local allocatables (see below), inherently reentrant
-  across domains. The single-domain driver runs the whole `yelmox_step`; the
-  bipolar driver breaks it into its `step_*` primitives and interleaves them with
-  the shared Ocean Box Model (see Drivers). Cross-hemisphere state — the
-  barystatic sea level and the OBM — is driver-owned and shared, not per-domain.
+The whole state of one region is bundled into `kryos_domain`:
 
 ```fortran
-module yelmox_domain
-
-    use coupler
-    use yelmo_defs,    only : yelmo_class
-    use marine_shelf,  only : marshelf_class, marshelf_update, marshelf_update_shelf
-    use fastisostasy,  only : isos_class, isos_update
-    use snapclim,      only : snapclim_class, snapclim_update
-    use smbpal,        only : smbpal_class, smbpal_update_monthly
-    use barysealevel,  only : bsl_class, bsl_update
-    use htopo,         only : htopo_class, htopo_init
-
-    type domain_ctl
-        logical :: with_ice_sheet, with_isostasy, with_marine_shelf, with_climate
-        character(len=256) :: domain       ! e.g. "Antarctica"
-        character(len=256) :: grid_name    ! highest-res reference grid = htopo,
-                                           !   e.g. "ANT-16KM" (ctl's top level)
-        character(len=256) :: grid_yelmo   ! Yelmo grid, e.g. "ANT-32KM"
-        character(len=256) :: grid_mshlf   ! marine-shelf grid (may equal grid_name)
-        ! ... time control, output config
-    end type
-
-    type ice_domain
-        type(yelmo_class)    :: yelmo
-        type(marshelf_class) :: mshlf
-        type(isos_class)     :: isos
-        type(snapclim_class) :: snp
-        type(smbpal_class)   :: smb
-        ! NB: bsl (barystatic sea level) is NOT here -- it is a shared,
-        !     driver-owned bsl_class, passed into the isostasy steps.
-        type(htopo_class)    :: topo       ! hi-res geometry reference hub
-        type(coupler_class)  :: cpl        ! this region's grids + maps
-        type(domain_ctl)     :: ctl
-    end type
-
-contains
-
-    subroutine domain_init(dom, path_par, ...)
-        ! 1. init sub-models (Yelmo etc. on their own grids)
-        ! 2. htopo_init(dom%topo, path_par, "htopo")   ! hi-res reference hub
-        ! 3. coupler_init(dom%cpl)                      ! grids resolve from maps/*.txt
-        ! 4. prime known maps (fail fast, cost up front):
-        !      coupler_prime(dom%cpl, ctl%grid_yelmo, ctl%grid_name, "bilin")
-        !      coupler_prime(dom%cpl, ctl%grid_name, ctl%grid_yelmo, "con")
-        ! No coupler_add_grid needed: names resolve from grid_<name>.txt on disk.
-    end subroutine
-
-    subroutine yelmox_step(dom, time, bsl)  ! bsl: shared, driver-owned
-        call step_isostasy(dom, time, bsl)  ! guarded by ctl%with_isostasy
-        call step_icesheet(dom, time)       ! guarded by ctl%with_ice_sheet
-        call step_climate(dom, time)        ! guarded by ctl%with_climate
-        call step_marine_shelf(dom, time)   ! guarded by ctl%with_marine_shelf
-    end subroutine
-
-    subroutine step_marine_shelf(dom, time)
-        real(wp), allocatable :: H_ice(:,:), z_bed(:,:), z_sl(:,:), f_grnd(:,:)
-        real(wp), allocatable :: bmb(:,:), T_shlf(:,:)
-        if (.not. dom%ctl%with_marine_shelf) return
-
-        ! remap Yelmo -> mshlf grid (bilin)
-        call remap(dom%cpl, dom%yelmo%tpo%now%H_ice, dom%ctl%grid_yelmo, &
-                   H_ice, dom%ctl%grid_mshlf, method="bilin")
-        call remap(dom%cpl, dom%yelmo%bnd%z_bed, dom%ctl%grid_yelmo, &
-                   z_bed, dom%ctl%grid_mshlf, method="bilin")
-        ! ... remaining inputs; unit-convert in place (newfield = f(buf))
-
-        call marshelf_update_shelf(dom%mshlf, H_ice, z_bed, f_grnd, ..., dx=dx_mshlf)
-        call marshelf_update(dom%mshlf, H_ice, z_bed, f_grnd, ..., dx=dx_mshlf)
-
-        ! aggregate outputs back to Yelmo (con is the default)
-        call remap(dom%cpl, dom%mshlf%now%bmb_shlf, dom%ctl%grid_mshlf, &
-                   bmb, dom%ctl%grid_yelmo, stat="mean")
-        call remap(dom%cpl, dom%mshlf%now%T_shlf, dom%ctl%grid_mshlf, &
-                   T_shlf, dom%ctl%grid_yelmo, stat="mean")
-        dom%yelmo%bnd%bmb_shlf = bmb
-        dom%yelmo%bnd%T_shlf   = T_shlf
-    end subroutine
-
-    ! step_isostasy, step_climate, step_smb, step_icesheet — same shape
-end module yelmox_domain
+type kryos_domain
+    type(yelmo_class)          :: yelmo
+    type(marshelf_class)       :: mshlf
+    type(isos_class)           :: isos
+    type(yelmox_climate_class) :: cl     ! climate backend ([comps] climate)
+    type(climate_out_class)    :: clim   ! backend-agnostic climate output (now/ref)
+    type(smbpal_class)         :: smb
+    type(smb_simple_class)     :: smbs   ! surface_method = "smb_simple"
+    type(sediments_class)      :: sed
+    type(geothermal_class)     :: gthrm
+    type(phys_const_class)     :: cnst   ! physical constants, shared by every component
+    type(htopo_class)          :: topo   ! hi-res geometry hub
+    type(coupler_class)        :: cpl    ! this region's grids + map cache
+    type(ice_opt_params)       :: opt    ! spin-up optimization
+    type(negis_params)         :: ngs
+    type(glacial_smb_params)   :: gsmb
+    type(domain_ctl)           :: ctl    ! [domain], [comps], [sim], [output]
+end type
 ```
 
-### Hi-res topography hub (htopo)
+The barystatic sea level (`bsl`) and the transient forcing (`tsf`) are not part
+of the domain: they are driver-owned, so a multi-domain driver shares them (or
+not). Each `step_*` primitive advances one component on its own grid and is a
+no-op when that component is inactive (`with_*`); each `couple_*_to_yelmo` lands
+one component's output on Yelmo's grid. Two domains (bipolar) carry their own
+coupler and grids, so they never collide.
 
-`htopo` sits *above* every physics module (including Yelmo): its grid is the
-finest resolution in the setup, and it is the reference geometry the coupler
-remaps *from*. On the topo grid it holds static masks `regions`/`basins` (loaded
-once) and geometry `z_bed`/`H_ice`/`z_srf` (initial reference, later refreshed
-each step from Yelmo/isostasy). It is configured by its own `[htopo]` namelist
-group, whose `domain`/`grid_name` name the highest-res level and drive the
-`{domain}/{grid_name}` path templating (`ctl%grid_name` mirrors `[htopo]
-grid_name`):
+The climate reaches the rest of the domain only through `climate_out_class`
+(`now` and `ref`): the atmosphere, the ocean as depth profiles or at the shelf
+base, and, when the backend has them, the surface mass balance and subglacial
+discharge. Nothing downstream depends on which backend produced them.
+
+### Domain definition (`[domain]`), the hi-res hub (htopo) and the regions
+
+One `[domain]` group (`[domain_north]`/`[domain_south]` in bipolar) defines the
+domain: its name, its physical constants and the grid of every component. Its
+topography is in `[topo]` and its regions, zones and basins in `[regions]`
+(`[topo_south]`, `[regions_south]`, ... in bipolar), all from
+[FesmData](https://github.com/fesmc/FesmData) v2 (`fesmdata/`). Yelmo takes
+the domain name and its grid from `[domain]` (`[yelmo]` no longer sets
+`domain`/`grid_name`). A blank component grid takes its default:
 
 ```
-&htopo
-    domain       = "Antarctica"
-    grid_name    = "ANT-16KM"
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    name_z_bed   = "z_bed"   name_H_ice = "H_ice"   name_z_srf = "z_srf"
-    basins_load  = True
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+&domain
+    name         = "Antarctica"
+    phys_const   = "Earth"      ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "ANT-16KM"   ! hi-res geometry hub
+    grid_ice     = "ANT-32KM"   ! Yelmo                                [grid_hub]
+    grid_isos    = ""           ! isostasy                             [grid_ice]
+    grid_clim    = ""           ! reference climate + transient forcing [grid_ice]
+    grid_surface = ""           ! surface mass balance                 [grid_clim]
+    grid_shelf   = ""           ! marine shelf                         [grid_hub]
+    basins       = "Zwally2012" ! basin ids of the hub output
+/
+&topo
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+&regions
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+    masks        = "APIS" "WAIS" "EAIS"           ! named regions for 1D output
+    mask_APIS    = "region:Antarctic_Peninsula"
+    mask_WAIS    = "region:West_Antarctica"
+    mask_EAIS    = "region:East_Antarctica"
 /
 ```
 
-`htopo_init` resolves the grid from `grid_<name>.txt` (the disk grid table) and
-reads the fields onto it — validated by `tests/test_htopo.f90` against the real
-ANT-16KM data. Set `basins_load`/`regions_load = False` (mirroring Yelmo core's
-`[yelmo_masks]`) when a domain has no mask file — e.g. paleo domains; the field
-defaults to `1.0` (single region/basin) and the path is left unread.
+`{domain}/{grid_name}` in the paths resolve to `name`/`grid_hub`. The groups are
+those of fesm-utils `topodata` and `regions` (see the fesm-utils docs), which
+also describe the selection expressions used below
+(`"region:Greenland & ~zone:open_ocean"`) and layers of other files
+(`layers`, `path_<layer>`, `var_<layer>`, e.g. the ISMIP7 basins).
+
+The other inputs are FesmData v2 products as well (`fesmdata/`, the link to
+`$FESMDATA` that runme copies into each run folder), on the grid of the
+component that reads them. The geothermal heat flux (`[ghf]`) and the sediments
+(`[sed]`) are remapped (bilinear) onto the Yelmo grid when their file is on
+another grid (its global attribute `grid_name`), so `obs_path` may name a coarser
+grid, e.g. `fesmdata/{domain}/PYR-2KM/PYR-2KM_GHF-Lucazeau2019.nc` on PYR-250M.
+
+The domain loads its physical constants once (`phys_const_load`, the group
+`phys_const` of `input/yelmo_phys_const.nml`) and hands the same record to every
+component: the hub, Yelmo (`yelmo_init` `cnst`), isostasy, the marine shelf and
+`smb_simple`. Yelmo's own `yelmo.phys_const` then only selects its calendar year
+(`sec_year`).
+
+`htopo` (fesm-utils) holds the hub. It sits *above* every physics module
+(including Yelmo): its grid (`grid_hub`) is the finest resolution in the setup,
+and it is the reference geometry the coupler remaps *from*. On the hub grid it
+holds the reference topography (`topo%ref`: `z_bed`, `H_ice`, `z_srf`,
+`z_bed_sd`), the regions (`topo%reg`) and the current geometry
+`z_bed`/`H_ice`/`z_srf`/`f_grnd`/`z_sl` (refreshed each step, see below).
+`htopo_init` resolves the grid from `grid_<name>.txt` (the disk grid table).
+Gaps in the topography (missing values, e.g. outside the coverage of the source
+dataset) are filled: no ice, the bed from the nearest valid cell, the surface
+from the bed and the ice thickness (sea level 0).
+
+Yelmo is populated from the domain like the other components. Its grid comes
+from `maps/grid_<grid_ice>.txt` (`yelmo_init_grid`, `grid_def="none"`), and the
+hub's `z_bed`/`H_ice`/`z_srf`/`z_bed_sd`, remapped conservatively to `grid_ice`,
+are both its initial topography and its present-day reference (`yelmo_init`
+`topo_init`/`topo_pd`). Yelmo then processes them as it would its own files
+(`[yelmo_init_topo]` keeps `init_topo_state`, `z_bed_f_sd`, smoothing; its
+`grad_lim_zb` applies). Where `grid_ice = grid_hub` the remap is a copy.
+
+The hub follows the models each step (`couple_yelmo_to_htopo`, after Yelmo). On
+Yelmo's grid it mirrors Yelmo, fractional grounding included. On a finer hub it keeps
+its hi-res reference and adds Yelmo's anomalies, refined bilinearly: the bed
+displacement `z_bed - z_bed_ref`, and the change in ice thickness from the hub
+reference as Yelmo received it (remapped conservatively), clipped at zero
+thickness. `htopo_update` then recomputes on the hub the grounding (0 or 1, from
+flotation) and the surface elevation, with Yelmo's densities; sea level is
+refined bilinearly. The hi-res bed and ice therefore reach the marine shelf and
+the climate's surface elevation, instead of a refined copy of Yelmo's fields.
+
+The regions reach every component on its own grid (the files of the hub grid,
+nearest neighbour), and each component makes its own masks from them once at
+init, with selection expressions in its own group:
+
+- Yelmo (`[yelmo_masks]`, `yelmo_init` `reg`): where ice is dynamic or fixed
+  (`mask_ice_dynamic`, `mask_ice_fixed`; Yelmo's `mask_border` then sets the
+  domain border), where it relaxes to the reference (`relax`, `relax_tau`, with
+  `ytopo.topo_rel = -1`), the region of the error metrics (`mask_rmse`), its
+  basins (`basins`), and the named regions of `[regions]` with their own 1D
+  output, `yelmo_ts_<name>.nc`.
+- The marine shelf (`[marine_shelf]`): the reference ocean mask (`mask_ocean`,
+  `mask_deep_ocean`), PICO's margin (`mask_pico_deep`), its basins (`basins`)
+  and the corrections by region (`corr_method` = none | tf | bmb, `corr_names`,
+  `corr_values` and one expression `corr_<name>` per name).
+- The climate (`[esm] basins`): the basins of the ocean extrapolation.
+- The domain: where a reconstruction's ice is imposed (`[sim] recon_regions`)
+  and the NEGIS parts (`[negis] region_centre/south/north`).
+
+A basin spec is `"<set>"`, `"<set>.group"` (e.g. `"Zwally2012.group"`, the
+Greenland major systems), `"None"` (no basins) or `"domain"` (the whole domain
+is one basin).
 
 ### Buffers
 
-Fields that cross a grid boundary land in **step-local allocatables** (e.g.
-`H_ice` above), not a coupler-owned pool. `remap` takes the destination as
+Fields that cross a grid boundary land in **step-local allocatables**, not a
+coupler-owned pool. `remap` takes the destination as
 `intent(inout), allocatable` and sizes it itself (allocate-on-demand, reshape if
 wrong), so callers never hand-compute `nx,ny`. Unit conversions are done in place
 on the buffer (`newfield = f(buf)`); they are caller concerns, kept out of the
@@ -321,175 +255,118 @@ coupler. 3D (e.g. monthly) fields use the `remap_3d` overload. Step-local
 allocatables are reentrant, which is what bipolar needs; per-timestep
 reallocation cost is negligible against the physics.
 
+## Coupling primitives
+
+`yelmox` and `yelmox_bipolar` advance a domain with these primitives (from `kryos_coupling`):
+
+- `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
+- `step_optimize(dom, ts, dtt)` — basal-friction / thermal-forcing optimization (`[sim] opt`) over the driver's step `dtt`: `cb_ref` on `grid_ice`, `tf_corr` on `grid_shelf` (its Yelmo-grid inputs remapped there, the basins of `[marine_shelf]`; `tf_corr` itself never crosses grids).
+- `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`), on the `dt_isos` cadence.
+- `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
+- `step_icesheet` — run `yelmo_update`.
+- `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
+- `step_climate(dom, ts, dtt, coefs)` — climate on `grid_clim` from the backend, with the coefficient registry and the terms of the forcing, on the `dt_clim` cadence.
+- `step_surface` — surface mass balance on `grid_surface` (`surface_method`: chion, smbpal, smb_simple, or the climate's own, `climate`).
+
+The hub geometry reaches `grid_clim` and `grid_surface` averaged over the target
+cell when the hub is finer (conservative), else interpolated
+(`remap_method_smooth`). The atmosphere is computed on `grid_clim` for the
+surface elevation there (`clim%now%z_srf`). On a different `grid_surface`, the
+monthly `tas` and `pr` are interpolated (bilinear) and moved to the surface
+elevation of `grid_surface` with the backend's monthly lapse rate
+(`clim%lapse`) and precipitation sensitivity (`clim%now%beta_p`):
+
+```
+tas_s = tas - lapse*dz,   pr_s = pr*exp(-beta_p*lapse*dz),   dz = z_srf_s - z_srf_c
+```
+
+the same elevation dependence the backend applies on its own grid (snapshots,
+esm; none for rembo). A coarse `grid_clim` thus keeps the elevation
+detail of the surface grid; on the same grid nothing changes.
+- `step_shelf` — sub-shelf melt on `grid_shelf`, from the climate's ocean as depth profiles or at the shelf base.
+
+Every driver writes the sequence out in its time loop, so the coupling order can
+be read directly from the program; `yelmox_bipolar` interleaves the second domain
+and the ocean box model there.
+
+### Initialization ordering
+
+On cold start, the Yelmo applied mass-balance diagnostics (`smb`, `bmb`, `fmb`)
+are populated at the initial time so the first output snapshot reflects the
+coupled boundary forcing rather than zeros. This is handled inside Yelmo: when
+the topography solver runs without advancing the ice (`pc_step="none"` at init,
+or any `topo_fixed` step), it diagnoses the applied mass balance from the current
+boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
+(nothing is applied), which is expected.
+
 ## Drivers
 
-Three thin programs share `yelmox_domain` (all per-domain physics/coupling lives
-there, so the drivers only differ in config parsing + the loop over domains).
+`yelmox` and `yelmox_bipolar` use the same driver plumbing:
 
-Common driver plumbing also lives in `yelmox_domain`, so every flavor uses the
-same handful of calls:
+- **`tstep_init(ts, path_par, group, dtt [, time_ref, cal])`** (fesm-utils
+  `timestepping`) — reads the run's timeline group (`[ctrl] run_step`: `"ctrl"`
+  for `[ctrl]` itself, or a phase group such as `[spinup]`/`[transient]`) and
+  initializes the driver-owned timestepper; `[ctrl] calendar` / `calendar_ref`
+  give `cal` / `time_ref` (calendar years, e.g. ESM runs). The driver owns the
+  timeline and the step `dtt`, and passes `dtt` to the steps that need it.
+- **`domain_init(dom, path_par, ts, coefs [, group_suffix, timeline_group])`**
+  (`kryos`) — the domain's sub-models at the start of the timeline `ts`
+  (Yelmo at the model time, the climate at the forcing time `time_rel`).
+  `timeline_group` (default `"ctrl"`, the group given to `tstep_init`) is read
+  only by the esm climate (its `time_ref`, `time_hist`, `time_proj`,
+  `time_esm_ref`).
+- **`domain_startup(dom, ts, dtt, bsl, restart, coefs [, restore_bsl])`**
+  (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
+  restore of the domain bundle `restart` + hub rebuild, continuing the
+  restored state: only the climate (and a stateless `smb_simple` surface) is
+  re-derived, nothing is stepped. The driver reads
+  `[ctrl] restart`. `yelmox` restores the shared bsl from the same bundle;
+  `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
+  each domain its subfolder of the bundle and `restore_bsl=.false.`.
+- **`domain_init_ice(dom, ts, dtt, coefs)`** — the cold-start ice state after
+  `yelmo_init_state` (`[sim]` `init_kill_shelves`, `init_marine_H`,
+  `init_method`, `init_time_thrm`; see [yelmox](yelmox.md#configuration)).
+- **`run_restart_write(dom, bsl, time, coefs [, fldr])`** — the single-domain
+  restart bundle (domain sub-models + `bsl_restart.nc` + one
+  `coef_<name>_restart.nc` per tsgen coefficient, one auto-named folder).
+- **`cadence_due(time, dt)`** (`kryos`) — the cadence predicate for `dt_clim`,
+  `dt_isos` and `dt_cmip`; `dt <= 0` disables a cadence. Output and restart bundles follow
+  fesm-utils `timeout` schedules (`[tm_1D]`, `[tm_2D]`, `[tm_2Dsm]`, `[tm_rst]`);
+  a restart bundle is always written at `time_end`.
 
-- **`timeline_init(ts, dtt, path_par, group [, time_ref, cal])`** — reads the
-  run's timeline group (`[ctrl]`, or the esm `run_step` group) and initializes
-  the driver-owned timestepper. `domain_init` takes the same group name
-  (`timeline_group`, default `"ctrl"`) and reads the values the domain logic
-  needs (`tstep_method`, `dtt`) itself — nothing is injected after init.
-- **`domain_startup(dom, ts, bsl [, restore_bsl])`** — cold start
-  (`domain_init_state`) or restart-bundle restore + hub rebuild. Single-domain
-  drivers restore the shared bsl from the same bundle; multi-domain drivers
-  restore it once via **`bsl_startup(bsl, ts, fldr)`** and pass
-  `restore_bsl=.false.`. Flavors with their own cold start (esm, rembo) keep
-  their cold branch and call this on the restart branch only.
-- **`run_restart_write(dom, bsl, time)`** — the single-domain restart bundle
-  (domain sub-models + run-level `bsl_restart.nc`, one auto-named folder).
-- **`tstep_due(time, dt)`** — the shared cadence predicate (restart, `dt_clim`,
-  CMIP output); `dt <= 0` disables a cadence.
+Every driver loop has the same shape: output and restarts are written at the
+top of the loop for the current time (`time_init` on the first pass), then the
+loop exits if the run is finished (`time_end`, or a tripped kill switch), else
+`tstep_update` advances the time and the domain is stepped with the coupling
+sequence written out inline. Each output call appears once, and the final state
++ restart bundle are written on the last pass (`timeout_check(...) .or.
+ts%is_finished`).
 
-The `[coupling<suffix>]` group is the single, complete description of a domain:
-every `domain_ctl` switch is a required key there (`with_ice_sheet`,
-`with_isostasy`, `with_climate`, `with_marine_shelf`, methods, cadences,
-per-component grids, restart, and the Greenland-specific startup switches --
-`use_negis=True` additionally loads a `[negis<suffix>]` group).
+- **`yelmox`** — argument is one parameter file; one `kryos_domain`, output to
+  the run dir. The climate backend is chosen at runtime (`[comps] climate`),
+  so ESM and REMBO runs use this program too. See [yelmox](yelmox.md).
+- **`yelmox_bipolar`** — argument is one parameter file holding both
+  hemispheres. Each domain's groups carry a hemisphere suffix (`yelmo_south`,
+  `domain_north`, `comps_north`, `snap_south`, …), threaded into every group
+  via `domain_init(..., group_suffix=…)`; `[ctrl]`, `[barysealevel]`, the OBM
+  groups and the Yelmo physics groups (`ydyn`, `ytopo`, …) are shared. Distinct
+  group names also let `runme -p group.name=val` target one hemisphere. The two
+  domains are explicit variables (`dom_north`, `dom_south`), not an array: the
+  ocean coupling is asymmetric. The driver owns the shared `bsl` and Ocean Box
+  Model and interleaves them with the per-domain steps; the ocean coupling lives
+  in `yelmox_bipolar/obm_coupling.f90`. Each domain writes to a subfolder named
+  after it. See [yelmox_bipolar](yelmox-bipolar.md).
 
-- **`yelmox`** (single domain) — argument is one domain nml; one `ice_domain`,
-  output to the run dir.
-- **`yelmox_bipolar`** (bipolar, in `yelmox_bipolar/`) — argument is a single parameter
-  file holding both hemispheres, in the original `yelmox_bipolar` convention: each
-  domain's instance groups carry a hemisphere suffix (`yelmo_south`,
-  `coupling_north`, `snap_south`, …), while `[ctrl]`, `[barysealevel]`, the
-  `[nautilus]`/`[stommel]` OBM block and the yelmo physics groups (`ydyn`,
-  `ytopo`, …) are shared. `[ctrl] active_north`/`active_south` select the
-  hemispheres (hardcoded `_north`/`_south` suffixes threaded into every `group=`
-  via `domain_init(..., group_suffix=…)`). Distinct group names also let
-  `runme -p group.name=val` target one hemisphere unambiguously. Each domain
-  writes to a subfolder named after its domain; invoke with
-  `runme -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml`.
+## Open issues
 
-  A bipolar run is never more than north + south, so the two domains are explicit
-  variables, not an array — the ocean coupling is asymmetric (north ↔
-  `obm%fn/thetan/tn`, south ↔ `obm%fs/thetas/ts`). The driver owns the shared
-  `bsl` and `obm`, breaks `yelmox_step` into its `step_*` primitives, and
-  interleaves the OBM exactly as in `yelmox_bipolar` (below). The ocean coupling
-  is fully contained in `yelmox_bipolar/obm_coupling.f90`: the module owns its
-  control (`obm_coupling_ctl`: exchange switches, freshwater-flux masks,
-  nautilus hysteresis forcing; `obm_ctl_load` + `obm_masks_init`) and exposes
-  one `obm_exchange` call per step. It and the OBM default off (`[ctrl]
-  active_obm=False`), so the config runs as two independent domains until enabled.
-
-```fortran
-program yelmox_bipolar
-    use yelmox_domain
-    use obm, only : obm_update
-    use obm_coupling
-    type(ice_domain)       :: dom_north, dom_south
-    type(bsl_class)        :: bsl      ! shared, driver-owned
-    type(obm_class)        :: obm      ! shared, driver-owned
-    type(obm_coupling_ctl) :: oc       ! obm_coupling's own control
-
-    call timeline_init(ts, dtt, path_par, "ctrl")          ! shared timeline
-    call obm_ctl_load(oc, path_par)                        ! [ctrl] exchange switches
-    call bsl_startup(bsl, ts, restart_bsl)                 ! run-level bsl restore
-    ! per domain: domain_init(group_suffix) + domain_startup(restore_bsl=.false.)
-    call obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
-
-    do while (.not. ts%is_finished)
-        call bsl_update(bsl, ts%time_rel)                  ! once, shared
-        call advance_isostasy(dom_north); call advance_isostasy(dom_south)
-        if (oc%active_obm) call obm_update(obm, dtt, oc%obm_name)
-        call advance_dynamics(dom_north); call advance_dynamics(dom_south)
-        call obm_exchange(oc, obm, dom_north, dom_south, ...)   ! atm2obm, fwf, hyster, obm2ism
-        call step_marine_shelf(dom_north, ...); call step_marine_shelf(dom_south, ...)
-        ! per-domain output/restart (subfolder each) + shared bsl/obm restart
-    end do
-end program
-```
-
-- **`yelmox_esm`** (single domain, in `yelmox_esm/`) — ESM climatic forcing in
-  place of snapclim. Reuses `domain_init` (with `init_climate=.false.`, so
-  snapclim is skipped) plus the shared `step_optimize/step_isostasy/step_icesheet/
-  refresh_htopo` primitives and the restart bundle, but the driver owns an
-  `esm_forcing_class` and calls its own `step_climate_esm` / `step_marine_shelf_esm`
-  (contained in the program) instead of the snapclim-based steps. esm is a
-  first-class multigrid component: it runs entirely on its own grid (*esm grid* =
-  `grid_clim`, exactly like snapclim), and each output is remapped to the consumer
-  module's grid at coupling time — atmosphere to `grid_smb` (smbpal), the
-  depth-interpolated ocean forcing to `grid_mshlf` (marine_shelf). This works
-  because `marshelf_interp_shelf` reads only `mshlf%par` (grid-agnostic), so the ESM
-  ocean interpolation runs on `grid_clim` and the resulting `T_shlf`/`S_shlf` are
-  remapped to `grid_mshlf` before `marshelf_update`; `esm.f90` is untouched.
-  Geometry comes from the hub, remapped to whichever grid a step needs; SMB / ocean
-  BCs aggregate back to Yelmo. With `grid_clim == grid_smb == grid_mshlf ==
-  grid_name == grid_yelmo` every remap is an identity copy, reproducing
-  `yelmox_esm.f90`; set `grid_clim` to a coarse ESM grid and it genuinely fans out.
-  Config splits ESM-specific control ([esm] + the run_step group
-  [spinup]/[transient]: `time_ref/hist/proj/esm_ref`, `use_*`, CMIP output) from
-  the shared mg groups ([coupling]/[output]/[htopo]). Output (incl. the
-  CMIP-formatted files) is kept identical to `yelmox_esm.f90` via the
-  `yelmox_esm_output` module (in the same folder). Invoke with
-  `runme -e esm -n yelmox_esm/yelmox_esm_Antarctica.nml`.
-
-```fortran
-program yelmox_esm
-    use yelmox_domain
-    use esm
-    use yelmox_esm_output
-    type(ice_domain)        :: dom
-    type(bsl_class)         :: bsl    ! shared, driver-owned
-    type(esm_forcing_class) :: esm    ! driver-owned climate (replaces snapclim)
-
-    call esm_ctl_load(ec, esm, path_par)      ! [ctrl] run_step + [esm] + [run_step]
-    call timeline_init(ts, ec%dtt, path_par, trim(ec%run_step), &
-                       time_ref=2000.0_wp, cal=.true.)   ! per-phase timeline
-    call domain_init(dom, path_par, ts%time, init_climate=.false., &   ! skip snapclim
-                     timeline_group=trim(ec%run_step))
-    call esm_forcing_init(esm, ..., grid_name=dom%ctl%grid_clim)      ! on esm's own grid
-    ! cold: esm_cold_start (contained); restart: domain_startup + re-forcing
-
-    do while (.not. ts%is_finished)
-        call bsl_update(bsl, ...)                       ! once, shared
-        call step_optimize(dom, ts); call step_isostasy(dom, ts, bsl)
-        call step_icesheet(dom, ts); call refresh_htopo(dom)
-        call step_climate_esm(dom, esm, ec, ts)         ! esm + smbpal (contained)
-        call step_marine_shelf_esm(dom, esm, ec, ts)    ! esm ocean BCs (contained)
-        ! output (yelmo2D / yelmo1D_esm / CMIP) + run_restart_write on tstep_due
-    end do
-end program
-```
-
-## Integration gaps to resolve during the build
-
-1. **Grid definitions come from disk.** `grid_<name>.txt` in `maps/` (parsed by
-   `grid_cdo_read_desc`, incl. cdo-native CF keys) — no `grid_select`, no
-   `ygrid_class`→`grid_class` conversion. Assumes `grid_<yelmo>.txt` matches
-   Yelmo's runtime grid (true for standard full-domain runs); the in-memory
-   registry override is the escape hatch otherwise. *(Done.)*
-2. **Precision.** No external conversion needed — `map_field` already has
-   `dp`/`sp`/`int` variants. `remap` provides matching `dp`/`sp`/`int` × 2d/3d
-   wrappers under one generic interface, each calling the generic `map_field`.
-   *(Done.)*
-3. **Grid names** are sourced from `domain_ctl` (and `[htopo]`) as the source of
-   truth for `remap` keys.
-4. **Conservative area basis.** `"con"` weights on projected cell area — sanity
+1. **Conservative area basis.** `"con"` weights use projected cell area — sanity
    check mass conservation of `z_bed`/`bmb` aggregation on a real grid pair before
    trusting it as a BC.
-5. **FastIsostasy hi-res output** — deferred. Lean toward the coupler upscaling
-   the 16KM isostasy output rather than making the solver grid-aware. Not in the
-   first skeleton.
-
-## Commit order
-
-1. `coupler.f90` in fesm-utils + `test_coupler` (remap 16↔2KM both directions,
-   `con` conservation, cache/prime, disk-driven resolution). *(Done.)*
-2. `grid_cdo_read_desc` cdo-native CF-key parsing + `test_grid_cf_read`;
-   coupler disk resolution of `grid_<name>.txt`. *(Done.)*
-3. `yelmox_domain.f90` skeleton: `ice_domain`, `domain_ctl`, empty `step_*`. *(Done.)*
-4. `htopo.f90` hi-res reference hub + `test_htopo` (load ANT-16KM fields). *(Done.)*
-5. `domain_init` (sub-model init on their grids + htopo + map priming). *(Done.)*
-6. Fill `step_*` one module at a time (marine_shelf first); diff vs `yelmox.f90`. *(Done: isostasy, ice sheet, climate, smb, marine_shelf, optimization.)*
-7. `yelmox.f90` driver; validate single-domain parity with `yelmox.f90`. *(Done: identity-grid parity tracks the reference; the residual is a small deterministic startup offset, independent of isostasy — bit parity not required for the move.)*
-8. Enable `nd=2` bipolar. *(Done: driver takes one par file per domain; AIS+GRL runs on a shared timeline to per-domain subfolders.)*
-
-Also ported from `yelmox.f90`: `equil_method="opt"` (basal-friction + thermal-forcing
-optimization, `step_optimize`), `smb_method="smb_simple"` + `calc_glacial_smb`, and
-domain-specific cold-start setup (Antarctica equilibration, Greenland masks/marine-ice/
-NEGIS, Laurentide/North LGM initialization).
+2. **FastIsostasy hi-res output** — deferred. Lean toward the coupler refining
+   the isostasy output rather than making the solver grid-aware.
+3. **One grid for reference climate and transient forcing.** `grid_clim` sets
+   the grid of both the reference climatology (often from a high-resolution
+   regional model) and the transient forcing (often from a coarser climate
+   model). A coarse `grid_clim` matches the forcing but loses the detail of the
+   high-res reference. Giving the two their own grids is a candidate for future
+   work; until then, set `grid_clim` to the highest-resolution climate input.

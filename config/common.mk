@@ -7,8 +7,9 @@
 
 # Dependency paths (serial build by default).
 FESMUTILSROOT = fesm-utils
-INC_FESMUTILS = -I${FESMUTILSROOT}/include-serial
-LIB_FESMUTILS = -L${FESMUTILSROOT}/include-serial -lfesmutils
+FESMUTILSLIBDIR = ${FESMUTILSROOT}/include-serial
+INC_FESMUTILS = -I${FESMUTILSLIBDIR}
+LIB_FESMUTILS = -L${FESMUTILSLIBDIR} -lfesmutils
 
 FFTWROOT = fesm-utils/fftw/fftw-serial
 INC_FFTW = -I${FFTWROOT}/include
@@ -42,16 +43,39 @@ TRACERROOT = ${YELMOROOT}/tracer
 INC_TRACER = -I${TRACERROOT}/libtracer/include
 LIB_TRACER = -L${TRACERROOT}/libtracer/include -ltracer
 
+# chion: snowpack / surface mass balance library (surface_method = "chion").
+CHIONROOT = chion
+INC_CHION = -I${CHIONROOT}/libchion/include
+LIB_CHION = -L${CHIONROOT}/libchion/include -lchion
+
+# insol: top-of-atmosphere insolation (fesmc/insol), for the surface models
+# that take insolation (chion's host, smbpal). Serial, no dependencies.
+INSOLROOT = insol
+INC_INSOL = -I${INSOLROOT}/libinsol/include
+LIB_INSOL = -L${INSOLROOT}/libinsol/include -linsol
+
 REMBOROOT = rembo1
 INC_REMBO = -I${REMBOROOT}/librembo/include
 LIB_REMBO = -L${REMBOROOT}/librembo/include -lrembo
+
+# REMBO climate backend (make rembo=1): link rembo1; by default a stub that
+# stops if climate = "rembo".
+rembo ?= 0
+ifeq ($(rembo), 1)
+    climate_rembo_obj = $(objdir)/climate_rembo.o
+    rembo_dep = rembo-static
+    rembo_lib = $(LIB_REMBO)
+else
+    climate_rembo_obj = $(objdir)/climate_rembo_stub.o
+    rembo_dep =
+    rembo_lib =
+endif
 
 # OpenMP build (make openmp=1): swap the serial dependency builds for their
 # OpenMP variants and append the compiler's OpenMP flag (set in the compiler
 # fragment as FFLAGS_OPENMP).
 ifeq ($(openmp), 1)
-    INC_FESMUTILS = -I${FESMUTILSROOT}/include-omp
-    LIB_FESMUTILS = -L${FESMUTILSROOT}/include-omp -lfesmutils
+    FESMUTILSLIBDIR = ${FESMUTILSROOT}/include-omp
 
     FFTWROOT = fesm-utils/fftw/fftw-omp
     INC_FFTW = -I${FFTWROOT}/include
@@ -70,4 +94,4 @@ endif
 # macbook does this). ?= leaves any such earlier machine setting in force.
 LFLAGS_EXTRA ?= -Wl,-zmuldefs
 
-LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_ELSA) $(LIB_TRACER) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)
+LFLAGS = $(LIB_YELMO) $(LIB_ISOSTASY) $(LIB_CHION) $(LIB_INSOL) $(LIB_FESMUTILS) $(LIB_FASTHYDRO) $(LIB_ELSA) $(LIB_TRACER) $(LIB_NC) $(LIB_LIS) $(LIB_FFTW) $(LFLAGS_EXTRA)

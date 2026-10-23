@@ -7,6 +7,7 @@ module esm_forcing
     use nml  
     use ncio 
     use varslice
+    use coordinates, only : grid_class
     use marine_shelf
 
     implicit none 
@@ -21,9 +22,6 @@ module esm_forcing
     ! Define default missing value 
     real(wp), parameter :: mv = -9999.0_wp 
 
-    ! Need to call marshelf class for oceanic interpolation into shelves
-    type(marshelf_class)        :: mshlf
-
     ! Class for holding ice-forcing data from esm archives
     type esm_forcing_class
         
@@ -31,14 +29,12 @@ module esm_forcing
         character(len=256)     :: gcm 
         character(len=256)     :: experiment 
         character(len=256)     :: domain 
-        character(len=256)     :: grid_name 
         character(len=256)     :: ctrl_run_type
         real(wp)               :: lapse(2)
         real(wp)               :: beta_p
         real(wp)               :: f_ocn
         real(wp)               :: f_polar
         real(wp)               :: dT_lim
-        character(len=256)     :: grid_src
 
         ! === Reference climatology ===
         ! Atmosphere
@@ -47,7 +43,7 @@ module esm_forcing
         type(varslice_class)   :: pr_ref
         
         ! Ocean
-        type(varslice_class)   :: to_ref, to_ref_src
+        type(varslice_class)   :: to_ref
         type(varslice_class)   :: so_ref
 
         ! ===  Variability climatologies ===
@@ -101,85 +97,62 @@ module esm_forcing
 
         ! === Atmosphere ===
         ! Monthly fields (but right now constant anomaly between months)
-        real(wp), allocatable :: t2m(:,:,:)       ! Monthly surface temperature [K]
-        real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation [mm/yr]
-        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr]
+        real(wp), allocatable :: t2m(:,:,:)       ! Monthly near-surface air temperature, at the model surface [K]
+        real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation, at the model surface [mm/d]
+        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr w.e.]
 
         ! Anomalies
-        real(wp), allocatable :: dts(:,:,:)       ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dpr(:,:,:)       ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr]
-        real(wp), allocatable :: dsmbdz(:,:)      ! SMB height anomaly [mm/yr*m]
-        real(wp), allocatable :: dts_var(:,:,:)   ! Surface temperature anomaly variability[K]
-        real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation relative anomaly variability [%]
-        real(wp), allocatable :: dsmb_var(:,:,:)  ! SMB anomaly variability [m/yr]
+        real(wp), allocatable :: dts(:,:,:)       ! Near-surface air temperature anomaly [K]
+        real(wp), allocatable :: dpr(:,:,:)       ! Precipitation anomaly, a ratio to the reference [1]
+        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr w.e.]
+        real(wp), allocatable :: dsmbdz(:,:)      ! SMB elevation gradient [mm/yr w.e. per m]
+        real(wp), allocatable :: dts_var(:,:,:)   ! Near-surface air temperature anomaly, variability [K]
+        real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation anomaly, variability, a ratio [1]
 
         ! ===    Ocean   ===
-        real(wp), allocatable :: dto(:,:)         ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dso(:,:)         ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dto_var(:,:)     ! Surface temperature anomaly variability [K]
-        real(wp), allocatable :: dso_var(:,:)     ! Precipitation relative anomaly variability [%]
+        real(wp), allocatable :: dto(:,:)         ! Ocean temperature anomaly at the shelf base [K]
+        real(wp), allocatable :: dso(:,:)         ! Ocean salinity anomaly at the shelf base [psu]
+        real(wp), allocatable :: dto_var(:,:)     ! Ocean temperature anomaly at the shelf base, variability [K]
+        real(wp), allocatable :: dso_var(:,:)     ! Ocean salinity anomaly at the shelf base, variability [psu]
         real(wp), allocatable :: Qd_ann(:,:)      ! Annual mean subglacial discharge [m3/s]
         real(wp), allocatable :: Qd_sum(:,:)      ! Summer mean subglacial discharge [m3/s]
+        logical :: with_sgd_hist = .false.        ! Qd from the sgd_hist group (Greenland; its filename /= "none")
+        logical :: with_sgd_proj = .false.        ! Qd from the sgd_proj group (Greenland; its filename /= "none")
         
         ! === Mean fields ===
-        real(wp), allocatable :: t2m_sum(:,:)     ! Summer surface temperature [K]
         real(wp), allocatable :: t2m_ann(:,:)     ! Annual surface temperature [K]
-        real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/yr]
+        real(wp), allocatable :: pr_ann(:,:)      ! Annual precipitation [mm/d]
         real(wp), allocatable :: smb_ann(:,:)     ! Annual SMB [mm/yr]
 
     end type
 
-    type esm_ice_var_class
-        character(len=56)  :: name 
-        character(len=128) :: long_name
-        character(len=12)  :: var_type
-        character(len=128) :: standard_name 
-        character(len=128) :: units_in
-        character(len=128) :: units_out
-        real(wp) :: unit_scale 
-        real(wp) :: unit_offset
-    end type
-
-    type esm_experiment_class
-        character(len=56)   :: expname
-        character(len=56)   :: group
-        character(len=56)   :: model
-        character(len=256)  :: experiment
-        character(len=256)  :: file_suffix
-    end type
-    
     private
     public :: esm_forcing_class
-    public :: esm_experiment_class
 
     ! General routines
     public :: esm_forcing_init
     public :: esm_forcing_update
     public :: esm_variability_update
     public :: esm_clim_update
-    
-    public :: esm_write_init
+    public :: esm_lapse_monthly
 
 contains
     
-    subroutine esm_forcing_init(esm,filename,domain,grid_name,run_type,gcm,experiment, &
-                                use_esm,use_smb,use_var,&
-                                use_hist,time_hist,&
-                                use_proj,time_proj)
+    subroutine esm_forcing_init(esm,filename,domain,grid,run_type,gcm,experiment, &
+                                use_esm,use_smb,use_var,use_hist,use_proj)
 
         implicit none 
     
         type(esm_forcing_class), intent(INOUT) :: esm
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain 
-        character(len=*), intent(IN) :: grid_name 
-        character(len=*), intent(IN), optional :: run_type, gcm, experiment
-        logical,          intent(IN), optional :: use_esm, use_smb, use_var
-        logical,          intent(IN), optional :: use_hist, use_proj
-        real(wp),         intent(IN), optional :: time_hist(2), time_proj(2)
+        type(grid_class), intent(IN) :: grid         ! the climate grid (target of remapped groups)
+        character(len=*), intent(IN) :: run_type, gcm, experiment
+        logical,          intent(IN) :: use_esm, use_smb, use_var
+        logical,          intent(IN) :: use_hist, use_proj
     
         ! Local variables 
+        character(len=256) :: grid_name
         character(len=256) :: group_prefix 
     
         ! Reference climatology
@@ -221,9 +194,6 @@ contains
         character(len=256) :: grp_so_proj
         character(len=256) :: grp_Qd_proj   ! used for Greenland
 
-        integer  :: iloc, k
-        real(wp) :: tmp
-        real(wp) :: time_par_ref(4),time_par_hist(4),time_par_proj(4),time_par_var(4)
         character(len=256) :: esm_subs(2,2)   ! {gcm}/{experiment} path substitutions for varslice
     
         ! Define the current experiment characteristics
@@ -233,6 +203,8 @@ contains
 
         ! {gcm}/{experiment} placeholder substitutions applied to ESM forcing
         ! file paths by the shared varslice reader (via its `subs` argument).
+        grid_name = trim(grid%name)
+
         esm_subs(1,1) = "gcm"
         esm_subs(1,2) = trim(esm%gcm)
         esm_subs(2,1) = "experiment"
@@ -290,86 +262,116 @@ contains
      
         ! Climatology
         ! Reference period
-        call varslice_init_nml(esm%ts_ref, filename, trim(grp_ts_ref), domain, grid_name, subs=esm_subs)
+        call varslice_init_nml(esm%ts_ref, filename, trim(grp_ts_ref), domain, grid_name, subs=esm_subs,grid=grid)
         if (use_smb) then
-            call varslice_init_nml(esm%smb_ref, filename, trim(grp_smb_ref), domain, grid_name, subs=esm_subs)
+            call varslice_init_nml(esm%smb_ref, filename, trim(grp_smb_ref), domain, grid_name, subs=esm_subs,grid=grid)
         else
-            call varslice_init_nml(esm%pr_ref, filename, trim(grp_pr_ref), domain, grid_name, subs=esm_subs)
+            call varslice_init_nml(esm%pr_ref, filename, trim(grp_pr_ref), domain, grid_name, subs=esm_subs,grid=grid)
         end if
-        call varslice_init_nml(esm%zs_ref, filename, trim(grp_zs_ref), domain, grid_name, subs=esm_subs)
-        call varslice_init_nml(esm%to_ref, filename, trim(grp_to_ref), domain, grid_name, subs=esm_subs)
-        call varslice_init_nml(esm%so_ref, filename, trim(grp_so_ref), domain, grid_name, subs=esm_subs)
-
-        ! Initialize variables at other grids if source grid is different
-        !call varslice_init_nml(esm%to_ref_src, filename, trim(grp_to_ref), domain, grid_name, subs=esm_subs)
+        call varslice_init_nml(esm%zs_ref, filename, trim(grp_zs_ref), domain, grid_name, subs=esm_subs,grid=grid)
+        call varslice_init_nml(esm%to_ref, filename, trim(grp_to_ref), domain, grid_name, subs=esm_subs,grid=grid)
+        call varslice_init_nml(esm%so_ref, filename, trim(grp_so_ref), domain, grid_name, subs=esm_subs,grid=grid)
 
         if (use_var) then
             ! Variability
             ! Transient dependent field
-            call varslice_init_nml(esm%ts_var, filename, trim(grp_ts_var), domain, grid_name, subs=esm_subs)
+            call varslice_init_nml(esm%ts_var, filename, trim(grp_ts_var), domain, grid_name, subs=esm_subs,grid=grid)
             if (use_smb) then
-                call varslice_init_nml(esm%smb_var, filename, trim(grp_smb_var), domain, grid_name, subs=esm_subs)
+                call varslice_init_nml(esm%smb_var, filename, trim(grp_smb_var), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
             else
-                call varslice_init_nml(esm%pr_var, filename, trim(grp_pr_var), domain, grid_name, subs=esm_subs)
+                call varslice_init_nml(esm%pr_var, filename, trim(grp_pr_var), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
             end if
-            call varslice_init_nml(esm%to_var, filename, trim(grp_to_var), domain, grid_name, subs=esm_subs)
-            call varslice_init_nml(esm%so_var, filename, trim(grp_so_var), domain, grid_name, subs=esm_subs)
+            call varslice_init_nml(esm%to_var, filename, trim(grp_to_var), domain, grid_name, subs=esm_subs,grid=grid)
+            call varslice_init_nml(esm%so_var, filename, trim(grp_so_var), domain, grid_name, subs=esm_subs,grid=grid)
             ! Reference period
-            call varslice_init_nml(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, subs=esm_subs)
+            call varslice_init_nml(esm%ts_var_ref, filename, trim(grp_ts_var), domain, grid_name, &
+                    subs=esm_subs,grid=grid)
             if (use_smb) then
-                call varslice_init_nml(esm%smb_var_ref, filename, trim(grp_smb_var), domain, grid_name, subs=esm_subs)
+                call varslice_init_nml(esm%smb_var_ref, filename, trim(grp_smb_var), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
             else
-                call varslice_init_nml(esm%pr_var_ref, filename, trim(grp_pr_var), domain, grid_name, subs=esm_subs)
+                call varslice_init_nml(esm%pr_var_ref, filename, trim(grp_pr_var), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
             end if
-            call varslice_init_nml(esm%to_var_ref, filename, trim(grp_to_var), domain, grid_name, subs=esm_subs)
-            call varslice_init_nml(esm%so_var_ref, filename, trim(grp_so_var), domain, grid_name, subs=esm_subs)
+            call varslice_init_nml(esm%to_var_ref, filename, trim(grp_to_var), domain, grid_name, &
+                    subs=esm_subs,grid=grid)
+            call varslice_init_nml(esm%so_var_ref, filename, trim(grp_so_var), domain, grid_name, &
+                    subs=esm_subs,grid=grid)
         end if
 
         ! Transient dependent fields
         if (trim(esm%ctrl_run_type) .eq. "transient" .and. trim(esm%experiment) .ne. "ctrl") then
             ! ESM reference period
             if (use_esm) then
-                call varslice_init_nml(esm%ts_esm_ref, filename, trim(grp_ts_esm_ref), domain, grid_name, subs=esm_subs)
+                call varslice_init_nml(esm%ts_esm_ref, filename, trim(grp_ts_esm_ref), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
                 if (use_smb) then
-                    call varslice_init_nml(esm%smb_esm_ref, filename, trim(grp_smb_esm_ref), domain, grid_name, subs=esm_subs)
+                    call varslice_init_nml(esm%smb_esm_ref, filename, trim(grp_smb_esm_ref), domain, grid_name, &
+                            subs=esm_subs,grid=grid)
                 else
-                    call varslice_init_nml(esm%pr_esm_ref, filename, trim(grp_pr_esm_ref), domain, grid_name, subs=esm_subs)
+                    call varslice_init_nml(esm%pr_esm_ref, filename, trim(grp_pr_esm_ref), domain, grid_name, &
+                            subs=esm_subs,grid=grid)
                 end if
-                call varslice_init_nml(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, subs=esm_subs)
-                call varslice_init_nml(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, subs=esm_subs)
-                call varslice_init_nml(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, subs=esm_subs)
+                call varslice_init_nml(esm%to_esm_ref, filename, trim(grp_to_esm_ref), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
+                call varslice_init_nml(esm%so_esm_ref, filename, trim(grp_so_esm_ref), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
+                call varslice_init_nml(esm%zs_esm_ref, filename, trim(grp_zs_esm_ref), domain, grid_name, &
+                        subs=esm_subs,grid=grid)
 
                 ! ESM historical period
                 if (use_hist) then
-                    call varslice_init_nml(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, subs=esm_subs)
+                    call varslice_init_nml(esm%ts_hist, filename,trim(grp_ts_hist), domain, grid_name, &
+                            subs=esm_subs,grid=grid)
                     if (use_smb) then
-                        call varslice_init_nml(esm%smb_hist, filename, trim(grp_smb_hist), domain, grid_name, subs=esm_subs)
-                        call varslice_init_nml(esm%dsmbdz_hist, filename, trim(grp_dsmbdz_hist), domain, grid_name, subs=esm_subs)
+                        call varslice_init_nml(esm%smb_hist, filename, trim(grp_smb_hist), domain, grid_name, &
+                                subs=esm_subs,grid=grid)
+                        call varslice_init_nml(esm%dsmbdz_hist, filename, trim(grp_dsmbdz_hist), domain, grid_name, &
+                                subs=esm_subs,grid=grid)
                     else
-                        call varslice_init_nml(esm%pr_hist, filename, trim(grp_pr_hist), domain, grid_name, subs=esm_subs)
+                        call varslice_init_nml(esm%pr_hist, filename, trim(grp_pr_hist), domain, grid_name, &
+                                subs=esm_subs,grid=grid)
                     end if
-                    call varslice_init_nml(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, subs=esm_subs)
-                    call varslice_init_nml(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, subs=esm_subs)
-                    if (trim(domain).eq."Greenland") then
-                        call varslice_init_nml(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name,subs=esm_subs)
+                    call varslice_init_nml(esm%to_hist, filename,trim(grp_to_hist), domain, grid_name, &
+                            subs=esm_subs,grid=grid)
+                    call varslice_init_nml(esm%so_hist, filename,trim(grp_so_hist), domain, grid_name, &
+                            subs=esm_subs,grid=grid)
+                    call esm_check_ocean_layout(esm%to_hist, esm%to_esm_ref)
+                    call esm_check_ocean_layout(esm%so_hist, esm%so_esm_ref)
+                    esm%with_sgd_hist = sgd_active(filename, grp_Qd_hist, domain)
+                    if (esm%with_sgd_hist) then
+                        call varslice_init_nml(esm%Qd_hist, filename,trim(grp_Qd_hist), domain,grid_name, &
+                                subs=esm_subs,grid=grid)
                     end if
                 end if
                 
                 ! ESM projection period
                 if (use_proj) then
                     ! atm
-                    call varslice_init_nml(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name,subs=esm_subs)
+                    call varslice_init_nml(esm%ts_proj, filename,trim(grp_ts_proj), domain,grid_name, &
+                            subs=esm_subs,grid=grid)
                     if (use_smb) then
-                        call varslice_init_nml(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, subs=esm_subs)
-                        call varslice_init_nml(esm%dsmbdz_proj, filename, trim(grp_dsmbdz_proj), domain, grid_name, subs=esm_subs)
+                        call varslice_init_nml(esm%smb_proj, filename, trim(grp_smb_proj), domain, grid_name, &
+                                subs=esm_subs,grid=grid)
+                        call varslice_init_nml(esm%dsmbdz_proj, filename, trim(grp_dsmbdz_proj), domain, grid_name, &
+                                subs=esm_subs,grid=grid)
                     else
-                        call varslice_init_nml(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, subs=esm_subs)
+                        call varslice_init_nml(esm%pr_proj, filename, trim(grp_pr_proj), domain, grid_name, &
+                                subs=esm_subs,grid=grid)
                     end if
                     ! ocean
-                    call varslice_init_nml(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name,subs=esm_subs)
-                    call varslice_init_nml(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name,subs=esm_subs)
-                    if (trim(domain).eq."Greenland") then
-                        call varslice_init_nml(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name,subs=esm_subs)
+                    call varslice_init_nml(esm%to_proj, filename,trim(grp_to_proj), domain,grid_name, &
+                            subs=esm_subs,grid=grid)
+                    call varslice_init_nml(esm%so_proj, filename,trim(grp_so_proj), domain,grid_name, &
+                            subs=esm_subs,grid=grid)
+                    call esm_check_ocean_layout(esm%to_proj, esm%to_esm_ref)
+                    call esm_check_ocean_layout(esm%so_proj, esm%so_esm_ref)
+                    esm%with_sgd_proj = sgd_active(filename, grp_Qd_proj, domain)
+                    if (esm%with_sgd_proj) then
+                        call varslice_init_nml(esm%Qd_proj, filename,trim(grp_Qd_proj), domain,grid_name, &
+                                subs=esm_subs,grid=grid)
                     end if
                 end if
             end if
@@ -384,32 +386,38 @@ contains
     
     end subroutine esm_forcing_init
 
-    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,domain,grid_name)
-        ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
+    function sgd_active(filename, group, domain) result(active)
+        ! Subglacial discharge (Qd) is a Greenland forcing; it is read from the
+        ! group's file unless its filename is "none" (Qd = 0).
+        character(len=*), intent(IN) :: filename, group, domain
+        logical :: active
+        character(len=512) :: sgd_file
+
+        active = .false.
+        if (trim(domain) .ne. "Greenland") return
+
+        call nml_read(filename, trim(group), "filename", sgd_file)
+        active = .not. (trim(sgd_file) .eq. "none" .or. trim(sgd_file) .eq. "None")
+        if (.not. active) write(*,*) "esm_forcing_init:: "//trim(group)//": filename = none, Qd = 0."
+    end function sgd_active
+
+    subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,south)
+        ! The reference climatology over time_ref: the atmosphere moved to the
+        ! model surface z_srf_ylm with the monthly lapse rate (pr with beta_p;
+        ! the smb without elevation change), and the reference ocean.
 
         implicit none
 
         type(esm_forcing_class), intent(INOUT) :: esm
         real(wp),                intent(IN)    :: z_srf_ylm(:,:)
-        real(wp),                intent(IN)    :: time
-        real(wp),                intent(IN)    :: time_ref(2)
+        real(dp),                intent(IN)    :: time
+        real(dp),                intent(IN)    :: time_ref(2)
         logical,                 intent(IN)    :: use_smb
-        character(len=*),        intent(IN)    :: domain, grid_name
+        logical,                 intent(IN)    :: south     ! southern hemisphere
 
         ! Local variables 
         integer :: m
-        real(wp) :: tmp, lapse
-        real(wp), parameter :: pi = 3.14159265359 
-        character(len=56)   :: slice_method, ref_grid_name 
-        !type(map_scrip_class) :: mps
-        logical  :: south
-
-        ! Get slices for current time
-        slice_method = "extrap"
-
-        ! select domain
-        south = .FALSE. 
-        if (trim(domain).eq."Antarctica") south = .TRUE.
+        real(wp) :: lapse, lapse_mon(12)
 
         ! Climatology reference
         ! === Atmospheric fields ===
@@ -424,29 +432,13 @@ contains
             call varslice_update(esm%pr_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=12)
         end if
         ! ===   Oceanic fields   ===
-        !call nc_read_attr(esm%to_ref,"grid_name", ref_grid_name)
-        !if (trim(file_grid_name) .eq. trim(grid_name) ) then
-        !    ! Ref grid and Yelmo grid are the same
-        !    call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
-        !else
-        !    ! Ref's grid is different than Yelmo grid. Load desired time range for the source code.
-        !    call varslice_update(esm%to_ref_src, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
-        !    ! Load the scrip map from file (should already have been generated via cdo externally)
-        !    call map_scrip_init(mps,file_grid_name,grid_name,method="con",fldr="maps",load=.TRUE.)
-        !    ! Remap src into the desired target
-        !    call varslice_map_to_grid(esm%to_ref,esm%to_ref_src,mps)
-        !end if
-
         call varslice_update(esm%to_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
         call varslice_update(esm%so_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
 
         ! Convert atmospheric fields to model elevation
+        lapse_mon = esm_lapse_monthly(esm, south)
         do m = 1,12 
-            if(south) then ! Southern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.4375-30.4375)/365.25))
-            else ! Northern Hemisphere
-                lapse = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
-            end if    
+            lapse = lapse_mon(m)
             esm%t2m(:,:,m) = esm%ts_ref%var(:,:,m,1) + lapse*(esm%zs_ref%var(:,:,1,1)-z_srf_ylm)
             if (use_smb) then
                 esm%smb(:,:,m) = esm%smb_ref%var(:,:,m,1) !No model elevation changes for SMB
@@ -463,17 +455,28 @@ contains
             esm%pr_ann  = sum(esm%pr,dim=3) / 12.0
         end if
 
-        if(south) then
-            esm%t2m_sum = (esm%t2m(:,:,1)+esm%t2m(:,:,2)+esm%t2m(:,:,12)) / 3.0
-        else
-            esm%t2m_sum = (esm%t2m(:,:,6)+esm%t2m(:,:,7)+esm%t2m(:,:,8)) / 3.0
-        end if      
-
         return
 
     end subroutine esm_clim_update
 
-    subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var,use_ref_atm,use_ref_ocn)
+    function esm_lapse_monthly(esm, south) result(lapse)
+        ! Monthly lapse rate [K/m] of the reference atmosphere: annual lapse(1)
+        ! with a seasonal cosine (phase of the month start), summer lapse(2).
+        type(esm_forcing_class), intent(IN) :: esm
+        logical,                 intent(IN) :: south
+        real(wp) :: lapse(12)
+        real(wp), parameter :: pi = 3.14159265359
+        integer :: m
+        do m = 1, 12
+            if (south) then
+                lapse(m) = (esm%lapse(1)+(esm%lapse(2)-esm%lapse(1))*cos(2*pi*(m*30.4375-30.4375)/365.25))
+            else
+                lapse(m) = (esm%lapse(1)+(esm%lapse(1)-esm%lapse(2))*cos(2*pi*(m*30.4375-30.4375)/365.25))
+            end if
+        end do
+    end function esm_lapse_monthly
+
+    subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -481,19 +484,19 @@ contains
     
         type(esm_forcing_class), intent(INOUT) :: esm
         type(marshelf_class),    intent(IN)    :: mshlf
-        real(wp), intent(IN) :: time
-        real(wp), intent(IN) :: dtt
+        real(dp), intent(IN) :: time
+        real(dp), intent(IN) :: dtt
         character(len=*), intent(IN) :: clim_var
-        real(wp), intent(IN) :: time_ref(2)
+        real(dp), intent(IN) :: time_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_var
-        logical,  intent(IN), optional :: use_ref_atm 
-        logical,  intent(IN), optional :: use_ref_ocn 
     
         ! Local variables 
-        integer  :: m, year, step_idx
-        real(wp) :: tmp, lapse
-        real(wp) :: rand, year_rand
+        integer  :: m, step_idx
+        real(wp) :: rand
+        real(dp) :: year_rand
+        real(wp), allocatable :: to_ref(:,:,:), so_ref(:,:,:)   ! the ocean fields, extrapolated
+        real(wp), allocatable :: to_now(:,:,:), so_now(:,:,:)
 
         ! Initialize anomalies
         esm%dts_var = 0.0_wp
@@ -511,8 +514,10 @@ contains
         call varslice_update(esm%to_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1)
         call varslice_update(esm%so_var_ref, [time_ref(1),time_ref(2)],method="range_mean",rep=1) 
         
-        call ocn_variable_extrapolation(esm%to_var_ref%var(:,:,:,1),H_ice,basins,-esm%to_var_ref%z,z_bed)
-        call ocn_variable_extrapolation(esm%so_var_ref%var(:,:,:,1),H_ice,basins,-esm%so_var_ref%z,z_bed)
+        to_ref = esm%to_var_ref%var(:,:,:,1)
+        so_ref = esm%so_var_ref%var(:,:,:,1)
+        call ocn_variable_extrapolation(to_ref,H_ice,basins,-esm%to_var_ref%z,z_bed)
+        call ocn_variable_extrapolation(so_ref,H_ice,basins,-esm%so_var_ref%z,z_bed)
 
         ! Obtain reference year climatology
         select case(trim(clim_var))
@@ -558,51 +563,21 @@ contains
                 call varslice_update(esm%so_var,[year_rand],method="extrap",rep=1)
 
                 ! Interpolate ocean data to the interior of ice shelves
-                call ocn_variable_extrapolation(esm%to_var%var(:,:,:,1),H_ice,basins,-esm%to_var%z,z_bed)
-                call ocn_variable_extrapolation(esm%so_var%var(:,:,:,1),H_ice,basins,-esm%so_var%z,z_bed)
+                to_now = esm%to_var%var(:,:,:,1)
+                so_now = esm%so_var%var(:,:,:,1)
+                call ocn_variable_extrapolation(to_now,H_ice,basins,-esm%to_var%z,z_bed)
+                call ocn_variable_extrapolation(so_now,H_ice,basins,-esm%so_var%z,z_bed)
 
                 ! Compute the anomaly at the desired depth level
-                call marshelf_interp_shelf(esm%dto_var,mshlf,esm%to_var%var(:,:,:,1)-esm%to_var_ref%var(:,:,:,1),H_ice, &
+                call marshelf_interp_shelf(esm%dto_var,mshlf,to_now-to_ref,H_ice, &
                                             z_bed,f_grnd,z_sl,-esm%to_var_ref%z)
-                call marshelf_interp_shelf(esm%dso_var,mshlf,esm%so_var%var(:,:,:,1)-esm%so_var_ref%var(:,:,:,1),H_ice, &
-                                            z_bed,f_grnd,z_sl,-esm%so_var_ref%z) 
+                call marshelf_interp_shelf(esm%dso_var,mshlf,so_now-so_ref,H_ice, &
+                                            z_bed,f_grnd,z_sl,-esm%so_var_ref%z)
 
             case DEFAULT
                 ! Assume no variabiliy anomaly (do nothing)
                 
         end select
-   
-        ! routine to rome variability in speciic basins. TO DO
-        if (.FALSE.) then
-                where(basins .eq. 1) esm%dto_var = 0.0_wp
-        end if
-
-        if (use_ref_atm) then
-            ! set atmosphere to reference values
-            esm%dts_var = 0.0_wp
-            esm%dpr_var = 1.0_wp
-        end if
-                    
-        if (use_ref_ocn) then
-            ! set ocean to reference values
-            esm%dto_var = 0.0_wp
-            esm%dso_var = 0.0_wp
-        end if
-
-        if (.FALSE.) then
-            ! variability field
-            write(*,*) "maxval ts_var", maxval(esm%ts_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval pr_var", maxval(esm%pr_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval to_var", maxval(esm%to_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval so_var", maxval(esm%so_esm_ref%var(:,:,:,1))
-                        
-            ! anomaly
-            write(*,*) "maxval dts_var",  maxval(esm%dts_var)
-            write(*,*) "maxval dpr_var",  maxval(esm%dpr_var)
-            write(*,*) "maxval dto_var",  maxval(esm%dto_var)
-            write(*,*) "maxval dso_vcar", maxval(esm%dso_var)
-                        
-        end if
         end if
 
         return 
@@ -610,7 +585,7 @@ contains
     end subroutine esm_variability_update
 
     subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,&
-                                  domain,H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
+                                  H_ice,basins,z_bed,f_grnd,z_sl,use_smb)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -618,22 +593,17 @@ contains
     
         type(esm_forcing_class), intent(INOUT) :: esm
         type(marshelf_class),    intent(IN)    :: mshlf
-        real(wp), intent(IN) :: time
+        real(dp), intent(IN) :: time
         logical,  intent(IN) :: use_esm
-        real(wp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
-        character(len=*), intent(IN) :: domain
+        real(dp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
-        logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
     
         ! Local variables
-        integer  :: k, m
-        real(wp) :: tmp, anomaly
-        character(len=56) :: slice_method
-        real(wp), allocatable :: to_ann(:,:,:), so_ann(:,:,:)
+        integer  :: m
+        real(wp) :: anomaly
+        real(wp), allocatable :: to_esm_ref(:,:,:), so_esm_ref(:,:,:)   ! the esm reference ocean, extrapolated
 
-        ! Get slices for current time
-        slice_method = "extrap"
         anomaly = 0.0_wp
             
         ! Initialize anomalies
@@ -652,7 +622,11 @@ contains
                 ! ctrl/opt/spinup: run only the reference climatology. (Do nothing)
             
             case("transient")
-                if (use_esm) then ! Fields loaded from ESM
+                if (trim(esm%experiment) == "ctrl") then
+                    ! The ctrl experiment: the reference climatology only, as
+                    ! esm_forcing_init loads no ESM fields for it (use_esm or not).
+
+                else if (use_esm) then ! Fields loaded from ESM
                     ! === Reference period   ===
                     ! === Atmospheric fields ===
                     call varslice_update(esm%ts_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=12)
@@ -666,9 +640,11 @@ contains
                     call varslice_update(esm%so_esm_ref,[time_esm_ref(1),time_esm_ref(2)],method="range_mean",rep=1)
                         
                     ! Interpolate ocean data to the interior of ice shelves
+                    to_esm_ref = esm%to_esm_ref%var(:,:,:,1)
+                    so_esm_ref = esm%so_esm_ref%var(:,:,:,1)
                     if (mshlf%par%extrap_shlf) then
-                        call ocn_variable_extrapolation(esm%to_esm_ref%var(:,:,:,1),H_ice,basins,-esm%to_esm_ref%z,z_bed)
-                        call ocn_variable_extrapolation(esm%so_esm_ref%var(:,:,:,1),H_ice,basins,-esm%so_esm_ref%z,z_bed)
+                        call ocn_variable_extrapolation(to_esm_ref,H_ice,basins,-esm%to_esm_ref%z,z_bed)
+                        call ocn_variable_extrapolation(so_esm_ref,H_ice,basins,-esm%so_esm_ref%z,z_bed)
                     end if
 
                     ! === Historical period ===
@@ -686,39 +662,22 @@ contains
                         do m = 1, 12 
                             esm%dts(:,:,m) = esm%ts_hist%var(:,:,m,1)-esm%ts_esm_ref%var(:,:,m,1)
                             if (use_smb) then
-                                esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_ref%var(:,:,m,1)
+                                esm%dsmb(:,:,m) = esm%smb_hist%var(:,:,m,1)-esm%smb_esm_ref%var(:,:,m,1)
                             else
                                 esm%dpr(:,:,m) = esm%pr_hist%var(:,:,m,1)/(esm%pr_esm_ref%var(:,:,m,1)+1e-8)
                             end if
                         end do
                         ! ===   Oceanic fields   ===
-                        ! rep is sourced from each field's declared sub-annual period
-                        ! (varslice_nsub): 12 for monthly ocean (e.g. Greenland), 1 for
-                        ! annual ocean (e.g. Antarctica). The monthly cycle is then
-                        ! collapsed to an annual mean so the shelf physics receives one
-                        ! (x,y,depth) field in either case (a no-op for annual data).
-                        call varslice_update(esm%to_hist,[time],method="extrap",rep=varslice_nsub(esm%to_hist))
-                        call varslice_update(esm%so_hist,[time],method="extrap",rep=varslice_nsub(esm%so_hist))
-                        to_ann = sum(esm%to_hist%var,dim=4) / real(size(esm%to_hist%var,4),wp)
-                        so_ann = sum(esm%so_hist%var,dim=4) / real(size(esm%so_hist%var,4),wp)
-                        if (trim(domain).eq."Greenland") then
+                        call esm_ocean_anomaly(esm%dto,mshlf,esm%to_hist,to_esm_ref,time, &
+                                               H_ice,basins,z_bed,f_grnd,z_sl)
+                        call esm_ocean_anomaly(esm%dso,mshlf,esm%so_hist,so_esm_ref,time, &
+                                               H_ice,basins,z_bed,f_grnd,z_sl)
+                        if (esm%with_sgd_hist) then
                             call varslice_update(esm%Qd_hist,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_hist%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_hist%var(:,:,6,1)+esm%Qd_hist%var(:,:,7,1)+esm%Qd_hist%var(:,:,8,1)) / 3.0
                         end if
 
-                        if (mshlf%par%extrap_shlf) then
-                            ! Extrapolate ocean data to the interior of ice shelves
-                            call ocn_variable_extrapolation(to_ann,H_ice,basins,-esm%to_hist%z,z_bed)
-                            call ocn_variable_extrapolation(so_ann,H_ice,basins,-esm%so_hist%z,z_bed)
-                        end if
-
-                        ! Compute the anomaly at the desired depth level
-                        call marshelf_interp_shelf(esm%dto,mshlf,to_ann-esm%to_esm_ref%var(:,:,:,1),H_ice, &
-                                                    z_bed,f_grnd,z_sl,-esm%to_esm_ref%z)
-                        call marshelf_interp_shelf(esm%dso,mshlf,so_ann-esm%so_esm_ref%var(:,:,:,1),H_ice, &
-                                                    z_bed,f_grnd,z_sl,-esm%so_esm_ref%z)
-                        
                     ! === Projection period ===
                     else if (time .ge. time_proj(1)) then
 
@@ -742,31 +701,15 @@ contains
                         end do    
                         
                         ! ===   Oceanic fields   ===
-                        ! rep sourced from the field's declared sub-annual period, then
-                        ! collapsed to an annual mean (see historical block above).
-                        call varslice_update(esm%to_proj,[time],method="extrap",rep=varslice_nsub(esm%to_proj))
-                        call varslice_update(esm%so_proj,[time],method="extrap",rep=varslice_nsub(esm%so_proj))
-                        to_ann = sum(esm%to_proj%var,dim=4) / real(size(esm%to_proj%var,4),wp)
-                        so_ann = sum(esm%so_proj%var,dim=4) / real(size(esm%so_proj%var,4),wp)
-                        if (trim(domain).eq."Greenland") then
+                        call esm_ocean_anomaly(esm%dto,mshlf,esm%to_proj,to_esm_ref,time, &
+                                               H_ice,basins,z_bed,f_grnd,z_sl)
+                        call esm_ocean_anomaly(esm%dso,mshlf,esm%so_proj,so_esm_ref,time, &
+                                               H_ice,basins,z_bed,f_grnd,z_sl)
+                        if (esm%with_sgd_proj) then
                             call varslice_update(esm%Qd_proj,[time],method="extrap",rep=12)
                             esm%Qd_ann = sum(esm%Qd_proj%var(:,:,:,1),dim=3) / 12.0
                             esm%Qd_sum = (esm%Qd_proj%var(:,:,6,1)+esm%Qd_proj%var(:,:,7,1)+esm%Qd_proj%var(:,:,8,1)) / 3.0
                         end if
-
-                        if (mshlf%par%extrap_shlf) then
-                            ! Interpolate ocean data to the interior
-                            call ocn_variable_extrapolation(to_ann,H_ice,basins,-esm%to_proj%z,z_bed)
-                            call ocn_variable_extrapolation(so_ann,H_ice,basins,-esm%so_proj%z,z_bed)
-                        end if
-
-                        ! Compute the anomaly at the desired depth level
-                        esm%dto = 0.0_wp
-                        esm%dso = 0.0_wp
-                        call marshelf_interp_shelf(esm%dto,mshlf,to_ann-esm%to_esm_ref%var(:,:,:,1),H_ice, &
-                                                    z_bed,f_grnd,z_sl,-esm%to_esm_ref%z)
-                        call marshelf_interp_shelf(esm%dso,mshlf,so_ann-esm%so_esm_ref%var(:,:,:,1),H_ice, &
-                                                    z_bed,f_grnd,z_sl,-esm%so_esm_ref%z)
 
                     ! === Reference period ===
                     ! Only used if there is a gap between the historical and projection period
@@ -792,9 +735,6 @@ contains
                                 esm%dto = esm%f_ocn*esm%f_polar*anomaly
                                 esm%dso = 0.0_wp
                             end if    
-                        
-                        case("ctrl")
-                                ! Do nothing
 
                         case DEFAULT
                             write(*,*) "esm_forcing_update:: Error: transient experiment not recognized: "//trim(esm%experiment)
@@ -809,120 +749,78 @@ contains
                 stop 
      
         end select
-            
-        if (use_ref_atm) then
-            ! set atmosphere to reference values
-            esm%dts  = 0.0_wp
-            esm%dpr  = 1.0_wp
-            esm%dsmb = 0.0_wp
-            esm%dsmbdz = 0.0_wp
-        end if
-            
-        if (use_ref_ocn) then
-            ! set ocean to reference values
-            esm%dto = 0.0_wp
-            esm%dso = 0.0_wp
-        end if
-    
-        if (.FALSE.) then
-            ! esm ref
-            write(*,*) "minval ts_esm", minval(esm%ts_esm_ref%var(:,:,:,1))
-            write(*,*) "minval pr_esm", minval(esm%pr_esm_ref%var(:,:,:,1))
-            write(*,*) "minval to_esm", minval(esm%to_esm_ref%var(:,:,:,1))
-            write(*,*) "minval so_esm", minval(esm%so_esm_ref%var(:,:,:,1))
-                                  
-            ! proj
-            write(*,*) "minval ts_proj", minval(esm%ts_proj%var(:,:,:,1))
-            write(*,*) "minval pr_proj", minval(esm%pr_proj%var(:,:,:,1))
-            write(*,*) "minval to_proj", minval(esm%to_proj%var(:,:,:,1))
-            write(*,*) "minval so_proj", minval(esm%so_proj%var(:,:,:,1))
-                                
-            ! anomaly
-            write(*,*) "minval dts", minval(esm%dts)
-            write(*,*) "minval dpr", minval(esm%dpr)
-            write(*,*) "minval dto", minval(esm%dto)
-            write(*,*) "minval dso", minval(esm%dso)
-
-            ! esm ref
-            write(*,*) "maxval ts_esm", maxval(esm%ts_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval pr_esm", maxval(esm%pr_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval to_esm", maxval(esm%to_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval so_esm", maxval(esm%so_esm_ref%var(:,:,:,1))
-                          
-            ! proj
-            write(*,*) "maxval ts_proj", maxval(esm%ts_proj%var(:,:,:,1))
-            write(*,*) "maxval pr_proj", maxval(esm%pr_proj%var(:,:,:,1))
-            write(*,*) "maxval to_proj", maxval(esm%to_proj%var(:,:,:,1))
-            write(*,*) "maxval so_proj", maxval(esm%so_proj%var(:,:,:,1))
-                        
-            ! anomaly
-            write(*,*) "maxval dts", maxval(esm%dts)
-            write(*,*) "maxval dpr", maxval(esm%dpr)
-            write(*,*) "maxval dto", maxval(esm%dto)
-            write(*,*) "maxval dso", maxval(esm%dso)
-                        
-        end if
     
         return 
     
     end subroutine esm_forcing_update
 
+    subroutine esm_ocean_anomaly(dvar,mshlf,vs,var_ref,time,H_ice,basins,z_bed,f_grnd,z_sl)
+        ! Shelf-depth anomaly of a transient ESM ocean field (historical or
+        ! projection) relative to its ESM reference (var_ref, on the same levels:
+        ! esm_check_ocean_layout). The field is sliced at the
+        ! current time with its declared sub-annual period (varslice_nsub) and
+        ! averaged to an annual (x,y,z) field (a single level for depth-less
+        ! forcing, e.g. Greenland ISMIP7), optionally extrapolated into the
+        ! ice-shelf interiors, and the anomaly is interpolated to the shelf depth.
 
-    
-    ! === ESM OUTPUT ROUTINES ==========
+        implicit none
 
-    subroutine esm_write_init(filename,xc,yc,time,lon,lat,area,map_name,lambda,phi)
+        real(wp),             intent(INOUT) :: dvar(:,:)
+        type(marshelf_class), intent(IN)    :: mshlf
+        type(varslice_class), intent(INOUT) :: vs
+        real(wp),             intent(IN)    :: var_ref(:,:,:)
+        real(dp),             intent(IN)    :: time
+        real(wp),             intent(IN)    :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
 
-        implicit none 
+        ! Local variables
+        real(wp), allocatable :: var_ann(:,:,:)
 
-        character(len=*),   intent(IN) :: filename
-        real(wp),           intent(IN) :: xc(:)
-        real(wp),           intent(IN) :: yc(:)
-        real(wp),           intent(IN) :: time
-        real(wp),           intent(IN) :: lon(:,:)
-        real(wp),           intent(IN) :: lat(:,:)
-        real(wp),           intent(IN) :: area(:,:)
-        character(len=*),   intent(IN) :: map_name
-        real(wp),           intent(IN) :: lambda
-        real(wp),           intent(IN) :: phi 
+        call varslice_update(vs,[time],method="extrap",rep=varslice_nsub(vs))
+        var_ann = varslice_sub_mean(vs)
 
-        ! Local variables 
-        character(len=12) :: xnm 
-        character(len=12) :: ynm 
-        
-        xnm = "xc"
-        ynm = "yc" 
+        if (mshlf%par%extrap_shlf) then
+            call ocn_variable_extrapolation(var_ann,H_ice,basins,-vs%z,z_bed)
+        end if
 
-        ! === Initialize netcdf file and dimensions =========
+        call marshelf_interp_shelf(dvar,mshlf,var_ann-var_ref,H_ice, &
+                                    z_bed,f_grnd,z_sl,-vs%z)
 
-        ! Create the netcdf file 
-        call nc_create(filename)
-
-        ! Add grid axis variables to netcdf file
-        call nc_write_dim(filename,xnm,x=xc*1e-3,units="kilometers")
-        call nc_write_attr(filename,xnm,"_CoordinateAxisType","GeoX")
-
-        call nc_write_dim(filename,ynm,x=yc*1e-3,units="kilometers")
-        call nc_write_attr(filename,ynm,"_CoordinateAxisType","GeoY")
-        
-        ! Add time axis with current value 
-        call nc_write_dim(filename,"time", x=time,dx=1.0_wp,nx=1,units="years",unlimited=.TRUE.)
-        
-        ! Projection information 
-        call nc_write_map(filename,map_name,dble(lambda),phi=dble(phi))
-
-        ! Lat-lon information
-        call nc_write(filename,"lon2D",lon,dim1=xnm,dim2=ynm,grid_mapping=map_name)
-        call nc_write_attr(filename,"lon2D","_CoordinateAxisType","Lon")
-        call nc_write(filename,"lat2D",lat,dim1=xnm,dim2=ynm,grid_mapping=map_name)
-        call nc_write_attr(filename,"lat2D","_CoordinateAxisType","Lat")
-
-        call nc_write(filename,"area",  area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=map_name,units="km^2")
-        call nc_write_attr(filename,"area","coordinates","lat2D lon2D")
-        
         return
 
-    end subroutine esm_write_init
+    end subroutine esm_ocean_anomaly
+
+    subroutine esm_check_ocean_layout(vs,vs_ref)
+        ! The transient ocean anomaly is taken level by level against the ESM
+        ! reference (esm_ocean_anomaly), so both fields must have the same
+        ! spatial layout: rank, horizontal extent and depth levels.
+
+        implicit none
+
+        type(varslice_class), intent(IN) :: vs
+        type(varslice_class), intent(IN) :: vs_ref
+
+        ! Local variables
+        logical :: same
+
+        same = (vs%par%ndim .eq. vs_ref%par%ndim)              .and. &
+               (vs%par%with_time .eqv. vs_ref%par%with_time)   .and. &
+               size(vs%x) .eq. size(vs_ref%x) .and. size(vs%y) .eq. size(vs_ref%y) .and. &
+               size(vs%z) .eq. size(vs_ref%z)
+        if (same) same = all(abs(vs%z-vs_ref%z) .le. 1e-3_wp)
+
+        if (.not. same) then
+            write(error_unit,*) "esm_check_ocean_layout:: Error: ocean field layout differs from &
+                                &its ESM reference."
+            write(error_unit,*) "field:     ", trim(vs%par%name), " (", trim(vs%par%filename), ")"
+            write(error_unit,*) "  ndim, nx, ny, nz = ", vs%par%ndim, size(vs%x), size(vs%y), size(vs%z)
+            write(error_unit,*) "reference: ", trim(vs_ref%par%name), " (", trim(vs_ref%par%filename), ")"
+            write(error_unit,*) "  ndim, nx, ny, nz = ", vs_ref%par%ndim, size(vs_ref%x), size(vs_ref%y), size(vs_ref%z)
+            error stop
+        end if
+
+        return
+
+    end subroutine esm_check_ocean_layout
 
     ! Initlialize allocatable objects
     subroutine esm_allocate(esm,nx,ny)
@@ -952,7 +850,6 @@ contains
         allocate(esm%dto_var(nx,ny))
         allocate(esm%dso_var(nx,ny))
         allocate(esm%t2m_ann(nx,ny))
-        allocate(esm%t2m_sum(nx,ny))
         allocate(esm%pr_ann(nx,ny)) 
         allocate(esm%smb_ann(nx,ny))       
 
@@ -983,7 +880,6 @@ contains
             if (allocated(esm%dso_var)) deallocate(esm%dso_var)
             if (allocated(esm%Qd_ann))  deallocate(esm%Qd_ann)
             if (allocated(esm%Qd_sum))  deallocate(esm%Qd_sum)
-            if (allocated(esm%t2m_sum)) deallocate(esm%t2m_sum)
             if (allocated(esm%t2m_ann)) deallocate(esm%t2m_ann)
             if (allocated(esm%pr_ann))  deallocate(esm%pr_ann)
             if (allocated(esm%smb_ann)) deallocate(esm%smb_ann)
@@ -991,14 +887,6 @@ contains
             return
     
         end subroutine esm_deallocate
-
-        ! Internal functions
-        function int_to_str(i) result(str)
-            integer, intent(in) :: i
-            character(len=20)   :: str
-            write(str, '(i10)') i
-            str = trim(str)
-        end function
     
 end module esm_forcing
 

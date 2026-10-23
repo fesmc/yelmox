@@ -4,6 +4,10 @@ module geothermal
 
     use nml 
     use ncio 
+    use interp2D, only : fill_nearest
+    use coordinates, only : grid_class
+    use mapping,  only : map_class
+    use fesmdata, only : fesmdata_map_init, fesmdata_read_field
 
     implicit none 
 
@@ -14,7 +18,6 @@ module geothermal
     ! Choose the precision of the library (sp,dp)
     integer,  parameter :: wp = sp 
 
-    real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
     real(wp), parameter :: pi        = 3.14159265359
 
     type geothermal_param_class
@@ -39,12 +42,10 @@ module geothermal
     private
     public :: geothermal_class
     public :: geothermal_init 
-    public :: geothermal_update
-    public :: geothermal_end 
 
 contains 
 
-    subroutine geothermal_init(gthrm,filename,nx,ny,domain,grid_name,group)
+    subroutine geothermal_init(gthrm,filename,grid,domain,group)
         ! Eventually interface should use 'sed' object directly
         ! instead of input/output arrays 
 
@@ -52,17 +53,22 @@ contains
 
         type(geothermal_class), intent(OUT) :: gthrm  
         character(len=*),       intent(IN)  :: filename 
-        integer,                intent(IN)  :: nx, ny 
-        character(len=*),       intent(IN)  :: domain, grid_name
+        type(grid_class),       intent(IN)  :: grid         ! Yelmo grid
+        character(len=*),       intent(IN)  :: domain
         character(len=*),       intent(IN), optional :: group
 
         ! Local variables
         character(len=32) :: nml_group
-        
+        integer :: nx, ny
+        logical :: use_err
+
         real(wp), parameter :: ghf_min = 0.1  ! [mW/m2] Minimum allowed ghf value
 
         ! Load geothermal parameters
-        call geothermal_par_load(gthrm%par,filename,domain,grid_name,init=.TRUE.,group=group)
+        call geothermal_par_load(gthrm%par,filename,domain,grid%name,init=.TRUE.,group=group)
+
+        nx = grid%G%nx
+        ny = grid%G%ny
 
         ! Allocate the geothermal object 
         call geothermal_allocate(gthrm%now,nx,ny)
@@ -73,29 +79,23 @@ contains
         !
         ! ====================================
         
-        ! Read in array 
         if (gthrm%par%use_obs) then 
-            ! Load geothermal heat flow data from file 
-            call nc_read(gthrm%par%obs_path,gthrm%par%obs_name,gthrm%now%ghf)
-            write(*,*) "geothermal_init:: geothermal heat flux loaded from: "
-            write(*,*) trim(gthrm%par%obs_path)//" : "//trim(gthrm%par%obs_name)
+            ! Geothermal heat flux from file
+            call read_ghf(gthrm%now%ghf,gthrm%par%obs_path,gthrm%par%obs_name,grid)
 
-            ! Also read it ghf error (e.g. standard deviation) if available
-
-            if ( (.not.  trim(gthrm%par%obs_err_name) .eq. "None") .and. &
-                 (.not.  trim(gthrm%par%obs_err_name) .eq. "none") .and. &
-                 (.not.  trim(gthrm%par%obs_err_name) .eq. "")   ) then 
-                ! Load stdev field too
-
-                call nc_read(gthrm%par%obs_path,gthrm%par%obs_err_name,gthrm%now%ghf_err)
-
-                ! Offset GHF field by desired sigma level
+            ! Offset by f_stdev times its error field (e.g. standard deviation),
+            ! read only when it is used
+            use_err = gthrm%par%f_stdev .ne. 0.0_wp .and. &
+                      trim(gthrm%par%obs_err_name) .ne. "None" .and. &
+                      trim(gthrm%par%obs_err_name) .ne. "none" .and. &
+                      trim(gthrm%par%obs_err_name) .ne. ""
+            if (use_err) then 
+                call read_ghf(gthrm%now%ghf_err,gthrm%par%obs_path,gthrm%par%obs_err_name,grid)
                 gthrm%now%ghf = gthrm%now%ghf + gthrm%par%f_stdev*gthrm%now%ghf_err
-
-                ! Make sure all values stay above set minimum
-                where (gthrm%now%ghf .lt. ghf_min) gthrm%now%ghf = ghf_min
-
             end if
+
+            ! Make sure all values stay above set minimum
+            where (gthrm%now%ghf .lt. ghf_min) gthrm%now%ghf = ghf_min
             
         else 
             ! Set geothermal heat flux to constant value
@@ -125,35 +125,92 @@ contains
 
     end subroutine geothermal_init
 
+    subroutine read_ghf(var,path,varname,grid)
+        ! A heat flux field (ghf or its error) of a file on grid, in mW/m2:
+        ! remapped (bilinear) from the grid of the file (FesmData global
+        ! attribute grid_name) if it is another grid, else read as it is;
+        ! missing values filled; converted to mW/m2.
 
-    subroutine geothermal_update(sed,year_bp)
+        implicit none
 
-        implicit none 
+        real(wp),         intent(OUT) :: var(:,:)
+        character(len=*), intent(IN)  :: path, varname
+        type(grid_class), intent(IN)  :: grid
 
-        type(geothermal_class) :: sed 
+        type(map_class) :: map
+        logical :: remap
+        integer :: nx, ny
+        real(wp), allocatable :: tmp(:,:)
 
-        real(wp) :: year_bp 
+        real(wp), parameter :: ghf_mv = -9999.0_wp   ! missing value marker
 
-        ! === To do ====
+        call fesmdata_map_init(map,remap,nx,ny,path,varname,"bilin",grid=grid)
+        call fesmdata_read_field(path,varname,tmp,nx,ny,remap,map)
+        var = tmp
+
+        if (remap) write(*,*) "geothermal_init:: "//trim(varname)//" remapped onto "//trim(grid%name)
+        write(*,*) "geothermal_init:: "//trim(varname)//" loaded from: "//trim(path)
+
+        ! A heat flux (and its error) is never negative: negative values are
+        ! the file's missing values (e.g. -9999, or -9e33 over the ocean in
+        ! the ISMIP7 fields). Fill them from the nearest valid value, so that
+        ! cells that are (or become) ice covered get a real heat flux.
+        if (any(var .lt. 0.0_wp)) then
+            where (var .lt. 0.0_wp) var = ghf_mv
+            call fill_nearest(var,ghf_mv)
+            write(*,*) "geothermal_init:: "//trim(varname)//": missing values filled from the nearest valid value."
+        end if
+
+        ! The model needs mW/m2; the units attribute of the variable says
+        ! what the file holds (e.g. the ISMIP7 fields are in W/m2).
+        var = var * ghf_to_mW(path,varname)
+
+        return
+
+    end subroutine read_ghf
 
 
-        return 
+    function ghf_to_mW(filename,varname) result(fac)
+        ! Factor converting the variable varname of filename to mW/m2,
+        ! from its units attribute (W/m2 or mW/m2, in any of the usual
+        ! spellings). Other units stop the model.
 
-    end subroutine geothermal_update
+        implicit none
 
+        character(len=*), intent(IN) :: filename, varname
+        real(wp) :: fac
 
-    subroutine geothermal_end(sed)
+        ! Local variables
+        character(len=256) :: units, u
+        integer :: i
 
-        implicit none 
+        units = ""
+        call nc_read_attr(filename,varname,"units",units)
 
-        type(geothermal_class) :: sed
+        ! Normalise the spelling: "mW m**-2", "mW m-2", "mW/m^2" -> "mWm-2", "mW/m2"
+        u = ""
+        do i = 1, len_trim(units)
+            if (index(" *^",units(i:i)) .eq. 0) u = trim(u)//units(i:i)
+        end do
 
-        ! Deallocate geothermal state object
-        call geothermal_deallocate(sed%now)
+        select case(trim(u))
+            case("mWm-2","mW/m2")
+                fac = 1.0_wp
+            case("Wm-2","W/m2")
+                fac = 1000.0_wp
+                write(*,*) "geothermal_init:: "//trim(varname)//" converted from W/m2 to mW/m2."
+            case DEFAULT
+                write(*,*) "geothermal_init:: Error: units of the geothermal heat flux not recognized."
+                write(*,*) "file:     ", trim(filename)
+                write(*,*) "variable: ", trim(varname)
+                write(*,*) "units:    ", trim(units)
+                write(*,*) "Expected W/m2 or mW/m2 (e.g. 'mW m-2', 'mW m**-2', 'W/m^2')."
+                stop
+        end select
 
-        return 
+        return
 
-    end subroutine geothermal_end
+    end function ghf_to_mW
 
 
     subroutine geothermal_par_load(par,filename,domain,grid_name,init,group)
@@ -176,7 +233,7 @@ contains
         end if
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
+        if (present(init)) init_pars = init
 
         call nml_read(filename,nml_group,"use_obs",         par%use_obs,        init=init_pars)
         call nml_read(filename,nml_group,"obs_path",        par%obs_path,       init=init_pars)

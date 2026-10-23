@@ -93,8 +93,15 @@ contains
         n_shlf = 0.0
         boxes  = 0.0
 
-        ! Assign number of boxes
-        n_shlf = 1.0 + NINT(SQRT(d_max_basin/d_max)*(n_box-1))
+        ! Assign number of boxes (Reese et al., 2018): n_box for the shelves
+        ! reaching farthest from the grounding line, fewer for smaller ones.
+        ! d_max = 0: no floating cell lies beyond the grounding-line cells
+        ! anywhere, so every shelf is one box.
+        if (d_max .gt. 0.0) then
+            n_shlf = 1.0 + NINT(SQRT(d_max_basin/d_max)*(n_box-1))
+        else
+            n_shlf = 1.0
+        end if
 
         ! divide ice shelves
         do k=1,int(n_shlf)

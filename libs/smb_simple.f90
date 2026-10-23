@@ -53,6 +53,7 @@ module smb_simple_m
     use iso_fortran_env, only: sp => real32
     use nml
     use ncio
+    use phys_constants, only : phys_const_class, phys_const_require, phys_const_get
     implicit none
     private
 
@@ -112,7 +113,9 @@ module smb_simple_m
         real(sp) :: z_max_in    = 2500.0_sp   ! m, inside cap
         real(sp) :: z_max_out   =  200.0_sp   ! m, outside floor
 
-        ! Plastic profile physical constants
+        ! Plastic profile physical constants. Taken from the phys_const_class
+        ! passed to smb_simple_init when there is one; these Earth values are
+        ! the standalone fallback, overridable from the namelist.
         real(sp) :: rho_ice = 910.0_sp        ! kg/m^3
         real(sp) :: g       =   9.81_sp       ! m/s^2
 
@@ -184,7 +187,7 @@ contains
     !> the (static) coordinate grid, and allocate the state fields.
     !> Build the target mask separately with smb_simple_set_mask.
     !-----------------------------------------------------------------
-    subroutine smb_simple_init(smbs, filename, x, y, lat, group, units, init)
+    subroutine smb_simple_init(smbs, filename, x, y, lat, group, units, init, cnst)
 
         type(smb_simple_class), intent(inout) :: smbs
         character(len=*),       intent(in)    :: filename
@@ -194,6 +197,7 @@ contains
         character(len=*),       intent(in), optional :: group
         character(len=*),       intent(in), optional :: units
         logical,                intent(in), optional :: init
+        type(phys_const_class), intent(in), optional :: cnst
 
         integer :: nx, ny
 
@@ -206,7 +210,7 @@ contains
         end if
 
         ! Load settings + synthetic-scheme parameters
-        call smb_simple_par_load(smbs, filename, group=group, init=init)
+        call smb_simple_par_load(smbs, filename, group=group, init=init, cnst=cnst)
 
         ! Coordinate units for the signed-distance calculation
         smbs%units = "m"
@@ -774,11 +778,11 @@ contains
         real(sp), intent(in)  :: slope_out
         real(sp), intent(in)  :: z_max_in
         real(sp), intent(in)  :: z_max_out
-        real(sp), optional, intent(in) :: rho_ice
-        real(sp), optional, intent(in) :: g
+        real(sp), intent(in)  :: rho_ice
+        real(sp), intent(in)  :: g
 
         integer  :: nx, ny, i, j
-        real(sp) :: zr, d, C, rho_use, g_use
+        real(sp) :: zr, d, C
 
         nx = size(z_syn, 1)
         ny = size(z_syn, 2)
@@ -795,12 +799,11 @@ contains
             error stop "compute_z_syn_plastic: tau0 must be > 0"
         end if
 
-        rho_use = 910.0_sp
-        g_use   =   9.81_sp
-        if (present(rho_ice)) rho_use = rho_ice
-        if (present(g))       g_use   = g
+        if (rho_ice <= 0.0_sp .or. g <= 0.0_sp) then
+            error stop "compute_z_syn_plastic: rho_ice and g must be > 0"
+        end if
 
-        C = sqrt(2.0_sp * tau0 / (rho_use * g_use))
+        C = sqrt(2.0_sp * tau0 / (rho_ice * g))
 
         do j = 1, ny
             do i = 1, nx
@@ -913,12 +916,15 @@ contains
     !> The TG24 scheme is not yet wired into yelmox, so its parameter
     !> type is not loaded here.
     !-----------------------------------------------------------------
-    subroutine smb_simple_par_load(smbs, filename, group, init)
+    subroutine smb_simple_par_load(smbs, filename, group, init, cnst)
 
         type(smb_simple_class), intent(inout) :: smbs
         character(len=*),       intent(in)    :: filename
         character(len=*),       intent(in), optional :: group
         logical,                intent(in), optional :: init
+        ! Physical constants come from here instead of the namelist when
+        ! present, so the &smb_simple group need not declare rho_ice and g.
+        type(phys_const_class), intent(in), optional :: cnst
 
         ! Local variables
         logical           :: init_pars
@@ -962,8 +968,14 @@ contains
         call nml_read(filename,nml_group,"slope_out",  smbs%par%slope_out,  init=init_pars)
         call nml_read(filename,nml_group,"z_max_in",   smbs%par%z_max_in,   init=init_pars)
         call nml_read(filename,nml_group,"z_max_out",  smbs%par%z_max_out,  init=init_pars)
-        call nml_read(filename,nml_group,"rho_ice",    smbs%par%rho_ice,    init=init_pars)
-        call nml_read(filename,nml_group,"g",          smbs%par%g,          init=init_pars)
+        if (present(cnst)) then
+            call phys_const_require(cnst, "smb_simple_init")
+            call phys_const_get(cnst, "rho_ice", smbs%par%rho_ice)
+            call phys_const_get(cnst, "g",       smbs%par%g)
+        else
+            call nml_read(filename,nml_group,"rho_ice",smbs%par%rho_ice,init=init_pars)
+            call nml_read(filename,nml_group,"g",      smbs%par%g,      init=init_pars)
+        end if
         call nml_read(filename,nml_group,"gamma_t",    smbs%par%gamma_t,    init=init_pars)
         call nml_read(filename,nml_group,"t_ice_max",  smbs%par%t_ice_max,  init=init_pars)
         call nml_read(filename,nml_group,"smb_min",    smbs%par%smb_min,    init=init_pars)

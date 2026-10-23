@@ -5,8 +5,11 @@
 # Follow-up to run_mg_resolution.sh. Branches 1 kyr forward runs off the
 # spun-up (t=25 kyr) state of each COMPLETED core/multigrid run, under two
 # forcings:
-#   - ctrl  : present-day climate held fixed (dTa=dTo=0);
-#   - warm  : uniform +2 K atmosphere and +2 K ocean anomaly (dTa=dTo=+2).
+#   - ctrl  : present-day climate held fixed (dT = 0);
+#   - warm  : uniform +2 K atmosphere and +2 K ocean anomaly (dT = +2, f_to = 1).
+# The anomaly is the uniform term_dT driven by the constant coefficient dT ([coef_dT] of
+# input/forcing_db.nml, copied into the staged par file by runme on -p):
+# dTa = dT, dTo = f_to*dT.
 #
 # Only the three Yelmo-32KM spin-ups finished within the wall-clock limit, so
 # the projections branch from those (marine_shelf grid = 8 / 16 / 32 KM). This
@@ -16,8 +19,8 @@
 # present-day spin-up.
 #
 # Each run restarts from the parent's restart bundle folder via
-# coupling.restart, with:
-#   - coupling.equil_method=none : freeze the optimized cf_ref / tf_corr that
+# ctrl.restart, with:
+#   - sim.opt=False              : freeze the optimized cf_ref / tf_corr that
 #       were loaded from the restart (no further optimization);
 #   - yelmo.restart_relax=0      : free evolution from the spun-up state (do NOT
 #       relax H_ice back toward the input PD topography). *** Sanity-check this:
@@ -27,12 +30,14 @@
 # Usage (from anywhere):
 #     yelmox/run_mg_forward.sh
 #
-# Submits to the queue by default. Set runopts='-r' to run locally instead.
+# Submits to the queue by default; set runopts to change that, e.g.
+#     runopts=-r yelmox/run_mg_forward.sh      # run locally
+#     runopts=-s yelmox/run_mg_forward.sh      # stage only
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)" || exit 1   # repo root (absolute)
 cd "$ROOT" || exit 1
 
-runopts='-rs -q compute -w 04:00:00'
+runopts="${runopts:--rs -q compute -w 04:00:00}"
 
 EXE="yelmox"
 NML="yelmox/yelmox_Antarctica.nml"
@@ -41,9 +46,10 @@ OUTROOT="output/mg_fwd"            # where projections are written
 RESTART_KYR="restart-25.000-kyr"   # spun-up bundle to branch from
 TIME_END=1000                      # [yr] projection length
 
-# run_fwd <parent_subdir> <yelmo_grid> <mshlf_grid> <scenario> <dTa> <dTo>
+# run_fwd <parent_subdir> <yelmo_grid> <mshlf_grid> <scenario> <dT> <f_to>
+#   dT [K]: the air temperature anomaly; f_to [1]: the ocean anomaly per K of dT
 run_fwd() {
-    local parent="$1" ygrid="$2" mgrid="$3" scen="$4" dTa="$5" dTo="$6"
+    local parent="$1" ygrid="$2" mgrid="$3" scen="$4" dT="$5" f_to="$6"
     local restart="$SPINROOT/$parent/$RESTART_KYR"
     local out="$OUTROOT/${parent}_${scen}"
 
@@ -53,21 +59,22 @@ run_fwd() {
     fi
 
     runme $runopts -e "$EXE" -n "$NML" -o "$out" \
-        -p yelmo.grid_name="$ygrid" htopo.grid_name="$mgrid" \
-           coupling.grid_mshlf="$mgrid" coupling.grid_isos="$ygrid" \
-           coupling.grid_clim=ANT-32KM coupling.grid_smb="$ygrid" \
-           coupling.restart="$restart" coupling.equil_method=none \
+        -p domain.grid_ice="$ygrid" domain.grid_hub="$mgrid" \
+           domain.grid_shelf="$mgrid" domain.grid_isos="$ygrid" \
+           domain.grid_clim=ANT-32KM domain.grid_surface="$ygrid" \
+           ctrl.restart="$restart" sim.relax=False sim.opt=False \
            yelmo.restart_relax=0 \
            ctrl.time_init=0 ctrl.time_end="$TIME_END" \
            tm_2D.dt=100 ytopo.gz_Hg1=100 \
-           snap.dTa_const="$dTa" snap.dTo_const="$dTo"
+           forcing.coefs=dT forcing.terms=dT term_dT.fields==tas,pr,to \
+           term_dT.f_to="$f_to" coef_dT.f_min="$dT" coef_dT.f_max="$dT"
 }
 
 # For each completed spin-up: a ctrl run and a +2/+2 warming run.
-# run_fwd <parent>      <yelmo>   <mshlf>   <scen> <dTa> <dTo>
-run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  ctrl   0  0
-run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  warm   2  2
-run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  ctrl   0  0
-run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  warm   2  2
-run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   ctrl   0  0
-run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   warm   2  2
+# run_fwd <parent>      <yelmo>   <mshlf>   <scen> <dT> <f_to>
+run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  ctrl   0  1
+run_fwd y32KM_m32KM  ANT-32KM  ANT-32KM  warm   2  1
+run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  ctrl   0  1
+run_fwd y32KM_m16KM  ANT-32KM  ANT-16KM  warm   2  1
+run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   ctrl   0  1
+run_fwd y32KM_m8KM   ANT-32KM  ANT-8KM   warm   2  1

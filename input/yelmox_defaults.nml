@@ -1,0 +1,188 @@
+! ============================================================
+! yelmox_defaults.nml — defaults of the yelmox forcing groups.
+! ============================================================
+!
+! The schema of the forcing groups (docs/_forcing-terms.md): the forcing
+! ([forcing], its coefficients [coef_<name>] and terms [term_<name>]), the
+! snapshot backend ([snapshots], [snapshot_<name>]), the climate transforms
+! ([taper], [bias]), the orbit of the insolation ([orbit]), the prescribed ice
+! ([ice_bnd]) and the forcing of the bipolar ocean box model ([obm_forcing]).
+! Every key yelmox reads in these groups is declared here and read with
+! nml_read(..., defaults_file = this file): a par file lists only what
+! differs, and nml_validate stops a run on a key that is not declared (a
+! typo, a removed key); scripts/check_par_nml.py checks the same offline.
+!
+! Named groups fall back to a template group (defaults_group):
+!   forcing<sfx>                  -> forcing
+!   coef_<name>                   -> coef
+!   term_<name>                   -> term
+!   snapshots<sfx>                -> snapshots
+!   snapshot_<name>               -> snapshot
+!   taper<sfx>, bias<sfx>, orbit<sfx>, ice_bnd<sfx>
+!                                 -> taper, bias, orbit, ice_bnd
+! (<sfx>: the domain suffix of a multi-domain driver, e.g. _north). An absent
+! group takes every default: a transform without its group is inactive.
+! Named groups (coef_, term_, snapshot_, and the varslice groups of the
+! fields) are read from the par file if it has them, else from the first of
+! the [forcing] var_defs files that does.
+!
+! The other yelmox groups (ctrl, comps, domain, sim, output, marine_shelf,
+! ...) are read without defaults for now. Yelmo's groups: yelmo_defaults.nml.
+
+! ===== Forcing =====
+
+&forcing
+    ! The forcing of a run: its coefficients, scalars of the forcing time
+    ! (shared by every domain, driver-owned), and per domain (forcing<sfx>) the
+    ! reference snapshot and the terms added to it (coefficient x pattern,
+    ! docs/_forcing-terms.md).
+    reference = "pd"               ! the reference snapshot, a group [snapshot_<name>]
+    coefs     = ""                 ! the coefficients, each a group [coef_<name>]; "" = none
+    terms     = ""                 ! the terms, each a group [term_<name>]; "" = none
+    var_defs  = "input/clim_db.nml" "input/forcing_db.nml"   ! files of the named groups not in the par file, searched in order
+/
+
+&coef
+    ! A coefficient: tsgen (fesm-utils tsgen), advanced on the forcing time
+    ! time_rel, or derived (method = "derived"), set each step by the model.
+    ! method = "series" reads it from a time series file (series_file).
+    method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1|derived
+    sigma            = 0.0           ! [f] std. dev. of gaussian noise added to the coefficient
+    ! method series
+    series_file      = ""            ! table (time, f) or netcdf file of the series
+    series_var       = ""            ! variable of a netcdf series_file
+    series_time_name = "time"        ! its time variable
+    norm_t0          = 0.0           ! [yr] normalise: f = (S - S(t0))/(S(t1) - S(t0)), t one time or a window t0 t1 (the mean);
+    norm_t1          = 0.0           ! [yr]   only when both are set in the par group (the values here are not used)
+    ! analytic and feedback methods
+    with_kill        = False         ! stop the run once the response equilibrates at a bound
+    dt_init          = 0.0           ! [yr] hold the forcing flat during this initial interval
+    dt_ramp          = 1000.0        ! [yr] ramp/period length (ramp-time, ramp-time-step, sin)
+    dt_conv          = 1000.0        ! [yr] convergence interval (ramp-time-step)
+    dt_ave           = 100.0         ! [yr] averaging window of the response derivative (feedback, kill)
+    df_sign          = 1.0           ! +1/-1 direction of the forcing change
+    tol              = 1.0           ! response-rate tolerance (feedback, kill)
+    df_dt_max        = 0.0           ! [f/yr] forcing rate (const/ramp-slope; maximum for feedback)
+    f_min            = 0.0           ! [f] lower bound; the value of const (f_min + df_dt_max*t, clamped)
+    f_max            = 1.0           ! [f] upper bound
+    f_conv           = 0.0           ! [f] value held after convergence (ramp-time-step)
+    ! derived: computed by the model after the atmosphere of the step is composed
+    from             = ""            ! air_anomaly: factor * mean sea-level air anomaly of the climate update over region;
+                                     ! obm_north, obm_south: the box temperature of the bipolar ocean box model [K]
+    factor           = 1.0           ! [1] air_anomaly: value = factor * mean(tsl_ann - tsl_ann_ref)
+    region           = "all"         ! air_anomaly: cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
+    anomaly          = True          ! obm_*: the box temperature minus its initial value (False: the temperature itself)
+    ! yelmox
+    units            = "1"           ! units label of coef_<name> in the 1D output
+    restart_every_df = 0.0           ! [f] write a restart each time f moves by this much; 0 = off
+    ! window modifier (tsgen): inside win_t0 < t < win_t1, f = win_ref + win_fac*(f - win_ref)
+    ! (only where f > win_ref if win_above), with linear ramps of win_taper at the edges;
+    ! off when win_t1 <= win_t0. The old snapclim f_hol rule: -12e3 -1e3, win_fac = f_hol,
+    ! win_ref = 1, win_above = True.
+    win_t0           = 0.0           ! [yr] window start
+    win_t1           = 0.0           ! [yr] window end
+    win_taper        = 0.0           ! [yr] ramp width inside the window edges
+    win_fac          = 1.0           ! [1] factor on f - win_ref inside the window
+    win_ref          = 0.0           ! [f] reference value of the scaling
+    win_above        = False         ! apply only where f > win_ref
+/
+
+&term
+    ! One term of the forcing: a coefficient times a pattern, on the fields listed.
+    ! By field, fixed: tas, to, so add; pr multiplies (the ratio of the
+    ! snapshots, or exp(beta_p*f_ta*f) in a uniform term, beta_p = [snapshots] f_p).
+    coef    = ""                  ! the coefficient ([forcing] coefs); "" = the constant 1 (snapshots pattern)
+    pattern = "snapshots"         ! snapshots: f*(snap1 - snap0), or f*snap1 without snap0 (a given anomaly / ratio);
+                                  ! uniform: tas + f_ta*f, pr * exp(beta_p*f_ta*f), to + f_to*f, so + f_so*f;
+                                  ! replace: to or so = f at every depth, in place of the reference (one per field)
+    snap0   = ""                  ! snapshots: the snapshot at coefficient 0 ([snapshot_<name>]); "" = none
+    snap1   = ""                  ! snapshots: the snapshot at coefficient 1
+    fields  = ""                  ! the fields the term touches: tas, pr, to, so (explicit, all bound by its snapshots and the reference)
+    f_ta    = 1.0                 ! [K]   uniform: gain on tas (and the pr factor)
+    f_to    = 1.0                 ! [K]   uniform: gain on to
+    f_so    = 1.0                 ! [psu] uniform: gain on so
+/
+
+! ===== Snapshot backend (snapshots) =====
+
+&snapshots
+    ! The snapshot backend of a domain: the fixed rules of the composition.
+    ! The reference and the terms: [forcing<sfx>]; the snapshots are the
+    ! reference and the snap0/snap1 of the snapshot terms.
+    grid_global = "GLOBAL-1DEG"     ! global grid of the paleoclimate products ({grid_global})
+    fields      = "tas" "pr" "to" "so" "zs"  ! the fields a snapshot may bind
+    lapse       = 0.0080 0.0065     ! [K m-1] lapse rates: annual, summer
+    f_p         = 0.05              ! [K-1] precipitation-temperature scaling (beta_p)
+/
+
+&snapshot
+    ! One snapshot: a named climate state, its fields bound to varslice groups.
+    exp        = ""     ! experiment, the {exp} of its var_defs paths (lgm, piControl, ...)
+    monthly    = True   ! tas/pr monthly (else tas = [annual, season], pr annual)
+    clim_sigma = 0.0    ! [km] gaussian smoothing of the atmosphere at loading; 0 = none
+    ocn_sigma  = 0.0    ! [km] gaussian smoothing of the ocean at loading; 0 = none
+    tas_season = ""     ! season of the second tas group: jja | djf; "" = the summer of the hemisphere
+    ! bindings: var_defs group(s) of each field; "" = not bound
+    tas        = ""
+    pr         = ""
+    zs         = ""
+    to         = ""
+    so         = ""
+/
+
+! ===== Climate transforms, after the terms (taper, then bias) =====
+
+&taper
+    ! The atmosphere towards the reference with a weight w in [0, 1] (static, on
+    ! the climate grid): now = ref + w*(now - ref) for tas, pr and their annual means.
+    active   = False    ! apply it?
+    weight   = ""       ! group of the weight w [1] (one 2D field; the par file, then [forcing] var_defs)
+    outside  = "ref"    ! where w < 1, towards: ref (the reference) or mean (ref + the mean anomaly of the cells with w = 1)
+/
+
+&bias
+    ! An additive temperature field and a precipitation factor field, monthly
+    ! (12) or annual (1), on the climate grid: tas + f_tas*dtas, pr*(1 + f_pr*(fpr - 1)).
+    ! A group with a time axis is sliced at the forcing time at every update.
+    active   = False    ! apply it?
+    dtas     = ""       ! group of the temperature correction [K] (the par file, then [forcing] var_defs); "" = none
+    fpr      = ""       ! group of the precipitation factor [1]; "" = none
+    f_tas    = 1.0      ! [1] weight of dtas
+    f_pr     = 1.0      ! [1] weight of fpr - 1
+/
+
+! ===== Orbit of the insolation =====
+
+&orbit
+    ! The orbital elements of the insolation of the surface models (chion
+    ! itm/bessi, smbpal itm; fesmc/insol, Laskar et al. 2004 tables).
+    method = "fixed_time"   ! forcing_time: at the forcing time time_rel; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
+    ecc    = 0.016702   ! [1]   eccentricity (fixed_orbit; these: the tables at 1950)
+    obl    = 23.4393    ! [deg] obliquity (fixed_orbit)
+    per    = 102.918    ! [deg] longitude of perihelion (fixed_orbit)
+    fldr   = "input"    ! folder of the orbital tables (LA2004.INSOLN.5Ma.txt, LA2004.INSOLP.1Ma.txt)
+/
+
+! ===== Prescribed ice (Yelmo's fixed and relaxation cells) =====
+
+&ice_bnd
+    ! H_ice_ref of Yelmo in its fixed (mask_ice = fixed) and relaxation
+    ! (tau_relax > 0) cells, e.g. the strip of yelmo_masks.border_width, from
+    ! an ice history at the forcing time; the interior keeps its H_ice_ref.
+    active     = False                ! apply it?
+    method     = "file"               ! file: H_ice at the forcing time (clamped to the file's range);
+                                      ! scaled: H = f*H_ice(slice_time), f a coefficient
+    H_ice      = "paleomist_H_ice"    ! group of the ice thickness [m] (the par file, then [forcing] var_defs)
+    coef       = ""                   ! scaled: the coefficient f ([forcing] coefs)
+    slice_time = -21e3                ! [yr] scaled: time of the slice H_ice(slice_time)
+/
+
+! ===== Ocean box model forcing (yelmox_bipolar) =====
+
+&obm_forcing
+    ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init +
+    ! ampl_i * gain * f (north, tropics, south) and the vapour fluxes.
+    coef  = ""          ! the global mean air temperature anomaly [K], a coefficient ([forcing] coefs)
+    gain  = 1.0         ! [1] dT_glob = gain * f
+/

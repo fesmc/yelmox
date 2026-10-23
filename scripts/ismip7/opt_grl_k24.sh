@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# ISMIP7 Greenland optimization spin-up with the K24 hydrology setting N_eff
+# (k24_params, on yelmox_esm_Greenland.nml); otherwise identical to opt_grl.sh, whose notes follow.
+# Same as legacy/opt_grl.sh: all its
+# overrides are valid for the current yelmox (climate = esm). opt.cf_init=-1 starts
+# cb_ref from the till friction of the bed (cb_tgt, from the ytill parameters).
+
+resolution=GRL-8KM
+output_path=output/ismip7/${resolution}/opt-l21-grimp-k24
+
+ctrl_params=(
+    "domain.grid_hub=${resolution}"
+    "ctrl.run_step=spinup"
+    "comps.dt_clim=10"
+    "sim.relax=True"
+    "sim.opt=True"
+    "spinup.time_end=15.0e3"
+    "sim.init_kill_shelves=True"
+    "tm_1D.dt=1.0"
+    "tm_2Dsm.dt=2.5e3"
+    "tm_2D.dt=15e3"
+    "yelmo.nz_aa=11"
+    "yelmo.dt_min=0.1"
+    "output.write_cmip=False"
+)
+
+opt_params=(
+    "opt.H0=100"
+    "opt.cf_time_end=15e3"
+    "opt.tf_time_end=15e3"
+    "opt.tau_c=500.0"
+    "relax.tau1=100.0"
+    "relax.time1=100.0"
+    "relax.tau2=100.0"
+    "relax.time2=100.0"
+    "opt.cf_init=-1"
+    "opt.H_grnd_lim=500.0"
+    "ytill.scale_zb=1"
+    "ytill.z0=-1000"
+    "ytill.z1=0"
+    "ytill.cf_min=1e-2"
+    "ytill.cf_ref=1e-0"
+    "marine_shelf.gamma_quad_nl=14.5e3"
+)
+
+topo_params=(
+    "ytopo.bmb_gl_method=pmp"
+    "ytopo.gl_sep=3"
+)
+
+calv_params=(
+    "ycalv.use_lsf=True"
+    "ycalv.calv_flt_method=equil"
+    "ycalv.calv_grnd_method=equil"
+    "ycalv.tau_ice_flt=200e3"
+)
+
+dyn_params=(
+    "ydyn.beta_min=10.0"
+    "ydyn.solver=diva"
+    "ydyn.ssa_solver=energy"
+    "ydyn.ssa_lat_bc=all"
+)
+
+mat_params=(
+    "ymat.enh_shear=1.0"
+    "ymat.enh_stream=1.0"
+    "ymat.enh_shlf=0.5"
+)
+
+# K24 basal hydrology: its water transport sets N_eff (the bucket N closure is not used).
+k24_params=(
+    "yhyd.method_transport=1"       # 0=NONE 1=K24
+    "yhyd.k24_sliding_law=4"        # 4 = Yelmo tau_b: frictional heat enters the K24 water source, consistent with q_T (0 = none: its source then sees -Q_b/L at cold bases)
+    "yhyd.k24_N_ub_coupled=True"    # re-evaluate N from u_b inside the DIVA iteration (needs yelmo#13); False = N once per step (2-step N/velocity cycle)
+)
+
+# Submits to the queue by default; set runopts to change that (other queues, e.g. on
+# albedo: runopts="-rs -q 48h -w 48:00:00", or -s to stage only).
+runopts="${runopts:--rs -q shared -w 2-00:00:00 -m 20G}"
+
+runme $runopts -e yelmox --omp 8 -n yelmox/yelmox_esm_Greenland.nml -o "${output_path}" \
+      -p "${ctrl_params[@]}" "${opt_params[@]}" "${topo_params[@]}" "${calv_params[@]}" "${dyn_params[@]}" "${mat_params[@]}" \
+         "${k24_params[@]}"

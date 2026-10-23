@@ -1,0 +1,115 @@
+---
+title: "Greenland"
+---
+
+Greenland test cases at 16 km, without optimization of the basal friction or the
+ocean thermal forcing: the present-day reference climate with the PMIP3
+piControl and LGM snapshots weighted by the coefficient `alpha`, an orbital record
+(`yelmox_Greenland.nml`), the same with a homogeneous air temperature ramp as a
+functionality test at 32 km, and the present-day reference alone (both
+`yelmox_Greenland.nml` with `-p` overrides).
+
+- **Program:** `yelmox` (`make yelmox`) with the snapshot backend
+  (`[comps] climate = "snapshots"`, see [Snapshots](climate-snapshots.md)).
+- **Config:** `yelmox/yelmox_Greenland.nml`; the ramp and present-day runs set
+  their differences with `-p` (see Running).
+
+## Running
+
+Run from the yelmox root:
+
+```bash
+runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl
+```
+
+```bash
+runme -rs -q compute -w 02:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-ramp \
+      -p ctrl.tstep_method=rel domain.grid_hub=GRL-32KM domain.grid_isos=GRL-32KM domain.grid_clim=GRL-32KM \
+         domain.grid_surface=GRL-32KM domain.grid_shelf=GRL-32KM regions.basin_sets=Zwally2012 tm_2D.dt=50 \
+         forcing.coefs==alpha,dTo,ramp forcing.terms==lgm,ocean,ramp
+```
+
+```bash
+runme -rs -q compute -w 08:00:00 --omp 16 -e yelmox -n yelmox/yelmox_Greenland.nml -o output/grl-pd \
+      -p ctrl.time_end=50e3 regions.basin_sets=Zwally2012 tm_2D.dt=500 tm_2Dsm.dt=500 \
+         forcing.coefs="" forcing.terms=""
+```
+
+On a busy queue, run them as chains of short jobs ([Long runs in
+chunks](run-chunks.md)). The forcing time of `yelmox_Greenland.nml` is set with `-p`: e.g.
+`ctrl.tstep_const=-21e3` holds the climate of 21 ka, `ctrl.tstep_method=rel
+ctrl.time_init=-130e3 ctrl.time_end=0` follows `alpha` through the last
+glacial cycle.
+
+## Timeline
+
+- **`yelmox_Greenland.nml`:** `[ctrl]` 0 to 15 kyr, `dtt = 10` yr, the forcing
+  held at present day (`tstep_method = "const"`, `tstep_const = 0`), where
+  `alpha = 0`: the climate is the present-day reference.
+- **Ramp:** the same on relative time
+  (`tstep_method = "rel"`), so that the ramp advances with the model time.
+- **Present day:** 0 to 50 kyr.
+- **All:** cold start on the present-day topography (`[sim] init_method =
+  "none"`), no relaxation, no optimization (`[sim] relax = False`, `opt =
+  False`; `[relax]` and `[opt]` are unused). Present-day insolation (`[orbit]
+  method = "fixed_time"`, `time = 0`); the sea level follows the model's own
+  ice-volume change (`[barysealevel] method = "fastiso"`).
+- **Output:** 1D every year; 2D every 200 yr (ramp: 50 yr; pd: 500 yr), small
+  2D every 50 yr (pd: 500 yr).
+
+## Climate: snapshots weighted by alpha
+
+The reference `pd` plus the term `lgm` (`[term_lgm]`, `picontrol` ->
+`lgm` on `tas` and `pr`): the temperature adds the PMIP3 LGM -- piControl
+anomaly scaled by the coefficient `alpha`, the precipitation is multiplied by
+their ratio. The PMIP3 snapshots give the annual mean and JJA temperature
+(`monthly = False`) and the annual precipitation, smoothed over 50 km at
+loading (`clim_sigma = 50`). The precipitation-temperature scaling is
+`[snapshots] f_p = 0.06` (default 0.05).
+
+The coefficient `[coef_alpha]` of the par file is the orbital record `input/alpha_orbital_r2020.dat`
+(`method = "series"`, 300 ka to present), normalised to 0 at present
+(`norm_t0 = 0`) and 1 at 21 ka (`norm_t1 = -21e3`). The ocean (ORAS5) has no
+snapshot term: the term `ocean` adds the derived coefficient `dTo`, 0.25 times the
+mean sea-level air temperature anomaly over the domain (`[coef_dTo]`,
+`from = "air_anomaly"`, `region = "all"`).
+
+![Forcing of yelmox_Greenland.nml at 21 ka and 125 ka minus present day, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_snap.png)
+
+## Air temperature ramp
+
+The ramp run adds the coefficient `ramp` and the uniform term `ramp` of
+`input/forcing_db.nml` (`forcing.coefs==alpha,dTo,ramp`,
+`forcing.terms==lgm,ocean,ramp`; `[term_ramp]` on `tas` and `pr` with
+`f_ta = 1`):
+
+- **Coefficient:** `[coef_ramp] method = "ramp-slope"`, `df_dt_max = 0.0025` yr⁻¹
+  from `f_min = 0` to `f_max = 5`: the air temperature rises by 5 K over
+  2000 yr and stays there; white noise of `sigma = 0.3` on the coefficient;
+  `with_kill = False`.
+- **Response:** the precipitation is multiplied by exp(`f_p`·dTa); the ocean
+  follows through the term `ocean`, whose sea-level anomaly includes dTa.
+
+![Forcing of the ramp run at 2000 yr minus its start, climate-only run on present-day topography: annual and summer air temperature difference, precipitation ratio.](figures/grl_ramp.png)
+
+## Present day
+
+The present-day run keeps the reference only (`forcing.coefs=""`,
+`forcing.terms=""`). Its basin sets are `Zwally2012` only (no `NEGIS`).
+
+## Configuration
+
+| | |
+|---|---|
+| Grids | `GRL-16KM` for every component (ramp: `GRL-32KM`) |
+| Topography | BedMachine v6 (`{grid_name}_TOPO-BedMachine-v6.nc`) |
+| Ice domain | `[yelmo_masks] mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"` |
+| Reference climate (`snapshot_pd`) | MAR v3.14 1961--1990 (temperature, snowfall + rainfall, elevation); ocean ORAS5 1981--2010 |
+| Snapshots (`snapshot_picontrol`, `snapshot_lgm`) | PMIP3 piControl and LGM ensemble means, global (`GLOBAL-1DEG`, remapped, 50 km smoothing; atmosphere only, the ocean follows the term `ocean`) |
+| Surface mass balance | chion ITM (`[comps] surface_method = "chion"`, `[chion] nml_itm = "itm_chion"`, `alb_ice = 0.31`) |
+| Shelf melt | `bmb_method = "lin"`, `tf_method = 1` |
+| Calving | `calv_flt_method = calv_grnd_method = "equil"` (level set, calving rate opposite to the ice velocity) |
+| Dynamics | DIVA, regularized Coulomb friction (`beta_method = 3`, `beta_q = 0.2`, `beta_u0 = 100` m/yr) |
+| Isostasy | FastIsostasy LV-ELRA (`method = 2`), uniform mantle (10²¹ Pa s, `tau = 3000` yr) |
+| Geothermal heat flux | constant 50 mW m⁻² (`[ghf] use_obs = False`) |
+| Present-day data | MAR v3.14 1961--1990 smb and surface temperature, velocity `Joughin2018`, isochrones `MacGregor2025` (`[yelmo_data]`) |

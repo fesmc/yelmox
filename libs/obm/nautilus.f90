@@ -23,7 +23,6 @@ module nautilus
     integer,  parameter :: prec = sp
     integer,  parameter :: wp   = sp 
 
-    real(wp), parameter :: sec_year  = 365.0*24.0*60.0*60.0   ! [s/a]
     real(wp), parameter :: pi        = 3.14159265359
 
     private
@@ -32,21 +31,24 @@ module nautilus
     
     contains
 
-    subroutine nautilus_init(ntls, filename, group)
+    subroutine nautilus_init(ntls, filename, group, restart)
+        ! restart: restart file to take the prognostic state from (last time
+        ! record), or "None" for the namelist initial state.
 
-        implicit none 
+        implicit none
 
         type(obm_class), intent(INOUT) :: ntls
-        character(len=*),  intent(IN) :: filename, group 
+        character(len=*),  intent(IN) :: filename, group
+        character(len=*),  intent(IN) :: restart
 
         integer          :: n
         logical          :: use_restart
-        character(len=256) :: ocn_restart
+        character(len=512) :: ocn_restart
+
+        use_restart = (trim(restart) /= "None")
+        ocn_restart = trim(restart)
 
         ! Read parameters from namelist file
-        call nml_read(filename, group, "use_restart", use_restart)
-        call nml_read(filename, group, "restart", ocn_restart)
-
         call nml_read(filename, group, "specific_heat_capacity", ntls%par%specific_heat_capacity)
         call nml_read(filename, group, "density_of_seawater", ntls%par%density_of_seawater)
         call nml_read(filename, group, "therm_exp_coeff", ntls%par%therm_exp_coeff)
@@ -74,51 +76,31 @@ module nautilus
         call nml_read(filename, group, "sh_temp_constant", ntls%par%psh)
         
 
-        ! Initialize prognostic states of the model
-        if (use_restart) then
-            n = nc_size(ocn_restart,"time")
-            call nc_read(ocn_restart,"tn",ntls%par%tn_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"tt",ntls%par%tt_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ttd",ntls%par%ttd_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ts",ntls%par%ts_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"sn",ntls%par%sn_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"st",ntls%par%st_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"std",ntls%par%std_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ss",ntls%par%ss_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"fn",ntls%par%fn_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"ft",ntls%par%ft_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"fs",ntls%par%fs_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"phin",ntls%par%phin_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"phit",ntls%par%phit_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetan",ntls%par%thetan_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetat",ntls%par%thetat_init,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetas",ntls%par%thetas_init,start=[n],count=[1]) 
-            call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
-            call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
-            call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
-            call nml_read(filename, group, "lambdas_init", ntls%par%lambdas_init)
-        else
-            call nml_read(filename, group, "tn_init", ntls%par%tn_init)
-            call nml_read(filename, group, "tt_init", ntls%par%tt_init)
-            call nml_read(filename, group, "ttd_init", ntls%par%ttd_init)
-            call nml_read(filename, group, "ts_init", ntls%par%ts_init)
-            call nml_read(filename, group, "sn_init", ntls%par%sn_init)
-            call nml_read(filename, group, "st_init", ntls%par%st_init)
-            call nml_read(filename, group, "std_init", ntls%par%std_init)
-            call nml_read(filename, group, "ss_init", ntls%par%ss_init)
-            call nml_read(filename, group, "fn_init", ntls%par%fn_init)
-            call nml_read(filename, group, "ft_init", ntls%par%ft_init) 
-            call nml_read(filename, group, "fs_init", ntls%par%fs_init) 
-            call nml_read(filename, group, "phin_init", ntls%par%phin_init)
-            call nml_read(filename, group, "phit_init", ntls%par%phit_init) 
-            call nml_read(filename, group, "thetan_init", ntls%par%thetan_init)
-            call nml_read(filename, group, "thetat_init", ntls%par%thetat_init) 
-            call nml_read(filename, group, "thetas_init", ntls%par%thetas_init)
-            call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
-            call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
-            call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
-            call nml_read(filename, group, "lambdas_init", ntls%par%lambdas_init)
-        end if
+        ! Initial state: the *_init parameters, which stay the cold-start values
+        ! (the reference of the atmospheric forcing, theta_i_init + ampl_i*dT,
+        ! and of the box anomaly of the derived series obm_north/obm_south,
+        ! tn - tn_init); on a restart the
+        ! state is then taken from the restart file.
+        call nml_read(filename, group, "tn_init", ntls%par%tn_init)
+        call nml_read(filename, group, "tt_init", ntls%par%tt_init)
+        call nml_read(filename, group, "ttd_init", ntls%par%ttd_init)
+        call nml_read(filename, group, "ts_init", ntls%par%ts_init)
+        call nml_read(filename, group, "sn_init", ntls%par%sn_init)
+        call nml_read(filename, group, "st_init", ntls%par%st_init)
+        call nml_read(filename, group, "std_init", ntls%par%std_init)
+        call nml_read(filename, group, "ss_init", ntls%par%ss_init)
+        call nml_read(filename, group, "fn_init", ntls%par%fn_init)
+        call nml_read(filename, group, "ft_init", ntls%par%ft_init) 
+        call nml_read(filename, group, "fs_init", ntls%par%fs_init) 
+        call nml_read(filename, group, "phin_init", ntls%par%phin_init)
+        call nml_read(filename, group, "phit_init", ntls%par%phit_init) 
+        call nml_read(filename, group, "thetan_init", ntls%par%thetan_init)
+        call nml_read(filename, group, "thetat_init", ntls%par%thetat_init) 
+        call nml_read(filename, group, "thetas_init", ntls%par%thetas_init)
+        call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
+        call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
+        call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
+        call nml_read(filename, group, "lambdas_init", ntls%par%lambdas_init)
 
         ntls%tn = ntls%par%tn_init
         ntls%tt = ntls%par%tt_init
@@ -129,7 +111,7 @@ module nautilus
         ntls%std = ntls%par%std_init
         ntls%ss = ntls%par%ss_init    
         ntls%fn = ntls%par%fn_init
-        ntls%ft = ntls%par%tt_init
+        ntls%ft = ntls%par%ft_init
         ntls%fs = ntls%par%fs_init  
         ntls%phin = ntls%par%phin_init
         ntls%phit = ntls%par%phit_init    
@@ -140,6 +122,30 @@ module nautilus
         ntls%lambdat = ntls%par%lambdat_init
         ntls%lambdatd = ntls%par%lambdatd_init
         ntls%lambdas = ntls%par%lambdas_init    
+
+        ! Restart: the prognostic state, the overturning (a diagnostic, for the
+        ! output at the restart time) and the forcing (fluxes, air temperatures)
+        ! of the last record of the restart file.
+        if (use_restart) then
+            n = nc_size(ocn_restart,"time")
+            call nc_read(ocn_restart,"tn",ntls%tn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tt",ntls%tt,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ttd",ntls%ttd,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ts",ntls%ts,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"sn",ntls%sn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"st",ntls%st,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"std",ntls%std,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ss",ntls%ss,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"m",ntls%m,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"fn",ntls%fn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"ft",ntls%ft,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"fs",ntls%fs,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"phin",ntls%phin,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"phit",ntls%phit,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetan",ntls%thetan,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetat",ntls%thetat,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"thetas",ntls%thetas,start=[n],count=[1]) 
+        end if
 
         return
 
@@ -156,12 +162,12 @@ module nautilus
         ! Local variables
         real(prec) :: dTsdt, dTndt, dTtdt, dTtddt 
         real(prec) :: dSsdt, dSndt, dStdt, dStddt 
-        real(prec) :: fn, ft, fs, phin, phit
+        real(prec) :: fn, fs, phin, phit
         real(prec), parameter :: maximum_overturning=100.0, maximum_salinity=50.0, minimum_salinity=0.0
 
-        ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1)
+        ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1).
+        ! The tropical flux ft is not part of the nautilus budget.
         fn = ntls%fn * factor
-        ft = ntls%ft * factor
         fs = ntls%fs * factor
 
         phin = ntls%phin * factor

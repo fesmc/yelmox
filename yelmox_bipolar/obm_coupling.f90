@@ -1,42 +1,59 @@
 module obm_coupling
-    ! Bipolar ocean coupling: exchanges scalars between an ice_domain (Yelmo +
-    ! snapclim) and the shared Ocean Box Model (OBM). Ported from
-    ! yelmox_bipolar.f90. This is a bridge module -- it sits above both
-    ! yelmox_domain (ice_domain) and the libs/obm ocean box model. It is only
-    ! pertinent to the bipolar flavor, so it lives here next to its driver.
+    ! Bipolar ocean coupling: exchanges scalars between the kryos_domains (Yelmo
+    ! + climate) and the shared Ocean Box Model (OBM). This is a bridge module --
+    ! it sits above both the Kryos modules (kryos_domain) and the libs/obm ocean
+    ! box model. It is only pertinent to yelmox_bipolar, so it lives here next
+    ! to its driver.
     !
     ! The whole obm stack is single precision (obm_defs preci = kind(1.0)), which
-    ! matches Yelmo's wp (= sp), so obm and Yelmo/snapclim fields are exchanged
+    ! matches Yelmo's wp (= sp), so obm and Yelmo/climate fields are exchanged
     ! without kind conversion.
     !
-    ! The three exchanges (per hemisphere):
-    !   atm2obm  : snapclim air-temperature anomaly -> obm box temperatures/vapor
+    ! The three exchanges:
+    !   atm2obm  : global mean air temperature anomaly ([obm_forcing], a
+    !              coefficient of the driver's registry) -> obm box air temperatures/vapor
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
-    !   obm2ism  : obm box ocean temperature -> snapclim%now%to_ann (mshlf forcing)
+    !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
+    !              to_ann (marine-shelf forcing), through the coefficients
+    !              derived from the boxes (obm_north, obm_south) and the domains' ocean
+    !              terms on them (climate_terms), applied here
     !
     ! The module owns its whole configuration (obm_coupling_ctl: exchange
-    ! switches, freshwater-flux masks, nautilus hysteresis forcing), loaded by
-    ! obm_ctl_load from [ctrl]. The driver calls obm_ctl_load + obm_masks_init
-    ! once, then obm_exchange once per step after the domains have advanced.
+    ! switches, the atmospheric forcing, freshwater-flux masks, nautilus
+    ! hysteresis forcing), loaded by obm_ctl_load from [ctrl] and
+    ! [obm_forcing]. obm2ism is on when a coefficient is derived from a box.
+    ! The driver calls obm_ctl_load, then coupling_obm2ism once the box model
+    ! is initialized (cold start or restart) and before the domains, so their
+    ! startup climate sees the box, then obm_coupling_init once the domains are
+    ! initialized, then obm_exchange once per step after the domains' climate
+    ! steps.
 
-    use nml,           only : nml_read
+    use nml,           only : nml_read, nml_validate, nml_replace
     use ncio,          only : nc_read
+    use precision,     only : dp
     use yelmo,         only : wp
-    use yelmox_domain, only : ice_domain
+    use kryos,         only : kryos_domain
+    use kryos_forcing, only : coefs_class, coefs_has, coefs_value, coefs_uses_derived, &
+                              coefs_set_obm
+    use yelmox_climate, only : climate_apply_ocean
+    use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
     use ice2ocean,     only : calc_fwf
-    use ocean2ice,     only : calc_ocean_temperature_field
+    use ocean2ice,     only : obm_temperature_kelvin
 
     implicit none
     private
 
     type obm_coupling_ctl
-        ! Which exchanges are active ([ctrl]).
+        ! Which exchanges are active ([ctrl]; obm2ism: a coefficient derived from a box).
         logical :: active_obm = .false.
         logical :: ism2obm    = .false.
-        logical :: obm2ism    = .false.
         logical :: atm2obm    = .false.
-        character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus"/"stommel")
+        character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
+        ! atm2obm: the global mean air temperature anomaly dT_glob = gain * coef
+        ! ([obm_forcing], a coefficient).
+        character(len=64)  :: forcing_coef  = ""
+        real(wp)           :: forcing_gain  = 1.0_wp
         ! ism2obm: freshwater-flux definition + per-hemisphere hydrographic masks.
         logical            :: couple_fwf_north = .false.
         logical            :: couple_fwf_south = .false.
@@ -48,10 +65,10 @@ module obm_coupling
         logical            :: hyster_on = .false.
         character(len=512) :: hyster_forcing = "", hyster_forcing_method = ""
         real(wp)           :: hyster_rate = 0.0_wp
-        real(wp)           :: hyster_positive_branch_time = 0.0_wp
+        real(dp)           :: hyster_positive_branch_time = 0.0_dp
     end type obm_coupling_ctl
 
-    public :: obm_coupling_ctl, obm_ctl_load, obm_masks_init, obm_exchange
+    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
     public :: coupling_atm2obm, coupling_ism2obm, coupling_obm2ism
     public :: update_bipolar_hyster_forcing
 
@@ -59,22 +76,36 @@ contains
 
     subroutine obm_ctl_load(oc, path_par)
         ! Load the ocean-coupling switches ([ctrl]) and, when needed, the
-        ! freshwater-flux mask paths and nautilus hysteresis-forcing parameters.
-        ! The masks themselves are read by obm_masks_init (they need the
-        ! initialized domains for their grid shape).
+        ! atmospheric forcing ([obm_forcing]; unset keys from
+        ! input/yelmox_defaults.nml), the freshwater-flux mask paths and the
+        ! nautilus hysteresis-forcing parameters. The masks themselves are read
+        ! by obm_coupling_init (they need the initialized domains for their
+        ! grid shape).
         type(obm_coupling_ctl), intent(inout) :: oc
         character(len=*),       intent(in)    :: path_par
 
         call nml_read(path_par, "ctrl", "active_obm", oc%active_obm)
         call nml_read(path_par, "ctrl", "ism2obm",    oc%ism2obm)
-        call nml_read(path_par, "ctrl", "obm2ism",    oc%obm2ism)
         call nml_read(path_par, "ctrl", "atm2obm",    oc%atm2obm)
         call nml_read(path_par, "ctrl", "obm_name",   oc%obm_name)
+
+        if (oc%atm2obm) then
+            call nml_validate(path_par, def_file, "obm_forcing")
+            call nml_read(path_par, "obm_forcing", "coef",  oc%forcing_coef, defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "gain",  oc%forcing_gain,  defaults_file=def_file)
+        end if
 
         if (oc%ism2obm) then
             call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
             call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
             call nml_read(path_par, "ctrl", "fwf_definition",   oc%fwf_definition)
+            select case(trim(oc%fwf_definition))
+                case("dVdt", "mb", "ablation")
+                case default
+                    write(*,*) "obm_ctl_load:: error: [ctrl] fwf_definition must be dVdt, mb &
+                               &or ablation; got '"//trim(oc%fwf_definition)//"'."
+                    error stop 1
+            end select
             if (oc%couple_fwf_north) &
                 call nml_read(path_par, "ctrl", "hydro_mask_north", oc%hydro_mask_north_path)
             if (oc%couple_fwf_south) &
@@ -90,43 +121,79 @@ contains
         end if
     end subroutine obm_ctl_load
 
-    subroutine obm_masks_init(oc, dom_north, dom_south, active_north, active_south)
-        ! Load the hydrographic masks (Yelmo grid) restricting the freshwater
-        ! flux per hemisphere. Only touches a domain when it is active and its
-        ! fwf coupling is on, so an inactive domain may be uninitialized.
+    subroutine obm_coupling_init(oc, coefs, dom_north, dom_south, active_north, active_south)
+        ! Check the exchanges against what the run holds, then load the
+        ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
+        ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
+        ! the coefficient of [obm_forcing] in the registry; ism2obm an ice-sheet
+        ! domain. Only touches a domain when it is active, so an inactive domain
+        ! may be uninitialized. Call after the coefficients and the domains.
         type(obm_coupling_ctl), intent(inout) :: oc
-        type(ice_domain),       intent(in)    :: dom_north, dom_south
+        type(coefs_class),      intent(in)    :: coefs
+        type(kryos_domain),     intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
+
+        logical :: obm2ism
+
+        ! obm2ism: a coefficient derived from a box (obm_north, obm_south), used by
+        ! the ocean terms of a domain.
+        obm2ism = coefs_uses_derived(coefs, "obm_north") .or. coefs_uses_derived(coefs, "obm_south")
+
+        if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%ism2obm .or. obm2ism)) then
+            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and the coefficients derived &
+                       &from the boxes (obm_north, obm_south) need the ocean box model &
+                       &([ctrl] active_obm = True)."
+            error stop 1
+        end if
+        if (oc%atm2obm .and. .not. coefs_has(coefs, oc%forcing_coef)) then
+            write(*,*) "obm_coupling_init:: error: [obm_forcing] coef = '"// &
+                       trim(oc%forcing_coef)//"' is not in [forcing] coefs (needed by atm2obm)."
+            error stop 1
+        end if
+        if (oc%ism2obm .and. .not. (active_north .or. active_south)) then
+            write(*,*) "obm_coupling_init:: error: ism2obm needs active_north or active_south."
+            error stop 1
+        end if
+
+        if (oc%atm2obm) &
+            write(*,*) "obm_coupling_init:: atm2obm from coefficient "//trim(oc%forcing_coef)// &
+                       ", gain =", oc%forcing_gain
 
         if (.not. oc%ism2obm) return
 
+        ! The masks are on the Yelmo grid of their domain: {domain}/{grid_name}
+        ! of the paths are its name and grid_ice.
         if (oc%couple_fwf_north .and. active_north) then
+            call nml_replace(oc%hydro_mask_north_path, "{domain}",    trim(dom_north%ctl%domain))
+            call nml_replace(oc%hydro_mask_north_path, "{grid_name}", trim(dom_north%ctl%grid_ice))
             allocate(oc%hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_north_path, "mask", oc%hydro_mask_north)
         end if
         if (oc%couple_fwf_south .and. active_south) then
+            call nml_replace(oc%hydro_mask_south_path, "{domain}",    trim(dom_south%ctl%domain))
+            call nml_replace(oc%hydro_mask_south_path, "{grid_name}", trim(dom_south%ctl%grid_ice))
             allocate(oc%hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
         end if
-    end subroutine obm_masks_init
+    end subroutine obm_coupling_init
 
-    subroutine obm_exchange(oc, obm, dom_north, dom_south, active_north, active_south, &
+    subroutine obm_exchange(oc, obm, coefs, dom_north, dom_south, active_north, active_south, &
                             time, time_init, dtt)
         ! One coupling pass, in the yelmox_bipolar order: atmosphere -> obm,
         ! ice-sheet freshwater flux -> obm, hysteresis forcing (nautilus), then
         ! obm ocean temperature -> ice sheets (read by the marine-shelf step).
         ! Call after the domains' dynamics/climate have advanced and before
-        ! their marine-shelf steps.
+        ! their marine-shelf steps. coefs: the driver's registry, advanced to
+        ! this step.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(obm_class),        intent(inout) :: obm
-        type(ice_domain),       intent(inout) :: dom_north, dom_south
+        type(coefs_class),      intent(inout) :: coefs
+        type(kryos_domain),     intent(inout) :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
-        real(wp),               intent(in)    :: time, time_init, dtt
+        real(dp),               intent(in)    :: time, time_init, dtt
 
-        if (oc%atm2obm) then
-            if (active_north) call coupling_atm2obm(dom_north, obm, "north", time)
-            if (active_south) call coupling_atm2obm(dom_south, obm, "south", time)
-        end if
+        if (oc%atm2obm) &
+            call coupling_atm2obm(obm, oc%forcing_gain*coefs_value(coefs, oc%forcing_coef))
 
         if (oc%ism2obm) then
             if (oc%couple_fwf_north .and. active_north) &
@@ -140,64 +207,42 @@ contains
                     oc%hyster_positive_branch_time, oc%hyster_rate, &
                     oc%hyster_forcing, oc%hyster_forcing_method)
 
-        if (oc%obm2ism) then
-            if (active_north) call coupling_obm2ism(dom_north, obm, oc%obm_name, "north")
-            if (active_south) call coupling_obm2ism(dom_south, obm, oc%obm_name, "south")
-        end if
+        ! obm2ism: the coefficients derived from the boxes, then the ocean terms of
+        ! each domain re-applied (idempotent; a no-op without ocean terms).
+        call coupling_obm2ism(obm, oc%obm_name, coefs)
+        if (active_north) call climate_apply_ocean(dom_north%cl, dom_north%clim, coefs)
+        if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, coefs)
     end subroutine obm_exchange
 
-    subroutine coupling_atm2obm(dom, obm, hemisphere, time)
-        ! Atmosphere -> OBM: drive the box-model atmospheric temperatures + vapor
-        ! fluxes from this domain's snapclim air-temperature anomaly series.
-        ! Hemisphere-specific: north sets thetan/phin, south sets thetas/phit.
-        ! Both hemispheres also set the shared tropical box temperature thetat; if
-        ! both are active the south value overwrites the north one, exactly as in
-        ! yelmox_bipolar (the original flagged this as redundant).
-        type(ice_domain), intent(in)    :: dom
-        type(obm_class),  intent(inout) :: obm
-        character(len=*), intent(in)    :: hemisphere
-        real(wp),         intent(in)    :: time
+    subroutine coupling_atm2obm(obm, dT_glob)
+        ! Atmosphere -> OBM: the box-model air temperatures of every box from the
+        ! global mean air temperature anomaly dT_glob [K] with the regional
+        ! amplification factors (Zickfeld et al., 2004), theta_i = theta_i_init
+        ! + ampl_i * dT_glob (north, tropics, south), and the vapor fluxes,
+        ! phin (tropics -> north) and phit (south -> tropics), linear in dT_glob
+        ! by the hydrological sensitivities.
+        type(obm_class), intent(inout) :: obm
+        real(wp),        intent(in)    :: dT_glob
 
-        real(wp) :: at, dTa
-
-        ! Air-temperature anomaly (snapclim series), scaled to a temperature change.
-        ! (Reaches into the snapclim backend; the bipolar driver builds with CLIMATE=snapclim.)
-        at  = series_interp(dom%cl%snp%at%time, dom%cl%snp%at%var, time)
-        dTa = at * dom%cl%snp%par%dTa_const
-
-        select case(trim(hemisphere))
-            case("north")
-                obm%thetan = obm%par%thetan_init + dTa
-                obm%thetat = obm%par%thetat_init + &
-                             dTa*obm%par%thermal_ampl_tropics/obm%par%thermal_ampl_north
-                obm%phin   = obm%par%phin_init + &
-                             obm%par%hn*obm%par%pnh*dTa/obm%par%thermal_ampl_north
-            case("south")
-                obm%thetas = obm%par%thetas_init + dTa
-                obm%thetat = obm%par%thetat_init + &
-                             dTa*obm%par%thermal_ampl_tropics/obm%par%thermal_ampl_south
-                obm%phit   = obm%par%phit_init + &
-                             obm%par%hs*obm%par%psh*dTa/obm%par%thermal_ampl_south
-        end select
+        obm%thetan = obm%par%thetan_init + obm%par%thermal_ampl_north  *dT_glob
+        obm%thetat = obm%par%thetat_init + obm%par%thermal_ampl_tropics*dT_glob
+        obm%thetas = obm%par%thetas_init + obm%par%thermal_ampl_south  *dT_glob
+        obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob
+        obm%phit   = obm%par%phit_init   + obm%par%hs*obm%par%psh*dT_glob
     end subroutine coupling_atm2obm
 
     subroutine coupling_ism2obm(dom, obm, mask, hemisphere, fwf_def)
         ! Ice sheet -> OBM: freshwater flux from the domain's ice mass balance
         ! (calc_fwf, on the Yelmo grid, restricted by the hydrographic mask) into
         ! the box model's northern (fn) or southern (fs) input flux.
-        ! dom is intent(inout) because calc_fwf takes its mass-balance fields as
-        ! non-intent (modifiable) allocatable dummies.
-        type(ice_domain),      intent(inout) :: dom
+        type(kryos_domain),    intent(in)    :: dom
         type(obm_class),       intent(inout) :: obm
-        real(wp), allocatable, intent(inout) :: mask(:,:)
+        real(wp),              intent(in)    :: mask(:,:)
         character(len=*),      intent(in)    :: hemisphere
         character(len=*),      intent(in)    :: fwf_def
 
-        real(wp)           :: fwf
-        character(len=512) :: fdef
+        real(wp) :: fwf
 
-        ! calc_fwf reassigns its fwf_def dummy internally, so pass a local copy.
-        fdef = fwf_def
         fwf  = calc_fwf(dom%yelmo%bnd%c%rho_w, dom%yelmo%bnd%c%rho_ice, &
                         dom%yelmo%bnd%c%sec_year, &
                         dom%yelmo%tpo%now%mb_net, dom%yelmo%tpo%now%smb, &
@@ -205,7 +250,7 @@ contains
                         dom%yelmo%tpo%now%H_ice,  dom%yelmo%tpo%now%dHidt, &
                         dom%yelmo%tpo%now%f_grnd, &
                         dom%yelmo%tpo%par%dx, dom%yelmo%tpo%par%dy, &
-                        mask, hemisphere, fdef)
+                        mask, hemisphere, fwf_def)
 
         select case(trim(hemisphere))
             case("north"); obm%fn = fwf
@@ -213,35 +258,32 @@ contains
         end select
     end subroutine coupling_ism2obm
 
-    subroutine coupling_obm2ism(dom, obm, obm_name, hemisphere)
-        ! OBM -> ice sheet: broadcast the box-model ocean temperature (northern box
-        ! tn / southern box ts) into the domain's snapclim ocean-temperature field
-        ! to_ann, which marine_shelf then reads as its ocean forcing.
-        type(ice_domain), intent(inout) :: dom
-        type(obm_class),  intent(in)    :: obm
-        character(len=*), intent(in)    :: obm_name
-        character(len=*), intent(in)    :: hemisphere
+    subroutine coupling_obm2ism(obm, obm_name, coefs)
+        ! OBM -> ice sheets: the box-model ocean temperatures of the
+        ! hemispheres (northern box tn, southern box ts) and their initial
+        ! values, in K, into the coefficients derived from them (obm_north,
+        ! obm_south: the temperature, or its anomaly), which the ocean terms of
+        ! the domains read (climate_apply_ocean) to set the ocean temperature
+        ! that marine_shelf then reads as its forcing.
+        type(obm_class),     intent(in)    :: obm
+        character(len=*),    intent(in)    :: obm_name
+        type(coefs_class),   intent(inout) :: coefs
 
-        character(len=512) :: name_loc
-
-        name_loc = obm_name
-        select case(trim(hemisphere))
-            case("north")
-                call calc_ocean_temperature_field(dom%clim%now%to_ann, obm%tn, name_loc)
-            case("south")
-                call calc_ocean_temperature_field(dom%clim%now%to_ann, obm%ts, name_loc)
-        end select
+        call coefs_set_obm(coefs, "obm_north", obm_temperature_kelvin(obm%tn, obm_name), &
+                                               obm_temperature_kelvin(obm%par%tn_init, obm_name))
+        call coefs_set_obm(coefs, "obm_south", obm_temperature_kelvin(obm%ts, obm_name), &
+                                               obm_temperature_kelvin(obm%par%ts_init, obm_name))
     end subroutine coupling_obm2ism
 
     subroutine update_bipolar_hyster_forcing(t, t0, obm, dt, branch_time_thr, &
                                              rate, forcing, forc_method)
         ! Hysteresis forcing for the nautilus box model: nudge one obm control
-        ! (phit/phin/fs/fn, or fn+fs) along a prescribed path. Ported verbatim
-        ! from yelmox_bipolar.f90.
-        real(wp),          intent(in)    :: t, t0
+        ! (phit/phin/fs/fn, or fn+fs) along a prescribed path.
+        real(dp),          intent(in)    :: t, t0
         type(obm_class),   intent(inout) :: obm
-        real(wp),          intent(in)    :: dt
-        real(wp),          intent(in)    :: branch_time_thr, rate
+        real(dp),          intent(in)    :: dt
+        real(dp),          intent(in)    :: branch_time_thr
+        real(wp),          intent(in)    :: rate
         character(len=*),  intent(in)    :: forcing, forc_method
 
         real(wp) :: factor
@@ -282,47 +324,12 @@ contains
         end select
     end subroutine update_bipolar_hyster_forcing
 
-    ! ----- private helpers (ported from yelmox_bipolar.f90) -----
+    ! ----- private helpers -----
 
-    function series_interp(series_time, series_var, time) result(var)
-        ! Linear interpolation of a (time, var) series at `time`.
-        real(wp), dimension(:), intent(in) :: series_time, series_var
-        real(wp),               intent(in) :: time
-        real(wp) :: var
-        var = interp_linear(series_time, series_var, xout=time)
-    end function series_interp
-
-    function interp_linear(x, y, xout) result(yout)
-        ! Simple linear interpolation of a point, clamped to the series endpoints.
-        real(wp), dimension(:), intent(in) :: x, y
-        real(wp),               intent(in) :: xout
-        real(wp) :: yout
-        integer  :: j, n
-        real(wp) :: alph
-
-        n = size(x)
-        if (xout .lt. x(1)) then
-            yout = y(1)
-        else if (xout .gt. x(n)) then
-            yout = y(n)
-        else
-            do j = 1, n
-                if (x(j) .ge. xout) exit
-            end do
-            if (j .eq. 1) then
-                yout = y(1)
-            else if (j .eq. n+1) then
-                yout = y(n)
-            else
-                alph = (xout - x(j-1)) / (x(j) - x(j-1))
-                yout = y(j-1) + alph*(y(j) - y(j-1))
-            end if
-        end if
-    end function interp_linear
 
     function r8_normal_ab(a, b) result(val)
         ! Sample of a normal PDF with mean a, standard deviation b (Box-Muller).
-        ! Ported from yelmox_bipolar.f90 (John Burkardt, MIT license).
+        ! After John Burkardt (MIT license).
         real(wp), intent(in) :: a, b
         real(wp) :: val
 

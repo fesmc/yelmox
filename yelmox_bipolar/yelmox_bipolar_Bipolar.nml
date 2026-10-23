@@ -1,15 +1,18 @@
 ! Bipolar (multi-domain) control file for yelmox_bipolar.
 !
 ! One file, original yelmox_bipolar convention: each domain's instance
-! groups carry a domain suffix (yelmo_south, coupling_north, snap_south, ...),
+! groups carry a domain suffix (yelmo_south, comps_north, forcing_north, snapshots_south, ...),
 ! while [ctrl], [barysealevel] and the yelmo physics groups (ydyn, ytopo,
 ! ymat, ytherm, ytill, ycalv, yhyd) are SHARED (no suffix). Distinct group
 ! names also let 'runme -p group.name=val' target one domain unambiguously.
 !
 ! [ctrl] active_north / active_south select the hemispheres (suffixes _north =
-! Greenland, _south = Antarctica). Physics groups are shared here (taken from
+! Greenland, _south = Antarctica); with neither, active_obm runs the ocean box
+! model alone. Physics groups are shared here (taken from
 ! the south domain); suffix them + repoint the [yelmo_<sfx>] nml_ydyn/... fields
 ! for per-domain physics.
+
+! ===== Run setup =====
 
 &ctrl
     tstep_method    = "const"
@@ -20,22 +23,25 @@
 
     active_north    = True              ! Run the Northern-Hemisphere domain?
     active_south    = True              ! Run the Southern-Hemisphere domain?
-    restart_bsl     = "None"            ! Shared bsl restart bundle folder, or "None"
+    restart         = "None"            ! restart bundle folder to start from, or "None" for a cold start
+    write_lossless  = False             ! write all output lossless (ignore per-field precision), e.g. for bit-for-bit comparisons
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
     active_obm       = False            ! Run the shared ocean box model?
-    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus"/"stommel")
+    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus")
 
     ism2obm          = False            ! Ice sheet -> OBM freshwater flux coupling?
     couple_fwf_north = False            ! North freshwater flux -> obm%fn?
     couple_fwf_south = False            ! South freshwater flux -> obm%fs?
     fwf_definition   = "dVdt"           ! "dVdt", "mb", "ablation"
-    hydro_mask_north = "ice_data/Greenland/GRL-16KM/GRL-16KM_HYDRO-BASINS_zickfeld2004.nc"
-    hydro_mask_south = "ice_data/Antarctica/ANT-32KM/ANT-32KM_HYDRO-BASINS_zickfeld2004.nc"
+    hydro_mask_north = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"   ! {domain}, {grid_name}: the domain's name and grid_ice
+    hydro_mask_south = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"
 
-    obm2ism          = False            ! OBM ocean temperature -> ice sheet (mshlf)?
-    atm2obm          = False            ! Atmosphere (snapclim) -> OBM forcing?
+    atm2obm          = False            ! Global air temperature anomaly ([obm_forcing]) -> OBM box air temperatures?
+                                        ! OBM ocean temperature -> ice sheet: a coefficient derived from a box (from = obm_north/obm_south)
 /
+
+! ===== Output timing =====
 
 &tm_1D
     method          = "const"           ! "const", "file", "times"
@@ -58,6 +64,15 @@
     times           = 0
 /
 
+&tm_rst
+    method          = "const"           ! "none", "const", "file", "times" (+ always at time_end)
+    dt              = 20e3
+    file            = "input/timeout_ramp_100kyr.txt"
+    times           = 0
+/
+
+! ===== Solid earth =====
+
 &barysealevel
     method      = "fastiso" ! "const": BSL = bsl_init throughout sim
                             ! "file": BSL = time series provided from sl_path
@@ -71,6 +86,49 @@
     restart    = "None"
 /
 
+! ===== Forcing =====
+
+&forcing
+    ! The forcing (docs/_forcing-terms.md): the coefficients, shared by both
+    ! domains and the OBM, on the forcing time time_rel; each a group
+    ! [coef_<name>] (this file, then the var_defs files: input/forcing_db.nml).
+    ! The reference snapshot and the terms of each domain: [forcing_north],
+    ! [forcing_south].
+    coefs = "alpha" "gmt" "dTo"
+/
+
+&coef_alpha
+    ! alpha of this setup: the orbital record alpha_orbital_r2020 normalised to
+    ! 0 at present (piControl) and 1 at 21 ka (LGM), the weight of the LGM
+    ! anomaly (term_lgm of the north).
+    method      = "series"
+    series_file = "input/alpha_orbital_r2020.dat"
+    norm_t0     = 0.0
+    norm_t1     = -21e3
+/
+
+
+&coef_gmt
+    ! Global mean air temperature anomaly [K]: the OBM forcing ([obm_forcing])
+    ! and, with the regional gains, the uniform anomaly of each domain
+    ! ([term_regional_north], [term_regional_south]). Zero here (present day).
+    ! A time series instead, e.g.:
+    !   method = "series", series_file = "input/<gmt series>.dat"
+    method      = "const"
+    f_min       = 0.0
+    units       = "K"
+/
+
+&obm_forcing
+    ! [ctrl] atm2obm: the OBM box air temperatures theta_i = theta_i_init +
+    ! ampl_i * gain * f (ampl_i: [nautilus] thermal_ampl_north/tropics/
+    ! south, Zickfeld et al., 2004) and the vapour fluxes.
+    coef  = "gmt"     ! global mean air temperature anomaly [K], a coefficient ([forcing] coefs)
+    gain  = 1.0       ! [1] dT_glob = gain * coef
+/
+
+! ===== Ocean box model =====
+
 &nautilus
     ! Hysteresis (OBM offline forcing)
     hyster_on = False
@@ -78,10 +136,6 @@
     hyster_forcing_method = "triangular"     ! "linear", "triangular", "sin", "noise"
     hyster_rate = 0.0                        ! rate (amplitude for "sin"/"noise")
     hyster_positive_branch_time = 0.0        ! branch time (period for "sin")
-
-    ! ctrl
-    use_restart = False
-    restart = "none"
 
     ! Constants
     specific_heat_capacity = 4000       ! [Jkg-1C-1] Specific heat capacity of seawater
@@ -143,15 +197,15 @@
     lambdatd_init = 0.0
 /
 
+! ===== Ice sheet (Yelmo) =====
+
 &ytopo
     solver              = "impl-lis"        ! "expl", "impl-lis"
-    surf_gl_method      = 0                 ! 0: binary (max grnd/flt elevation), 1: subgrid average elevation
     grad_lim            = 0.05              ! [m/m] Maximum allowed sloped in gradient calculations (dz/dx,dH/dx)
-    grad_lim_zb         = 0.05              ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
-    dHdt_dyn_lim        = 100.0             ! [m/yr] Maximum allowed ice thickness change due to dynamics
-    margin2nd           = False             ! Apply second-order upwind approximation to gradients at the margin
-    margin_flt_subgrid  = False             ! Allow fractional ice area for floating margins
-    f_ice_method        = "upstream"        ! "upstream" (H_ice/H_neighb) or "lsf" (geometric LSF area fraction)
+    grad_lim_zb         = 0.5               ! [m/m] Maximum allowed sloped in bed gradient (dzb/dx)
+    front_subgrid       = "marine"          ! Subgrid ice fronts: "none" (binary f_ice), "floating", "marine" (floating + marine-grounded)
+    front_H_eff_min     = 50.0              ! [m] Minimum effective thickness of front cells (front_subgrid)
+    front_dHdx          = 0.0               ! [m/m] Thickness gradient assumed at a full front (front_subgrid)
     use_bmb             = True              ! Use basal mass balance in mass conservation equation
     topo_fixed          = False             ! Keep ice thickness fixed, perform other ytopo calculations
     topo_rel            = 0                 ! 0: No relaxation; 1: relax shelf; 2: relax shelf + gl; 3: all points 
@@ -160,8 +214,8 @@
 
     ! === Grounding line ===
     bmb_gl_method       = "pmpt"             ! "fcmp": flotation; "fmp": full melt; "pmp": partial melt; "nmp": no melt
-    gl_sep              = 1                 ! 1: Linear f_grnd_acx/acy and binary f_grnd, 2: area f_grnd, average to acx/acy
-    gz_nx               = 15                ! [-] Number of interpolation points (nx*nx) to calculate grounded area at grounding line
+    gl_sep              = 1                 ! 1: binary f_grnd, linear f_grnd_acx/acy; 3: grounded area of H_grnd bilinear between cell centres (Leguy et al., 2021)
+    gz_nx               = 15                ! [-] Subgrid points per side (gz_nx*gz_nx) of the grounding-zone melt, bmb_gl_method = "pmpt"
 
     ! bmb_gl_method = pmpt
     dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
@@ -204,7 +258,8 @@
     w2                  = 0.0               ! Weighting coefficient of 2nd principal strain/stress
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
-    tau_ice             = 100.0e3           ! [Pa] Ice strength failure
+    tau_ice_flt         = 100.0e3           ! [Pa] Ice strength failure, floating fronts (vm-m16)
+    tau_ice_grnd        = 100.0e3           ! [Pa] Ice strength failure, marine-grounded fronts (vm-m16)
 
     ! === threshold method ===
     Hc_ref_flt          = 200.0             ! [m] Calving limit in ice thickness (thinner ice calves)
@@ -232,19 +287,15 @@
     H_grnd_lim          = 500.0           ! [m] For beta_gl_scale=1, reduce beta linearly between H_grnd=0 and H_grnd_lim 
     beta_min            = 100.0           ! [Pa a m-1] Minimum value of beta allowed for grounded ice (for stability)
     eps_0               = 1e-6            ! [1/a] Regularization term for effective viscosity - minimum strain rate
-    scale_T             = 1               ! 0: no scaling of c_bed with T, 1: linearly increase c_bed to c_bed_frozen=cf_ref*N_eff for cold ice
-    T_frz               = -3.0            ! Temperature below which ice considered fully frozen (linear increase in friction )
     ssa_solver           = "energy"       ! "residual" | "energy"
     ssa_lis_opt_residual = "-i minres -p jacobi -maxiter 100 -tol 1.0e-2 -initx_zeros false"  ! See Lis library !-omp_num_threads 2
-    ssa_lis_opt_energy   = "-i cg -p jacobi -maxiter 200 -tol 1.0e-4 -initx_zeros false"       ! SPD => CG (matches Yelmo.jl default)
-    ssa_lat_bc          = "all"           ! "all", "marine", "floating", "none", "slab"
-    ssa_beta_max        = 1e20            ! [Pa a m-1] Maximum value of beta for which ssa should be calculated 
-    ssa_vel_max         = 5000.0          ! [m a-1] SSA velocity limit to avoid spurious results 
+    ssa_lis_opt_energy   = "-i cg -p ssor -maxiter 200 -tol 1.0e-3 -initx_zeros false"         ! SPD => CG; tol 1e-3 is below the Picard tolerance ssa_iter_conv
+    ssa_lat_bc          = "all"           ! "all", "marine", "floating", "none"
+    ssa_vel_max         = 10000.0          ! [m a-1] Velocity limit: clip value (both methods); "drag": also the speed at which the limit drag reaches ssa_vel_lim_tau
     ssa_iter_max        = 5               ! Number of maximum allowed iterations over ssa to converge on vel. solution
     ssa_iter_rel        = 0.7             ! [--] Relaxation fraction [0:1] to stabilize ssa iterations
     ssa_iter_conv       = 1e-2            ! [--] L2 relative error convergence limit to exit ssa iterations
     taud_lim            = 2e5             ! [Pa] Maximum allowed driving stress 
-    cb_sia              = 0.0             ! [m a-1 Pa-1] Bed roughness coefficient for SIA sliding
     neff_nxi            = 0               ! Subgrid interpolation of hyd%N onto dyn%N_eff. 0: none, 1: Gaussian quadrature, >1: nxi x nxi subgrid.
     
 /
@@ -276,7 +327,7 @@
     ! ---- bucket (bkt_) ----
     bkt_N_closure     = 2    ! 0=CONST 1=OVERBURDEN 2=MARINE 3=TILL 4=TWO_VALUE
     bkt_till_rate     = 1e-3 ! [m/a]  was ytherm.till_rate
-    bkt_floating_mode = 1    ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
+    bkt_floating_mode = 0    ! 0=ZERO 1=MARGIN_FILL (legacy saturate floating+margin ring)
 
     ! ---- closures (no prefix) ----
     const_N         = 1.0e7  ! [Pa] N_CLOSURE_CONST (legacy yneff.const)
@@ -290,33 +341,31 @@
 
     ! ---- k24 (k24_) ----
     k24_substrate_type               = 2
-    k24_flux_solver                  = 0
-    k24_manning_exponent             = 3.0
+    k24_flux_solver                  = 3
+    k24_glen_n                       = 3.0
     k24_latent_heat_water            = 3.35e5
-    k24_bed_thickness                = 0.1
-    k24_manning_coefficient_exponent = 1.25
-    k24_bed_friction_exponent        = 1.5
+    k24_bed_bump_height              = 0.1
+    k24_flux_W_exponent              = 1.25
+    k24_flux_grad_exponent           = 1.5
     k24_friction_factor              = 0.1
     k24_till_factor                  = 1.1
     k24_critical_discharge           = 1.0
-    k24_initial_cavity_height        = 0.1
-    k24_coupling_length              = 1.0e4
-    k24_long_coupling_water          = 5.0
+    k24_H0_efficient                 = 0.1
+    k24_conduit_spacing              = 1.0e4
+    k24_coupling_length_kamb86       = 10.0
     k24_min_pressure_fraction        = 0.02
-    k24_eta_w                        = 1.8e-3
+    k24_water_viscosity              = 1.8e-3
     k24_W_min                        = 1.0e-8
     k24_W_max                        = 0.015
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
     rf_with_water           = False         ! Only applied for rf_method=1, scale rf by water content?
     n_glen                  = 3.0           ! Glen flow law exponent
     visc_min                = 1e3           ! [Pa a] Minimum allowed viscosity 
-    de_max                  = 0.5           ! [a-1]  Maximum allowed effective strain rate
     enh_method              = "shear3D"     ! "simple","shear2D", "shear3D", "paleo-shear" 
     enh_shear               = 1.0
     enh_stream              = 1.0
@@ -329,12 +378,10 @@
 /
 
 &ytherm
-    method          = "temp"            ! "fixed", "robin", "temp", "enth"
-    qb_method       = 2                 ! 1: simple-stagger, 2: quadrature
+    qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
-    use_strain_sia  = False             ! True: calculate strain heating from SIA approx.
+    strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
     const_cp        = 2009.0            ! [J kg-1 K-1] Specific heat capacity 
     use_const_kt    = False             ! Use specified constant value of heat conductivity?
@@ -347,18 +394,110 @@
     zeta_scale_rock = "exp-inv"         ! "linear", "exp-inv"
     zeta_exp_rock   = 2.0  
     H_rock          = 2000.0            ! [m] Lithosphere thickness 
-    cp_rock         = 1000.0            ! [J kg-1 K-1] Specific heat capacity of bedrock
+    rhoc_rock       = 2.0e6             ! [J m-3 K-1] Volumetric heat capacity of bedrock (rho*cp)
     kt_rock         = 6.3e7             ! [J a-1 m-1 K-1] Thermal conductivity of bedrock [W m-1 K-1 * sec_year] => [J a-1 m-1 K-1]
 /
 
+! ##### South domain (Antarctica): groups *_south #####
+
+! ===== Run setup =====
+
+&comps_south
+    ! Components: which are active, with which model, how often.
+    with_ice_sheet    = True   ! Is the ice sheet active?
+    with_isostasy     = True   ! Is isostasy active?
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = True   ! Is the shelf base (melt + temperature) active? Needs with_climate
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
+    surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
+    dt_clim         = 10.0     ! [yr] Frequency of climate updates
+    dt_isos         = 10.0     ! [yr] isostasy update interval
+/
+
+&sim_south
+    ! Conditions of this simulation: cold-start ice state (init_*),
+    ! relaxation, optimization, regional modifications.
+    init_method             = "equil"   ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_equil_time         = 10.0      ! [yr] equil: equilibration time
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
+    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+
+    relax                   = True      ! relax the topography towards the reference ([relax_south])
+    opt                     = True      ! optimize cb_ref and tf_corr ([opt_south])
+
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis_south] group)
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_south] group)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
+/
+
+! [sim_south] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb_south
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
+
+&output_south
+    write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
+    write_isos    = True
+    write_shelf   = True
+    write_surface = True
+    write_clim    = True
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
+/
+
+&domain_south
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Antarctica"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "ANT-16KM"         ! hi-res geometry hub
+    grid_ice     = "ANT-32KM"         ! Yelmo [grid_hub]
+    grid_isos    = "ANT-32KM"         ! isostasy [grid_ice]
+    grid_clim    = "ANT-32KM"         ! reference climate + transient forcing [grid_ice]
+    grid_surface = "ANT-32KM"         ! surface mass balance [grid_clim]
+    grid_shelf   = "ANT-16KM"         ! marine shelf [grid_hub]
+    basins       = "Zwally2012"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo_south
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v4.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+
+&regions_south
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+    masks        = "APIS" "WAIS" "EAIS"
+    mask_APIS    = "region:Antarctic_Peninsula"
+    mask_WAIS    = "region:West_Antarctica"
+    mask_EAIS    = "region:East_Antarctica"
+/
+
+! ===== Simulation options =====
+
+&relax_south
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100.0             ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2e3               ! [yr] End of the tau1 period
+    time2           = 6e3               ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
+/
+
 &opt_south
-    opt_cf          = True              ! Should basal friction be optimized?
+    opt_cf          = "L21"             ! Basal friction optimization: "none", "L21"
     cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
     cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
     cf_init         = 1e-2              ! Initial value of cf_ref everywhere (negative uses cb_tgt)
-    cf_min          = 1e-4              ! [--] Minimum allowed cf value
-    use_yelmo_cf_min = True             ! Use Yelmo's till_cf_min as the cf lower bound
-    opt_cf_min      = 1e-4              ! [--] Fallback cf lower bound (if not using Yelmo's)
     tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale
     H0              = 100.0             ! [m]  L21: Optimization ice-thickness error scaling 
 
@@ -366,374 +505,20 @@
     sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
     fill_method     = "cf_min"          ! nearest, analog, target, cf_min
 
-    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2e3               ! [yr] Time limit for time period 1
-    rel_time2       = 6e3               ! [yr] Time limit for time period 2
-    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
-
-    opt_tf          = True              ! Should thermal forcing be optimized too?
+    opt_tf          = "L21-points"      ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
     tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
     tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    tf_time         = 15e3              ! [yr] When should optimization of thermal forcing stop?
     H_grnd_lim      = 500.0             ! [m] Distance from grounding line to consider in terms of thickness above flotation
-    tf_sigma        = 50e3              ! [m] Smoothing radius for error to calculate tf_corr
+    tf_sigma        = 50e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
     tau_m           = 100.0             ! [yr] Optimization relxation timescale 
     m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
     tf_min          = -1.0              ! [degC] Minimum allowed tf_corr value 
     tf_max          =  1.0              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
-    basin_fill      = False             ! If true: Fill grounded basins with ice-shelf mean tf-corr values
+    tf_basins       = -1                ! L21: Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
 /
 
-&yelmo_south
-    domain          = "Antarctica"
-    grid_name       = "ANT-32KM"
-    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    phys_const      = "Earth"
-    experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
-    nml_ytopo       = "ytopo"
-    nml_ycalv       = "ycalv"
-    nml_ydyn        = "ydyn"
-    nml_ytill       = "ytill"
-    nml_yhyd       = "yhyd"
-    nml_ymat        = "ymat"
-    nml_ytherm      = "ytherm"
-    nml_masks       = "yelmo_masks_south"
-    nml_init_topo   = "yelmo_init_topo_south"
-    nml_data        = "yelmo_data_south"
-    restart         = "None"
-    restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
-    restart_H_ice   = True              ! Take H_ice from restart file
-    restart_relax   = 1e3               ! [yrs] Years to relax from restart=>input topography
-    log_timestep    = False 
-    disable_kill    = False             ! Disable automatic kill if unstable
-    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
-    zeta_exp        = 2.0  
-    nz_aa           = 10                ! Vertical resolution in ice
-    dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
-    dt_min          = 0.1              ! [a] Minimum timestep 
-    cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
-    cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
-    pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
-    pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
-    pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
-    pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
-    pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
-    pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1.0               ! Predictor-corrector tolerance 
-    
-/
-
-&yelmo_masks_south
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin_reese" "basin_mask"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
-/
-
-&yelmo_init_topo_south
-    init_topo_load    = True 
-    init_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    init_topo_names   = "H_ice" "z_bed" "z_bed_sd" "z_srf"      ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
-    init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
-    z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
-    smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
-    smooth_z_bed      = 0.0                                     ! Smooth bedrock field at loading time, with sigma=N*dx
-    
-/
-
-&yelmo_data_south
-    pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
-    pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc" 
-    pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
-    pd_tsrf_monthly   = True
-    pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
-    pd_smb_name       = "smb"                        ! Surface mass balance 
-    pd_smb_monthly    = True 
-    pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-R11-2.nc"
-    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
-    pd_age_load       = False 
-    pd_age_path       = "input/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
-
-/
-
-&snap_south
-    atm_type           = "anom"
-    ocn_type           = "anom"
-    fname_at           = "input/zeros.dat"
-    fname_ao           = "input/zeros.dat"
-    fname_ap           = "input/zeros.dat"
-    fname_as           = "input/zeros.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 0.0  
-    dTo_const          = 0.0
-    dSo_const          = 0.0 
-    f_to               = 0.25 
-    f_p                = 0.05
-    f_stdev            = 0.0  
-/
-
-&snap_south_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 1.0 
-    f_glac             = 1.0 
-    f_hol              = 1.0 
-    f_seas             = 1.0 
-    f_to               = 0.2
-/
-
-&snap_south_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
-    clim_names      = "zs" "T_srf" "pr" ""                                                   ! Default (if monthly = True) : "zs" "T_srf" "pr" ""
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
-    ocn_names       = "z" "mask_ocn" "to" "so"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
-
-&snap_south_clim1
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_present_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
-
-&snap_south_clim2
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_djf" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7weak_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
-/
-
-&snap_south_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
-/
-
-&smbpal_south
-    const_insol = True
-    const_kabp  = 0.0
-    insol_fldr  = "input"
-    abl_method  = "pdd"   ! "itm" or "pdd"
-    sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
-    sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
-    sigma_land  = 5.0     ! Standard deviation of temperature [K] over land 
-    
-    sf_a        = 0.273   ! Snow fraction function (parameter a)
-    sf_b        = 273.6   ! Snow fraction function (parameter b)
-    firn_fac    = 0.0266  ! Reduction in surface temp versus melting [K/mm w.e.]
-
-    mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
-    mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
-
-/
-
-&smb_simple_south
-    ! Alternative surface mass balance method (ctrl: smb_method = "smb_simple").
-    ! Synthetic-elevation piecewise-linear scheme. Output is mm w.e./yr.
-    ! Latitude terms use phi = |lat|, so these NH-tuned values apply in the SH too.
-    scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
-    co2_const   = 280.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
-    f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
-    mask_file   = ""         ! Target ice-mask file ("" => use reference H_ice_ref > 0)
-    mask_var    = ""         ! Target ice-mask variable name in mask_file
-    mask_idx    = 1          ! Index along 3rd dim of mask_var (used only if mask_file set)
-
-    ! Climate snow line  z_SL = a1 + a2*|phi| + a3*CO2 + a4*(f - fmean)
-    a1          = 3900.0     ! [m]   tuned to NH smbpal (LGM)
-    a2          = -50.0      ! [m/degN]
-    a3          = 0.0        ! [m/ppm]
-    a4          = 0.0        ! [m/(W/m2)]
-    fmean       = 494.5      ! [W/m2]
-
-    ! Ablation lapse rate  beta = max(beta_floor, beta0 + beta1*(phiref - |phi|))
-    beta0       = 5.0        ! [(mm/yr)/m] at phiref   tuned to NH smbpal (LGM)
-    beta1       = 0.05       ! [(mm/yr)/m] per degN
-    phiref      = 60.0       ! [degN]
-    beta_floor  = 0.0        ! [(mm/yr)/m]
-
-    ! Accumulation: acc = c0 * f_lat(|phi|) * f_dist(d_in)
-    !   f_dist = exp(-d_in_km / L_acc)   maritime decay inland (1 at margin)
-    !   f_lat  = clamp(1 - k_acc_lat*max(0, |phi| - phi_acc_ref), facc_lat_min, 1)
-    c0            = 300.0     ! [mm w.e./yr] maximum (coastal) accumulation at the margin   tuned
-    L_acc         = 300.0     ! [km]     e-folding length of inland accumulation decay   tuned
-    k_acc_lat     = 0.0       ! [1/degN] frac. accum decrease per degN beyond phi_acc_ref (0=off)
-    phi_acc_ref   = 0.0       ! [degN]   latitude above which accum starts dropping
-    facc_lat_min  = 0.3       ! [-]      floor on latitude modifier
-
-    ! Synthetic-elevation profile
-    use_plastic = True       ! True => plastic Nye/Vialov; False => linear wedge
-    slope       = 6.09e-3    ! [m/m] linear inside (use_plastic=False)
-    tau0        = 36.0e3     ! [Pa]  plastic basal yield stress
-    slope_out   = 6.09e-3    ! [m/m] linear outside ramp
-    z_max_in    = 2500.0     ! [m]   inside cap
-    z_max_out   = 200.0      ! [m]   outside floor
-    rho_ice     = 910.0      ! [kg/m3]
-    g           = 9.81       ! [m/s2]
-
-    ! Surface temperature  t_srf = t_sl - gamma_t*max(z_syn,0), capped at t_ice_max over ice
-    gamma_t     = 6.5e-3     ! [K/m] lapse rate
-    t_ice_max   = 273.15     ! [K]
-
-    smb_min     = -2000.0    ! [mm w.e./yr] SMB floor outside the target mask (<= 0)
-/
-
-&itm_south
-        
-    H_snow_max      =  5.0e3         ! Maximum allowed snowpack thickness [mm w.e.]
-    Pmaxfrac        =  0.6           ! Refreezing factor 
-
-    ! ## ITM 
-    trans_a         =  0.46 
-    trans_b         =  6e-5
-    trans_c         =  0.01
-    itm_c           = -75.0
-    itm_t           =  10.0
-    itm_b           =  -2.0 
-    itm_lat0        =  65.0 
-
-    ! ## Surface albedo
-    alb_snow_dry       =  0.8
-    alb_snow_wet       =  0.65
-    alb_ice            =  0.4
-    alb_land           =  0.2
-    alb_forest         =  0.1
-    alb_ocean          =  0.1
-    H_snow_crit_desert =  10.0
-    H_snow_crit_forest = 100.0
-    melt_crit          =   0.5      ! Critical melt rate to reduce snow albedo [mm/day]
-
-/
-
-&marine_shelf_south
-    bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
-    interp_depth    = "shlf"        ! "shlf", "bed", "const"
-    interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
-    find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
-    restart         = "none"        ! Load fields from a restart file?
-    extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
-                                    ! Useful to account for moving ice fronts and/or filling mv in datasets
-    
-    corr_method     = "tf-ant"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-ant": use values in tf_corr_ant parameter section
-    basin_number    = 1             ! 1 2 3
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.0           ! 1.0   2.0  3.0  
-    tf_correction   = False        ! yelmox bring-up: mshlf runs from remapped snapclim forcing (no grid-specific tf file)
-    tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
-    tf_name         = "dT_nl"
- 
-    bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
-    
-    ! Deep ocean bmb 
-    c_deep          = -10.0         ! [m/a] Melt rate in deep ocean, should be negative but not huge
-    depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
-    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depth=const
-    depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
-    depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
-    
-    ! Freezing point coefficients
-    lambda1         = -0.0575       ! [degC PSU−1] Liquidus slope
-    lambda2         = 0.0832        ! [degC] Liquidus intercept 
-    lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
-
-    ! bmb_method == [lin,quad,quad-nl] 
-    gamma_lin       = 630.0         ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
-    gamma_quad      = 11100.0       ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
-    gamma_quad_nl   = 14500.0       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
-    gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
-
-    ! bmb_method == anom
-    kappa_grz       = 10.0          ! [m/a K-1] Heat flux coefficient [kappa*dT]
-    c_grz           = 1.0           ! [-] bmb_ref scalar [c_grz*bmb_ref]
-    f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
-    grz_length      = 16.0          ! [km] Length scale of assumed grounding zone
-
-    ! bmb_method == anom, bmb_ref parameters 
-    use_obs         = False         ! Load obs for bmb_ref
-    obs_path        = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
-    obs_name        = "bm_eq_reese"
-    obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
-    obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
-    
-/
-
-&tf_corr_ant
-    ronne   =  0.3                  ! [K] tf_corr for ronne basin (basin=1)
-    ross    =  0.3                  ! [K] tf_corr for ronne ross  (basin=12)
-    pine    = -1.5                  ! [K] tf_corr for ronne pine  (basin=14)
-    abbott  =  0.0                  ! [K] tf_corr for Abbott glacier (basin=15)
-/
-
-&pico_south
-    n_box          = 5.0        ! Maximum number of boxes in PICO.  
-    a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.
-    b_pico         = 0.0788     ! Constant coefficient of freezing equation [ºC]. Reese et al., (2018) suggest 0.0788.
-    c_pico         = 7.77e-8    ! Pressure coefficient of freezing equation [ºC/Pa]. Reese et al., (2018) suggest 7.77e-8.
-    alpha_pico     = 7.5e-5     ! Thermal expansion coefficien [1/ºC]. Reese et al., (2018) suggest 7.5e-5.
-    beta_pico      = 7.7e-4     ! Salt contraction coefficient [1/PSU]. Reese et al., (2018) suggest 7.7e-4.
-    rho_star       = 1033.0     ! Reference density [kg/m3]. Reese et al., (2018) suggest 1033.0.
-    gamma_tstar    = 630.0      ! Effective turbulent temperature exchange velocity [m/yr]. Reese et al., (2018) uses 630.0 and suggest 600-1000.
-    C_over         = 1.0        ! Overturning strength [Sv m3/kg]. Reese et al., (2018) suggest 1.0.
-
-/
-
-&sed_south
-    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
-    obs_name  = "z_sed"
-
-/
-
-&ghf_south
-    use_obs   = True 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-S04.nc"
-    obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
-    f_stdev   = 0.0
-    ghf_const = 50.0           ! [mW/m^2]
-
-/
+! ===== Solid earth =====
 
 &isos_south
     ! Options
@@ -776,20 +561,15 @@
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
     nu              = 0.28          ! [-] Poisson ratio
-    rho_ice         = 910.          ! [kg/m^3]
-    rho_seawater    = 1028.0        ! [kg/m^3]
-    rho_water       = 1000.0        ! [kg/m^3]
-    rho_uppermantle = 3400.0        ! [kg/m^3]
     rho_litho       = 3200.0        ! [kg/m^3]  Optionally set to 0 ==> decouple the elastic
                                     ! displacement from the viscous one
-    g               = 9.81          ! [m/s^2]
     r_earth         = 6.378e3       ! [km] Earth radius, Coulon et al. (2021)
     m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
 
     ! Files
     restart = "None"
     mask_file = "None"
-    rheology_file = "isostasy_data/earth_structure/yelmo/ANT-16KM_GIA_HR24.nc"
+    rheology_file = "isostasy_data/earth_structure/yelmo/{grid_name}_GIA_HR24.nc"  ! {grid_name} = grid_isos
     litho_thickness_varname = "litho_thickness" ! Variable name in netcdf file
     log10_viscosity_varname = "log10_visc"       ! Variable name in netcdf file
     stddev_log10_viscosity_varname = "stddev_log10_visc"     ! Variable name in netcdf file
@@ -808,89 +588,27 @@
     q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
 /
 
-&htopo_south
-    domain       = "Antarctica"
-    grid_name    = "ANT-16KM"
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine.nc"
-    name_z_bed   = "z_bed"
-    name_H_ice   = "H_ice"
-    name_z_srf   = "z_srf"
-    basins_load  = True
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+&sed_south
+    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_name  = "z_sed"
+
 /
 
-&coupling_south
-    ! Domain setup: active components + methods, per-component grids, restart.
-    with_ice_sheet    = True   ! Is the ice sheet active?
-    with_isostasy     = True   ! Is isostasy active?
-    with_climate      = True   ! Are climate + surface mass balance active?
-    with_marine_shelf = True   ! Is the marine shelf (ocean bmb) active?
-    equil_method    = "opt"    ! "none", "relax", "opt"
-    smb_method      = "smbpal" ! "smbpal" or "smb_simple"
-    dt_restart      = 20e3     ! [yr] Frequency of writing restart files
-    dt_clim         = 10.0     ! [yr] Frequency of snapclim snapshot updates
-    grid_mshlf = "ANT-16KM"    ! hi-res hub grid; set "ANT-32KM" to keep mshlf on the Yelmo grid
-    grid_isos  = "ANT-32KM"    ! isostasy grid; default = grid_yelmo (identity, exact parity)
-    grid_clim  = "ANT-32KM"    ! climate grid; must have forcing data (default = grid_yelmo)
-    grid_smb   = "ANT-32KM"    ! smb grid; default = grid_clim
-    restart    = "None"        ! restart bundle folder, or "None" for a cold start
+&ghf_south
+    use_obs   = True 
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-Shapiro2004.nc"
+    obs_name  = "ghf"
+    obs_err_name = "ghf_sd"
+    f_stdev   = 0.0
+    ghf_const = 50.0           ! [mW/m^2]
 
-    ! Domain-specific switches (Greenland only; keep False elsewhere).
-    scale_glacial_smb       = False   ! Reduce negative glacial smb (Greenland)
-    lim_pd_ice              = False   ! Extra melt outside PD ice extent (Greenland)
-    use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
-&output_south
-    write_yelmo = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
-    write_isos  = True
-    write_mshlf = True
-    write_smb   = True
-    write_snap  = True
-    write_htopo = True
-/
+! ===== Ice sheet (Yelmo) =====
 
-&opt_north
-    opt_cf          = True              ! Should basal friction be optimized?
-    cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
-    cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
-    cf_init         = 5e-3              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
-    cf_min          = 1e-5              ! [--] Minimum allowed cf value
-    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
-    H0              = 0.0               ! [m]  L21: Optimization ice-thickness error scaling 
-
-    sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
-    sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
-    fill_method     = "cf_min"          ! nearest, analog, target, cf_min
-
-    rel_tau1        = 100.0             ! [yr] Relaxation timescale in time period 1
-    rel_tau2        = 2000.0            ! [yr] Relaxation timescale in time period 2
-    rel_time1       = 2000.0            ! [yr] Time limit for time period 1
-    rel_time2       = 6000.0            ! [yr] Time limit for time period 2
-    rel_m           = 2.0               ! [--] Non-linear exponent to scale interpolation of rel_tau between time1 and time2 
-
-    opt_tf          = True              ! Should thermal forcing be optimized?
-    tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
-    tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
-    H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
-    tf_sigma        = 10e3              ! [m] Smoothing radius for error to calculate tf_corr
-    tau_m           = 10.0              ! [yr] Optimization relxation timescale 
-    m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
-    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
-    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
-    tf_basins       = -1                ! Basin numbers to optimize (-1 for all basins)
-    basin_fill      = False    
-/
-
-&yelmo_north
-    domain          = "Greenland"
-    grid_name       = "GRL-16KM"
-    grid_path       = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+&yelmo_south
+    ! domain, grid_name and the grid come from &domain_south
     phys_const      = "Earth"
     experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
     nml_ytopo       = "ytopo"
@@ -900,46 +618,43 @@
     nml_yhyd       = "yhyd"
     nml_ymat        = "ymat"
     nml_ytherm      = "ytherm"
-    nml_masks       = "yelmo_masks_north"
-    nml_init_topo   = "yelmo_init_topo_north"
-    nml_data        = "yelmo_data_north"
+    nml_masks       = "yelmo_masks_south"
+    nml_init_topo   = "yelmo_init_topo_south"
+    nml_data        = "yelmo_data_south"
     restart         = "None"
     restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
     restart_H_ice   = True              ! Take H_ice from restart file
-    restart_relax   = 500.0             ! [yrs] Years to relax from restart=>input topography
+    restart_relax   = 1e3               ! [yrs] Years to relax from restart=>input topography
     log_timestep    = False 
     disable_kill    = False             ! Disable automatic kill if unstable
     zeta_scale      = "exp"             ! "linear", "exp", "tanh"
     zeta_exp        = 2.0  
-    nz_aa           = 6                 ! Vertical resolution in ice
+    nz_aa           = 10                ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
-    dt_min          = 0.01              ! [a] Minimum timestep 
+    dt_min          = 0.1              ! [a] Minimum timestep 
     cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
-    cfl_diff_max    = 0.12              ! Bueler et al (2007), Eq. 25  
     pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
     pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
     pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
     pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
-    pc_corr_vel     = False             ! Calculate dynamics again for corrected H_ice
     pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
-    pc_tol          = 5.0               ! [m/a] Tolerance threshold to redo timestep
-    pc_eps          = 1.0               ! Predictor-corrector tolerance 
-
+    pc_tol          = 1.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
+    pc_eps          = 0.02               ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
+    
 /
 
-&yelmo_masks_north
-    basins_load     = True 
-    basins_path     = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc" 
-    basins_nms      = "basin" "basin_mask"
-    regions_load    = True 
-    regions_path    = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    regions_nms     = "mask" "None"
+&yelmo_masks_south
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "Zwally2012"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "~zone:open_ocean"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "all"
 /
 
-&yelmo_init_topo_north
-    init_topo_load    = True 
-    init_topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    init_topo_names   = "H_ice" "z_bed" "z_bed_sd" "z_srf"      ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+&yelmo_init_topo_south
+    ! The initial topography comes from the hub ([domain_south])
     init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
     z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
     smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
@@ -947,128 +662,72 @@
     
 /
 
-&yelmo_data_north
-    pd_topo_load      = True 
-    pd_topo_path      = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    pd_topo_names     = "H_ice" "z_bed" "z_bed_sd" "z_srf"  ! Ice thickness, bedrock elevation, bedrock noise, surface elevation
+&yelmo_data_south
+    ! The present-day topography comes from the hub ([domain_south])
     pd_tsrf_load      = True 
-    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_tsrf_path      = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc" 
     pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
     pd_tsrf_monthly   = False
     pd_smb_load       = True 
-    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_annmean_1961-1990.nc"
+    pd_smb_path       = "ice_data/{domain}/{grid_name}/{grid_name}_RACMO23-ERAINT-HYBRID_1981-2010.nc"
     pd_smb_name       = "smb"                        ! Surface mass balance 
     pd_smb_monthly    = False 
     pd_vel_load       = True 
-    pd_vel_path       = "ice_data/{domain}/{grid_name}/{grid_name}_VEL-J18.nc"
+    pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Rignot2011.nc"
     pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
-    pd_age_load       = True 
-    pd_age_path       = "ice_data/{domain}/{grid_name}/{grid_name}_STRAT-M15.nc"
-    pd_age_names      = "age_iso" "depth_iso"        ! ages of isochrones; depth of isochrones 
+    pd_age_load       = False 
+    pd_age_path       = "none"
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
 
 /
 
-&ice_enh_north
-    enh_path = "input/alpha_orbital_r2020.dat"
-    enh_glac = 3.0                              ! Glacial enhancement factor 
-    enh_int  = 1.0                              ! Interglacial enhancement factor 
+! ===== Climate =====
+
+&forcing_south
+    ! The forcing of the southern domain: the reference snapshot and the terms.
+    ! regional_south: the global anomaly gmt times the OBM's southern
+    ! amplification. The OBM southern box into the ocean instead: a
+    ! coefficient derived from it (method = "derived", from = "obm_south") with a replace
+    ! or uniform term on to.
+    reference = "pd_ant"
+    terms     = "regional_south"
 /
 
-&snap_north
-    atm_type           = "snap_1ind_new"
-    ocn_type           = "fraction"
-    fname_at           = "input/alpha_orbital_r2020.dat"
-    fname_ao           = "input/alpha_orbital_r2020.dat"
-    fname_ap           = "input/alpha_orbital_r2020.dat"
-    fname_as           = "input/salinity_index_deglaciation.dat"
-    fname_bt           = "input/ones.dat"
-    fname_bo           = "input/ones.dat"
-    fname_bp           = "input/ones.dat"
-    fname_bs           = "input/ones.dat"
-    lapse              = 0.0080 0.0065    ! lapse_ann, lapse_sum 
-    dTa_const          = 2.0  
-    dTo_const          = 0.5
-    dSo_const          = 3.0
-    f_to               = 0.25 
-    f_p                = 0.06
-    f_stdev            = 0.0 
+&term_regional_south
+    ! Uniform anomaly from the global one, f_ta = [nautilus] thermal_ampl_south
+    ! (zero while gmt = 0).
+    coef    = "gmt"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+    f_ta    = 0.86    ! [K]
 /
 
-&snap_north_hybrid
-    hybrid_path        = "ice_data/Greenland/paleo300ka_hybrid_aicc2012.nc"
-    f_eem              = 0.3 
-    f_glac             = 1.0 
-    f_hol              = 0.5 
-    f_seas             = 1.0 
-    f_to               = 0.2
+&snapshots_south
+    ! Snapshot backend of the south: present day only (RACMO2.3p2 1981-2010,
+    ! 2 m air temperature; ISMIP7 ocean), [snapshot_pd_ant].
+    lapse      = 0.0080 0.0065
+    f_p        = 0.05
 /
 
-&snap_north_recon
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_CLIM-RECON-B20.nc"
-    clim_names      = "time" "tas" "pr" "zs"
-    clim_monthly    = False
-    ocn_path        = "ice_data/{domain}/{grid_name}/{grid_name}_OCN-RECON-TRACE21ka.nc"
-    ocn_names       = "time" "depth" "mask_ocn" "to"
-    ocn_monthly     = False
+&snapshot_pd_ant
+    tas = "racmo23p2_1981_2010_tas"
+    pr  = "racmo23p2_1981_2010_pr"
+    zs  = "racmo23p2_1981_2010_zs"
+    to  = "ismip7_to"
+    so  = "ismip7_so"
 /
 
-&snap_north_clim0
-    clim_path       = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990.nc"
-    clim_names      = "z_srf" "tas" "sf" "rf"                                                   ! Default (if monthly = True) : "zs" "t3m" "sf" "rf"
-    clim_monthly    = True                                                                   ! If True and no snowfall (sf) then the third variable is precip and the fourth one irrelevant
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010.nc"
-    ocn_names       = "depth" "mask_ocn" "to" "so"
-    ocn_monthly     = True
-    ocn_time        = 0
+&orbit_south
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
+    ! per (method = "fixed_orbit") and fldr from input/yelmox_defaults.nml.
+    method = "fixed_time"   ! forcing_time: at the forcing time; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
 /
 
-&snap_north_clim1
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = 0
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-piControl-mean.nc"
-    ocn_names       = "none" "mask" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = 0
-/
+! ===== Surface =====
 
-&snap_north_clim2
-    clim_path       = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
-    clim_names      = "z_srf" "t2m_ann" "t2m_jja" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-stdev.nc"
-    clim_stdev_name = "pr_ann" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/PMIP3_sig50km/{grid_name}_PMIP3-lgm-mean.nc"
-    ocn_names       = "none" "mask" "sst_ann"
-    ocn_monthly     = False
-    ocn_time        = -21000
-/
-
-&snap_north_clim3
-    clim_path       = "ice_data/{domain}/{grid_name}/Montoya2008_sig250km/{grid_name}_lgm_1p7strong.nc"
-    clim_names      = "zs" "t2m_ann" "t2m_sum" "pr_ann"
-    clim_monthly    = False
-    clim_time       = -21000
-    clim_stdev_path = "None"
-    clim_stdev_name = "pr" 
-    ocn_path        = "ice_data/{domain}/{grid_name}/Montoya2008_sig100km/{grid_name}_lgm_1p7strong_ocean.nc"
-    ocn_names       = "depth" "mask_ocn" "to"
-    ocn_monthly     = False
-    ocn_time        = -21000
-/
-
-&smbpal_north
-    const_insol = True
-    const_kabp  = 0.0
-    insol_fldr  = "input"
-    abl_method  = "itm"   ! "itm" or "pdd"
+&smbpal_south
+    abl_method  = "pdd"   ! "itm" or "pdd"
     sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
     sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
     sigma_land  = 5.0     ! Standard deviation of temperature [K] over land 
@@ -1079,12 +738,14 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
 
 /
 
-&smb_simple_north
-    ! Alternative surface mass balance method (ctrl: smb_method = "smb_simple").
+&smb_simple_south
+    ! Alternative surface mass balance method (ctrl: surface_method = "smb_simple").
     ! Synthetic-elevation piecewise-linear scheme. Output is mm w.e./yr.
+    ! Latitude terms use phi = |lat|, so these NH-tuned values apply in the SH too.
     scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
     co2_const   = 280.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
     f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
@@ -1092,22 +753,22 @@
     mask_var    = ""         ! Target ice-mask variable name in mask_file
     mask_idx    = 1          ! Index along 3rd dim of mask_var (used only if mask_file set)
 
-    ! Climate snow line  z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean)
+    ! Climate snow line  z_SL = a1 + a2*|phi| + a3*CO2 + a4*(f - fmean)
     a1          = 3900.0     ! [m]   tuned to NH smbpal (LGM)
     a2          = -50.0      ! [m/degN]
     a3          = 0.0        ! [m/ppm]
     a4          = 0.0        ! [m/(W/m2)]
     fmean       = 494.5      ! [W/m2]
 
-    ! Ablation lapse rate  beta = max(beta_floor, beta0 + beta1*(phiref - phi))
+    ! Ablation lapse rate  beta = max(beta_floor, beta0 + beta1*(phiref - |phi|))
     beta0       = 5.0        ! [(mm/yr)/m] at phiref   tuned to NH smbpal (LGM)
     beta1       = 0.05       ! [(mm/yr)/m] per degN
     phiref      = 60.0       ! [degN]
     beta_floor  = 0.0        ! [(mm/yr)/m]
 
-    ! Accumulation: acc = c0 * f_lat(phi) * f_dist(d_in)
+    ! Accumulation: acc = c0 * f_lat(|phi|) * f_dist(d_in)
     !   f_dist = exp(-d_in_km / L_acc)   maritime decay inland (1 at margin)
-    !   f_lat  = clamp(1 - k_acc_lat*max(0, phi - phi_acc_ref), facc_lat_min, 1)
+    !   f_lat  = clamp(1 - k_acc_lat*max(0, |phi| - phi_acc_ref), facc_lat_min, 1)
     c0            = 300.0     ! [mm w.e./yr] maximum (coastal) accumulation at the margin   tuned
     L_acc         = 300.0     ! [km]     e-folding length of inland accumulation decay   tuned
     k_acc_lat     = 0.0       ! [1/degN] frac. accum decrease per degN beyond phi_acc_ref (0=off)
@@ -1121,8 +782,6 @@
     slope_out   = 6.09e-3    ! [m/m] linear outside ramp
     z_max_in    = 2500.0     ! [m]   inside cap
     z_max_out   = 200.0      ! [m]   outside floor
-    rho_ice     = 910.0      ! [kg/m3]
-    g           = 9.81       ! [m/s2]
 
     ! Surface temperature  t_srf = t_sl - gamma_t*max(z_syn,0), capped at t_ice_max over ice
     gamma_t     = 6.5e-3     ! [K/m] lapse rate
@@ -1131,16 +790,15 @@
     smb_min     = -2000.0    ! [mm w.e./yr] SMB floor outside the target mask (<= 0)
 /
 
-&itm_north
+&itm_south
         
     H_snow_max      =  5.0e3         ! Maximum allowed snowpack thickness [mm w.e.]
     Pmaxfrac        =  0.6           ! Refreezing factor 
-    
+
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
-    itm_c           = -45.0
+    itm_c           = -75.0
     itm_t           =  10.0
     itm_b           =  -2.0 
     itm_lat0        =  65.0 
@@ -1158,30 +816,68 @@
 
 /
 
-&marine_shelf_north
-    bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+&surface_chion_south
+    ! Host side of chion (surface_method = "chion"): forcing chion does not own.
+    sf_a        = 0.273   ! Snow fraction function (parameter a)
+    sf_b        = 273.6   ! Snow fraction function (parameter b)
+    sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs (itm)
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
+    dt_days     = 1       ! [d] chion step (divides the 360-day year)
+    trans_sw    = 0.6     ! [1] TOA -> surface shortwave transmissivity (bessi)
+    wind_speed  = 5.0     ! [m s-1] Constant wind speed (bessi)
+    rel_hum     = 0.8     ! [1] Constant relative humidity (bessi)
+/
+
+&chion_south
+    model           = "pdd"                          ! Snowpack model: "itm", "bessi" or "pdd"
+    nml_pdd         = "pdd_chion_south"               ! PDD parameters (chion's own group)
+/
+
+&pdd_chion_south
+    ! chion's PDD parameters: smbpal's PDD ([smbpal_south] mm_snow, mm_ice, sigma, firn_fac;
+    ! [itm_south] Pmaxfrac, H_snow_max).
+    ddf_snow            = 3.0       ! [kg m-2 K-1 d-1] Degree-day factor for snow
+    ddf_ice             = 8.0       ! [kg m-2 K-1 d-1] Degree-day factor for ice
+    refreezing_fraction = 0.6       ! [1] Refreezing capacity per unit snowpack
+    temperature_sigma   = 5.0       ! [K] Std dev of unresolved temperature variability
+    H_snow_max          = 5000.0    ! [kg m-2] Snowpack cap; the excess is converted to ice
+    pdd_method          = "cg05"    ! PDD integral: "cg05" (Calov and Greve, 2005) or "simple"
+    firn_fac            = 0.0266    ! [K (mm w.e. yr-1)-1] Firn warming per annual refreezing
+/
+
+! ===== Ocean =====
+
+&marine_shelf_south
+    bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method       = 1             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
     restart         = "none"        ! Load fields from a restart file?
     extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
                                     ! Useful to account for moving ice fronts and/or filling mv in datasets
+    basins          = "Zwally2012"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there, e.g. "region:Antarctica & zone:shelf_break_buffer"
+    corr_method     = "tf"  ! none, tf or bmb: corrections by region
+    corr_names      = "ronne" "ross" "pine" "abbott"
+    corr_values     = 0.3 0.3 -1.5 0.0
+    corr_ronne = "Zwally2012:1"
+    corr_ross = "Zwally2012:12"
+    corr_pine = "Zwally2012:14"
+    corr_abbott = "Zwally2012:15"
     
-    corr_method     = "none"      ! "tf": corrected tf basin, "bmb": corrected bmb basin, "tf-grl": use values in tf_corr_grl parameter section
-    basin_number    = 1             ! 1 2 3
-    basin_bmb_corr  = 0.0           ! -1.0  -1.0 -1.0 [corrected bmb m/yr; -: melting, +: accretion]
-    basin_tf_corr   = 0.5           ! 1.0   2.0  3.0  
-    tf_correction   = False
-    tf_path         = "ice_data_javi/{domain}/{grid_name}/Ocean_parameterization_J20.nc"
+    tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped climate forcing
+    tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
     tf_name         = "dT_nl"
  
     bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
     
     ! Deep ocean bmb 
-    c_deep          = -10.0         ! [m/yr] Melt rate in deep ocean, should be negative but not huge
-    depth_deep      =  500.0        ! [m] Depth at which deep ocean is assumed
-    depth_const     =    0.0        ! [m] Constant shelf depth for interp_depthconst
+    c_deep          = -10.0         ! [m/a] Melt rate in deep ocean, should be negative but not huge
+    depth_deep      = 2000.0        ! [m] Depth at which deep ocean is assumed
+    depth_const     = 2000.0        ! [m] Constant shelf depth for interp_depth=const
     depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
     depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
     
@@ -1197,45 +893,152 @@
     gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
 
     ! bmb_method == anom
-    kappa_grz       = 10.0          ! [m/yr K-1] Heat flux coefficient [kappa*dT]
+    kappa_grz       = 10.0          ! [m/a K-1] Heat flux coefficient [kappa*dT]
     c_grz           = 1.0           ! [-] bmb_ref scalar [c_grz*bmb_ref]
     f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
-    grz_length      = 32.0          ! [km] Length scale of assumed grounding zone
+    grz_length      = 16.0          ! [km] Length scale of assumed grounding zone
 
     ! bmb_method == anom, bmb_ref parameters 
     use_obs         = False         ! Load obs for bmb_ref
-    obs_path        = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
-    obs_name        = "bm_eq_reese"
+    obs_path        = "fesmdata/{domain}/{grid_name}/{grid_name}_BasalMelt-Rignot2013.nc"
+    obs_name        = "bmelt_eq_reese"
     obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
     obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
-    basin_name      = "none"        !"northwest" "northeast" "east"
-    basin_bmb       = 0.0           !        -1.0       -1.0   -1.0
     
 /
 
-&tf_corr_grl
-    ne      = 0.0                   ! [K] tf_corr for northeast/negis basin (basin=2)
-    e       = 1.0                   ! [K] tf_corr for eastern basin (basin=3)
-    se      = 1.5                   ! [K] tf_corr for southeast basin (basin=4)
-    w       = 0.0                   ! [K] tf_corr for western basin (basins=[6,7,8])
-/
-
-&sed_north
-    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_SED-L97.nc"
-    obs_name  = "z_sed"
-
-/
-
-&ghf_north
-    use_obs   = False 
-    obs_path  = "ice_data/{domain}/{grid_name}/{grid_name}_GHF-M05.nc"
-    obs_name  = "ghf"
-    obs_err_name = "ghf_sigma"
-    f_stdev   = 0.0
-    ghf_const = 50.0           ! [mW/m^2]
+! PICO box model (Reese et al., 2018), read only with bmb_method = "pico".
+! Not used or calibrated in the shipped configurations: the parameters are
+! the published defaults.
+&pico_south
+    n_box          = 5.0        ! Maximum number of boxes per basin
+    a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.
+    b_pico         = 0.0788     ! Constant coefficient of freezing equation [ºC]. Reese et al., (2018) suggest 0.0788.
+    c_pico         = 7.77e-8    ! Pressure coefficient of freezing equation [ºC/Pa]. Reese et al., (2018) suggest 7.77e-8.
+    alpha_pico     = 7.5e-5     ! Thermal expansion coefficien [1/ºC]. Reese et al., (2018) suggest 7.5e-5.
+    beta_pico      = 7.7e-4     ! Salt contraction coefficient [1/PSU]. Reese et al., (2018) suggest 7.7e-4.
+    rho_star       = 1033.0     ! Reference density [kg/m3]. Reese et al., (2018) suggest 1033.0.
+    gamma_tstar    = 630.0      ! Effective turbulent temperature exchange velocity [m/yr]. Reese et al., (2018) uses 630.0 and suggest 600-1000.
+    C_over         = 1.0        ! Overturning strength [Sv m3/kg]. Reese et al., (2018) suggest 1.0.
 
 /
+
+! ##### North domain (Greenland): groups *_north #####
+
+! ===== Run setup =====
+
+&comps_north
+    ! Components: which are active, with which model, how often.
+    with_ice_sheet    = True
+    with_isostasy     = True
+    with_climate      = True   ! Is the climate (atmosphere + ocean) active?
+    with_surface      = True   ! Is the surface (mass balance + temperature) active? Needs with_climate
+    with_shelf        = True
+    climate         = "snapshots"  ! climate backend: "snapshots", "esm" or "rembo"
+    surface_method  = "chion"  ! "chion", "smbpal", "smb_simple" or "climate"
+    dt_clim         = 10.0
+    dt_isos         = 10.0
+/
+
+&sim_north
+    ! Conditions of this simulation: cold-start ice state (init_*),
+    ! relaxation, optimization, regional modifications.
+    init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
+    init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
+    init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed
+
+    relax                   = False     ! relax the topography towards the reference ([relax_north])
+    opt                     = False     ! optimize cb_ref and tf_corr ([opt_north])
+
+    use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_north] group)
+    lim_pd_ice              = False   ! Extra melt outside PD ice extent
+/
+
+! [sim_north] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb_north
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
+
+&output_north
+    write_yelmo   = True
+    write_isos    = True
+    write_shelf   = True
+    write_surface = True
+    write_clim    = True
+    write_htopo   = True
+    write_cmip    = False        ! CMIP/ISMIP-formatted output (yelmo_cmip.nc, yelmo_ts_cmip.nc)
+    dt_cmip       = 1.0          ! [yr] its interval
+/
+
+&domain_north
+    ! Domain definition: name, the grid of every component, and the basins
+    ! of the hub output (topography: [topo], regions: [regions]).
+    ! A blank component grid takes the default given in brackets.
+    name         = "Greenland"
+    phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
+    grid_hub     = "GRL-16KM"         ! hi-res geometry hub
+    grid_ice     = ""                 ! Yelmo [grid_hub]
+    grid_isos    = "GRL-32KM"         ! isostasy [grid_ice]
+    grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
+    grid_surface = "GRL-32KM"         ! surface mass balance [grid_clim]
+    grid_shelf   = "GRL-32KM"         ! marine shelf [grid_hub]
+    basins       = "Zwally2012.group"  ! basin ids of the hub output: <set>, <set>.group, None or domain
+/
+
+&topo_north
+    path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
+    vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
+    remap = "con"
+/
+
+&regions_north
+    path_regions = "fesmdata/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
+    path_basins  = "fesmdata/{domain}/{grid_name}/{grid_name}_BASINS-{set}.nc"
+    basin_sets   = "Zwally2012"
+/
+
+! ===== Simulation options =====
+
+&relax_north
+    ! Relaxation of the topography ([sim] relax), over the time elapsed since the start of the run.
+    topo_rel        = 4                 ! ytopo.topo_rel mode while active (4: grounding line + grounding zone)
+    tau1            = 100.0             ! [yr] Relaxation timescale until time1
+    tau2            = 2000.0            ! [yr] Relaxation timescale at time2
+    time1           = 2000.0            ! [yr] End of the tau1 period
+    time2           = 6000.0            ! [yr] End of the relaxation (then the ytopo values apply)
+    m               = 2.0               ! [--] Non-linear exponent of the tau1 -> tau2 ramp
+/
+
+&opt_north
+    opt_cf          = "L21"             ! Basal friction optimization: "none", "L21"
+    cf_time_init    = 0.0               ! [yr] When should optimization of basal friction start?
+    cf_time_end     = 15e3              ! [yr] When should optimization of basal friction stop?
+    cf_init         = 5e-3              ! Initial value of cf_ref everywhere (negative uses cb_tgt) if not using restart file
+    tau_c           = 500.0             ! [yr] L21: Optimization relaxation timescale 
+    H0              = 0.0               ! [m]  L21: Optimization ice-thickness error scaling 
+
+    sigma_err       = 50e3              ! [m] Smoothing radius for error to calculate correction in cf_ref
+    sigma_vel       = 100.0             ! [m/yr] Speed at which smoothing diminishes to zero
+    fill_method     = "cf_min"          ! nearest, analog, target, cf_min
+
+    opt_tf          = "L21-points"      ! Thermal forcing optimization: "none", "L21" (by basin), "L21-points"
+    tf_time_init    = 0.0               ! [yr] When should optimization of thermal forcing start?
+    tf_time_end     = 15e3              ! [yr] When should optimization of thermal forcing stop?
+    H_grnd_lim      = 0.0               ! [m] Distance from grounding line to consider in terms of thickness above flotation
+    tf_sigma        = 10e3              ! [m] L21-points: Smoothing radius for error to calculate tf_corr
+    tau_m           = 10.0              ! [yr] Optimization relxation timescale 
+    m_temp          = 10.0              ! [m yr^−1 degC^−1] Optimization scaling value
+    tf_min          = -2.0              ! [degC] Minimum allowed tf_corr value 
+    tf_max          =  2.0              ! [degC] Maximum allowed tf_corr value 
+    tf_basins       = -1                ! L21: Basin numbers to optimize (-1 for all basins)
+    basin_fill      = False             ! L21-points: If true, fill grounded basins with ice-shelf mean tf_corr values
+/
+
+! ===== Solid earth =====
 
 &isos_north
     ! Options
@@ -1273,12 +1076,7 @@
     ! Physical constants
     E               = 66.0          ! [GPa] Young modulus
     nu              = 0.28          ! [-] Poisson ratio
-    rho_ice         = 910.          ! [kg/m^3]
-    rho_seawater    = 1028.0        ! [kg/m^3]
-    rho_water       = 1000.0        ! [kg/m^3]
-    rho_uppermantle = 3400.0        ! [kg/m^3]
     rho_litho       = 3200.0        ! [kg/m^3]  If 0: decouple the elastic displacement from the viscous one
-    g               = 9.81          ! [m/s^2]
     r_earth         = 6.378e3       ! [km]  Earth radius, Coulon et al. (2021)
     m_earth         = 5.972e24      ! [kg] Earth mass,   Coulon et al. (2021)
 
@@ -1300,49 +1098,306 @@
     q = 1.0                 ! Exponent for dt adaptation. The higher the most conservative the time stepping.
 /
 
-&htopo_north
-    domain       = "Greenland"
-    grid_name    = "GRL-32KM"
-    topo_path    = "ice_data/{domain}/{grid_name}/{grid_name}_TOPO-M17.nc"
-    name_z_bed   = "z_bed"
-    name_H_ice   = "H_ice"
-    name_z_srf   = "z_srf"
-    basins_load  = True
-    basins_path  = "ice_data/{domain}/{grid_name}/{grid_name}_BASINS-nasa.nc"
-    name_basins  = "basin"
-    regions_load = True
-    regions_path = "ice_data/{domain}/{grid_name}/{grid_name}_REGIONS.nc"
-    name_regions = "mask"
+&sed_north
+    method    = 0               ! 0: no sediments, H_sed=0; 1: read sediments from observations
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_Sediment-CRUST1.nc"
+    obs_name  = "z_sed"
+
 /
 
-&coupling_north
-    with_ice_sheet    = True
-    with_isostasy     = True
-    with_climate      = True
-    with_marine_shelf = True
-    equil_method    = "none"
-    smb_method      = "smbpal"
-    dt_restart      = 20e3
-    dt_clim         = 10.0
-    grid_mshlf = "GRL-32KM"
-    grid_isos  = "GRL-32KM"
-    grid_clim  = "GRL-32KM"
-    grid_smb   = "GRL-32KM"
-    restart    = "None"
+&ghf_north
+    use_obs   = False 
+    obs_path  = "fesmdata/{domain}/{grid_name}/{grid_name}_GHF-FoxMaule2005.nc"
+    obs_name  = "ghf"
+    obs_err_name = "None"
+    f_stdev   = 0.0
+    ghf_const = 50.0           ! [mW/m^2]
 
-    ! Domain-specific switches (Greenland).
-    scale_glacial_smb       = False   ! Reduce negative glacial smb
-    lim_pd_ice              = False   ! Extra melt outside PD ice extent
-    use_negis               = False   ! NEGIS cb_ref modification (needs [negis_north] group)
-    greenland_init_marine_H = False   ! Impose LGM-like marine ice at cold start
 /
 
-&output_north
-    write_yelmo = True
-    write_isos  = True
-    write_mshlf = True
-    write_smb   = True
-    write_snap  = True
-    write_htopo = True
+! ===== Ice sheet (Yelmo) =====
+
+&yelmo_north
+    ! domain, grid_name and the grid come from &domain_north
+    phys_const      = "Earth"
+    experiment      = "None"            ! "None", "EISMINT1", "MISMIP3D"  to apply special boundary conditions
+    nml_ytopo       = "ytopo"
+    nml_ycalv       = "ycalv"
+    nml_ydyn        = "ydyn"
+    nml_ytill       = "ytill"
+    nml_yhyd       = "yhyd"
+    nml_ymat        = "ymat"
+    nml_ytherm      = "ytherm"
+    nml_masks       = "yelmo_masks_north"
+    nml_init_topo   = "yelmo_init_topo_north"
+    nml_data        = "yelmo_data_north"
+    restart         = "None"
+    restart_z_bed   = True              ! Take z_bed (and z_bed_sd) from restart file
+    restart_H_ice   = True              ! Take H_ice from restart file
+    restart_relax   = 500.0             ! [yrs] Years to relax from restart=>input topography
+    log_timestep    = False 
+    disable_kill    = False             ! Disable automatic kill if unstable
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
+    zeta_exp        = 2.0  
+    nz_aa           = 6                 ! Vertical resolution in ice
+    dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
+    dt_min          = 0.01              ! [a] Minimum timestep 
+    cfl_max         = 0.5               ! Maximum value is 1.0, lower will be more stable
+    pc_method       = "AB-SAM"          ! "FE-SBE", "AB-SAM", "HEUN"
+    pc_controller   = "PI42"            ! PI42, H312b, H312PID, H321PID, PID1
+    pc_use_H_pred   = True              ! Use predicted H_ice instead of corrected H_ice 
+    pc_filter_vel   = True              ! Use mean vel. solution of current and previous timestep
+    pc_n_redo       = 5                 ! How many times can the same iteration be repeated (when high error exists)
+    pc_tol          = 1.0               ! [1/a] Redo the timestep when pc_eta > pc_tol; pc_eta = RMS of tau/(1 m + 0.01 H) over the pc mask without the pc_eta_trim largest, tau = pc truncation error [m/a]
+    pc_eps          = 0.02               ! [1/a] Target pc_eta of the adaptive timestep (dt_method=2), must be <= pc_tol
+
 /
 
+&yelmo_masks_north
+    regions_group    = "None"            ! the regions come from the driver ([regions])
+    basins           = "Zwally2012.group"    ! <set>, <set>.group, None or domain (one basin)
+    mask_ice_dynamic = "region:Greenland,Canadian_Arctic_Archipelago"
+    mask_ice_fixed   = "none"
+    relax            = "none"
+    relax_tau        = 0.0
+    mask_rmse        = "region:Greenland & ~zone:open_ocean"
+/
+
+&yelmo_init_topo_north
+    ! The initial topography comes from the hub ([domain_north])
+    init_topo_state   = 0                                       ! 0: from file, 1: ice-free, 2: ice-free, rebounded 
+    z_bed_f_sd        = 0.0                                     ! Scaling fraction to modify z_bed = z_bed + f_sd*z_bed_sd
+    smooth_H_ice      = 0.0                                     ! Smooth ice thickness field at loading time, with sigma=N*dx
+    smooth_z_bed      = 0.0                                     ! Smooth bedrock field at loading time, with sigma=N*dx
+    
+/
+
+&yelmo_data_north
+    ! The present-day topography comes from the hub ([domain_north])
+    pd_tsrf_load      = True 
+    pd_tsrf_path      = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
+    pd_tsrf_name      = "T_srf"                      ! Surface temperature (or near-surface temperature)
+    pd_tsrf_monthly   = False
+    pd_smb_load       = True 
+    pd_smb_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990-annual-mean.nc"
+    pd_smb_name       = "smb"                        ! Surface mass balance 
+    pd_smb_monthly    = False 
+    pd_vel_load       = True 
+    pd_vel_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Velocity-Joughin2018.nc"
+    pd_vel_names      = "ux_srf" "uy_srf"            ! Surface velocity 
+    pd_age_load       = True 
+    pd_age_path       = "fesmdata/{domain}/{grid_name}/{grid_name}_Stratigraphy-MacGregor2025.nc"
+    pd_age_names      = "age" "depth_iso"            ! ages of isochrones; depth of isochrones 
+
+/
+
+! ===== Climate =====
+
+&forcing_north
+    ! The forcing of the northern domain: the reference snapshot and the terms.
+    ! lgm: PMIP3 lgm - picontrol weighted by alpha (library);
+    ! regional_north: the global anomaly gmt times the OBM's northern
+    ! amplification; ocean: the profiles plus 0.25 x the mean sea-level air
+    ! anomaly (coefficient dTo, derived). The OBM northern box into the ocean
+    ! instead of `ocean`: a coefficient derived from it (from = "obm_north") with
+    ! a replace or uniform term on to.
+    reference = "pd_grl"
+    terms     = "lgm" "regional_north" "ocean"
+/
+
+&term_regional_north
+    ! Uniform anomaly from the global one, f_ta = [nautilus] thermal_ampl_north
+    ! (zero while gmt = 0).
+    coef    = "gmt"
+    pattern = "uniform"
+    fields  = "tas" "pr"
+    f_ta    = 1.07    ! [K]
+/
+
+&snapshots_north
+    ! Snapshot backend of the north: present day (MAR v3.14 1961-1990, ORAS5;
+    ! [snapshot_pd_grl]) and PMIP3 piControl and LGM (library) on the term lgm.
+    lapse      = 0.0080 0.0065
+    f_p        = 0.06
+/
+
+&snapshot_pd_grl
+    tas = "mar314_1961_1990_tas"
+    pr  = "mar314_1961_1990_sf" "mar314_1961_1990_rf"
+    zs  = "mar314_1961_1990_zs"
+    to  = "oras5_1981_2010_to"
+    so  = "oras5_1981_2010_so"
+/
+
+&orbit_north
+    ! The orbit of the insolation (chion itm/bessi, smbpal itm); ecc, obl,
+    ! per (method = "fixed_orbit") and fldr from input/yelmox_defaults.nml.
+    method = "fixed_time"   ! forcing_time: at the forcing time; fixed_time: at time; fixed_orbit: ecc, obl, per
+    time   = 0.0        ! [yr] model time of the orbit (fixed_time; relative to 1950, past < 0)
+/
+
+! ===== Surface =====
+
+&smbpal_north
+    abl_method  = "itm"   ! "itm" or "pdd"
+    sigma_snow  = 5.0     ! Standard deviation of temperature [K] over ice and snow
+    sigma_melt  = 5.0     ! Standard deviation of temperature [K] in ablation zone
+    sigma_land  = 5.0     ! Standard deviation of temperature [K] over land 
+    
+    sf_a        = 0.273   ! Snow fraction function (parameter a)
+    sf_b        = 273.6   ! Snow fraction function (parameter b)
+    firn_fac    = 0.0266  ! Reduction in surface temp versus melting [K/mm w.e.]
+
+    mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
+    mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
+
+/
+
+&smb_simple_north
+    ! Alternative surface mass balance method (ctrl: surface_method = "smb_simple").
+    ! Synthetic-elevation piecewise-linear scheme. Output is mm w.e./yr.
+    scheme      = "syn"      ! "syn" (synthetic-elevation pwl); "tg24" not yet supported
+    co2_const   = 280.0      ! [ppm]   Constant CO2     (only affects z_SL if a3 /= 0)
+    f_const     = 494.5      ! [W/m2]  Constant insolation (only affects z_SL if a4 /= 0)
+    mask_file   = ""         ! Target ice-mask file ("" => use reference H_ice_ref > 0)
+    mask_var    = ""         ! Target ice-mask variable name in mask_file
+    mask_idx    = 1          ! Index along 3rd dim of mask_var (used only if mask_file set)
+
+    ! Climate snow line  z_SL = a1 + a2*phi + a3*CO2 + a4*(f - fmean)
+    a1          = 3900.0     ! [m]   tuned to NH smbpal (LGM)
+    a2          = -50.0      ! [m/degN]
+    a3          = 0.0        ! [m/ppm]
+    a4          = 0.0        ! [m/(W/m2)]
+    fmean       = 494.5      ! [W/m2]
+
+    ! Ablation lapse rate  beta = max(beta_floor, beta0 + beta1*(phiref - phi))
+    beta0       = 5.0        ! [(mm/yr)/m] at phiref   tuned to NH smbpal (LGM)
+    beta1       = 0.05       ! [(mm/yr)/m] per degN
+    phiref      = 60.0       ! [degN]
+    beta_floor  = 0.0        ! [(mm/yr)/m]
+
+    ! Accumulation: acc = c0 * f_lat(phi) * f_dist(d_in)
+    !   f_dist = exp(-d_in_km / L_acc)   maritime decay inland (1 at margin)
+    !   f_lat  = clamp(1 - k_acc_lat*max(0, phi - phi_acc_ref), facc_lat_min, 1)
+    c0            = 300.0     ! [mm w.e./yr] maximum (coastal) accumulation at the margin   tuned
+    L_acc         = 300.0     ! [km]     e-folding length of inland accumulation decay   tuned
+    k_acc_lat     = 0.0       ! [1/degN] frac. accum decrease per degN beyond phi_acc_ref (0=off)
+    phi_acc_ref   = 0.0       ! [degN]   latitude above which accum starts dropping
+    facc_lat_min  = 0.3       ! [-]      floor on latitude modifier
+
+    ! Synthetic-elevation profile
+    use_plastic = True       ! True => plastic Nye/Vialov; False => linear wedge
+    slope       = 6.09e-3    ! [m/m] linear inside (use_plastic=False)
+    tau0        = 36.0e3     ! [Pa]  plastic basal yield stress
+    slope_out   = 6.09e-3    ! [m/m] linear outside ramp
+    z_max_in    = 2500.0     ! [m]   inside cap
+    z_max_out   = 200.0      ! [m]   outside floor
+
+    ! Surface temperature  t_srf = t_sl - gamma_t*max(z_syn,0), capped at t_ice_max over ice
+    gamma_t     = 6.5e-3     ! [K/m] lapse rate
+    t_ice_max   = 273.15     ! [K]
+
+    smb_min     = -2000.0    ! [mm w.e./yr] SMB floor outside the target mask (<= 0)
+/
+
+&itm_north
+        
+    H_snow_max      =  5.0e3         ! Maximum allowed snowpack thickness [mm w.e.]
+    Pmaxfrac        =  0.6           ! Refreezing factor 
+    
+    ! ## ITM 
+    trans_a         =  0.46 
+    trans_b         =  6e-5
+    itm_c           = -45.0
+    itm_t           =  10.0
+    itm_b           =  -2.0 
+    itm_lat0        =  65.0 
+
+    ! ## Surface albedo
+    alb_snow_dry       =  0.8
+    alb_snow_wet       =  0.65
+    alb_ice            =  0.4
+    alb_land           =  0.2
+    alb_forest         =  0.1
+    alb_ocean          =  0.1
+    H_snow_crit_desert =  10.0
+    H_snow_crit_forest = 100.0
+    melt_crit          =   0.5      ! Critical melt rate to reduce snow albedo [mm/day]
+
+/
+
+&surface_chion_north
+    ! Host side of chion (surface_method = "chion"): forcing chion does not own.
+    sf_a        = 0.273   ! Snow fraction function (parameter a)
+    sf_b        = 273.6   ! Snow fraction function (parameter b)
+    sigma_pdd   = 5.0     ! [K] Temperature standard deviation for the annual PDDs
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up (annual cycles)
+    dt_days     = 1       ! [d] chion step (divides the 360-day year)
+    trans_sw    = 0.6     ! [1] TOA -> surface shortwave transmissivity (bessi)
+    wind_speed  = 5.0     ! [m s-1] Constant wind speed (bessi)
+    rel_hum     = 0.8     ! [1] Constant relative humidity (bessi)
+/
+
+&chion_north
+    model           = "itm"                          ! Snowpack model: "itm", "bessi" or "pdd"
+    nml_itm         = "itm_north"                    ! ITM parameters: shared with smbpal
+/
+
+! ===== Ocean =====
+
+&marine_shelf_north
+    bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
+    tf_method       = 1             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
+    interp_depth    = "shlf"        ! "shlf", "bed", "const"
+    interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
+    find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
+    restart         = "none"        ! Load fields from a restart file?
+    extrap_shlf     = False         ! Extrapolate ocean front values into the shelf
+                                    ! Useful to account for moving ice fronts and/or filling mv in datasets
+    basins          = "Zwally2012.group"  ! basin ids: <set>, <set>.group, None or domain (one basin)
+    mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
+    mask_deep_ocean = "~region:Greenland | zone:open_ocean"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there
+    corr_method     = "none"  ! none, tf or bmb: corrections by region
+    corr_names      = ""
+    corr_values     = 0.0
+    
+    tf_correction   = False
+    tf_path         = "none"
+    tf_name         = "dT_nl"
+ 
+    bmb_max         = 0.0           ! [m/a] Maximum allowed bmb value (eg, for no refreezing, set bmb_max=0.0) 
+    
+    ! Deep ocean bmb 
+    c_deep          = -10.0         ! [m/yr] Melt rate in deep ocean, should be negative but not huge
+    depth_deep      =  500.0        ! [m] Depth at which deep ocean is assumed
+    depth_const     =    0.0        ! [m] Constant shelf depth for interp_depthconst
+    depth_min       = 1100.0        ! [m] interp_method=mean, min depth to include
+    depth_max       = 1500.0        ! [m] interp_method=mean, max depth to include
+    
+    ! Freezing point coefficients
+    lambda1         = -0.0575       ! [degC PSU−1] Liquidus slope
+    lambda2         = 0.0832        ! [degC] Liquidus intercept 
+    lambda3         = 7.59e-4       ! [degC m−1] Liquidus pressure coefficient
+
+    ! bmb_method == [lin,quad,quad-nl] 
+    gamma_lin       = 630.0         ! [m/yr] Linear heat excange velocity. Favier et al., (2019) suggest 630.
+    gamma_quad      = 11100.0       ! [m/yr] Quadratic heat exchange velocity. Jourdain et al. (2020) suggest 11100.
+    gamma_quad_nl   = 14500.0       ! [m/yr] Quadratic non-local heat exchange velocity. Jourdain et al. (2020) suggest 14500.
+    gamma_prime     = 100.0         ! [-] Scalar when '*-slope' method is used
+
+    ! bmb_method == anom
+    kappa_grz       = 10.0          ! [m/yr K-1] Heat flux coefficient [kappa*dT]
+    c_grz           = 1.0           ! [-] bmb_ref scalar [c_grz*bmb_ref]
+    f_grz_shlf      = 10.0          ! [-] Ratio of grz melt to shelf melt
+    grz_length      = 32.0          ! [km] Length scale of assumed grounding zone
+
+    ! bmb_method == anom, bmb_ref parameters 
+    use_obs         = False         ! Load obs for bmb_ref
+    obs_path        = "ice_data/{domain}/{grid_name}/{grid_name}_BMELT-R13.nc"
+    obs_name        = "bm_eq_reese"
+    obs_scale       = 1.0           ! [-] bmb_ref = obs_scale*bmb_obs
+    obs_lim         = 100.0         ! [m/yr] Maximum magnitude of bmb_ref
+    
+/

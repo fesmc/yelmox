@@ -18,9 +18,9 @@
 !   the reference the ramp uses for itself, so ramp and stabilisations are consistent.
 !   => *_esm_ref filenames hardcode .../esm-up2p0/... ; *_proj keep {experiment}.
 !
-! CAVEATS (same as ramp) -- verify before scientific use:
-!  - Salinity (so_*) and subglacial discharge (sgd/Qd) have no TIPMIP field, so
-!    those groups point at gcm-free ORAS4 (dso=0) / a literal ISMIP7 sgd placeholder.
+! Notes (as for the ramp):
+!  - Salinity (so_*) has no TIPMIP field: gcm-free ORAS5 (dso = 0). Subglacial
+!    discharge has none either: sgd groups are "none" (Qd = 0).
 !  - TF_anomaly carries NaN fill in some ocean cells (as ISMIP7 tf does); the
 !    2D ocean forcing tolerates it and the 1D diagnostic masks it (ocn_mean).
 !  - *_proj time = 1,0,49,1,12 matches the 50-yr stabilisation files; *_esm_ref
@@ -33,31 +33,31 @@
 ! ======== Reference period ========
 
 &gcm_ts_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
-    name        = "tas"
-    units       = "degrees C" "K"
-    scaling     = 1.0 273.15
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
+    name        = "t2m"
+    units       = "K" "K"
+    scaling     = 1.0 0.0
     time        = 0, 1961, 1990, 0, 12.0
 /
 
 &gcm_pr_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name        = "pr"
-    units       = "mm d-1" "mm d-1"
-    scaling     = 1 0.0
+    units       = "kg m-2 yr-1" "mm d-1"
+    scaling     = 2.73785e-3 0.0
     time        = 0, 1961, 1990, 0, 12.0
 /
 
 &gcm_smb_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name        = "smb"
-    units       = "mm d-1" "mm yr-1"
-    scaling     = 365.25 0.0
+    units       = "kg m-2 yr-1" "mm yr-1"
+    scaling     = 1.0 0.0
     time        = 0, 1961, 1990, 0, 12.0
 /
 
 &gcm_zs_ref
-    filename    = "ice_data/{domain}/{grid_name}/{grid_name}_MARv3.11-ERA_monmean_1961-1990_with_pr.nc"
+    filename    = "fesmdata/{domain}/{grid_name}/{grid_name}_SMB-MARv3.14-1961-1990.nc"
     name        = "z_srf"
     units       = "m" "m"
     scaling     = 1.0 0.0
@@ -170,19 +170,25 @@
 
 ! ======== Reference period ========
 &gcm_to_ref
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    filename    = "fesmdata/{domain}/GRL-16KM/GRL-16KM_Ocean-ORAS5-1981-2010.nc"   ! ORAS5 is cropped on GRL-16KM/32KM only
     name        = "to"
-    units       = "degrees C" "K"
+    units       = "degC" "K"
     scaling     = 1.0 273.15
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    remap       = "bilin"
+    grid_src    = "GRL-16KM"
+    fill        = "nearest"
 /
 
 &gcm_so_ref
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    filename    = "fesmdata/{domain}/GRL-16KM/GRL-16KM_Ocean-ORAS5-1981-2010.nc"   ! ORAS5 is cropped on GRL-16KM/32KM only
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    remap       = "bilin"
+    grid_src    = "GRL-16KM"
+    fill        = "nearest"
 /
 
 ! ======== ESM Reference period ========
@@ -198,12 +204,15 @@
 ! loaded but not used so far
 &gcm_so_esm_ref
     ! TIPMIP has no salinity field. Point esm_ref AND proj at the same (gcm-free)
-    ! ORAS4 reference so the salinity anomaly dso = so_proj - so_esm_ref = 0.
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    ! ORAS5 reference so the salinity anomaly dso = so_proj - so_esm_ref = 0.
+    filename    = "fesmdata/{domain}/GRL-16KM/GRL-16KM_Ocean-ORAS5-1981-2010.nc"   ! ORAS5 is cropped on GRL-16KM/32KM only
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    remap       = "bilin"
+    grid_src    = "GRL-16KM"
+    fill        = "nearest"
 /
 
 ! ======== Historical period ========
@@ -216,7 +225,7 @@
 /
 
 &gcm_sgd_hist
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/{gcm}/historical/SDBN1/sgd/{grid_name}_{gcm}_historical_1850-2014_sgd.nc"
+    filename    = "none"                ! TIPMIP has no subglacial discharge: Qd = 0
     name        = "sgd"
     units       = "m3 s-1" "K"
     scaling     = 1.0 1
@@ -243,12 +252,8 @@
 /
 
 &gcm_sgd_proj
-    ! SCAFFOLD placeholder: TIPMIP has no subglacial-discharge field, so point at
-    ! a LITERAL existing ISMIP7 sgd file (CESM2-WACCM ssp585). Its 2015-2300 axis
-    ! sits entirely above the TIPMIP 0..232 run clock, so the "extrap" slice used
-    ! for Qd_proj clamps to the 2015 boundary slice (a constant). Qd is diagnostic
-    ! only here (forcing-only, with_ice_sheet=False); replace for scientific use.
-    filename    = "ice_data/ISMIP7/{domain}/{grid_name}/CESM2-WACCM/ssp585/SDBN1/sgd/{grid_name}_CESM2-WACCM_ssp585_2015-2300_sgd.nc"
+    ! TIPMIP has no subglacial-discharge field: filename = "none" gives Qd = 0.
+    filename    = "none"
     name        = "sgd"
     units       = "m3 s-1" "K"
     scaling     = 1.0 1
@@ -257,12 +262,15 @@
 
 ! Loaded but not used
 &gcm_so_proj
-    ! No TIPMIP salinity: reuse the ORAS4 reference so dso = 0 (see so_esm_ref).
-    filename    = "ice_data/{domain}/{grid_name}/ERA-INT-ORAS4/{grid_name}_ERA-INT-ORAS4_1981-2010_annual.nc"
+    ! No TIPMIP salinity: reuse the ORAS5 reference so dso = 0 (see so_esm_ref).
+    filename    = "fesmdata/{domain}/GRL-16KM/GRL-16KM_Ocean-ORAS5-1981-2010.nc"   ! ORAS5 is cropped on GRL-16KM/32KM only
     name        = "so"
     units       = "PSU" "PSU"
     scaling     = 1.0 0.0
-    time        = 0, 1981, 2010, 0, 1
+    time        = 0, 1981, 2010, 0, 12
+    remap       = "bilin"
+    grid_src    = "GRL-16KM"
+    fill        = "nearest"
 /
 
 ! ==================================
