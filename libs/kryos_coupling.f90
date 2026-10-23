@@ -46,21 +46,25 @@ contains
                           dom%rlx%topo_rel0, dom%rlx%topo_rel_tau0)
     end subroutine step_relax
 
-    subroutine step_optimize(dom, ts)
+    subroutine step_optimize(dom, ts, dtt)
         ! Optimization ([sim] opt), within the [opt] time windows: nudge the
         ! basal-friction field cb_ref and the marine thermal-forcing correction
-        ! tf_corr toward present-day observations.
+        ! tf_corr toward present-day observations, over the step dtt.
         !
-        ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr lives on the
-        ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
-        ! Yelmo grid, so the correction is lifted to the Yelmo grid (tf_corr_y),
-        ! optimized there, and remapped back to the shelf grid. At identity grids
-        ! both remaps are copies.
+        ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr is a
+        ! marine_shelf control, optimized in place on grid_shelf, where it lives
+        ! and is never remapped (a round trip through the Yelmo grid would smooth
+        ! it every step). The Yelmo-grid inputs of its optimization (the current
+        ! and observed geometry) are remapped onto grid_shelf instead; the
+        ! basins are marine_shelf's own. At identity grids these remaps are copies.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        real(dp),          intent(in)    :: dtt   ! [yr] the driver's time step
 
-        real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
+        real(wp), allocatable :: H_ice_m(:,:), H_grnd_m(:,:), dHidt_m(:,:)
+        real(wp), allocatable :: H_ice_pd_m(:,:), H_grnd_pd_m(:,:)
         character(len=256) :: gm, gy
+        character(len=32)  :: mth
 
         if (.not. dom%ctl%opt) return
 
@@ -76,43 +80,50 @@ contains
                     dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%uxy_s, dom%yelmo%dta%pd%H_grnd, &
                     dom%opt%cf_min, dom%opt%cf_max, dom%yelmo%tpo%par%dx, &
                     dom%opt%sigma_err, dom%opt%sigma_vel, dom%opt%tau_c, dom%opt%H0, &
-                    dt=dom%ctl%dtt, fill_method=dom%opt%fill_method, fill_dist=dom%opt%sigma_err, &
+                    dt=dtt, fill_method=dom%opt%fill_method, fill_dist=dom%opt%sigma_err, &
                     cb_tgt=dom%yelmo%dyn%now%cb_tgt)
         end if
 
-        ! Thermal-forcing correction (tf_corr) optimization -- lift shelf-grid
-        ! correction to the Yelmo grid, optimize against Yelmo-grid targets, remap
-        ! back. tf_corr persists on the shelf grid (in mshlf, incl. its restart).
+        ! Thermal-forcing correction (tf_corr) optimization -- grid_shelf, in
+        ! place on mshlf (incl. its restart). The Yelmo-grid inputs land on
+        ! grid_shelf averaged over the target cell when the Yelmo grid is finer
+        ! (conservative), else interpolated (remap_method_smooth). The basins are
+        ! marine_shelf's (mshlf%now%basins, on grid_shelf): the same regions layer
+        ! and ids as Yelmo's bnd%basins when [marine_shelf] basins = [yelmo_masks]
+        ! basins, as in every par file, so the ids of tf_basins.
         ! Method: "L21" (one correction per basin) or "L21-points".
         if (trim(dom%opt%opt_tf) /= "none" .and. ts%time_elapsed >= dom%opt%tf_time_init &
                             .and. ts%time_elapsed <= dom%opt%tf_time_end) then
-            call remap(dom, dom%mshlf%now%tf_corr, gm, tf_corr_y, gy, "con")
+            mth = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_shelf)
+            call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_m,    gm, mth)
+            call remap(dom, dom%yelmo%tpo%now%H_grnd, gy, H_grnd_m,   gm, mth)
+            call remap(dom, dom%yelmo%tpo%now%dHidt,  gy, dHidt_m,    gm, mth)
+            call remap(dom, dom%yelmo%dta%pd%H_ice,   gy, H_ice_pd_m, gm, mth)
             select case (trim(dom%opt%opt_tf))
             case ("L21")
-                call optimize_tf_corr_basin(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
-                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%bnd%basins, &
+                call optimize_tf_corr_basin(dom%mshlf%now%tf_corr, H_ice_m, H_grnd_m, &
+                        dHidt_m, H_ice_pd_m, dom%mshlf%now%basins, &
                         dom%opt%H_grnd_lim, dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                        dom%opt%tf_basins, dt=dom%ctl%dtt)
+                        dom%opt%tf_basins, dt=dtt)
             case ("L21-points")
-                call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
-                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
-                        dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
+                call remap(dom, dom%yelmo%dta%pd%H_grnd, gy, H_grnd_pd_m, gm, mth)
+                call optimize_tf_corr(dom%mshlf%now%tf_corr, H_ice_m, H_grnd_m, &
+                        dHidt_m, H_ice_pd_m, H_grnd_pd_m, &
+                        dom%opt%H_grnd_lim, dom%mshlf%now%basins, dom%opt%basin_fill, &
                         dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                        dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+                        dom%ctl%dx_shelf, sigma=dom%opt%tf_sigma, dt=dtt)
             end select
-            call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
-            dom%mshlf%now%tf_corr = tf_corr_m
         end if
     end subroutine step_optimize
 
     subroutine step_isostasy(dom, ts, bsl)
         ! Run isostasy on its own grid, on the dt_isos cadence (FastIsostasy
         ! integrates the whole interval; the bedrock is held in between): ice load
-        ! from Yelmo (bilin). The bedrock /
+        ! from Yelmo, conservative onto a coarser grid_isos, bilinear onto a finer
+        ! one (remap_method_smooth; a copy when equal). The bedrock /
         ! sea-surface outputs stay on grid_isos (in dom%isos%out); they are landed
-        ! on the Yelmo grid by couple_isostasy_to_yelmo (in step_icesheet, before
-        ! yelmo_update). Assumes grid_isos is at least as fine as grid_ice
-        ! (identity when equal). bsl is the shared, driver-owned sea level (already
+        ! on the Yelmo grid by couple_isostasy_to_yelmo (in couple_to_yelmo, before
+        ! step_icesheet). bsl is the shared, driver-owned sea level (already
         ! updated for this step by the driver); isos_update reads it and, under
         ! fastiso/mixed, writes back the prognostic bsl_now -- so with several
         ! domains sharing one bsl the sea level integrates every domain's ice load.
@@ -265,7 +276,7 @@ contains
                        &reference, so the two must describe the same bedrock."
             write(*,*) "  On a restart this usually means isos_restart.nc came from a run with a &
                        &different topography than the one Yelmo is reading now."
-            stop
+            error stop 1
         end if
     end subroutine check_isostasy_reference
 
@@ -365,43 +376,50 @@ contains
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
-        ! NEGIS: update cb_ref from bed properties + NEGIS scaling.
-        if (dom%ngs%use_negis_par) &
-            call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time)
+        ! NEGIS: cb_ref from the bed properties + the NEGIS scaling at the
+        ! forcing time (Yelmo's till_method = -1, set by domain_negis_init).
+        if (dom%ctl%use_negis) &
+            call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time_rel)
 
         if (.not. dom%ctl%with_ice_sheet) return
-        if (ts%n == 0 .and. dom%yelmo%par%use_restart) return
 
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, coefs, init)
+    subroutine step_climate(dom, ts, dtt, coefs, init, force)
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend and its
         ! terms into dom%clim, read by step_surface, step_shelf and
-        ! couple_climate_to_yelmo. coefs is the driver-owned coefficient
-        ! registry (advanced to this step; the climate sets its derived
-        ! coefficients in it).
-        ! init=.true. marks the cold start: the update runs regardless of the
-        ! cadence.
+        ! couple_climate_to_yelmo. dtt is the driver's time step. coefs is the
+        ! driver-owned coefficient registry (advanced to this step; the climate
+        ! sets its derived coefficients in it).
+        ! init=.true. marks the cold start: the backend's own initialization
+        ! (the REMBO equilibration), with an update regardless of the cadence.
+        ! force=.true. updates regardless of the cadence, without that
+        ! initialization: the re-derivation on a restart and the refresh after
+        ! a cold-start change of the geometry (recon).
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
+        real(dp),              intent(in)    :: dtt
         type(coefs_class),     intent(inout) :: coefs
         logical,               intent(in), optional :: init
+        logical,               intent(in), optional :: force
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
         real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:)
         character(len=256) :: gc, gh
         character(len=32)  :: mth
-        logical :: is_init
+        logical :: is_init, is_forced
 
         if (.not. dom%ctl%with_climate) return
 
         is_init = .false.
         if (present(init)) is_init = init
+        is_forced = .false.
+        if (present(force)) is_forced = force
 
-        if (.not. (is_init .or. cadence_due(ts%time_elapsed, dom%ctl%dt_clim))) return
+        if (.not. (is_init .or. is_forced .or. cadence_due(ts%time_elapsed, dom%ctl%dt_clim))) return
 
         gc = trim(dom%ctl%grid_clim)
         gh = trim(dom%ctl%grid_hub)
@@ -417,8 +435,7 @@ contains
         call remap(dom, dom%topo%ref%z_srf, gh, z_srf_ref_c, gc, mth)
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
-                            z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
-                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
+                            z_srf_ref_c, dtt=dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)
@@ -482,8 +499,7 @@ contains
             call remap(dom, dom%topo%H_ice,  gh, H_ice_s, gs, mth)
             call remap_atm_to_surface(dom, z_srf_s, tas_s, pr_s)
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
-                call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
-                        ts%time_rel, time_equil=100.0_wp)
+                call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
             end if
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if

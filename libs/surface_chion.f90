@@ -33,10 +33,13 @@ module surface_chion
     !
     ! smb is the surface mass balance, sf + rf - runoff - subl (smbpal's smb),
     ! not chion_get_smb's ice-facing flux. tsrf: for ITM and PDD chion's
-    ! chion_tsrf_annual, smbpal's calc_temp_surf on the annual means (the
-    ! annual-mean air temperature warmed by the annual refreezing, firn_fac,
-    ! capped at freezing over ice); for BESSI the annual mean of its per-step
-    ! surface temperature (chion_get_surface). alb_s is the annual mean of
+    ! chion_tsrf_annual on the annual means: over ice the annual-mean air
+    ! temperature warmed by the gross annual refreezing, capped at freezing,
+    ! min(T0, t_air + firn_fac*max(refrz,0)), elsewhere the air temperature.
+    ! This is intended: smbpal PDD did the same, while smbpal ITM warmed by
+    ! the net refreezing max(refrz - melt, 0), i.e. less where it melts.
+    ! BESSI: the annual mean of its per-step surface temperature
+    ! (chion_get_surface). alb_s is the annual mean of
     ! chion's per-step albedo (missing for PDD, which has none).
     !
     ! The per-column host work (forcing, accumulation, PDDs, insolation lookup)
@@ -54,7 +57,7 @@ module surface_chion
     use orbit_forcing, only : orbit_ctl_class, orbit_pars_class, orbit_ctl_load, &
                               orbit_pars_now, orbit_pars_equal
     use chion,      only : wp, dp, wp_acc, MV, chion_class, chion_init, chion_init_state, &
-                           chion_update, chion_end, chion_set_active_mask, &
+                           chion_update, chion_set_active_mask, &
                            chion_get_surface_flux_totals, chion_get_surface, &
                            chion_restart_write, chion_restart_read, &
                            monthly_to_daily_class, monthly_to_daily_init, &
@@ -133,7 +136,6 @@ module surface_chion
     public :: surface_chion_update
     public :: surface_chion_restart_write
     public :: surface_chion_restart_read
-    public :: surface_chion_end
 
 contains
 
@@ -370,9 +372,11 @@ contains
         sc%ann%smb    = unpack_col(pr_sum - runoff_a - subl_a,   idx, sc, 0.0_wp)
         sc%ann%alb_s  = unpack_col(alb_sum/real(nday, wp),       idx, sc, MV)
 
-        ! Surface temperature (inactive columns keep t2m): ITM and PDD, chion's
-        ! on the annual means (chion_tsrf_annual; H_ice is chion's forcing of
-        ! the year); BESSI, the annual mean of its per-step surface temperature.
+        ! Surface temperature (inactive columns keep t2m): ITM and PDD, the
+        ! annual-mean air temperature warmed by the gross annual refreezing
+        ! (chion_tsrf_annual; H_ice is chion's forcing of the year; smbpal ITM
+        ! used the net refreezing refrz - melt instead); BESSI, the annual mean
+        ! of its per-step surface temperature.
         sc%ann%tsrf = sc%ann%t2m
         if (trim(sc%chn%par%model) == "bessi") then
             call scatter(sc%ann%tsrf, ts_sum/real(nday, wp), idx, sc)
@@ -491,12 +495,6 @@ contains
         end subroutine read_ann
 
     end subroutine surface_chion_restart_read
-
-    subroutine surface_chion_end(sc)
-        type(surface_chion_class), intent(inout) :: sc
-
-        call chion_end(sc%chn)
-    end subroutine surface_chion_end
 
     subroutine surface_chion_par_load(par, filename, group)
         type(surface_chion_param_class), intent(out) :: par

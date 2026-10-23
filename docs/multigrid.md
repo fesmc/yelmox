@@ -260,12 +260,12 @@ reallocation cost is negligible against the physics.
 `yelmox` and `yelmox_bipolar` advance a domain with these primitives (from `kryos_coupling`):
 
 - `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
-- `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`).
+- `step_optimize(dom, ts, dtt)` — basal-friction / thermal-forcing optimization (`[sim] opt`) over the driver's step `dtt`: `cb_ref` on `grid_ice`, `tf_corr` on `grid_shelf` (its Yelmo-grid inputs remapped there, the basins of `[marine_shelf]`; `tf_corr` itself never crosses grids).
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`), on the `dt_isos` cadence.
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
 - `couple_yelmo_to_htopo` — the hub's current geometry from the models (a mirror of Yelmo on its grid; hi-res reference + Yelmo's anomalies on a finer hub).
-- `step_climate` — climate on `grid_clim` from the backend, with the coefficient registry and the terms of the forcing, on the `dt_clim` cadence.
+- `step_climate(dom, ts, dtt, coefs)` — climate on `grid_clim` from the backend, with the coefficient registry and the terms of the forcing, on the `dt_clim` cadence.
 - `step_surface` — surface mass balance on `grid_surface` (`surface_method`: chion, smbpal, smb_simple, or the climate's own, `climate`).
 
 The hub geometry reaches `grid_clim` and `grid_surface` averaged over the target
@@ -307,10 +307,15 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
   `timestepping`) — reads the run's timeline group (`[ctrl] run_step`: `"ctrl"`
   for `[ctrl]` itself, or a phase group such as `[spinup]`/`[transient]`) and
   initializes the driver-owned timestepper; `[ctrl] calendar` / `calendar_ref`
-  give `cal` / `time_ref` (calendar years, e.g. ESM runs). `domain_init` takes
-  the same group name (`timeline_group`) and reads the values the domain needs
-  (`tstep_method`, `dtt`) itself.
-- **`domain_startup(dom, ts, bsl, restart, coefs [, restore_bsl])`**
+  give `cal` / `time_ref` (calendar years, e.g. ESM runs). The driver owns the
+  timeline and the step `dtt`, and passes `dtt` to the steps that need it.
+- **`domain_init(dom, path_par, ts, coefs [, group_suffix, timeline_group])`**
+  (`kryos`) — the domain's sub-models at the start of the timeline `ts`
+  (Yelmo at the model time, the climate at the forcing time `time_rel`).
+  `timeline_group` (default `"ctrl"`, the group given to `tstep_init`) is read
+  only by the esm climate (its `time_ref`, `time_hist`, `time_proj`,
+  `time_esm_ref`).
+- **`domain_startup(dom, ts, dtt, bsl, restart, coefs [, restore_bsl])`**
   (`kryos_startup`) — cold start (`restart = "None"`, `domain_init_state`) or
   restore of the domain bundle `restart` + hub rebuild, continuing the
   restored state: only the climate (and a stateless `smb_simple` surface) is
@@ -318,7 +323,7 @@ boundary forcing (`calc_ytopo_mb_diagnostic`). `mb_net` remains zero at `t=0`
   `[ctrl] restart`. `yelmox` restores the shared bsl from the same bundle;
   `yelmox_bipolar` restores it once via **`bsl_startup(bsl, fldr)`**, passes
   each domain its subfolder of the bundle and `restore_bsl=.false.`.
-- **`domain_init_ice(dom, ts, coefs)`** — the cold-start ice state after
+- **`domain_init_ice(dom, ts, dtt, coefs)`** — the cold-start ice state after
   `yelmo_init_state` (`[sim]` `init_kill_shelves`, `init_marine_H`,
   `init_method`, `init_time_thrm`; see [yelmox](yelmox.md#configuration)).
 - **`run_restart_write(dom, bsl, time, coefs [, fldr])`** — the single-domain

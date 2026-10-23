@@ -22,6 +22,7 @@ module kryos
 
     use precision,    only : dp
     use nml,          only : nml_read, nml_replace
+    use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
     use phys_constants, only : phys_const_class, phys_const_load
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_init_grid, ytopo_input_class
@@ -52,11 +53,13 @@ module kryos
     character(len=*), parameter :: PHYS_CONST_FILE = "input/yelmo_phys_const.nml"
 
     type domain_ctl
-        ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
+        ! The values below are placeholders: every key domain_ctl_load reads
+        ! ([domain], [comps], [sim], [output]) is required in the par file
+        ! (nml_read stops on a missing key), the init_method keys for their
+        ! method only. The dx_* and south are derived by domain_init.
+        !
+        ! Parameter file (kept for sub-steps that reload from it, e.g. the recon startup).
         character(len=512) :: path_par = ""
-        ! Shared timeline (read from the driver's timeline group, e.g. [ctrl]).
-        character(len=56) :: tstep_method = "const"
-        real(dp) :: dtt         = 10.0_dp
         ! Components ([comps]): which are active in the coupling sequence, with
         ! which model, how often.
         logical :: with_ice_sheet = .true.
@@ -124,15 +127,17 @@ module kryos
         real(dp) :: dt_cmip    = 1.0_dp
     end type domain_ctl
 
-    ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters.
+    ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters
+    ! ([negis]; [sim] use_negis). cb_ref is the till friction of the bed with
+    ! each NEGIS part scaled by its factor: the centre always, the north part
+    ! (paleo ice stream) before -4 ka, the south part from -4 ka; all parts by
+    ! the ramp cf_0 (before -11 ka) -> cf_1 (from 0 ka), on the forcing time.
     type negis_params
-        logical  :: use_negis_par = .false.
         real(wp) :: cf_0    = 1.0_wp
         real(wp) :: cf_1    = 1.0_wp
         real(wp) :: cf_centre = 1.0_wp
         real(wp) :: cf_north  = 1.0_wp
         real(wp) :: cf_south  = 1.0_wp
-        real(wp) :: cf_x    = 1.0_wp
         ! The NEGIS parts (selection expressions of the regions), and their
         ! masks on the Yelmo grid
         character(len=1000) :: region_centre = "", region_south = "", region_north = ""
@@ -216,7 +221,7 @@ contains
         if (dt > 0.0_dp) due = (mod(nint(time*100), nint(dt*100)) == 0)
     end function cadence_due
 
-    subroutine domain_init(dom, path_par, time, coefs, group_suffix, timeline_group)
+    subroutine domain_init(dom, path_par, ts, coefs, group_suffix, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
@@ -235,15 +240,18 @@ contains
         ! ytopo, ...) stay shared: they are named by pointer fields inside the
         ! [yelmo<suffix>] block, so the nml decides whether they are shared.
         !
-        ! timeline_group (optional, default "ctrl") names the group holding the
-        ! run's shared timeline -- the same group the driver passes to
-        ! tstep_init -- from which the domain reads tstep_method/dtt itself.
+        ! ts is the driver's timeline at the start: Yelmo starts at the model
+        ! time, the climate at the forcing time (time_rel). timeline_group
+        ! (optional, default "ctrl") names the group holding it -- the same
+        ! group the driver passes to tstep_init -- for the climate backends
+        ! that read it (esm). The time step stays the driver's (dtt), passed to
+        ! the steps that need it.
         !
         ! coefs is the driver's coefficient registry (shared by every domain);
         ! the climate checks the coefficients it names against it.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
-        real(dp),         intent(in)    :: time       ! model time
+        type(tstep_class),  intent(in)  :: ts
         type(coefs_class),   intent(in) :: coefs
         character(len=*), intent(in), optional :: group_suffix
         character(len=*), intent(in), optional :: timeline_group
@@ -263,7 +271,7 @@ contains
         if (present(timeline_group)) tgroup = trim(timeline_group)
 
         ! --- domain definition + run control ---
-        call domain_ctl_load(dom%ctl, path_par, trim(sfx), trim(tgroup))
+        call domain_ctl_load(dom%ctl, path_par, trim(sfx))
         domain = trim(dom%ctl%domain)
 
         ! --- physical constants of the domain, handed to every component ---
@@ -287,8 +295,10 @@ contains
         ! relaxation, basins; Yelmo's mask_border then sets the border).
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         call grid_cdo_read_desc(grid_h, trim(dom%ctl%grid_hub), MAP_FLDR)
-        dom%ctl%dx_hub = dom%yelmo%grd%G%dx * (grid_h%G%dx / grid_y%G%dx)
         call yelmo_init_grid(dom%yelmo%grd, grid_y)
+        ! Hub grid spacing in Yelmo units, scaled by the resolution ratio (as
+        ! the other components' below; needs the Yelmo grid).
+        dom%ctl%dx_hub = dom%yelmo%grd%G%dx * (grid_h%G%dx / grid_y%G%dx)
 
         call remap(dom, dom%topo%ref%z_bed,    dom%ctl%grid_hub, topo_y%z_bed,    dom%ctl%grid_ice, "con")
         call remap(dom, dom%topo%ref%H_ice,    dom%ctl%grid_hub, topo_y%H_ice,    dom%ctl%grid_ice, "con")
@@ -297,10 +307,22 @@ contains
 
         call domain_regions_load(reg_y, dom, path_par, trim(sfx), grid_y)
 
-        call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=time, &
+        call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=ts%time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
                         group="yelmo"//trim(sfx), reg=reg_y, &
                         topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
+
+        ! Relaxation parameters + the par-file ytopo values it restores; no-op
+        ! unless [sim] relax. Must follow yelmo_init (ytopo params known).
+        call domain_relax_init(dom, path_par, trim(sfx))
+
+        ! Optimization state (basal friction + thermal forcing); no-op unless
+        ! [sim] opt. Must follow yelmo_init (grid + till params known).
+        call domain_opt_init(dom, path_par, trim(sfx))
+
+        ! NEGIS cb_ref modification; no-op unless [sim] use_negis. Must follow
+        ! domain_opt_init (refuses the cb_ref optimization).
+        call domain_negis_init(dom, path_par, trim(sfx), reg_y)
 
         ! Where the reconstruction's ice is imposed (init_method = recon).
         if (trim(dom%ctl%init_method) == "recon") then
@@ -310,10 +332,6 @@ contains
         ! Prescribed ice in Yelmo's fixed and relaxation cells ([ice_bnd]),
         ! read on the Yelmo grid; no-op unless active.
         call ice_bnd_init(dom%ibnd, path_par, "ice_bnd"//trim(sfx), domain, grid_y, coefs)
-
-        ! NEGIS cb_ref modification: its parameters and the masks of its parts,
-        ! loaded when enabled, so it cannot silently run with defaults.
-        if (dom%ctl%use_negis) call negis_par_load(dom%ngs, path_par, trim(sfx), reg_y)
 
         call regions_end(reg_y)
 
@@ -347,7 +365,7 @@ contains
         dom%ctl%south = (sum(grid_c%lat) / size(grid_c%lat) < 0.0_wp)
         call domain_regions_load(reg_c, dom, path_par, trim(sfx), grid_c)
         call climate_init(dom%cl, dom%ctl%climate, path_par, domain, grid_c, &
-                          time, reg_c, dom%ctl%south, sfx=trim(sfx), &
+                          ts%time_rel, reg_c, dom%ctl%south, sfx=trim(sfx), &
                           timeline_group=trim(tgroup), &
                           smb_direct=(trim(dom%ctl%surface_method) == "climate"), coefs=coefs)
         call regions_end(reg_c)
@@ -369,10 +387,12 @@ contains
                              orbit_group="orbit"//trim(sfx))
 
         ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
-        ! smbpal (1D axes), smb_simple takes 2D projected coordinates.
+        ! smbpal (1D axes), smb_simple takes 2D projected coordinates, in
+        ! metres: the grid's axes are in the units of its description (e.g. km),
+        ! converted by its xy_conv.
         if (trim(dom%ctl%surface_method) == "smb_simple") then
-            call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x, wp), &
-                                 y=real(grid_s%y, wp), lat=lats_s, &
+            call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x*grid_s%cs%xy_conv, wp), &
+                                 y=real(grid_s%y*grid_s%cs%xy_conv, wp), lat=lats_s, &
                                  group="smb_simple"//trim(sfx), units="m", &
                                  cnst=dom%cnst)
             ! {domain}/{grid_name} of the target-mask file: the domain name and
@@ -403,16 +423,9 @@ contains
         call domain_regions_load(reg_m, dom, path_par, trim(sfx), grid_m)
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
-                           domain, trim(dom%ctl%grid_shelf), reg_m, cnst=dom%cnst)
+                           domain, trim(dom%ctl%grid_shelf), reg_m, &
+                           xc=real(grid_m%G%x, wp), yc=real(grid_m%G%y, wp), cnst=dom%cnst)
         call regions_end(reg_m)
-
-        ! Relaxation parameters + the par-file ytopo values it restores; no-op
-        ! unless [sim] relax. Must follow yelmo_init (ytopo params known).
-        call domain_relax_init(dom, path_par, trim(sfx))
-
-        ! Optimization state (basal friction + thermal forcing); no-op unless
-        ! [sim] opt. Must follow yelmo_init (grid + till params known).
-        call domain_opt_init(dom, path_par, trim(sfx))
 
         ! Glacial smb scaling: load its group when enabled, so it cannot
         ! silently run with default parameters.
@@ -420,16 +433,43 @@ contains
 
     end subroutine domain_init
 
+    subroutine domain_negis_init(dom, path_par, suffix, reg)
+        ! NEGIS cb_ref modification ([sim] use_negis): load its parameters and
+        ! the masks of its parts (so it cannot silently run with defaults), and
+        ! prepare Yelmo for external cb_ref (till_method = -1), which the
+        ! coupling sets each step (negis_update_cb_ref, as on the cold start).
+        ! Exclusive with the cb_ref optimization, the other external cb_ref.
+        ! No-op unless [sim] use_negis.
+        type(kryos_domain),  intent(inout) :: dom
+        character(len=*),    intent(in)    :: path_par
+        character(len=*),    intent(in)    :: suffix
+        type(regions_class), intent(in)    :: reg
+
+        if (.not. dom%ctl%use_negis) return
+
+        if (dom%ctl%opt) then
+            if (trim(dom%opt%opt_cf) /= "none") then
+                write(*,*) "domain_negis_init:: error: sim"//trim(suffix)//".use_negis sets cb_ref, &
+                           &as does the cb_ref optimization (opt"//trim(suffix)//".opt_cf = "// &
+                           trim(dom%opt%opt_cf)//"); use one of them (opt_cf = ""none"")."
+                stop 1
+            end if
+        end if
+
+        call negis_par_load(dom%ngs, path_par, suffix, reg)
+
+        ! cb_ref is set externally by the NEGIS modification from here on.
+        dom%yelmo%dyn%par%till_method = -1
+    end subroutine domain_negis_init
+
     subroutine negis_par_load(ngs, path_par, suffix, reg)
         ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]) and make the
-        ! masks of its parts from the regions on the Yelmo grid. Only read when
-        ! [sim] use_negis is set.
+        ! masks of its parts from the regions on the Yelmo grid.
         type(negis_params),  intent(inout) :: ngs
         character(len=*),    intent(in)    :: path_par
         character(len=*),    intent(in)    :: suffix
         type(regions_class), intent(in)    :: reg
 
-        ngs%use_negis_par = .true.
         call nml_read(path_par, "negis"//trim(suffix), "cf_0",      ngs%cf_0)
         call nml_read(path_par, "negis"//trim(suffix), "cf_1",      ngs%cf_1)
         call nml_read(path_par, "negis"//trim(suffix), "cf_centre", ngs%cf_centre)
@@ -499,27 +539,19 @@ contains
         dom%yelmo%dyn%par%till_method = -1
     end subroutine domain_opt_init
 
-    subroutine domain_ctl_load(ctl, path_par, suffix, timeline_group)
+    subroutine domain_ctl_load(ctl, path_par, suffix)
         ! Load this domain's definition, components, simulation conditions and
         ! output config ([domain], [comps], [sim], [output]). All groups
         ! carry an optional domain suffix (e.g. "_north"), so several domains can
         ! coexist in one parameter file without group.name collisions (matters
-        ! for runme -p). The shared timeline is driver-owned (tstep_init); the
-        ! values the domain logic needs (tstep_method, dtt) are read from the
-        ! same timeline_group here, so nothing is injected after init.
+        ! for runme -p). The shared timeline is driver-owned (tstep_init).
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
         character(len=*), intent(in)    :: suffix
-        character(len=*), intent(in)    :: timeline_group
 
         character(len=256) :: gd, gc, gs, go
 
         ctl%path_par = trim(path_par)
-
-        ! Shared timeline values used by the domain logic (dt_clim cadence,
-        ! optimization dt, domain-specific startup).
-        call nml_read(path_par, timeline_group, "tstep_method", ctl%tstep_method)
-        call nml_read(path_par, timeline_group, "dtt",          ctl%dtt)
 
         ! Domain definition ([domain<suffix>]): name and the grid of every
         ! component. The hub's topography and masks are read by htopo_init.
@@ -558,7 +590,6 @@ contains
             stop 1
         end if
         call nml_read(path_par, gc, "climate",        ctl%climate)
-        ctl%surface_method = "chion"
         call nml_read(path_par, gc, "surface_method", ctl%surface_method)
         select case(trim(ctl%surface_method))
             case("chion", "smbpal", "climate")
@@ -622,9 +653,17 @@ contains
         ! require a [negis<suffix>] / [glacial_smb<suffix>] group.
         call nml_read(path_par, gs, "use_negis",         ctl%use_negis)
         call nml_read(path_par, gs, "scale_glacial_smb", ctl%scale_glacial_smb)
+        ! The glacial index of scale_glacial_smb is the climate's annual air
+        ! temperature against its reference, which rembo does not supply.
+        if (ctl%scale_glacial_smb .and. trim(ctl%climate) == "rembo") then
+            write(*,*) "domain_ctl_load:: error: "//trim(gs)//".scale_glacial_smb needs the &
+                       &reference annual air temperature of the climate; climate = rembo has none &
+                       &(REMBO supplies its own atmosphere and smb). Set scale_glacial_smb = False."
+            stop 1
+        end if
         call nml_read(path_par, gs, "lim_pd_ice",        ctl%lim_pd_ice)
 
-        ! Per-module output switches ([output<suffix>]); default = write everything.
+        ! Per-module output switches ([output<suffix>]); every key is required.
         go = "output"//trim(suffix)
         call nml_read(path_par, go, "write_yelmo", ctl%write_yelmo)
         call nml_read(path_par, go, "write_isos",  ctl%write_isos)
@@ -634,6 +673,13 @@ contains
         call nml_read(path_par, go, "write_htopo", ctl%write_htopo)
         call nml_read(path_par, go, "write_cmip",  ctl%write_cmip)
         call nml_read(path_par, go, "dt_cmip",     ctl%dt_cmip)
+
+        ! Effective switches: a component's files are written only when it runs
+        ! (an inactive component's fields are unset or static).
+        ctl%write_isos    = ctl%write_isos    .and. ctl%with_isostasy
+        ctl%write_shelf   = ctl%write_shelf   .and. ctl%with_shelf
+        ctl%write_surface = ctl%write_surface .and. ctl%with_surface
+        ctl%write_clim    = ctl%write_clim    .and. ctl%with_climate
     end subroutine domain_ctl_load
 
     ! ----- remap: identity-copy when src == dst, else via the coupler ---

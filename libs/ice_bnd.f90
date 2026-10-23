@@ -28,7 +28,7 @@ module ice_bnd
     use varslice,      only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use yelmo_defs,    only : MASK_ICE_FIXED
     use kryos_forcing, only : coefs_class, coefs_value, coefs_has
-    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
+    use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, forcing_var_defs, def_file => yelmox_defaults_file
 
     implicit none
 
@@ -68,8 +68,7 @@ contains
         call nml_read(filename, group, "active", ibnd%active, defaults_file=def_file, defaults_group="ice_bnd")
         if (.not. ibnd%active) return
 
-        call nml_read(filename, group, "var_defs",   var_defs,        init=.true., &
-                      defaults_file=def_file, defaults_group="ice_bnd")
+        var_defs = forcing_var_defs(filename)
         call nml_read(filename, group, "method",     ibnd%method,     defaults_file=def_file, defaults_group="ice_bnd")
         call nml_read(filename, group, "H_ice",      ibnd%H_ice,      defaults_file=def_file, defaults_group="ice_bnd")
         call nml_read(filename, group, "coef",       ibnd%coef,       defaults_file=def_file, defaults_group="ice_bnd")

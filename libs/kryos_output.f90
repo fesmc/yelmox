@@ -17,6 +17,7 @@ module kryos_output
     use yelmox_climate, only : climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     use cmip_output,  only : cmip_write_init, write_step_2D_cmip, write_step_1D_cmip
     use kryos,        only : kryos_domain, MAP_FLDR, remap, cadence_due
+    use kryos_forcing, only : coefs_class, coefs_write_step
 
     implicit none
     private
@@ -156,11 +157,14 @@ contains
                                   time, nms=yvars, compare_pd=.FALSE.)
     end subroutine domain_write_step_sm
 
-    subroutine domain_write_1D(dom, outfldr, time, init)
-        ! Write 1D timeseries: Yelmo regional aggregates + isostasy diagnostics.
+    subroutine domain_write_1D(dom, outfldr, time, coefs, init)
+        ! Write 1D timeseries: Yelmo regional aggregates with the driver's
+        ! coefficients (coef_<name> in yelmo_ts.nc), isostasy diagnostics and
+        ! the climate's own.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(dp),         intent(in)    :: time
+        type(coefs_class), intent(in)   :: coefs
         logical, intent(in), optional   :: init
 
         logical :: is_init
@@ -175,6 +179,7 @@ contains
                 call yelmo_regions_write(dom%yelmo, time, init=.TRUE., units="years")
             else
                 call yelmo_regions_write(dom%yelmo, time)
+                call coefs_write_step(coefs, dom%yelmo%reg%fnm, time)
             end if
         end if
 
@@ -185,7 +190,7 @@ contains
         end if
 
         ! The climate's own 1D diagnostics (esm, rembo), over the ice on the climate grid.
-        if (dom%ctl%write_clim .and. dom%ctl%with_climate) then
+        if (dom%ctl%write_clim) then
             call remap(dom, dom%topo%H_ice,  dom%ctl%grid_hub, H_ice_c,  dom%ctl%grid_clim, "bilin")
             call remap(dom, dom%topo%f_grnd, dom%ctl%grid_hub, f_grnd_c, dom%ctl%grid_clim, "bilin")
             call climate_write_1D(dom%cl, dom%clim, &
@@ -351,7 +356,7 @@ contains
                       prec_abs=1e-4_wp)
         call io_var2D(filename, "H_snow", sc%ann%H_snow, n, ncid, "mm w.e.", "Snowpack thickness (end of year)", &
                       prec_abs=0.1_wp)
-        call io_var2D(filename, "mask",   sc%ann%mask,   n, ncid, "1", "chion active (z_srf > z_sl)")
+        call io_var2D(filename, "mask",   sc%ann%mask,   n, ncid, "1", "chion active (land or ice)")
         call nc_close(ncid)
     end subroutine surface_chion_write_step
 

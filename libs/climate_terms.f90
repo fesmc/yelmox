@@ -16,30 +16,38 @@ module climate_terms
     ! that has it; unset keys from the template term of
     ! input/yelmox_defaults.nml.
     !
-    ! Order within a climate update (yelmox_climate): the backend (with the
-    ! snapshot terms) -> the uniform terms on the atmosphere (terms_apply_atm)
-    ! -> the derived coefficients (coefs_set by the climate, from the composed
-    ! atmosphere) -> the ocean terms (terms_apply_ocn) -> taper -> bias. The
-    ! ocean application is idempotent: it rebuilds the ocean from a copy of
-    ! the backend's (terms_save_ocean, after the backend), so a driver that
-    ! sets a derived coefficient later in the step (the bipolar bridge, the OBM
-    ! box temperatures) re-applies it.
+    ! The value f of each term's coefficient is evaluated here once per
+    ! update (terms_eval), kept in the term, read by the backends (the
+    ! snapshot terms, rembo's input) and the applications below, and written
+    ! for every term in one place (terms_write_step).
+    !
+    ! Order within a climate update (yelmox_climate): terms_eval -> the
+    ! backend (with the snapshot terms) -> the uniform terms on the atmosphere
+    ! (terms_apply_atm) -> the derived coefficients (coefs_set by the climate,
+    ! from the composed atmosphere; terms_eval of the terms they drive) -> the
+    ! ocean terms (terms_apply_ocn) -> taper -> bias. The ocean application is
+    ! idempotent: it rebuilds the ocean from a copy of the backend's
+    ! (terms_save_ocean, after the backend), so a driver that sets a derived
+    ! coefficient later in the step (the bipolar bridge, the OBM box
+    ! temperatures) re-evaluates and re-applies it.
     !
     ! Contracts, checked at init (terms_check) against what the backend
     ! supplies (climate_caps_class), an error naming the term:
     !   - a snapshots pattern needs the snapshot backend (snapshots, or the
     !     rembo ocean); its fields are bound by snap0, snap1 and the reference
     !     (checked by the backend);
-    !   - a uniform term on tas or pr is refused when the backend supplies the
-    !     surface mass balance (esm with its smb), which a post-hoc anomaly
-    !     cannot reach; rembo takes the uniform tas terms as its input
-    !     (dT_sum, terms_uniform_dT) and refuses pr;
+    !   - a uniform term on tas or pr needs an atmosphere that drives the
+    !     surface (caps_need_atm, the predicate of the transforms too): not
+    !     with a backend that supplies the surface mass balance (esm with its
+    !     smb), which a post-hoc anomaly cannot reach; rembo takes the uniform
+    !     tas terms as its input (dT_sum, terms_uniform_dT) and ignores pr in
+    !     them (it computes its own precipitation; a notice at init, an error
+    !     only for a term on pr alone, which would have no effect);
     !   - a derived coefficient is computed after the atmosphere, so its term may
     !     touch to and so only;
-    !   - a replace term: to or so only, one per field, ocean profiles (not
-    !     the esm ocean at the shelf base);
-    !   - a term on to or so with a climate without any ocean stops at the
-    !     first update (the fields are known only then).
+    !   - a uniform term on to or so needs an ocean (profiles or at the shelf
+    !     base); a replace term: to or so only, one per field, ocean profiles
+    !     (not the esm ocean at the shelf base).
 
     use precision,     only : wp
     use nml,           only : nml_read, nml_validate
@@ -58,12 +66,17 @@ module climate_terms
     ! What a backend supplies, for the contracts (set by climate_init).
     type climate_caps_class
         character(len=16) :: name = ""           ! the backend, for messages
-        logical :: has_smb       = .false.       ! supplies the surface mass balance
-        logical :: has_ocn_shelf = .false.       ! ocean at the shelf base (else profiles)
-        logical :: has_tsl_ann   = .false.       ! sea-level air temperature (now and ref)
-        logical :: monthly       = .true.        ! monthly air temperature and precipitation
-        logical :: anom_input    = .false.       ! takes the uniform tas terms as an input (rembo)
-        logical :: has_ref_atm   = .true.        ! a reference atmosphere (ref%tas, ...)
+        ! The surface (smb, tsrf) is computed from the atmosphere of
+        ! climate_out: monthly tas and pr, now and ref (snapshots; esm without
+        ! its smb). False for a backend that supplies the surface mass balance
+        ! itself (esm with its smb; rembo, annual fields only), which a change
+        ! of tas or pr after the backend cannot reach (caps_need_atm).
+        logical :: atm_drives_srf = .false.
+        logical :: has_tsl_ann    = .false.      ! sea-level air temperature (now and ref)
+        logical :: anom_input     = .false.      ! takes the uniform tas terms as an input (rembo)
+        logical :: has_snapshots  = .false.      ! reads the snapshot terms (snapshots; the rembo ocean)
+        logical :: has_ocn_prof   = .false.      ! ocean profiles (to_ann, so_ann)
+        logical :: has_ocn_shelf  = .false.      ! ocean at the shelf base (T_shlf, S_shlf)
     end type climate_caps_class
 
     ! One term: coefficient x pattern on a list of fields.
@@ -80,7 +93,7 @@ module climate_terms
         real(wp) :: f_to = 1.0_wp                  ! [K]   uniform: to + f_to*f
         real(wp) :: f_so = 1.0_wp                  ! [psu] uniform: so + f_so*f
         logical  :: derived = .false.              ! the coefficient is derived (set by the model)
-        real(wp) :: f = 0.0_wp                     ! the coefficient value at the last application
+        real(wp) :: f = 0.0_wp                     ! the coefficient value (1 without one), terms_eval
     end type term_class
 
     type terms_class
@@ -93,9 +106,9 @@ module climate_terms
         real(wp), allocatable :: T_base(:,:), S_base(:,:), dT_base(:,:), dS_base(:,:)
     end type terms_class
 
-    public :: climate_caps_class, term_class, terms_class
-    public :: terms_init, terms_check, terms_save_ocean, terms_apply_atm, terms_apply_ocn
-    public :: terms_uniform_dT, terms_has_pattern, terms_write_step, coef_label
+    public :: climate_caps_class, caps_need_atm, term_class, terms_class
+    public :: terms_init, terms_check, terms_eval, terms_save_ocean, terms_apply_atm, terms_apply_ocn
+    public :: terms_uniform_dT, terms_write_step, coef_label
 
 contains
 
@@ -214,59 +227,104 @@ contains
             associate(t => terms%term(k))
             select case(trim(t%pattern))
                 case("snapshots")
-                    if (trim(caps%name) /= "snapshots" .and. trim(caps%name) /= "rembo") &
+                    if (.not. caps%has_snapshots) &
                         call term_error(t, "pattern snapshots needs the snapshot backend; climate = "// &
                                            trim(caps%name)//" reads no snapshots.")
                 case("uniform")
-                    if ((t%on_tas .or. t%on_pr) .and. caps%has_smb .and. .not. caps%anom_input) &
-                        call term_error(t, "a uniform term on tas/pr needs a climate that does not &
-                                           &supply the surface mass balance (an air anomaly cannot &
-                                           &reach it); climate = "//trim(caps%name)//" supplies it &
-                                           &(esm: use the esm smb anomalies or surface_method /= climate).")
-                    if (t%on_pr .and. caps%anom_input) &
-                        call term_error(t, "climate = "//trim(caps%name)//" takes the uniform &
-                                           &terms on tas as its input and computes its own &
-                                           &precipitation: list tas, not pr.")
+                    if (caps%anom_input) then
+                        ! rembo: the terms on tas are its input (not applied
+                        ! after it); it computes its own precipitation.
+                        if (t%on_pr) then
+                            if (.not. (t%on_tas .or. t%on_to .or. t%on_so)) &
+                                call term_error(t, "lists only pr, which climate = "//trim(caps%name)// &
+                                                   " ignores (it computes its own precipitation): &
+                                                   &the term has no effect.")
+                            write(*,*) "terms_check:: ["//trim(t%group)//"] climate = "//trim(caps%name)// &
+                                       " ignores pr in this term (it computes its own precipitation)."
+                        end if
+                    else if (t%on_tas .or. t%on_pr) then
+                        call caps_need_atm(caps, "["//trim(t%group)//"] (a uniform term on tas/pr)")
+                    end if
+                    if ((t%on_to .or. t%on_so) .and. .not. (caps%has_ocn_prof .or. caps%has_ocn_shelf)) &
+                        call term_error(t, "lists to or so, but climate = "//trim(caps%name)// &
+                                           " has no ocean (neither profiles nor at the shelf base).")
                 case("replace")
-                    if (caps%has_ocn_shelf) &
+                    if (.not. caps%has_ocn_prof) &
                         call term_error(t, "pattern replace needs ocean profiles; climate = "// &
-                                           trim(caps%name)//" has the ocean at the shelf base.")
+                                           trim(caps%name)//" has none (esm: the ocean at the shelf base).")
             end select
             end associate
         end do
 
     end subroutine terms_check
 
-    logical function terms_has_pattern(terms, pattern) result(has)
-        ! Does any term have this pattern?
-        type(terms_class), intent(in) :: terms
-        character(len=*),  intent(in) :: pattern
-        integer :: k
-        has = .false.
-        do k = 1, terms%n
-            if (trim(terms%term(k)%pattern) == trim(pattern)) has = .true.
-        end do
-    end function terms_has_pattern
+    subroutine caps_need_atm(caps, who)
+        ! The one predicate of the terms and transforms that change the
+        ! atmosphere (tas, pr) after the backend: stop unless it drives the
+        ! surface (caps%atm_drives_srf). `who` names the term or transform.
+        type(climate_caps_class), intent(in) :: caps
+        character(len=*),         intent(in) :: who
+
+        if (caps%atm_drives_srf) return
+
+        if (caps%anom_input) then
+            write(*,*) "climate_init:: error: "//trim(who)//" changes the atmosphere after the &
+                       &backend; climate = "//trim(caps%name)//" computes its own atmosphere and &
+                       &surface mass balance (annual fields) and takes only the uniform terms on &
+                       &tas, as its input."
+        else
+            write(*,*) "climate_init:: error: "//trim(who)//" changes the atmosphere after the &
+                       &backend, which cannot reach the surface: climate = "//trim(caps%name)// &
+                       " supplies the surface mass balance itself (esm: use its smb anomalies, &
+                       &or surface_method /= climate)."
+        end if
+        error stop 1
+
+    end subroutine caps_need_atm
 
     ! ===== application ======================================================
 
-    subroutine terms_apply_atm(terms, out, coefs)
+    subroutine terms_eval(terms, coefs, derived)
+        ! The value f of each term's coefficient from the registry (1 for a
+        ! term without one): every term, once per update before the backend.
+        ! With derived = .true., after the derived coefficients are set (by
+        ! the climate, or later in the step by the driver): only the uniform
+        ! and replace terms with a derived coefficient, applied after that
+        ! (terms_apply_ocn); a snapshot term keeps the value the backend applied.
+        type(terms_class), intent(inout) :: terms
+        type(coefs_class), intent(in)    :: coefs
+        logical,           intent(in), optional :: derived
+
+        logical :: only_derived
+        integer :: k
+
+        only_derived = .false.
+        if (present(derived)) only_derived = derived
+
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (only_derived .and. (.not. t%derived .or. trim(t%pattern) == "snapshots")) cycle
+            t%f = 1.0_wp
+            if (len_trim(t%coef) > 0) t%f = coefs_value(coefs, t%coef)
+            end associate
+        end do
+
+    end subroutine terms_eval
+
+    subroutine terms_apply_atm(terms, out)
         ! The uniform terms on the atmosphere: tas, ta_ann, tsl_ann + f_ta*f;
         ! pr, pr_ann * exp(beta_p*f_ta*f) (beta_p: the backend's sensitivity).
-        type(terms_class),       intent(inout) :: terms
+        type(terms_class),       intent(in)    :: terms
         type(climate_out_class), intent(inout) :: out
-        type(coefs_class),       intent(in)    :: coefs
 
-        real(wp) :: f, dTa
+        real(wp) :: dTa
         integer  :: k, m
 
         do k = 1, terms%n
             associate(t => terms%term(k), now => out%now)
             if (trim(t%pattern) /= "uniform") cycle
             if (.not. (t%on_tas .or. t%on_pr)) cycle
-            f   = coefs_value(coefs, t%coef)
-            t%f = f
-            dTa = t%f_ta*f
+            dTa = t%f_ta*t%f
             if (t%on_tas) then
                 now%tas    = now%tas + dTa
                 now%ta_ann = now%ta_ann + dTa
@@ -302,16 +360,15 @@ contains
 
     end subroutine terms_save_ocean
 
-    subroutine terms_apply_ocn(terms, out, coefs)
+    subroutine terms_apply_ocn(terms, out)
         ! The ocean terms on the saved base: a replace term sets the field to
         ! its coefficient at every depth, the uniform ones add f_to*f / f_so*f; the
         ! profiles to_ann/so_ann, or at the shelf base T_shlf/S_shlf and
-        ! dT_shlf/dS_shlf. Idempotent (see the header).
-        type(terms_class),       intent(inout) :: terms
+        ! dT_shlf/dS_shlf (the climate has the ocean a term needs: terms_check).
+        ! Idempotent (see the header).
+        type(terms_class),       intent(in)    :: terms
         type(climate_out_class), intent(inout) :: out
-        type(coefs_class),       intent(in)    :: coefs
 
-        real(wp) :: f
         logical  :: any_ocn
         integer  :: k
 
@@ -324,11 +381,6 @@ contains
 
         if (.not. terms%ocn_saved) then
             write(*,*) "terms_apply_ocn:: error: no saved ocean (terms_save_ocean first)."
-            error stop 1
-        end if
-        if (.not. (out%has_ocn_shelf .or. allocated(terms%to_base) .or. allocated(terms%so_base))) then
-            write(*,*) "terms_apply_ocn:: error: ["//trim(terms%group)//"] has a term on to or so, &
-                       &but the climate has no ocean (neither profiles nor at the shelf base)."
             error stop 1
         end if
 
@@ -347,12 +399,8 @@ contains
         do k = 1, terms%n
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "replace") cycle
-            f   = coefs_value(coefs, t%coef)
-            t%f = f
-            if (t%on_to) call need(allocated(out%now%to_ann), t, "to")
-            if (t%on_so) call need(allocated(out%now%so_ann), t, "so")
-            if (t%on_to) out%now%to_ann = f
-            if (t%on_so) out%now%so_ann = f
+            if (t%on_to) out%now%to_ann = t%f
+            if (t%on_so) out%now%so_ann = t%f
             end associate
         end do
 
@@ -361,74 +409,50 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "uniform") cycle
             if (.not. (t%on_to .or. t%on_so)) cycle
-            f   = coefs_value(coefs, t%coef)
-            t%f = f
             if (out%has_ocn_shelf) then
                 if (t%on_to) then
-                    out%now%T_shlf  = out%now%T_shlf  + t%f_to*f
-                    out%now%dT_shlf = out%now%dT_shlf + t%f_to*f
+                    out%now%T_shlf  = out%now%T_shlf  + t%f_to*t%f
+                    out%now%dT_shlf = out%now%dT_shlf + t%f_to*t%f
                 end if
                 if (t%on_so) then
-                    out%now%S_shlf  = out%now%S_shlf  + t%f_so*f
-                    out%now%dS_shlf = out%now%dS_shlf + t%f_so*f
+                    out%now%S_shlf  = out%now%S_shlf  + t%f_so*t%f
+                    out%now%dS_shlf = out%now%dS_shlf + t%f_so*t%f
                 end if
             else
-                if (t%on_to) call need(allocated(out%now%to_ann), t, "to")
-                if (t%on_so) call need(allocated(out%now%so_ann), t, "so")
-                if (t%on_to) out%now%to_ann = out%now%to_ann + t%f_to*f
-                if (t%on_so) out%now%so_ann = out%now%so_ann + t%f_so*f
+                if (t%on_to) out%now%to_ann = out%now%to_ann + t%f_to*t%f
+                if (t%on_so) out%now%so_ann = out%now%so_ann + t%f_so*t%f
             end if
             end associate
         end do
 
-    contains
-
-        subroutine need(ok, t, field)
-            logical,          intent(in) :: ok
-            type(term_class), intent(in) :: t
-            character(len=*), intent(in) :: field
-            if (.not. ok) call term_error(t, "lists "//field//", but the climate has no "// &
-                                             field//" profiles.")
-        end subroutine need
-
     end subroutine terms_apply_ocn
 
-    real(wp) function terms_uniform_dT(terms, coefs, field) result(dT)
-        ! The sum of gain*coefficient over the uniform terms on `field` (tas: f_ta,
-        ! to: f_to, so: f_so): the anomaly a backend takes as its input (rembo
-        ! dT_sum from tas).
+    real(wp) function terms_uniform_dT(terms) result(dT)
+        ! The sum f_ta*f over the uniform terms on tas: the air temperature
+        ! anomaly a backend takes as its input (rembo dT_sum).
         type(terms_class),   intent(in) :: terms
-        type(coefs_class),   intent(in) :: coefs
-        character(len=*),    intent(in) :: field
         integer :: k
         dT = 0.0_wp
         do k = 1, terms%n
             associate(t => terms%term(k))
-            if (trim(t%pattern) /= "uniform") cycle
-            select case(trim(field))
-                case("tas"); if (t%on_tas) dT = dT + t%f_ta*coefs_value(coefs, t%coef)
-                case("to");  if (t%on_to)  dT = dT + t%f_to*coefs_value(coefs, t%coef)
-                case("so");  if (t%on_so)  dT = dT + t%f_so*coefs_value(coefs, t%coef)
-            end select
+            if (trim(t%pattern) == "uniform" .and. t%on_tas) dT = dT + t%f_ta*t%f
             end associate
         end do
     end function terms_uniform_dT
 
     subroutine terms_write_step(terms, filename, ncid, n)
-        ! Record n of the uniform and replace terms into an open 2D output
-        ! file: the coefficient value applied, term_<name> (the snapshot terms are
-        ! written by the backend).
+        ! Record n of every term into an open 2D output file: the value of
+        ! its coefficient, term_<name> (1 for a snapshot term without one).
         type(terms_class), intent(in) :: terms
         character(len=*),  intent(in) :: filename
         integer,           intent(in) :: ncid, n
         integer :: k
         do k = 1, terms%n
             associate(t => terms%term(k))
-            if (trim(t%pattern) == "snapshots") cycle
             call nc_write(filename, "term_"//trim(t%name), t%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Coefficient "//trim(t%coef)//" of the "//trim(t%pattern)// &
-                                    " term "//trim(t%name))
+                          long_name="Coefficient "//trim(coef_label(t%coef))//" of the "// &
+                                    trim(t%pattern)//" term "//trim(t%name))
             end associate
         end do
     end subroutine terms_write_step

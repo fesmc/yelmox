@@ -1,6 +1,6 @@
 # YelmoX
 
-**YelmoX** is the driver framework around the [Yelmo](https://github.com/fesmc/yelmo) ice-sheet model. It bundles Yelmo together with the libraries needed to run realistic ice-sheet simulations: climate and ocean forcing modules, the [FastIsostasy](https://github.com/palma-ice/FastIsostasy) bedrock module, the [REMBOv1](https://github.com/alex-robinson/rembo1) energy/moisture-balance model, and shared utilities from [fesm-utils](https://github.com/fesmc/fesm-utils).
+**YelmoX** is the driver framework around the [Yelmo](https://github.com/fesmc/yelmo) ice-sheet model. It bundles Yelmo together with the libraries needed to run realistic ice-sheet simulations: climate and ocean forcing modules, the [chion](https://github.com/fesmc/chion) surface mass balance model, the [FastIsostasy](https://github.com/palma-ice/FastIsostasy) bedrock module, the [REMBOv1](https://github.com/alex-robinson/rembo1) energy/moisture-balance model, and shared utilities from [fesm-utils](https://github.com/fesmc/fesm-utils).
 
 For documentation of the Yelmo ice-sheet model itself, see [the Yelmo docs](https://fesmc.github.io/yelmo/).
 
@@ -21,7 +21,7 @@ make yelmox
 
 ## What `configme install yelmox` does
 
-`configme install yelmox` clones YelmoX and its component repositories (`fesm-utils`, `yelmo`, `FastIsostasy`, `rembo1`, `chion`, `insol`), configures each for your machine and compiler, links them into the YelmoX directory, and builds `fesm-utils` (LIS + FFTW + utils, which can take 10-30 min). If `configme` can detect your machine from the hostname it does so, otherwise it prompts you.
+`configme install yelmox` clones YelmoX and its component repositories (`fesm-utils`, `yelmo` with `FastHydrology`, `elsa` and `tracer`, `FastIsostasy`, `rembo1`, `chion`, `insol`; versions pinned in `.configme/manifest.toml`), configures each for your machine and compiler, links them into the YelmoX directory, and builds `fesm-utils` (LIS + FFTW + utils, which can take 10-30 min), `chion` and `insol`. If `configme` can detect your machine from the hostname it does so, otherwise it prompts you.
 
 The only system dependency you must install yourself is **netCDF** (see the [Yelmo dependencies notes](https://fesmc.github.io/yelmo/getting-started.html#dependencies) for installation tips). Everything else — LIS, FFTW, the `fesm-utils` libraries, the component repositories, their links, and `runme` — is managed by `configme`.
 

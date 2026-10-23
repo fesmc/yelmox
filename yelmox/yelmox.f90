@@ -23,7 +23,7 @@ program yelmox
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
                                coefs_restart_due, coefs_restart_fldr, &
-                               coefs_restart_read, coefs_write_step
+                               coefs_restart_read
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
@@ -99,9 +99,9 @@ program yelmox
     call coefs_init(coefs, path_par, ts%time_rel)
     if (trim(restart) /= "None") call coefs_restart_read(coefs, trim(restart))
 
-    ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
-    ! reads the timeline values it needs from the same [run_step] group.
-    call domain_init(dom, path_par, ts%time, coefs, timeline_group=trim(run_step))
+    ! Initialize the domain: sub-models + hi-res hub + coupler maps, at the
+    ! start of the timeline ([run_step] group).
+    call domain_init(dom, path_par, ts, coefs, timeline_group=trim(run_step))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
@@ -110,7 +110,7 @@ program yelmox
     ! (incl. the shared bsl) and continue its state: the hi-res hub rebuilt
     ! from the restored models, the climate (and a stateless surface)
     ! re-derived from it (see domain_startup).
-    call domain_startup(dom, ts, bsl, trim(restart), coefs)
+    call domain_startup(dom, ts, dtt, bsl, trim(restart), coefs)
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"
@@ -130,7 +130,7 @@ program yelmox
     ! field set) and 1D timeseries.
     if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
     if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
-    if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+    if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, coefs, init=.TRUE.)
     call domain_write_cmip(dom, trim(outfldr), ts, init=.TRUE.)
 
     ! === main time loop ===
@@ -155,8 +155,7 @@ program yelmox
         end if
 
         if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
-            call domain_write_1D(dom, trim(outfldr), ts%time)
-            call coefs_write_step(coefs, dom%yelmo%reg%fnm, ts%time)
+            call domain_write_1D(dom, trim(outfldr), ts%time, coefs)
             call timer_write_totals(tmr, ts%time, "s", trim(outfldr)//"timing.txt", &
                                     init=timing_init)
             timing_init = .FALSE.
@@ -190,7 +189,7 @@ program yelmox
         ! === coupling sequence ===
         call step_relax(dom, ts)          ! topography relaxation (relax)
         call timer_step(tmr, tt_relax)
-        call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
+        call step_optimize(dom, ts, dtt)  ! cb_ref/tf_corr optimization (opt)
         call timer_step(tmr, tt_optimize)
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call timer_step(tmr, tt_isostasy)
@@ -201,7 +200,7 @@ program yelmox
         call timer_step(tmr, tt_icesheet)
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call timer_step(tmr, tt_couple_htopo)
-        call step_climate(dom, ts, coefs)        ! climate (dt_clim cadence)
+        call step_climate(dom, ts, dtt, coefs)   ! climate (dt_clim cadence)
         call timer_step(tmr, tt_climate)
         call step_surface(dom, ts)        ! surface mass balance + temperature
         call timer_step(tmr, tt_surface)

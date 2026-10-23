@@ -55,6 +55,13 @@
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
 /
 
+! [sim] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
+
 &output
     write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
     write_isos    = True
@@ -222,12 +229,14 @@
 /
 
 &negis
-    ! NEGIS basal friction scaling ([sim] use_negis): cb_ref of each part times its factor
-    cf_0          = 1.0             ! [-] before -11 ka, ramping to cf_1 at 0 ka
-    cf_1          = 1.0
+    ! NEGIS basal friction scaling ([sim] use_negis), on the forcing time: cb_ref of each
+    ! part times its factor (north part before -4 ka, south part from -4 ka), then all
+    ! parts times the ramp cf_0 -> cf_1
+    cf_0          = 1.0             ! [-] all parts: before -11 ka, ramping linearly to cf_1 at 0 ka
+    cf_1          = 1.0             ! [-] all parts: from 0 ka
     cf_centre     = 1.0             ! [-] factor of the centre part
-    cf_south      = 1.0             ! [-] factor of the south part
-    cf_north      = 1.0             ! [-] factor of the north part (paleo ice stream)
+    cf_south      = 1.0             ! [-] factor of the south part, from -4 ka
+    cf_north      = 1.0             ! [-] factor of the north part (paleo ice stream), before -4 ka
     region_centre = "NEGIS:centre"  ! basin set NEGIS (FesmData; NEGIS-v1: the hand-drawn v1 parts)
     region_south  = "NEGIS:south"
     region_north  = "NEGIS:north"
@@ -536,7 +545,6 @@
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
@@ -557,7 +565,6 @@
 &ytherm
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
@@ -648,6 +655,7 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
 
 /
 
@@ -706,7 +714,6 @@
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
     itm_c           = -45.0
     itm_t           =  10.0
     itm_b           =  -2.0 
@@ -782,7 +789,7 @@
 
 &marine_shelf
     bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 1             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -792,7 +799,7 @@
     basins          = "Zwally2012.group"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "zone:open_ocean"                      ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there
     corr_method     = "none"  ! none, tf or bmb: corrections by region
     corr_names      = ""
     corr_values     = 0.0

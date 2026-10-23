@@ -11,6 +11,7 @@ module climate_rembo
 
     public :: rembo_clim_init
     public :: rembo_clim_update
+    public :: rembo_clim_dT_ann
     public :: rembo_clim_restart_write
 
 contains
@@ -34,6 +35,15 @@ contains
         call not_built()
 
     end subroutine rembo_clim_update
+
+    function rembo_clim_dT_ann(dT_summer) result(dT_ann)
+        real(wp), intent(in) :: dT_summer
+        real(wp) :: dT_ann
+
+        dT_ann = 0.0_wp
+        call not_built()
+
+    end function rembo_clim_dT_ann
 
     subroutine rembo_clim_restart_write(filename, time, z_srf, H_ice, z_sl)
         character(len=*), intent(in) :: filename

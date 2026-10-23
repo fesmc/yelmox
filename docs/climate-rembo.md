@@ -40,14 +40,17 @@ the surface mass balance; the ocean comes from the snapshot backend.
   `f_to = 0.25`).
 - **Transient forcing.** The uniform terms on `tas` (`[term_<name>]
   pattern = "uniform"`) are an input of REMBO, not applied after it: their
-  sum `f_ta·f` is REMBO's summer air temperature anomaly `dT_sum`, the annual
-  `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6); `pr` in their fields has
-  no effect (REMBO computes the precipitation). Snapshot terms on the
-  atmosphere are refused. Off in the par file (`[forcing] coefs = ""`,
-  `terms = ""`).
-- **Transforms.** `[taper]` and `[bias]` are refused at start-up (no reference
-  atmosphere, annual fields only); so is a derived `air_anomaly` coefficient (no
-  sea-level air temperature).
+  sum `f_ta·f` is REMBO's summer air temperature anomaly `dT_sum`; the annual
+  mean anomaly REMBO applies with it, `dT_ann = (1 + T_wintfac)/2·dT_sum`
+  (its seasonal cycle, `T_wintfac` of `rembo_Greenland.nml`), is written as a
+  diagnostic. `pr` in their fields is ignored, with a notice at start-up
+  (REMBO computes the precipitation); a uniform term on `pr` alone is refused
+  (no effect). Snapshot terms on the atmosphere are refused. Off in the par
+  file (`[forcing] coefs = ""`, `terms = ""`).
+- **Transforms.** `[taper]` and `[bias]` are refused at start-up: REMBO
+  supplies the smb itself, so a change of its atmosphere after it cannot reach
+  the surface. So is a derived `air_anomaly` coefficient (no sea-level air
+  temperature).
 - **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
 ## Output
@@ -59,6 +62,7 @@ over the ice sheet and the accumulation-area ratio). The coefficients go to
 the Yelmo 1D file (`coef_<name>`), as for the other climates. The library
 holds the hysteresis setup, `coef_hyst` (PI42 with kill switch) and the
 uniform `term_hyst` on `tas` and `pr`: `-p forcing.coefs=hyst
-forcing.terms=hyst` runs it (a second uniform term on `to` for the ocean).
+forcing.terms=hyst` runs it with rembo (its `tas` part is REMBO's `dT_sum`,
+its `pr` part ignored; a second uniform term on `to` for the ocean).
 Restart bundles hold REMBO's
 `rembo_restart.nc`; REMBO reads its restart as set in `rembo_Greenland.nml`.

@@ -149,7 +149,10 @@ usage:
 	@echo " Default (multigrid) drivers, one per program folder:"
 	@echo "   make yelmox | yelmox_bipolar"
 	@echo "   rembo=1 links REMBO (climate = rembo)"
+	@echo " Tests:"
+	@echo "   make test_coefs | test_timestepping"
 	@echo " make clean      : cleans object files"
+	@echo " make cleanall   : also cleans the dependency libraries"
 	@echo ""
 
 clean:
@@ -163,3 +166,4 @@ cleanall: clean
 	$(MAKE) -C $(YELMOROOT) clean
 	$(MAKE) -C $(REMBOROOT) clean
 	$(MAKE) -C $(INSOLROOT) clean
+	$(MAKE) -C $(CHIONROOT) clean

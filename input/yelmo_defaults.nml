@@ -36,7 +36,7 @@
     log_timestep    = False 
     log_mb_check    = False             ! Print global mass-budget check (residual) every timestep
     disable_kill    = False             ! Disable automatic kill if unstable
-    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh", "exp-inv"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
@@ -80,8 +80,9 @@
     gl_sep              = 1                 ! 1: binary f_grnd, linear f_grnd_acx/acy; 3: grounded area of H_grnd bilinear between cell centres (Leguy et al., 2021)
     gz_nx               = 15                ! [-] Subgrid points per side (gz_nx*gz_nx) of the grounding-zone melt, bmb_gl_method = "pmpt"
 
+    dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz), defines mask_grz
+
     ! bmb_gl_method = pmpt
-    dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
     gz_Hg1              = 0.0               ! Grounding zone, limit of penetration of bmb_shlf 
     
@@ -105,8 +106,8 @@
     lsf_method          = "snap"            ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
     dt_lsf              = -1                ! [yr] periodic LSF reflag interval; <= 0 disables. snap mode only.
     lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations. redist mode only.
-    calv_flt_method     = "vm-m16"          ! use_lsf=F: "zero"/"none","threshold","vm-l19","eigen","kill","kill-pos" | use_lsf=T: "zero"/"none","equil","threshold","vm-m16","exp1"-"exp5"
-    calv_grnd_method    = "vm-m16"          ! use_lsf=F: "zero"/"none","stress-b12" | use_lsf=T: "zero"/"none","equil","threshold","vm-m16","ismip7"
+    calv_flt_method     = "vm-m16"          ! use_lsf=F: "zero"/"none","threshold","vm-l19","eigen","kill","kill-pos" | use_lsf=T: "zero"/"none","equil","threshold","vm-m16","vm-m16-old","exp1"-"exp5"
+    calv_grnd_method    = "vm-m16"          ! use_lsf=F: "zero"/"none","stress-b12" | use_lsf=T: "zero"/"none","equil","threshold","vm-m16","vm-m16-old","ismip7"
     
     ! === numeric noise === 
     H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
@@ -123,7 +124,7 @@
     w2                  = 0.0               ! Weighting coefficient of 2nd principal strain/stress
     kt_ref              = 0.0025            ! [m yr-1 Pa-1] vm-l19 calving scaling parameter
     kt_deep             = 0.1               ! [m yr-1 Pa-1] vm-l19 calving scaling parameter for deep ocean
-    tau_ice_flt         = 250.0e3           ! [Pa] Ice strength failure, floating fronts (vm-m16)
+    tau_ice_flt         = 100.0e3           ! [Pa] Ice strength failure, floating fronts (vm-m16)
     tau_ice_grnd        = 1.0e6             ! [Pa] Ice strength failure, marine-grounded fronts (vm-m16)
 
     ! === threshold method ===
@@ -286,7 +287,6 @@
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
@@ -335,7 +335,6 @@
     method          = "enth"            ! "enth","temp","robin","robin-cold","linear","fixed"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     advecxy_order   = 2                 ! Horizontal advection order: 1=upwind, 2=flux-limited 2nd-order upwind
     advecxy_cfl     = 0.5               ! [--] Target Courant number per horizontal-advection sub-step (CFL_safe)
     advecxy_nmax    = 10                ! [--] Max horizontal-advection sub-steps (safety cap; warns if hit)

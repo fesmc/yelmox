@@ -62,13 +62,13 @@ the domain once per step with the coupling sequence written out in the time loop
 
 ```fortran
 call step_relax(dom, ts)          ! topography relaxation (relax)
-call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
+call step_optimize(dom, ts, dtt)  ! cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level (dt_isos cadence)
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_ice_bnd(dom, ts, coefs) ! prescribed ice in the fixed/relaxation cells ([ice_bnd])
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
-call step_climate(dom, ts, coefs) ! climate (dt_clim cadence)
+call step_climate(dom, ts, dtt, coefs) ! climate (dt_clim cadence)
 call step_surface(dom, ts)        ! surface mass balance + temperature
 call step_shelf(dom, ts)          ! shelf-base melt + temperature
 ```
@@ -178,8 +178,9 @@ writes a restart bundle `restart-<n>` each time a coefficient moves by more than
 its `restart_every_df`. Each tsgen coefficient restarts from
 `coef_<name>_restart.nc` in the bundle (a derived one is recomputed; an older
 bundle's `series_<name>_restart.nc` is still read, with a note); every
-coefficient is written to the 1D output as `coef_<name>` (tsgen ones also
-`coef_<name>_df_dt`), labelled with `units`.
+coefficient is written to the 1D output `yelmo_ts.nc` (with `[output]
+write_yelmo`) as `coef_<name>` (tsgen ones also `coef_<name>_df_dt`), labelled
+with `units`.
 
 **Terms** are one coefficient times one pattern on an explicit list of `fields`:
 
@@ -226,7 +227,7 @@ reconstruction). The reference is taken at the current
 surface: a reference at its own elevation (snapshots: the surface of the
 reference snapshot) is moved there with the backend's monthly lapse rate and
 `beta_p`, as the climate itself. The ocean is unchanged. Refused for a backend
-without a reference atmosphere (rembo).
+that supplies the smb itself (esm with its smb; rembo).
 
 `outside` sets the climate where w < 1:
 
@@ -261,9 +262,9 @@ of `scripts/grl-paleo/params.sh`).
 ## Climate bias correction (`[bias]`)
 
 A spatial correction of the atmosphere, the last climate transform, applied
-on the climate grid to the monthly air temperature and precipitation of any
-backend except rembo (annual fields only), before the move to the surface
-grid's elevation:
+on the climate grid to the monthly air temperature and precipitation, before
+the move to the surface grid's elevation; refused for a backend that supplies
+the smb itself (esm with its smb; rembo):
 
     tas = tas + f_tas*dtas,    pr = pr*(1 + f_pr*(fpr - 1))
 
@@ -495,7 +496,9 @@ run bit for bit: the state is restored, not stepped again (the surface restart
 files carry the annual fields of the last cycle); only the climate is re-derived
 from it, which equals the run's own when the restart time lies on its `dt_clim`
 cadence (counted from the start of the run, as are `dt_isos` and the `[relax]`,
-`[opt]` time windows).
+`[opt]` time windows). With `dt_clim <= 0` the climate is re-derived once at the
+restart, from the restored geometry, so it is not the cold-start climate of the
+run that wrote the bundle.
 
 ### `[comps]`
 
@@ -505,8 +508,8 @@ The components: which are active, with which model, how often.
 |---|---|---|
 | `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
 | `climate` | `snapshots`, `esm`, `rembo` | the climate backend |
-| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM, BESSI or PDD snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs; PDD's parameters are the group `[chion] nml_pdd` names, `[pdd_chion]` with `pdd_method = "cg05"` (Calov and Greve, 2005), smbpal's PDD; the surface temperature of ITM and PDD is chion's `chion_tsrf_annual`, the annual-mean air temperature warmed by `firn_fac` times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapshots); the climate's own smb (esm, rembo; required by rembo) |
-| `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start |
+| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; smbpal's ITM spins its snowpack up for `[smbpal] time_equil` years at the cold start; chion runs the ITM, BESSI or PDD snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs; PDD's parameters are the group `[chion] nml_pdd` names, `[pdd_chion]` with `pdd_method = "cg05"` (Calov and Greve, 2005), smbpal's PDD; the surface temperature of ITM and PDD is chion's `chion_tsrf_annual`, the annual-mean air temperature warmed by `firn_fac` times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapshots); the climate's own smb (esm, rembo; required by rembo) |
+| `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start (and re-derived once on a restart) |
 | `dt_isos` | [yr] | isostasy update interval (> 0; 10 in all par files): FastIsostasy integrates the whole interval in one call, the bedrock is held in between |
 
 ### `[sim]`
@@ -528,8 +531,8 @@ times counted from the start of the run (`time_init`).
 | `init_time_thrm` | [yr] | then equilibrate with the topography fixed (`0` = off) |
 | `relax` | bool | relax the topography towards the reference (`[relax]`) |
 | `opt` | bool | optimize the basal friction and the thermal-forcing correction (`[opt]`) |
-| `use_negis` | bool | NEGIS basal-friction modification (`[negis]`) |
-| `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
+| `use_negis` | bool | NEGIS basal-friction modification (`[negis]`): `cb_ref` is set each step (Yelmo's `ytill.method = -1`) as the till friction of the bed with the NEGIS parts scaled, the centre by `cf_centre`, the north part by `cf_north` before 4 ka BP, the south part by `cf_south` from 4 ka BP, all parts by `cf_0` before 11 ka BP ramping linearly to `cf_1` at 0 ka, on the forcing time; not with the `cb_ref` optimization (`opt_cf`) |
+| `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`: `dt_lgm`, `lat_lim`, `fac_lim`), by a glacial index from the climate's annual air temperature against its reference; refused with `climate = rembo` (no reference) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |
 
 A spin-up usually sets `relax` and `opt` together: the relaxation holds the
@@ -555,7 +558,11 @@ is `topo_rel` and its timescale ramps from `tau1` to `tau2`; after `time2`, the
 The optimization (`step_optimize`), towards the observed ice thickness, of the
 basal-friction coefficient `cb_ref` (`opt_cf`, between `cf_time_init` and
 `cf_time_end`) and of the thermal-forcing correction `tf_corr` of the marine shelf
-(`opt_tf`, between `tf_time_init` and `tf_time_end`):
+(`opt_tf`, between `tf_time_init` and `tf_time_end`). `cb_ref` is optimized on
+`grid_ice`, `tf_corr` on `grid_shelf`, where it lives: the Yelmo-grid inputs
+(current and observed ice thickness and grounding, `dHidt`) are remapped onto
+`grid_shelf`, the basins (and the ids of `tf_basins`) are those of
+`[marine_shelf] basins`, and `tf_corr` is never remapped.
 
 | Key | Values | |
 |---|---|---|
@@ -569,11 +576,14 @@ The method and its other parameters are described in the Yelmo docs,
 ### `[output]`
 
 Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
-`[tm_2Dsm]` (small 2D) and `[tm_1D]` (time series) intervals:
+`[tm_2Dsm]` (small 2D) and `[tm_1D]` (time series) intervals. Every key is
+required. A component switched off in `[comps]` writes no files whatever its
+switch (`write_isos`, `write_shelf`, `write_surface`, `write_clim` need
+`with_isostasy`, `with_shelf`, `with_surface`, `with_climate`):
 
 | Key | Files |
 |---|---|
-| `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<name>.nc` for the named masks of `[regions]`) |
+| `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` with the coefficients (and `yelmo_ts_<name>.nc` for the named masks of `[regions]`) |
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
 | `write_shelf` | `mshlf.nc` |
 | `write_surface` | the surface model's file, `<surface_method>.nc`: `chion.nc`, `smbpal.nc`, `smb_simple.nc`; none with `climate` (the climate's file has the smb, `smb_ann`, `tsrf_ann`) |

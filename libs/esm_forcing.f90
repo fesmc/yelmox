@@ -22,9 +22,6 @@ module esm_forcing
     ! Define default missing value 
     real(wp), parameter :: mv = -9999.0_wp 
 
-    ! Need to call marshelf class for oceanic interpolation into shelves
-    type(marshelf_class)        :: mshlf
-
     ! Class for holding ice-forcing data from esm archives
     type esm_forcing_class
         
@@ -100,24 +97,23 @@ module esm_forcing
 
         ! === Atmosphere ===
         ! Monthly fields (but right now constant anomaly between months)
-        real(wp), allocatable :: t2m(:,:,:)       ! Monthly surface temperature [K]
-        real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation [mm/yr]
-        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr]
+        real(wp), allocatable :: t2m(:,:,:)       ! Monthly near-surface air temperature, at the model surface [K]
+        real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation, at the model surface [mm/d]
+        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr w.e.]
 
         ! Anomalies
-        real(wp), allocatable :: dts(:,:,:)       ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dpr(:,:,:)       ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr]
-        real(wp), allocatable :: dsmbdz(:,:)      ! SMB height anomaly [mm/yr*m]
-        real(wp), allocatable :: dts_var(:,:,:)   ! Surface temperature anomaly variability[K]
-        real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation relative anomaly variability [%]
-        real(wp), allocatable :: dsmb_var(:,:,:)  ! SMB anomaly variability [m/yr]
+        real(wp), allocatable :: dts(:,:,:)       ! Near-surface air temperature anomaly [K]
+        real(wp), allocatable :: dpr(:,:,:)       ! Precipitation anomaly, a ratio to the reference [1]
+        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr w.e.]
+        real(wp), allocatable :: dsmbdz(:,:)      ! SMB elevation gradient [mm/yr w.e. per m]
+        real(wp), allocatable :: dts_var(:,:,:)   ! Near-surface air temperature anomaly, variability [K]
+        real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation anomaly, variability, a ratio [1]
 
         ! ===    Ocean   ===
-        real(wp), allocatable :: dto(:,:)         ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dso(:,:)         ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dto_var(:,:)     ! Surface temperature anomaly variability [K]
-        real(wp), allocatable :: dso_var(:,:)     ! Precipitation relative anomaly variability [%]
+        real(wp), allocatable :: dto(:,:)         ! Ocean temperature anomaly at the shelf base [K]
+        real(wp), allocatable :: dso(:,:)         ! Ocean salinity anomaly at the shelf base [psu]
+        real(wp), allocatable :: dto_var(:,:)     ! Ocean temperature anomaly at the shelf base, variability [K]
+        real(wp), allocatable :: dso_var(:,:)     ! Ocean salinity anomaly at the shelf base, variability [psu]
         real(wp), allocatable :: Qd_ann(:,:)      ! Annual mean subglacial discharge [m3/s]
         real(wp), allocatable :: Qd_sum(:,:)      ! Summer mean subglacial discharge [m3/s]
         logical :: with_sgd_hist = .false.        ! Qd from the sgd_hist group (Greenland; its filename /= "none")
@@ -130,28 +126,8 @@ module esm_forcing
 
     end type
 
-    type esm_ice_var_class
-        character(len=56)  :: name 
-        character(len=128) :: long_name
-        character(len=12)  :: var_type
-        character(len=128) :: standard_name 
-        character(len=128) :: units_in
-        character(len=128) :: units_out
-        real(wp) :: unit_scale 
-        real(wp) :: unit_offset
-    end type
-
-    type esm_experiment_class
-        character(len=56)   :: expname
-        character(len=56)   :: group
-        character(len=56)   :: model
-        character(len=256)  :: experiment
-        character(len=256)  :: file_suffix
-    end type
-    
     private
     public :: esm_forcing_class
-    public :: esm_experiment_class
 
     ! General routines
     public :: esm_forcing_init
@@ -159,15 +135,11 @@ module esm_forcing
     public :: esm_variability_update
     public :: esm_clim_update
     public :: esm_lapse_monthly
-    
-    public :: esm_write_init
 
 contains
     
     subroutine esm_forcing_init(esm,filename,domain,grid,run_type,gcm,experiment, &
-                                use_esm,use_smb,use_var,&
-                                use_hist,time_hist,&
-                                use_proj,time_proj)
+                                use_esm,use_smb,use_var,use_hist,use_proj)
 
         implicit none 
     
@@ -175,10 +147,9 @@ contains
         character(len=*), intent(IN) :: filename
         character(len=*), intent(IN) :: domain 
         type(grid_class), intent(IN) :: grid         ! the climate grid (target of remapped groups)
-        character(len=*), intent(IN), optional :: run_type, gcm, experiment
-        logical,          intent(IN), optional :: use_esm, use_smb, use_var
-        logical,          intent(IN), optional :: use_hist, use_proj
-        real(dp),         intent(IN), optional :: time_hist(2), time_proj(2)
+        character(len=*), intent(IN) :: run_type, gcm, experiment
+        logical,          intent(IN) :: use_esm, use_smb, use_var
+        logical,          intent(IN) :: use_hist, use_proj
     
         ! Local variables 
         character(len=256) :: grid_name
@@ -223,9 +194,6 @@ contains
         character(len=256) :: grp_so_proj
         character(len=256) :: grp_Qd_proj   ! used for Greenland
 
-        integer  :: iloc, k
-        real(wp) :: tmp
-        real(wp) :: time_par_ref(4),time_par_hist(4),time_par_proj(4),time_par_var(4)
         character(len=256) :: esm_subs(2,2)   ! {gcm}/{experiment} path substitutions for varslice
     
         ! Define the current experiment characteristics
@@ -434,7 +402,9 @@ contains
     end function sgd_active
 
     subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,south)
-        ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
+        ! The reference climatology over time_ref: the atmosphere moved to the
+        ! model surface z_srf_ylm with the monthly lapse rate (pr with beta_p;
+        ! the smb without elevation change), and the reference ocean.
 
         implicit none
 
@@ -447,12 +417,7 @@ contains
 
         ! Local variables 
         integer :: m
-        real(wp) :: tmp, lapse, lapse_mon(12)
-        character(len=56)   :: slice_method
-
-        ! Get slices for current time
-        slice_method = "extrap"
-
+        real(wp) :: lapse, lapse_mon(12)
 
         ! Climatology reference
         ! === Atmospheric fields ===
@@ -511,7 +476,7 @@ contains
         end do
     end function esm_lapse_monthly
 
-    subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var,use_ref_atm,use_ref_ocn)
+    subroutine esm_variability_update(esm,mshlf,time,dtt,clim_var,time_ref,H_ice,basins,z_bed,f_grnd,z_sl,use_var)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -525,12 +490,9 @@ contains
         real(dp), intent(IN) :: time_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_var
-        logical,  intent(IN), optional :: use_ref_atm 
-        logical,  intent(IN), optional :: use_ref_ocn 
     
         ! Local variables 
-        integer  :: m, year, step_idx
-        real(wp) :: tmp, lapse
+        integer  :: m, step_idx
         real(wp) :: rand
         real(dp) :: year_rand
         real(wp), allocatable :: to_ref(:,:,:), so_ref(:,:,:)   ! the ocean fields, extrapolated
@@ -616,33 +578,6 @@ contains
                 ! Assume no variabiliy anomaly (do nothing)
                 
         end select
-   
-        if (use_ref_atm) then
-            ! set atmosphere to reference values
-            esm%dts_var = 0.0_wp
-            esm%dpr_var = 1.0_wp
-        end if
-                    
-        if (use_ref_ocn) then
-            ! set ocean to reference values
-            esm%dto_var = 0.0_wp
-            esm%dso_var = 0.0_wp
-        end if
-
-        if (.FALSE.) then
-            ! variability field
-            write(*,*) "maxval ts_var", maxval(esm%ts_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval pr_var", maxval(esm%pr_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval to_var", maxval(esm%to_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval so_var", maxval(esm%so_esm_ref%var(:,:,:,1))
-                        
-            ! anomaly
-            write(*,*) "maxval dts_var",  maxval(esm%dts_var)
-            write(*,*) "maxval dpr_var",  maxval(esm%dpr_var)
-            write(*,*) "maxval dto_var",  maxval(esm%dto_var)
-            write(*,*) "maxval dso_vcar", maxval(esm%dso_var)
-                        
-        end if
         end if
 
         return 
@@ -650,7 +585,7 @@ contains
     end subroutine esm_variability_update
 
     subroutine esm_forcing_update(esm,mshlf,time,use_esm,time_ref,time_hist,time_proj,time_esm_ref,&
-                                  H_ice,basins,z_bed,f_grnd,z_sl,use_smb,use_ref_atm,use_ref_ocn)
+                                  H_ice,basins,z_bed,f_grnd,z_sl,use_smb)
         ! Update climatic fields. These will be used as bnd conditions for Yelmo.
         ! Output are anomaly fields with respect to a reference field from the ESM.
     
@@ -663,16 +598,12 @@ contains
         real(dp), intent(IN) :: time_ref(2),time_hist(2),time_proj(2),time_esm_ref(2)
         real(wp), intent(IN) :: H_ice(:,:),basins(:,:),z_bed(:,:),f_grnd(:,:),z_sl(:,:)
         logical,  intent(IN) :: use_smb  
-        logical,  intent(IN), optional :: use_ref_atm, use_ref_ocn
     
         ! Local variables
-        integer  :: k, m
-        real(wp) :: tmp, anomaly
-        character(len=56) :: slice_method
+        integer  :: m
+        real(wp) :: anomaly
         real(wp), allocatable :: to_esm_ref(:,:,:), so_esm_ref(:,:,:)   ! the esm reference ocean, extrapolated
 
-        ! Get slices for current time
-        slice_method = "extrap"
         anomaly = 0.0_wp
             
         ! Initialize anomalies
@@ -818,59 +749,6 @@ contains
                 stop 
      
         end select
-            
-        if (use_ref_atm) then
-            ! set atmosphere to reference values
-            esm%dts  = 0.0_wp
-            esm%dpr  = 1.0_wp
-            esm%dsmb = 0.0_wp
-            esm%dsmbdz = 0.0_wp
-        end if
-            
-        if (use_ref_ocn) then
-            ! set ocean to reference values
-            esm%dto = 0.0_wp
-            esm%dso = 0.0_wp
-        end if
-    
-        if (.FALSE.) then
-            ! esm ref
-            write(*,*) "minval ts_esm", minval(esm%ts_esm_ref%var(:,:,:,1))
-            write(*,*) "minval pr_esm", minval(esm%pr_esm_ref%var(:,:,:,1))
-            write(*,*) "minval to_esm", minval(esm%to_esm_ref%var(:,:,:,1))
-            write(*,*) "minval so_esm", minval(esm%so_esm_ref%var(:,:,:,1))
-                                  
-            ! proj
-            write(*,*) "minval ts_proj", minval(esm%ts_proj%var(:,:,:,1))
-            write(*,*) "minval pr_proj", minval(esm%pr_proj%var(:,:,:,1))
-            write(*,*) "minval to_proj", minval(esm%to_proj%var(:,:,:,1))
-            write(*,*) "minval so_proj", minval(esm%so_proj%var(:,:,:,1))
-                                
-            ! anomaly
-            write(*,*) "minval dts", minval(esm%dts)
-            write(*,*) "minval dpr", minval(esm%dpr)
-            write(*,*) "minval dto", minval(esm%dto)
-            write(*,*) "minval dso", minval(esm%dso)
-
-            ! esm ref
-            write(*,*) "maxval ts_esm", maxval(esm%ts_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval pr_esm", maxval(esm%pr_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval to_esm", maxval(esm%to_esm_ref%var(:,:,:,1))
-            write(*,*) "maxval so_esm", maxval(esm%so_esm_ref%var(:,:,:,1))
-                          
-            ! proj
-            write(*,*) "maxval ts_proj", maxval(esm%ts_proj%var(:,:,:,1))
-            write(*,*) "maxval pr_proj", maxval(esm%pr_proj%var(:,:,:,1))
-            write(*,*) "maxval to_proj", maxval(esm%to_proj%var(:,:,:,1))
-            write(*,*) "maxval so_proj", maxval(esm%so_proj%var(:,:,:,1))
-                        
-            ! anomaly
-            write(*,*) "maxval dts", maxval(esm%dts)
-            write(*,*) "maxval dpr", maxval(esm%dpr)
-            write(*,*) "maxval dto", maxval(esm%dto)
-            write(*,*) "maxval dso", maxval(esm%dso)
-                        
-        end if
     
         return 
     
@@ -944,61 +822,6 @@ contains
 
     end subroutine esm_check_ocean_layout
 
-    ! === ESM OUTPUT ROUTINES ==========
-
-    subroutine esm_write_init(filename,xc,yc,time,lon,lat,area,map_name,lambda,phi)
-
-        implicit none 
-
-        character(len=*),   intent(IN) :: filename
-        real(wp),           intent(IN) :: xc(:)
-        real(wp),           intent(IN) :: yc(:)
-        real(dp),           intent(IN) :: time
-        real(wp),           intent(IN) :: lon(:,:)
-        real(wp),           intent(IN) :: lat(:,:)
-        real(wp),           intent(IN) :: area(:,:)
-        character(len=*),   intent(IN) :: map_name
-        real(wp),           intent(IN) :: lambda
-        real(wp),           intent(IN) :: phi 
-
-        ! Local variables 
-        character(len=12) :: xnm 
-        character(len=12) :: ynm 
-        
-        xnm = "xc"
-        ynm = "yc" 
-
-        ! === Initialize netcdf file and dimensions =========
-
-        ! Create the netcdf file 
-        call nc_create(filename)
-
-        ! Add grid axis variables to netcdf file
-        call nc_write_dim(filename,xnm,x=xc*1e-3,units="kilometers")
-        call nc_write_attr(filename,xnm,"_CoordinateAxisType","GeoX")
-
-        call nc_write_dim(filename,ynm,x=yc*1e-3,units="kilometers")
-        call nc_write_attr(filename,ynm,"_CoordinateAxisType","GeoY")
-        
-        ! Add time axis with current value 
-        call nc_write_dim(filename,"time", x=time,dx=1.0_dp,nx=1,units="years",unlimited=.TRUE.)
-        
-        ! Projection information 
-        call nc_write_map(filename,map_name,dble(lambda),phi=dble(phi))
-
-        ! Lat-lon information
-        call nc_write(filename,"lon2D",lon,dim1=xnm,dim2=ynm,grid_mapping=map_name)
-        call nc_write_attr(filename,"lon2D","_CoordinateAxisType","Lon")
-        call nc_write(filename,"lat2D",lat,dim1=xnm,dim2=ynm,grid_mapping=map_name)
-        call nc_write_attr(filename,"lat2D","_CoordinateAxisType","Lat")
-
-        call nc_write(filename,"area",  area*1e-6,  dim1=xnm,dim2=ynm,grid_mapping=map_name,units="km^2")
-        call nc_write_attr(filename,"area","coordinates","lat2D lon2D")
-        
-        return
-
-    end subroutine esm_write_init
-
     ! Initlialize allocatable objects
     subroutine esm_allocate(esm,nx,ny)
 
@@ -1064,14 +887,6 @@ contains
             return
     
         end subroutine esm_deallocate
-
-        ! Internal functions
-        function int_to_str(i) result(str)
-            integer, intent(in) :: i
-            character(len=20)   :: str
-            write(str, '(i10)') i
-            str = trim(str)
-        end function
     
 end module esm_forcing
 

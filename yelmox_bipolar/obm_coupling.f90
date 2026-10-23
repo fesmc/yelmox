@@ -49,7 +49,7 @@ module obm_coupling
         logical :: active_obm = .false.
         logical :: ism2obm    = .false.
         logical :: atm2obm    = .false.
-        character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus"/"stommel")
+        character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
         ! atm2obm: the global mean air temperature anomaly dT_glob = gain * coef
         ! ([obm_forcing], a coefficient).
         character(len=64)  :: forcing_coef  = ""
@@ -99,6 +99,13 @@ contains
             call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
             call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
             call nml_read(path_par, "ctrl", "fwf_definition",   oc%fwf_definition)
+            select case(trim(oc%fwf_definition))
+                case("dVdt", "mb", "ablation")
+                case default
+                    write(*,*) "obm_ctl_load:: error: [ctrl] fwf_definition must be dVdt, mb &
+                               &or ablation; got '"//trim(oc%fwf_definition)//"'."
+                    error stop 1
+            end select
             if (oc%couple_fwf_north) &
                 call nml_read(path_par, "ctrl", "hydro_mask_north", oc%hydro_mask_north_path)
             if (oc%couple_fwf_south) &
@@ -228,19 +235,14 @@ contains
         ! Ice sheet -> OBM: freshwater flux from the domain's ice mass balance
         ! (calc_fwf, on the Yelmo grid, restricted by the hydrographic mask) into
         ! the box model's northern (fn) or southern (fs) input flux.
-        ! dom is intent(inout) because calc_fwf takes its mass-balance fields as
-        ! non-intent (modifiable) allocatable dummies.
-        type(kryos_domain),      intent(inout) :: dom
+        type(kryos_domain),    intent(in)    :: dom
         type(obm_class),       intent(inout) :: obm
-        real(wp), allocatable, intent(inout) :: mask(:,:)
+        real(wp),              intent(in)    :: mask(:,:)
         character(len=*),      intent(in)    :: hemisphere
         character(len=*),      intent(in)    :: fwf_def
 
-        real(wp)           :: fwf
-        character(len=512) :: fdef
+        real(wp) :: fwf
 
-        ! calc_fwf reassigns its fwf_def dummy internally, so pass a local copy.
-        fdef = fwf_def
         fwf  = calc_fwf(dom%yelmo%bnd%c%rho_w, dom%yelmo%bnd%c%rho_ice, &
                         dom%yelmo%bnd%c%sec_year, &
                         dom%yelmo%tpo%now%mb_net, dom%yelmo%tpo%now%smb, &
@@ -248,7 +250,7 @@ contains
                         dom%yelmo%tpo%now%H_ice,  dom%yelmo%tpo%now%dHidt, &
                         dom%yelmo%tpo%now%f_grnd, &
                         dom%yelmo%tpo%par%dx, dom%yelmo%tpo%par%dy, &
-                        mask, hemisphere, fdef)
+                        mask, hemisphere, fwf_def)
 
         select case(trim(hemisphere))
             case("north"); obm%fn = fwf

@@ -28,7 +28,7 @@
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
     active_obm       = False            ! Run the shared ocean box model?
-    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus"/"stommel")
+    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus")
 
     ism2obm          = False            ! Ice sheet -> OBM freshwater flux coupling?
     couple_fwf_north = False            ! North freshwater flux -> obm%fn?
@@ -360,7 +360,6 @@
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
@@ -381,7 +380,6 @@
 &ytherm
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
@@ -433,6 +431,13 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_south] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
 /
+
+! [sim_south] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb_south
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
 
 &output_south
     write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
@@ -733,6 +738,7 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
 
 /
 
@@ -792,7 +798,6 @@
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
     itm_c           = -75.0
     itm_t           =  10.0
     itm_b           =  -2.0 
@@ -844,7 +849,7 @@
 
 &marine_shelf_south
     bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 1             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -854,7 +859,7 @@
     basins          = "Zwally2012"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "region:Antarctica & zone:shelf_break_buffer"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there, e.g. "region:Antarctica & zone:shelf_break_buffer"
     corr_method     = "tf"  ! none, tf or bmb: corrections by region
     corr_names      = "ronne" "ross" "pine" "abbott"
     corr_values     = 0.3 0.3 -1.5 0.0
@@ -902,8 +907,11 @@
     
 /
 
+! PICO box model (Reese et al., 2018), read only with bmb_method = "pico".
+! Not used or calibrated in the shipped configurations: the parameters are
+! the published defaults.
 &pico_south
-    n_box          = 5.0        ! Maximum number of boxes in PICO.  
+    n_box          = 5.0        ! Maximum number of boxes per basin
     a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.
     b_pico         = 0.0788     ! Constant coefficient of freezing equation [ºC]. Reese et al., (2018) suggest 0.0788.
     c_pico         = 7.77e-8    ! Pressure coefficient of freezing equation [ºC/Pa]. Reese et al., (2018) suggest 7.77e-8.
@@ -947,6 +955,13 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_north] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
 /
+
+! [sim_north] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb_north
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
 
 &output_north
     write_yelmo   = True
@@ -1235,6 +1250,7 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
 
 /
 
@@ -1293,7 +1309,6 @@
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
     itm_c           = -45.0
     itm_t           =  10.0
     itm_b           =  -2.0 
@@ -1333,7 +1348,7 @@
 
 &marine_shelf_north
     bmb_method      = "lin"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 1             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -1343,7 +1358,7 @@
     basins          = "Zwally2012.group"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "~region:Greenland | zone:open_ocean"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there
     corr_method     = "none"  ! none, tf or bmb: corrections by region
     corr_names      = ""
     corr_values     = 0.0
