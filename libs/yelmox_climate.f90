@@ -260,7 +260,7 @@ contains
     end subroutine climate_init
 
     subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
-                              domain, dx, dtt, mshlf, coefs, init)
+                              dtt, mshlf, coefs, init)
         ! Evaluate the terms (their coefficients), update the backend on the
         ! climate grid and fill `out`, then its elevation dependence, the
         ! uniform terms on the atmosphere, the derived air-anomaly
@@ -279,8 +279,6 @@ contains
         type(tstep_class),          intent(in)    :: ts
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_bed(:,:), f_grnd(:,:), z_sl(:,:)
         real(wp),         intent(in) :: z_srf_ref(:,:)
-        character(len=*), intent(in) :: domain
-        real(wp),         intent(in) :: dx
         real(dp),         intent(in) :: dtt              ! [yr] time step of the run
         type(marshelf_class),  intent(in)    :: mshlf
         type(coefs_class),     intent(inout) :: coefs
@@ -300,7 +298,7 @@ contains
 
         select case(trim(cl%method))
             case("snapshots")
-                call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, terms=cl%terms, dx=dx)
+                call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, terms=cl%terms)
                 call snapshots_state_copy(out%now, cl%snapshots%now)
                 call snapshots_state_copy(out%ref, cl%snapshots%ref)
 
@@ -309,7 +307,7 @@ contains
                                 z_srf_ref, mshlf)
 
             case("rembo")
-                call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, is_init)
+                call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, is_init)
         end select
 
         ! The elevation dependence of the atmosphere, to move it to another surface
@@ -804,11 +802,10 @@ contains
 
         call esm_forcing_update(esm, mshlf, time, ec%use_esm, ec%time_ref, ec%time_hist, &
                                 ec%time_proj, ec%time_esm_ref, H_ice, basins, z_bed, &
-                                f_grnd, z_sl, ec%use_smb, use_ref_atm=.false., use_ref_ocn=.false.)
+                                f_grnd, z_sl, ec%use_smb)
 
         call esm_variability_update(esm, mshlf, time, dtt, ec%clim_var, ec%time_ref, H_ice, &
-                                    basins, z_bed, f_grnd, z_sl, ec%use_var, &
-                                    use_ref_atm=.false., use_ref_ocn=.false.)
+                                    basins, z_bed, f_grnd, z_sl, ec%use_var)
 
         ! Atmosphere.
         out%now%tas    = esm%t2m + esm%dts + esm%dts_var
@@ -860,7 +857,7 @@ contains
 
     ! ===== rembo backend ===================================================
 
-    subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, init)
+    subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, init)
         ! REMBO's atmosphere and surface mass balance, and the ocean from snapshots
         ! (at `time`, as for the snapshots backend). REMBO needs the anomaly
         ! before it runs, so the uniform terms on tas are its input (not applied
@@ -873,8 +870,6 @@ contains
         type(tstep_class),          intent(in)    :: ts
         real(dp),         intent(in) :: time
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
-        character(len=*), intent(in) :: domain
-        real(wp),         intent(in) :: dx
         logical,          intent(in) :: init
 
         integer :: nx, ny
@@ -883,7 +878,7 @@ contains
         ny = size(z_srf,2)
 
         ! The summer anomaly REMBO takes as its input: the uniform terms on tas.
-        cl%rembo%dT_sum = terms_uniform_dT(cl%terms, "tas")
+        cl%rembo%dT_sum = terms_uniform_dT(cl%terms)
         cl%rembo%dT_ann = rembo_clim_dT_ann(cl%rembo%dT_sum)
 
         ! Atmosphere and surface mass balance, at the current surface.
@@ -898,7 +893,7 @@ contains
 
         ! Ocean (depth profiles) from snapshots (ocean only); its terms are
         ! applied by climate_update.
-        call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, terms=cl%terms, dx=dx)
+        call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, terms=cl%terms)
         call snapshots_state_copy(out%now, cl%snapshots%now)
         call snapshots_state_copy(out%ref, cl%snapshots%ref)
 

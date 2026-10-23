@@ -106,7 +106,7 @@ module climate_terms
 
     public :: climate_caps_class, caps_need_atm, term_class, terms_class
     public :: terms_init, terms_check, terms_eval, terms_save_ocean, terms_apply_atm, terms_apply_ocn
-    public :: terms_uniform_dT, terms_has_pattern, terms_write_step, coef_label
+    public :: terms_uniform_dT, terms_write_step, coef_label
 
 contains
 
@@ -269,17 +269,6 @@ contains
 
     end subroutine caps_need_atm
 
-    logical function terms_has_pattern(terms, pattern) result(has)
-        ! Does any term have this pattern?
-        type(terms_class), intent(in) :: terms
-        character(len=*),  intent(in) :: pattern
-        integer :: k
-        has = .false.
-        do k = 1, terms%n
-            if (trim(terms%term(k)%pattern) == trim(pattern)) has = .true.
-        end do
-    end function terms_has_pattern
-
     ! ===== application ======================================================
 
     subroutine terms_eval(terms, coefs, derived)
@@ -425,22 +414,15 @@ contains
 
     end subroutine terms_apply_ocn
 
-    real(wp) function terms_uniform_dT(terms, field) result(dT)
-        ! The sum of gain*coefficient over the uniform terms on `field` (tas: f_ta,
-        ! to: f_to, so: f_so): the anomaly a backend takes as its input (rembo
-        ! dT_sum from tas).
+    real(wp) function terms_uniform_dT(terms) result(dT)
+        ! The sum f_ta*f over the uniform terms on tas: the air temperature
+        ! anomaly a backend takes as its input (rembo dT_sum).
         type(terms_class),   intent(in) :: terms
-        character(len=*),    intent(in) :: field
         integer :: k
         dT = 0.0_wp
         do k = 1, terms%n
             associate(t => terms%term(k))
-            if (trim(t%pattern) /= "uniform") cycle
-            select case(trim(field))
-                case("tas"); if (t%on_tas) dT = dT + t%f_ta*t%f
-                case("to");  if (t%on_to)  dT = dT + t%f_to*t%f
-                case("so");  if (t%on_so)  dT = dT + t%f_so*t%f
-            end select
+            if (trim(t%pattern) == "uniform" .and. t%on_tas) dT = dT + t%f_ta*t%f
             end associate
         end do
     end function terms_uniform_dT

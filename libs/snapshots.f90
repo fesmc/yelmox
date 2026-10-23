@@ -60,31 +60,18 @@ module snapshots
     ! Types
     ! =====================================================================
 
-    ! Ad-hoc output field, accessed by name (escape hatch for the long tail;
-    ! hot fields are named members of climate_state_class instead).
-    type named_field_class
-        character(len=32)     :: name
-        real(wp), allocatable :: var(:,:,:)
-    end type
-
     ! One physical field in the registry (immutable after load).
     type field_spec_class
-        character(len=32) :: name           ! "tas","pr","to","so","zs","smb","bmb_shlf",...
+        character(len=32) :: name           ! "tas", "pr", "to", "so", "zs"
         character(len=16) :: kind           ! from the name: "atm_temp" | "atm_precip" | "ocn" | "ocn_salt" | "elev"
-        character(len=16) :: combine        ! "anomaly" | "absolute"
         character(len=16) :: blend          ! "linear" | "ratio" | "const", fixed by the field name
         integer           :: n_term          ! number of terms on this field
         integer           :: term_k(TERM_MAX) ! their positions in snapshots_class%term
-        logical           :: enabled        ! off by default for exotic fields
-        logical           :: apply_lapse
-        logical           :: precip_scaling
-        logical           :: seasonal_synth
     end type
 
     ! One climate state: PD, LGM, piControl, ... (config side).
     type snapshot_spec_class
         character(len=64) :: name
-        logical           :: is_ref         ! the distinguished reference state
         logical           :: monthly        ! raw atm fields are monthly (else annual+season -> synthesized)
         character(len=3)  :: tas_season     ! season of the second tas field: "jja" | "djf"
         real(wp)          :: clim_sigma     ! [km] Gaussian smoothing of the atmosphere at loading (0: none)
@@ -94,25 +81,20 @@ module snapshots
         integer,           allocatable :: nsrc(:)    ! (n_field) number of groups per field (0 = not bound)
     end type
 
-    ! A climate state. Option A: named members for the hot path, unallocated when a
-    ! run does not use them (allocated() is the "in use" guard); `extra` for the tail.
-    ! Used both as a snapshot's reduced (sea-level) fields and as the blended output.
+    ! A climate state: the fields in use allocated (allocated() is the "in
+    ! use" guard). Used both as a snapshot's reduced (sea-level) fields and as
+    ! the blended output.
     type climate_state_class
         ! atmosphere, monthly (nx,ny,12): tas at surface, tsl at sea level
         real(wp), allocatable :: tas(:,:,:), tsl(:,:,:), pr(:,:,:), prcor(:,:,:)
-        ! atmosphere, annual / summer (nx,ny); the summer means of the output only
-        real(wp), allocatable :: ta_ann(:,:), ta_sum(:,:), pr_ann(:,:)
-        real(wp), allocatable :: tsl_ann(:,:), tsl_sum(:,:), prcor_ann(:,:)
+        ! atmosphere, annual (nx,ny)
+        real(wp), allocatable :: ta_ann(:,:), pr_ann(:,:), tsl_ann(:,:)
         real(wp), allocatable :: beta_p(:,:)          ! precip-temperature sensitivity
         ! ocean
         real(wp), allocatable :: to_ann(:,:,:), so_ann(:,:,:)
         real(wp), allocatable :: depth(:)
-        ! geometry / masks
-        real(wp), allocatable :: mask(:,:), z_srf(:,:)
-        ! exotic / expansion forcing (named for the common ones)
-        real(wp), allocatable :: smb(:,:), bmb_shlf(:,:,:)
-        ! escape hatch for genuinely ad-hoc future fields (temp-copy access only)
-        type(named_field_class), allocatable :: extra(:)
+        ! geometry
+        real(wp), allocatable :: z_srf(:,:)
     end type
 
     ! A field's source binding for one snapshot: one varslice group (already monthly)
@@ -141,7 +123,6 @@ module snapshots
         integer            :: nx, ny
         real(wp)           :: dx_km         ! [km] grid spacing (snapshot smoothing)
         logical            :: south         ! southern hemisphere (seasons, lapse rates)
-        character(len=16)  :: combine       ! default combine mode
         character(len=64)  :: ref_name      ! which snapshot is the reference
         integer            :: iref          ! its position in snap
         logical            :: with_atm      ! the reference binds the atmosphere (tas, pr)
@@ -149,7 +130,6 @@ module snapshots
         real(wp)           :: lapse(2)      ! [annual, summer] lapse rate [K/m]
         ! precip sensitivity parameters
         real(wp)           :: f_p           ! precip-temperature Clausius factor -> beta_p [1/K]
-        real(wp)           :: f_p_ne        ! NE-Greenland beta_p multiplier (not active)
         integer            :: n_snap, n_field, n_term
     end type
 
@@ -220,7 +200,7 @@ contains
         return
     end subroutine snapshots_init
 
-    subroutine snapshots_update(sc, z_srf, time, terms, dx)
+    subroutine snapshots_update(sc, z_srf, time, terms)
         ! Pipeline: refresh loads -> combine (the position on each term: the
         ! value f of its coefficient in `terms`, evaluated for this update by
         ! terms_eval) -> transform (the atmosphere, if bound). The uniform and
@@ -230,7 +210,6 @@ contains
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(dp),              intent(IN)    :: time
         type(terms_class),     intent(IN)    :: terms
-        real(wp),              intent(IN), optional :: dx
 
         ! 1. Refresh time-varying loads and re-reduce those snapshots.
         call snapshots_refresh_loads(sc, time)
@@ -239,7 +218,7 @@ contains
         call snapshots_combine(sc, terms)
 
         ! 3. Transform: inflate sea-level fields to the current model elevation
-        !    (tsl -> tas), precip, annual/summer aggregates.
+        !    (tsl -> tas), precip, annual means.
         if (sc%par%with_atm) call snapshots_transform(sc, z_srf)
 
         return
@@ -300,7 +279,6 @@ contains
         type(climate_state_class) :: none   ! the snap0 of a term with snap0 = ""
 
         do f = 1, sc%par%n_field
-            if (.not. sc%registry(f)%enabled) cycle
             if (sc%snap(sc%par%iref)%spec%nsrc(f) == 0) cycle   ! not bound in the reference: not built
 
             ! Start from the reference state.
@@ -397,22 +375,18 @@ contains
 
     subroutine snapshots_transform(sc, z_srf)
         ! Inflate the blended sea-level fields to the current model elevation and
-        ! compute the annual/summer aggregates. The monthly lapse rate is the one
-        ! of the sea-level reduction (lapse_monthly), so a snapshot at its own
+        ! compute the annual means. The monthly lapse rate is the one of the
+        ! sea-level reduction (lapse_monthly), so a snapshot at its own
         ! elevation is recovered exactly.
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         integer  :: m
-        logical  :: south
         real(wp) :: lapse(NMONTH)
 
-        south = sc%par%south
         lapse = snapshots_lapse_monthly(sc)
 
         sc%now%z_srf = z_srf
-        sc%now%mask  = 0.0_wp
-        where (z_srf > 1.0_wp) sc%now%mask = 1.0_wp
 
         ! 3a: monthly tas from tsl via seasonal lapse rate to the current elevation.
         do m = 1, NMONTH
@@ -425,18 +399,10 @@ contains
                 exp(sc%now%beta_p*(sc%now%tas(:,:,m) - sc%now%tsl(:,:,m)))
         end do
 
-        ! Step 4: annual and summer aggregates.
+        ! 3c: annual means.
         sc%now%tsl_ann = sum(sc%now%tsl, dim=3) / 12.0_wp
         sc%now%ta_ann  = sum(sc%now%tas, dim=3) / 12.0_wp
-        if (south) then
-            sc%now%tsl_sum = sum(sc%now%tsl(:,:,[12,1,2]), dim=3) / 3.0_wp
-            sc%now%ta_sum  = sum(sc%now%tas(:,:,[12,1,2]), dim=3) / 3.0_wp
-        else
-            sc%now%tsl_sum = sum(sc%now%tsl(:,:,[6,7,8]),  dim=3) / 3.0_wp
-            sc%now%ta_sum  = sum(sc%now%tas(:,:,[6,7,8]),  dim=3) / 3.0_wp
-        end if
-        sc%now%prcor_ann = sum(sc%now%prcor, dim=3) / 12.0_wp * 365.0_wp
-        sc%now%pr_ann    = sum(sc%now%pr,    dim=3) / 12.0_wp * 365.0_wp
+        sc%now%pr_ann  = sum(sc%now%pr,  dim=3) / 12.0_wp * 365.0_wp
 
         return
     end subroutine snapshots_transform
@@ -583,13 +549,9 @@ contains
         call nml_validate(filename, def_file, group, defaults_group="snapshots")
         call nml_read(filename, group, "grid_global", sc%par%grid_global, init=.TRUE., &
                       defaults_file=def_file, defaults_group="snapshots")
-        call nml_read(filename, group, "combine",     sc%par%combine,     init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snapshots")
         call nml_read(filename, group, "lapse",       sc%par%lapse,       init=.TRUE., &
                       defaults_file=def_file, defaults_group="snapshots")
         call nml_read(filename, group, "f_p",         sc%par%f_p,         init=.TRUE., &
-                      defaults_file=def_file, defaults_group="snapshots")
-        call nml_read(filename, group, "f_p_ne",      sc%par%f_p_ne,      init=.TRUE., &
                       defaults_file=def_file, defaults_group="snapshots")
 
         ! --- field registry ---------------------------------------------------
@@ -599,7 +561,7 @@ contains
         if (allocated(sc%registry)) deallocate(sc%registry)
         allocate(sc%registry(sc%par%n_field))
         do i = 1, sc%par%n_field
-            call read_field_spec(sc%registry(i), group, trim(names(i)), sc%par%combine)
+            call read_field_spec(sc%registry(i), group, trim(names(i)))
         end do
 
         ! --- the snapshot terms, and the snapshots they and the reference name -
@@ -632,7 +594,7 @@ contains
             gfile  = var_defs_find(sc%par%var_defs, filename, trim(sgroup), &
                                    "a snapshot of the forcing of "//trim(group))
             call read_snapshot_spec(sc%snap(i)%spec, trim(gfile), trim(sgroup), &
-                                    trim(names(i)), sc%par%ref_name, sc%registry, sc%par%south)
+                                    trim(names(i)), sc%registry, sc%par%south)
         end do
         sc%par%iref = snapshot_position(sc, sc%par%ref_name, "reference")
 
@@ -817,22 +779,17 @@ contains
         stop 1
     end function field_position
 
-    subroutine read_field_spec(fs, group, name, combine_default)
+    subroutine read_field_spec(fs, group, name)
         ! One field of the registry: its kind and blend rule follow from its
         ! name (tas, to, so: linear; pr: ratio; zs: const); the terms on it
         ! are added by snapshots_par_load.
         implicit none
         type(field_spec_class), intent(OUT) :: fs
-        character(len=*),       intent(IN)  :: group, name, combine_default
+        character(len=*),       intent(IN)  :: group, name
 
-        fs%name           = name
-        fs%combine        = combine_default
-        fs%n_term         = 0
-        fs%term_k         = 0
-        fs%enabled        = .TRUE.
-        fs%apply_lapse    = .FALSE.
-        fs%precip_scaling = .FALSE.
-        fs%seasonal_synth = .FALSE.
+        fs%name   = name
+        fs%n_term = 0
+        fs%term_k = 0
 
         select case(trim(name))
             case("tas")
@@ -859,7 +816,7 @@ contains
         return
     end subroutine read_field_spec
 
-    subroutine read_snapshot_spec(ss, filename, group, name, ref_name, registry, south)
+    subroutine read_snapshot_spec(ss, filename, group, name, registry, south)
         ! The spec of one snapshot and its bindings: per registry field, the
         ! var_defs group(s) under the field's name (key absent or "" = not bound).
         ! tas_season: the season of the second tas field of an annual snapshot,
@@ -867,7 +824,7 @@ contains
         ! keys from the template snap_snapshot of the defaults file.
         implicit none
         type(snapshot_spec_class), intent(OUT) :: ss
-        character(len=*),          intent(IN)  :: filename, group, name, ref_name
+        character(len=*),          intent(IN)  :: filename, group, name
         type(field_spec_class),    intent(IN)  :: registry(:)
         logical,                   intent(IN)  :: south
 
@@ -875,7 +832,6 @@ contains
         integer :: f
 
         ss%name      = name
-        ss%is_ref    = .FALSE.
         call nml_validate(filename, def_file, group, defaults_group="snapshot")
         call nml_read(filename, group, "exp",        ss%exp,        init=.TRUE., &
                       defaults_file=def_file, defaults_group="snapshot")
@@ -899,8 +855,6 @@ contains
                            trim(ss%tas_season)//"'; must be jja or djf."
                 stop 1
         end select
-        ! The reference snapshot is designated solely by the top-level ref_name.
-        if (trim(name) == trim(ref_name)) ss%is_ref = .TRUE.
 
         ! Bindings: 1 group (monthly) or 2 ([ann, season]; pr monthly: summed).
         allocate(ss%refs(size(registry),2), ss%nsrc(size(registry)))
@@ -945,8 +899,6 @@ contains
             allocate(sc%snap(s)%bind(sc%par%n_field))
 
             do f = 1, sc%par%n_field
-                if (.not. sc%registry(f)%enabled) cycle
-
                 nsrc = sc%snap(s)%spec%nsrc(f)
                 if (nsrc == 0) cycle          ! this snapshot does not bind this field
 
@@ -1029,10 +981,9 @@ contains
 
         associate(spec => sc%snap(s)%spec, st => sc%snap(s)%state, bind => sc%snap(s)%bind)
 
-        ! --- elevation, mask, beta_p ----------------------------------------------
+        ! --- elevation, beta_p ----------------------------------------------------
         if (has_zs) then
             call realloc2(st%z_srf, nx, ny)
-            call realloc2(st%mask,  nx, ny)
             call realloc2(st%beta_p, nx, ny)
             st%z_srf = bind(f_zs)%src(1)%var(:,:,1,1)
             ! Missing-value fill -> domain mean (GRL inputs are complete; guard on the
@@ -1042,12 +993,8 @@ contains
                         / real(max(count(st%z_srf > -9000.0_wp),1), wp)
                 where (st%z_srf <= -9000.0_wp) st%z_srf = zmean
             end if
-            st%mask = 0.0_wp
-            where (st%z_srf > 0.0_wp) st%mask = 1.0_wp
-            ! beta_p = f_p everywhere (the NE-basin branch is dormant); f_p_ne is
-            ! retained in par for future basin dependence.
-            st%beta_p = sc%par%f_p * 1.0_wp
-            if (sc%par%f_p_ne /= 1.0_wp) st%beta_p = sc%par%f_p  ! (kept uniform; see note)
+            ! beta_p = f_p everywhere
+            st%beta_p = sc%par%f_p
         end if
 
         ! --- air temperature: monthly tas -----------------------------------------
@@ -1104,8 +1051,7 @@ contains
             end if
         end if
 
-        ! Smooth the snapshot (spec%clim_sigma, e.g. coarse GCM fields), then the
-        ! land mask of the smoothed elevation.
+        ! Smooth the snapshot (spec%clim_sigma, e.g. coarse GCM fields).
         if (spec%clim_sigma > 0.0_wp) then
             if (has_zs) call filter_gaussian(st%z_srf, spec%clim_sigma, sc%par%dx_km)
             if (has_tas) then
@@ -1120,10 +1066,6 @@ contains
                     call filter_gaussian(st%pr(:,:,m), spec%clim_sigma, sc%par%dx_km)
                 end do
             end if
-            if (has_zs) then
-                st%mask = 0.0_wp
-                where (st%z_srf > 0.0_wp) st%mask = 1.0_wp
-            end if
         end if
 
         ! --- sea-level temperatures and elevation-desensitized precip -----------
@@ -1134,8 +1076,7 @@ contains
                 st%tsl_ann = st%ta_ann
             end if
             if (has_pr) then
-                st%prcor     = st%pr
-                st%prcor_ann = st%pr_ann
+                st%prcor = st%pr
             end if
         else
             if (has_tas) then
@@ -1149,8 +1090,6 @@ contains
             end if
             if (has_pr) then   ! with tas and zs (snapshots_check_bindings)
                 call realloc3(st%prcor, nx, ny, NMONTH)
-                call realloc2(st%prcor_ann, nx, ny)
-                st%prcor_ann = st%pr_ann / exp(st%beta_p*(st%ta_ann - st%tsl_ann))
                 do m = 1, NMONTH
                     st%prcor(:,:,m) = st%pr(:,:,m) / exp(st%beta_p*(st%tas(:,:,m) - st%tsl(:,:,m)))
                 end do
