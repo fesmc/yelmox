@@ -76,7 +76,8 @@ contains
         ! held when the restart time lies on its dt_clim cadence (counted from
         ! its start). A stateful surface would be stepped one extra year by a
         ! re-derivation (bundles written before its outputs were added;
-        ! restart_read warns).
+        ! restart_read warns). The climate is re-derived whatever the cadence
+        ! (force), so also with dt_clim <= 0 (never updated after the cold start).
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         type(bsl_class),   intent(inout) :: bsl
@@ -95,7 +96,7 @@ contains
             if (do_bsl) call bsl_startup(bsl, trim(restart))
             call domain_restart_read(dom, trim(restart), ts, bsl, surface_restored)
             call couple_yelmo_to_htopo(dom)
-            call step_climate(dom, ts, coefs)
+            call step_climate(dom, ts, coefs, force=.true.)
             if (.not. surface_restored) call step_surface(dom, ts)
         end if
     end subroutine domain_startup
@@ -324,7 +325,7 @@ contains
         ! Refresh the hub and climate/smb to reflect the new geometry, then land
         ! the smb on the Yelmo grid for the stabilization below.
         call couple_yelmo_to_htopo(dom)
-        call step_climate(dom, ts, coefs)
+        call step_climate(dom, ts, coefs, force=.true.)
         call step_surface(dom, ts)
         call couple_surface_to_yelmo(dom)
 

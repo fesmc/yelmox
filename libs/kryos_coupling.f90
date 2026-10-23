@@ -375,7 +375,7 @@ contains
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, coefs, init)
+    subroutine step_climate(dom, ts, coefs, init, force)
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend and its
@@ -383,25 +383,31 @@ contains
         ! couple_climate_to_yelmo. coefs is the driver-owned coefficient
         ! registry (advanced to this step; the climate sets its derived
         ! coefficients in it).
-        ! init=.true. marks the cold start: the update runs regardless of the
-        ! cadence.
+        ! init=.true. marks the cold start: the backend's own initialization
+        ! (the REMBO equilibration), with an update regardless of the cadence.
+        ! force=.true. updates regardless of the cadence, without that
+        ! initialization: the re-derivation on a restart and the refresh after
+        ! a cold-start change of the geometry (recon).
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
         type(coefs_class),     intent(inout) :: coefs
         logical,               intent(in), optional :: init
+        logical,               intent(in), optional :: force
 
         real(wp), allocatable :: z_srf_c(:,:), H_ice_c(:,:), z_bed_c(:,:), f_grnd_c(:,:)
         real(wp), allocatable :: z_sl_c(:,:), z_srf_ref_c(:,:)
         character(len=256) :: gc, gh
         character(len=32)  :: mth
-        logical :: is_init
+        logical :: is_init, is_forced
 
         if (.not. dom%ctl%with_climate) return
 
         is_init = .false.
         if (present(init)) is_init = init
+        is_forced = .false.
+        if (present(force)) is_forced = force
 
-        if (.not. (is_init .or. cadence_due(ts%time_elapsed, dom%ctl%dt_clim))) return
+        if (.not. (is_init .or. is_forced .or. cadence_due(ts%time_elapsed, dom%ctl%dt_clim))) return
 
         gc = trim(dom%ctl%grid_clim)
         gh = trim(dom%ctl%grid_hub)
