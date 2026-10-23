@@ -13,18 +13,21 @@ module climate_mods
     ! the [forcing] var_defs files that has them.
     !
     ! Contract: each transform states what it touches in `now` (`ref` is never
-    ! touched) and which backends it refuses; climate_mods_init checks every
-    ! active transform against what the backend supplies (climate_caps_class)
-    ! and stops on a mismatch, never a silent partial application.
+    ! touched); climate_mods_init checks every active transform against what
+    ! the backend supplies (climate_caps_class) and stops on a mismatch, never
+    ! a silent partial application. Both change the atmosphere after the
+    ! backend, so both need an atmosphere that drives the surface (monthly tas
+    ! and pr, now and ref: caps_need_atm, the predicate of the uniform terms
+    ! too); refused for a backend that supplies the surface mass balance
+    ! itself (esm with its smb; rembo).
     !   taper: now = ref + w*(now - ref) for tas, pr, ta_ann, pr_ann and
-    !         tsl_ann (those the climate has, now and ref), w in [0, 1] a static
-    !         field on the climate grid, the reference at the current surface
+    !         tsl_ann (those the climate has), w in [0, 1] a static field on
+    !         the climate grid, the reference at the current surface
     !         (taper_apply); with outside = "mean", ref + w*(now - ref) +
     !         (1 - w)*the mean anomaly (temperature; precipitation: ratio of the
-    !         totals) over the cells with w = 1, per month. Refused for a
-    !         backend without a reference atmosphere (rembo).
+    !         totals) over the cells with w = 1, per month.
     !   bias: tas, ta_ann, tsl_ann + dtas; pr * fpr, pr_ann by the ratio of the
-    !         annual totals. Refused for a backend with annual fields only (rembo).
+    !         annual totals.
 
     use precision,     only : wp, dp
     use nml,           only : nml_read, nml_validate
@@ -32,7 +35,7 @@ module climate_mods
     use coordinates,   only : grid_class
     use varslice,      only : varslice_class, varslice_init_nml, varslice_update, varslice_end
     use climate_out,   only : climate_out_class
-    use climate_terms, only : climate_caps_class
+    use climate_terms, only : climate_caps_class, caps_need_atm
     use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, forcing_var_defs, def_file => yelmox_defaults_file
 
     implicit none
@@ -167,7 +170,7 @@ contains
 
     subroutine taper_init(tap, filename, group, caps, domain, grid)
         ! Read [taper<sfx>] (optional group; inactive without it), check its
-        ! contract (a reference atmosphere) and load the weight from its
+        ! contract (caps_need_atm) and load the weight from its
         ! var_defs group (static, one field) on the climate grid; a weight
         ! outside [0, 1] (or missing) is an error.
         type(taper_class),        intent(inout) :: tap
@@ -183,11 +186,7 @@ contains
         call nml_read(filename, group, "active", tap%active, defaults_file=def_file, defaults_group="taper")
         if (.not. tap%active) return
 
-        if (.not. caps%has_ref_atm) then
-            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs a reference &
-                       &atmosphere; climate = "//trim(caps%name)//" has none."
-            error stop 1
-        end if
+        call caps_need_atm(caps, "["//trim(group)//"]")
 
         var_defs = forcing_var_defs(filename)
         call nml_read(filename, group, "weight",   tap%weight, defaults_file=def_file, defaults_group="taper")
@@ -316,7 +315,7 @@ contains
 
     subroutine bias_init(bias, filename, group, caps, domain, grid, time)
         ! Read [bias<sfx>] (optional group; inactive without it), check its
-        ! contract (monthly fields) and open its fields from the var_defs
+        ! contract (caps_need_atm) and open its fields from the var_defs
         ! groups it names (1 or 12 slices) on the climate grid, sliced at
         ! `time` when they have a time axis.
         type(bias_class),         intent(inout) :: bias
@@ -334,12 +333,7 @@ contains
         call nml_read(filename, group, "active", bias%active, defaults_file=def_file, defaults_group="bias")
         if (.not. bias%active) return
 
-        if (.not. caps%monthly) then
-            write(*,*) "climate_mods_init:: error: ["//trim(group)//"] needs monthly air &
-                       &temperature and precipitation; climate = "//trim(caps%name)// &
-                       " has annual fields only."
-            error stop 1
-        end if
+        call caps_need_atm(caps, "["//trim(group)//"]")
 
         var_defs = forcing_var_defs(filename)
         call nml_read(filename, group, "dtas",     grp_dtas,   init=.true., &

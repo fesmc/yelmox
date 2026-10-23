@@ -143,7 +143,13 @@ One term = one coefficient × one pattern, on an explicit list of fields:
 Contracts, checked at init with an error naming the term: every field is
 bound by `snap0` (if given), `snap1` and the reference; `snap1` of a term
 without `snap0` is a sea-level anomaly or ratio (no `zs`); `replace` once
-per field; a derived coefficient on the ocean only.
+per field, on ocean profiles; a uniform term on `to`/`so` needs an ocean
+(profiles or at the shelf base); a derived coefficient on the ocean only.
+One predicate of the backend serves the uniform terms on `tas`/`pr` and the
+transforms (`[taper]`, `[bias]`), which change the atmosphere after the
+backend: its atmosphere must drive the surface (monthly `tas` and `pr`, now
+and reference). They are refused when the backend supplies the smb itself
+(esm with its smb; rembo, which takes the uniform `tas` terms as its input).
 
 ### 3.5 Transforms and other consumers
 

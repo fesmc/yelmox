@@ -153,11 +153,11 @@ contains
             error stop 1
         end if
 
-        ! The backend, and what it supplies (caps) for the modifiers' contracts.
-        ! It supplies the surface mass balance exactly when it is taken from it
-        ! (smb_direct: esm with use_smb, rembo; checked above).
-        caps%name    = trim(cl%method)
-        caps%has_smb = smb_direct
+        ! The backend, and what it supplies (caps) for the contracts of the
+        ! terms and transforms. It supplies the surface mass balance exactly
+        ! when it is taken from it (smb_direct: esm with use_smb, rembo;
+        ! checked above); otherwise its atmosphere drives the surface.
+        caps%name = trim(cl%method)
         select case(trim(cl%method))
             case("snapshots")
                 call snapshots_init(cl%snapshots, filename, domain, grid, time, &
@@ -170,12 +170,15 @@ contains
                                &no tas/pr."
                     error stop 1
                 end if
-                caps%has_tsl_ann = cl%snapshots%par%with_atm
-                caps%monthly     = cl%snapshots%par%with_atm
+                caps%atm_drives_srf = .true.
+                caps%has_tsl_ann    = .true.
+                caps%has_snapshots  = .true.
+                caps%has_ocn_prof   = cl%snapshots%par%with_ocn
             case("esm")
                 call esm_init(cl, filename, domain, grid, "esm"//trim(sfx), timeline_group, &
                               smb_direct, reg)
-                caps%has_ocn_shelf = .true.
+                caps%atm_drives_srf = .not. smb_direct
+                caps%has_ocn_shelf  = .true.
             case("rembo")
                 ! REMBO for the atmosphere and smb, snapshots for the ocean: an
                 ! ocean-only reference snapshot (to, optionally so).
@@ -191,9 +194,9 @@ contains
                 call rembo_clim_init(time, nx, ny)
                 allocate(cl%rembo%ta_sum(nx,ny))
                 cl%rembo%ta_sum = 0.0_wp
-                caps%monthly     = .false.
-                caps%anom_input  = .true.
-                caps%has_ref_atm = .false.
+                caps%anom_input    = .true.
+                caps%has_snapshots = .true.
+                caps%has_ocn_prof  = .true.
             case default
                 write(*,*) "climate_init:: error: climate must be snapshots, esm or rembo; got ", &
                            trim(cl%method)
