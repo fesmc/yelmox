@@ -129,7 +129,7 @@ module marine_shelf
         real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface by data (ismip6)
         real(wp), allocatable :: tf_corr_basin(:,:)     ! Thermal correction at the ice-shelf interface by basin
         
-        real(wp), allocatable :: z_base(:,:)            ! Ice-shelf base elevation (relative to sea level)
+        real(wp), allocatable :: z_base(:,:)            ! [m] Ice-base elevation relative to the datum (present-day sea level; bed where grounded)
         real(wp), allocatable :: slope_base(:,:)        ! Ice-shelf base slope (slope=sin(theta)=length/hypotenuse)
 
         integer,  allocatable :: mask_ocn_ref(:,:) 
@@ -509,8 +509,9 @@ contains
 
         ! 2. Calculate various fields of interest ============================
 
-        ! Calculate ocean water freezing point [K]
-        call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base, &
+        ! Calculate ocean water freezing point [K], at the depth of the ice
+        ! base below the current sea level
+        call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base-z_sl, &
                                     mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3, &
                                     T_ref=mshlf%par%T0)
 
@@ -1520,22 +1521,23 @@ contains
 
     end subroutine calc_shelf_variable_depth
 
-    elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
+    elemental subroutine calc_freezing_point(to_fp,so,z_ice_sl,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
         ! Favier et al (2019), Eq. 3
-        ! z_base is ice-base elevation, which is negative below sea level
+        ! z_ice_sl is the ice-base elevation relative to the current sea
+        ! level (z_base - z_sl), negative below the sea surface
 
         implicit none 
 
         real(wp), intent(OUT) :: to_fp
         real(wp), intent(IN)  :: so 
-        real(wp), intent(IN)  :: z_base 
+        real(wp), intent(IN)  :: z_ice_sl 
         real(wp), intent(IN)  :: lambda1 
         real(wp), intent(IN)  :: lambda2 
         real(wp), intent(IN)  :: lambda3 
         real(wp), intent(IN)  :: T_ref 
 
-        to_fp = lambda1*so + lambda2 + lambda3*z_base + T_ref 
+        to_fp = lambda1*so + lambda2 + lambda3*z_ice_sl + T_ref 
 
         return 
 
