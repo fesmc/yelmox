@@ -23,15 +23,15 @@ annotated git tag. Dates are release (tag) dates.
   by field (tas, to, so add; pr a ratio, exp(beta_p f_ta f) in a uniform term). Contracts
   checked at init (coefficients and snapshots exist, fields bound, replace once per field,
   derived coefficients on the ocean, uniform atmosphere terms need an atmosphere that
-  drives the surface, ocean terms an ocean). The coefficients are owned by the driver
-  (`libs/kryos_forcing.f90`), advanced once per step on the forcing time `time_rel` with
-  the ice volume as response, shared by the domains of `yelmox_bipolar`, evaluated once
-  per climate update (`libs/climate_terms.f90`). Output `term_<name>` (2D), `coef_<name>`
-  (1D, in `yelmo_ts.nc`), restart `coef_<name>_restart.nc` (with the RNG state: noisy
-  coefficients continue identically). Coefficients are named by their symbol in the
-  equation (`alpha`, `beta`, ...); the record a symbol loads is the setup's, in its par
-  file. Terms are named by what they add. `tests/test_coefs.f90` covers the derived
-  coefficients.
+  drives the surface or rembo, refused with esm and its smb; ocean terms an ocean). The
+  coefficients are owned by the driver (`libs/kryos_forcing.f90`), advanced once per step
+  on the forcing time `time_rel` with the ice volume as response, shared by the domains of
+  `yelmox_bipolar`, evaluated once per climate update (`libs/climate_terms.f90`). Output
+  `term_<name>` (2D), `coef_<name>` (1D, in `yelmo_ts.nc`), restart
+  `coef_<name>_restart.nc` (with the RNG state: noisy coefficients continue identically).
+  Coefficients are named by their symbol in the equation (`alpha`, `beta`, ...); the
+  record a symbol loads is the setup's, in its par file. Terms are named by what they add.
+  `tests/test_coefs.f90` covers the derived coefficients.
 - `input/forcing_db.nml`: the library of named forcing groups that par files share:
   `snapshot_picontrol`, `_lgm`, `_b18_base`, `_b18`, `_b20`; `coef_alpha` (the default
   record, combined), `_dTo`, `_ramp`, `_hyst`, `_dT`, `_obm_north`, `_obm_south`;
@@ -276,8 +276,10 @@ annotated git tag. Dates are release (tag) dates.
 - REMBO is a climate backend (`climate = "rembo"`, `surface_method = "climate"`): par
   files `yelmox/yelmox_rembo_Greenland.nml` and `yelmox/rembo_Greenland.nml` (staged by
   runme), script `scripts/rembo/`. REMBO supplies the atmosphere and smb; its summer
-  anomaly is the uniform `tas` terms; the ocean is an ocean-only snapshots reference
-  (ORAS5; was none). The marine-ice rule and the cold start are those of `yelmox`.
+  anomaly `dT_sum` is the `tas` part of the uniform terms (the `pr` part of a term that
+  also lists `pr`, e.g. `term_hyst`, is ignored with a notice at start-up; a uniform term
+  on `pr` alone is refused); the ocean is an ocean-only snapshots reference (ORAS5; was
+  none). The marine-ice rule and the cold start are those of `yelmox`.
 - `yelmox_bipolar`: the OBM box air temperatures from one global anomaly coefficient,
   `[obm_forcing]` (`coef`, `gain`): `theta_i = theta_i_init + ampl_i × gain × f` for every
   box, vapour fluxes likewise (`libs/obm/atm2ocean.f90` gone). The ocean of each domain
@@ -345,11 +347,12 @@ annotated git tag. Dates are release (tag) dates.
 - `[opt]`: `opt_cf = "none" | "L21"`, `opt_tf = "none" | "L21" | "L21-points"` (were
   logical; `"L21"` one `tf_corr` per basin, `tf_basins`; `"L21-points"` each point, the
   former method). `step_optimize` only optimizes `cb_ref` and `tf_corr`; `tf_corr` is
-  optimized on `grid_shelf` in place (Yelmo-grid inputs remapped there, the
-  `[marine_shelf] basins`), no longer through a con/bilin round trip through the Yelmo
-  grid each step: unchanged when `grid_shelf = grid_ice`, answers change for Antarctica
-  (shelf 16 km, ice 32 km). The optimization's cold-start `cb_ref` is set before
-  `yelmo_init_state` in every driver (`opt` cold starts change slightly).
+  optimized on `grid_shelf` in place (Yelmo-grid inputs remapped there; the basins, and
+  the `tf_basins` ids, are `[marine_shelf] basins` on the shelf grid), no longer through a
+  con/bilin round trip through the Yelmo grid each step: unchanged when `grid_shelf =
+  grid_ice`, answers change for Antarctica (shelf 16 km, ice 32 km). The optimization's
+  cold-start `cb_ref` is set before `yelmo_init_state` in every driver (`opt` cold starts
+  change slightly).
 - NEGIS (`[sim] use_negis`) and the glacial smb scaling (`scale_glacial_smb`, group
   `[glacial_smb]`: `dt_lgm`, `lat_lim`, `fac_lim`) apply to any domain. NEGIS takes its
   parts from the `NEGIS` basin set (`[negis] region_centre`, `_south`, `_north`), sets
@@ -412,9 +415,9 @@ annotated git tag. Dates are release (tag) dates.
   their combination checked at init.
 - PICO: box k fed by the basin-mean T/S of box k-1 and the basin box-1 overturning (Reese
   et al., 2018); box-n salinity sign; parameters from `[pico<sfx>]`; lakes excluded;
-  `bmb_shlf` set in every cell (the basin's box-1 melt in partially grounded cells, 0
-  where fully grounded); no NaN without shelf beyond the grounding line. No shipped setup
-  uses PICO.
+  `bmb_shlf` set in every cell (the basin's box-1 melt in partially grounded cells, for
+  Yelmo's `bmb_gl_method`; 0 where fully grounded, on land and in lakes); no NaN without
+  shelf beyond the grounding line. No shipped setup uses PICO.
 - CMIP output: `hfgeoubed` in W m-2 (was x1e6 too large), `ligroundf` per area (kg m-2
   s-1); 2D fluxes from Yelmo's applied smb/bmb/cmb and the 1D integrals from them
   (`tendacabf` the applied smb, `libmassbfgr`/`libmassbffl` the applied bmb).
@@ -445,6 +448,9 @@ annotated git tag. Dates are release (tag) dates.
 - Cold start: the surface is updated once more on the final initial geometry (new margin
   ice had smb = 0 until the next update); Yelmo topo diagnostics reconciled after the
   isostasy init.
+- `[sim] scale_glacial_smb = True` is refused at start-up with `climate = "rembo"` (the
+  glacial index needs the climate's reference annual air temperature, which REMBO does not
+  supply; the run used an unallocated field).
 - `[domain]`: `dx_hub` after `yelmo_init_grid` (was from the unset Yelmo dx).
 - Output: `write_clim` without a climate crashed; marine_shelf restart field units (were
   all m/yr) and real `xc`/`yc` axes in km; OBM air temperatures in degC (were K), restart
