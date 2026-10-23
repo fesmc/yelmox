@@ -29,6 +29,7 @@
         real(prec) :: sigma_snow, sigma_melt, sigma_land
         real(prec) :: sf_a, sf_b, firn_fac  
         real(prec) :: mm_snow, mm_ice 
+        real(prec) :: time_equil                ! [yr] cold-start snowpack spin-up (itm)
 
         real(prec), allocatable :: x(:), y(:)
         real(prec), allocatable :: lats(:,:)           ! Latitude of domain [deg N]
@@ -171,8 +172,9 @@ contains
 
     end subroutine smbpal_init
 
-    subroutine smbpal_update_monthly_equil(smb,t2m,pr,z_srf,H_ice,time_bp,time_equil)
-        ! Generate climate using monthly input data [nx,ny,nmon]
+    subroutine smbpal_update_monthly_equil(smb,t2m,pr,z_srf,H_ice,time_bp)
+        ! Cold-start snowpack: par%time_equil years under the monthly
+        ! climate [nx,ny,nmon] and geometry
         
         implicit none 
         
@@ -180,7 +182,6 @@ contains
         real(prec), intent(IN) :: t2m(:,:,:), pr(:,:,:)
         real(prec), intent(IN) ::  z_srf(:,:), H_ice(:,:)
         real(dp),   intent(IN) :: time_bp       ! [yr] model time (relative to 1950, past < 0), for the orbit 
-        real(prec), intent(IN) :: time_equil    ! years to equilibrate
 
         ! Local variables
         integer :: n 
@@ -191,11 +192,11 @@ contains
             ! The daily forcing is the same every year: prepare it once
             call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
             call smbpal_itm_forcing_init(frc,smb%par,t2m,pr)
-            do n = 1, int(time_equil)
+            do n = 1, int(smb%par%time_equil)
                 call smbpal_update_itm(smb,frc,z_srf,H_ice)
             end do
         else 
-            do n = 1, int(time_equil) 
+            do n = 1, int(smb%par%time_equil) 
                 call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp)
             end do 
         end if 
@@ -551,6 +552,7 @@ contains
         call nml_read(filename,nml_group,"firn_fac",par%firn_fac,init=init_pars)
         call nml_read(filename,nml_group,"mm_snow",par%mm_snow,init=init_pars)
         call nml_read(filename,nml_group,"mm_ice",par%mm_ice,init=init_pars)
+        call nml_read(filename,nml_group,"time_equil",par%time_equil,init=init_pars)
 
         ! Also load itm parameters
         call itm_par_load(par%itm,filename,init=init_pars,group=itm_nml_group)
