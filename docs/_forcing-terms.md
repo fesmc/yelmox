@@ -1,9 +1,9 @@
 # Forcing as terms: coefficient × pattern
 
-Status: design agreed 2026-10-21 on the interactive mock-up
-`docs/_forcing-terms-mockup.html` (open it in a browser; the records are the
-real files of `input/`); phases 2-4 implemented on the branch `forcing-terms`
-(2026-10-21, not yet verified on Levante). The leading `_` keeps quarto
+Status: implemented, merged to dev 2026-10-21 (764a6cd); kept as the design
+reference (the user-facing description is `yelmox.md`, Forcing). Design agreed
+2026-10-21 on an interactive mock-up, `docs/_forcing-terms-mockup.html`, removed
+2026-10-23 (superseded by the forcing builder; in the git history). The leading `_` keeps quarto
 from rendering it. Supersedes sections 3, 4, 6, 7 and 8 of
 `_forcing-design.md` (indices, axes, modifiers, OBM); the rest of that doc
 (insolation, database, retirement of snapclim, phases 0-6 done) stands.

@@ -1,7 +1,8 @@
 # Forcing and climate in yelmox: a unified design
 
-Status: proposal (2026-10-18, revised after a code review the same day),
-nothing implemented. The leading `_` keeps quarto from rendering it. Merges
+Status: implemented and merged to dev 2026-10-19 (proposal of 2026-10-18,
+revised after a code review the same day); sections 3, 4, 6, 7 and 8 superseded
+by `_forcing-terms.md` (2026-10-21). The leading `_` keeps quarto from rendering it. Merges
 and supersedes the open parts of `_snapclim-retirement-plan.md` and
 `_grl-paleo-plan.md`, and takes in the LIS work (`paper-lis-dynamics`, on
 2.4-beta).
