@@ -51,17 +51,20 @@ contains
         ! basal-friction field cb_ref and the marine thermal-forcing correction
         ! tf_corr toward present-day observations, over the step dtt.
         !
-        ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr lives on the
-        ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
-        ! Yelmo grid, so the correction is lifted to the Yelmo grid (tf_corr_y),
-        ! optimized there, and remapped back to the shelf grid. At identity grids
-        ! both remaps are copies.
+        ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr is a
+        ! marine_shelf control, optimized in place on grid_shelf, where it lives
+        ! and is never remapped (a round trip through the Yelmo grid would smooth
+        ! it every step). The Yelmo-grid inputs of its optimization (the current
+        ! and observed geometry) are remapped onto grid_shelf instead; the
+        ! basins are marine_shelf's own. At identity grids these remaps are copies.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
         real(dp),          intent(in)    :: dtt   ! [yr] the driver's time step
 
-        real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
+        real(wp), allocatable :: H_ice_m(:,:), H_grnd_m(:,:), dHidt_m(:,:)
+        real(wp), allocatable :: H_ice_pd_m(:,:), H_grnd_pd_m(:,:)
         character(len=256) :: gm, gy
+        character(len=32)  :: mth
 
         if (.not. dom%ctl%opt) return
 
@@ -81,28 +84,35 @@ contains
                     cb_tgt=dom%yelmo%dyn%now%cb_tgt)
         end if
 
-        ! Thermal-forcing correction (tf_corr) optimization -- lift shelf-grid
-        ! correction to the Yelmo grid, optimize against Yelmo-grid targets, remap
-        ! back. tf_corr persists on the shelf grid (in mshlf, incl. its restart).
+        ! Thermal-forcing correction (tf_corr) optimization -- grid_shelf, in
+        ! place on mshlf (incl. its restart). The Yelmo-grid inputs land on
+        ! grid_shelf averaged over the target cell when the Yelmo grid is finer
+        ! (conservative), else interpolated (remap_method_smooth). The basins are
+        ! marine_shelf's (mshlf%now%basins, on grid_shelf): the same regions layer
+        ! and ids as Yelmo's bnd%basins when [marine_shelf] basins = [yelmo_masks]
+        ! basins, as in every par file, so the ids of tf_basins.
         ! Method: "L21" (one correction per basin) or "L21-points".
         if (trim(dom%opt%opt_tf) /= "none" .and. ts%time_elapsed >= dom%opt%tf_time_init &
                             .and. ts%time_elapsed <= dom%opt%tf_time_end) then
-            call remap(dom, dom%mshlf%now%tf_corr, gm, tf_corr_y, gy, "con")
+            mth = remap_method_smooth(real(dom%yelmo%grd%G%dx, wp), dom%ctl%dx_shelf)
+            call remap(dom, dom%yelmo%tpo%now%H_ice,  gy, H_ice_m,    gm, mth)
+            call remap(dom, dom%yelmo%tpo%now%H_grnd, gy, H_grnd_m,   gm, mth)
+            call remap(dom, dom%yelmo%tpo%now%dHidt,  gy, dHidt_m,    gm, mth)
+            call remap(dom, dom%yelmo%dta%pd%H_ice,   gy, H_ice_pd_m, gm, mth)
             select case (trim(dom%opt%opt_tf))
             case ("L21")
-                call optimize_tf_corr_basin(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
-                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%bnd%basins, &
+                call optimize_tf_corr_basin(dom%mshlf%now%tf_corr, H_ice_m, H_grnd_m, &
+                        dHidt_m, H_ice_pd_m, dom%mshlf%now%basins, &
                         dom%opt%H_grnd_lim, dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
                         dom%opt%tf_basins, dt=dtt)
             case ("L21-points")
-                call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
-                        dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
-                        dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
+                call remap(dom, dom%yelmo%dta%pd%H_grnd, gy, H_grnd_pd_m, gm, mth)
+                call optimize_tf_corr(dom%mshlf%now%tf_corr, H_ice_m, H_grnd_m, &
+                        dHidt_m, H_ice_pd_m, H_grnd_pd_m, &
+                        dom%opt%H_grnd_lim, dom%mshlf%now%basins, dom%opt%basin_fill, &
                         dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                        dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dtt)
+                        dom%ctl%dx_shelf, sigma=dom%opt%tf_sigma, dt=dtt)
             end select
-            call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
-            dom%mshlf%now%tf_corr = tf_corr_m
         end if
     end subroutine step_optimize
 

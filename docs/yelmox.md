@@ -558,7 +558,11 @@ is `topo_rel` and its timescale ramps from `tau1` to `tau2`; after `time2`, the
 The optimization (`step_optimize`), towards the observed ice thickness, of the
 basal-friction coefficient `cb_ref` (`opt_cf`, between `cf_time_init` and
 `cf_time_end`) and of the thermal-forcing correction `tf_corr` of the marine shelf
-(`opt_tf`, between `tf_time_init` and `tf_time_end`):
+(`opt_tf`, between `tf_time_init` and `tf_time_end`). `cb_ref` is optimized on
+`grid_ice`, `tf_corr` on `grid_shelf`, where it lives: the Yelmo-grid inputs
+(current and observed ice thickness and grounding, `dHidt`) are remapped onto
+`grid_shelf`, the basins (and the ids of `tf_basins`) are those of
+`[marine_shelf] basins`, and `tf_corr` is never remapped.
 
 | Key | Values | |
 |---|---|---|

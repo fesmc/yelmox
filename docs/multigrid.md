@@ -260,7 +260,7 @@ reallocation cost is negligible against the physics.
 `yelmox` and `yelmox_bipolar` advance a domain with these primitives (from `kryos_coupling`):
 
 - `step_relax` — topography relaxation towards the reference, with a timescale ramp (`[sim] relax`).
-- `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`).
+- `step_optimize` — basal-friction / thermal-forcing optimization (`[sim] opt`): `cb_ref` on `grid_ice`, `tf_corr` on `grid_shelf` (its Yelmo-grid inputs remapped there, the basins of `[marine_shelf]`; `tf_corr` itself never crosses grids).
 - `step_isostasy` — bedrock/sea-level (FastIsostasy), against the shared barystatic sea level (`bsl`), on the `dt_isos` cadence.
 - `couple_to_yelmo` — assemble the Yelmo boundary state from the component outputs (incl. the climate's subglacial discharge, when supplied).
 - `step_icesheet` — run `yelmo_update`.
