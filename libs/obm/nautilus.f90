@@ -111,7 +111,7 @@ module nautilus
         ntls%std = ntls%par%std_init
         ntls%ss = ntls%par%ss_init    
         ntls%fn = ntls%par%fn_init
-        ntls%ft = ntls%par%tt_init
+        ntls%ft = ntls%par%ft_init
         ntls%fs = ntls%par%fs_init  
         ntls%phin = ntls%par%phin_init
         ntls%phit = ntls%par%phit_init    
@@ -162,12 +162,12 @@ module nautilus
         ! Local variables
         real(prec) :: dTsdt, dTndt, dTtdt, dTtddt 
         real(prec) :: dSsdt, dSndt, dStdt, dStddt 
-        real(prec) :: fn, ft, fs, phin, phit
+        real(prec) :: fn, fs, phin, phit
         real(prec), parameter :: maximum_overturning=100.0, maximum_salinity=50.0, minimum_salinity=0.0
 
-        ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1)
+        ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1).
+        ! The tropical flux ft is not part of the nautilus budget.
         fn = ntls%fn * factor
-        ft = ntls%ft * factor
         fs = ntls%fs * factor
 
         phin = ntls%phin * factor
