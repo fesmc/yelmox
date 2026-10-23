@@ -1,5 +1,8 @@
 # Submodule conversion plan for yelmox
 
+Status (2026-10-23): superseded; configme clones and pins the components
+(`.configme/manifest.toml`). Not rendered (leading `_`).
+
 Future-reference plan for converting the four sibling-directory symlinks in the yelmox root (`fesm-utils`, `FastIsostasy`, `rembo1`, `yelmo`) into proper git submodules. Not yet executed.
 
 ## Goal
