@@ -54,7 +54,7 @@ module surface_chion
     use orbit_forcing, only : orbit_ctl_class, orbit_pars_class, orbit_ctl_load, &
                               orbit_pars_now, orbit_pars_equal
     use chion,      only : wp, dp, wp_acc, MV, chion_class, chion_init, chion_init_state, &
-                           chion_update, chion_end, chion_set_active_mask, &
+                           chion_update, chion_set_active_mask, &
                            chion_get_surface_flux_totals, chion_get_surface, &
                            chion_restart_write, chion_restart_read, &
                            monthly_to_daily_class, monthly_to_daily_init, &
@@ -133,7 +133,6 @@ module surface_chion
     public :: surface_chion_update
     public :: surface_chion_restart_write
     public :: surface_chion_restart_read
-    public :: surface_chion_end
 
 contains
 
@@ -491,12 +490,6 @@ contains
         end subroutine read_ann
 
     end subroutine surface_chion_restart_read
-
-    subroutine surface_chion_end(sc)
-        type(surface_chion_class), intent(inout) :: sc
-
-        call chion_end(sc%chn)
-    end subroutine surface_chion_end
 
     subroutine surface_chion_par_load(par, filename, group)
         type(surface_chion_param_class), intent(out) :: par

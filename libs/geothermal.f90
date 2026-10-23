@@ -42,8 +42,6 @@ module geothermal
     private
     public :: geothermal_class
     public :: geothermal_init 
-    public :: geothermal_update
-    public :: geothermal_end 
 
 contains 
 
@@ -176,36 +174,6 @@ contains
     end subroutine read_on_grid
 
 
-    subroutine geothermal_update(sed,year_bp)
-
-        implicit none 
-
-        type(geothermal_class) :: sed 
-
-        real(dp) :: year_bp 
-
-        ! === To do ====
-
-
-        return 
-
-    end subroutine geothermal_update
-
-
-    subroutine geothermal_end(sed)
-
-        implicit none 
-
-        type(geothermal_class) :: sed
-
-        ! Deallocate geothermal state object
-        call geothermal_deallocate(sed%now)
-
-        return 
-
-    end subroutine geothermal_end
-
-
     function ghf_to_mW(filename,varname) result(fac)
         ! Factor converting the variable varname of filename to mW/m2,
         ! from its units attribute (W/m2 or mW/m2, in any of the usual
@@ -269,7 +237,7 @@ contains
         end if
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
+        if (present(init)) init_pars = init
 
         call nml_read(filename,nml_group,"use_obs",         par%use_obs,        init=init_pars)
         call nml_read(filename,nml_group,"obs_path",        par%obs_path,       init=init_pars)
