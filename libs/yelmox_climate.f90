@@ -30,9 +30,9 @@ module yelmox_climate
                               esm_forcing_update, esm_variability_update, &
                               esm_lapse_monthly
     use marine_shelf,  only : marshelf_class, marshelf_interp_shelf, ocn_variable_extrapolation
-    use kryos_forcing, only : coefs_class, coefs_value, coefs_set, coefs_is_derived, &
+    use kryos_forcing, only : coefs_class, coefs_set, coefs_is_derived, &
                               coefs_derived, derived_spec
-    use climate_terms, only : climate_caps_class, terms_class, terms_init, terms_check, &
+    use climate_terms, only : climate_caps_class, terms_class, terms_init, terms_check, terms_eval, &
                               terms_save_ocean, terms_apply_atm, terms_apply_ocn, &
                               terms_uniform_dT, terms_write_step
     use climate_mods,  only : climate_mods_class, climate_mods_init, &
@@ -162,7 +162,7 @@ contains
         select case(trim(cl%method))
             case("snapshots")
                 call snapshots_init(cl%snapshots, filename, domain, grid, time, &
-                                  south, coefs, cl%terms, "snapshots"//trim(sfx), cl%reference)
+                                  south, cl%terms, "snapshots"//trim(sfx), cl%reference)
                 ! The surface reads the atmosphere; an ocean-only reference
                 ! serves the rembo ocean only.
                 if (.not. cl%snapshots%par%with_atm) then
@@ -184,7 +184,7 @@ contains
                 ! REMBO for the atmosphere and smb, snapshots for the ocean: an
                 ! ocean-only reference snapshot (to, optionally so).
                 call snapshots_init(cl%snapshots, filename, domain, grid, time, &
-                                  south, coefs, cl%terms, "snapshots"//trim(sfx), cl%reference)
+                                  south, cl%terms, "snapshots"//trim(sfx), cl%reference)
                 if (cl%snapshots%par%with_atm .or. .not. cl%snapshots%par%with_ocn) then
                     write(*,*) "climate_init:: error: climate = rembo takes the ocean only from &
                                &the snapshots: the reference snapshot ([forcing"//trim(sfx)// &
@@ -261,9 +261,10 @@ contains
 
     subroutine climate_update(cl, out, ts, z_srf, H_ice, z_bed, f_grnd, z_sl, z_srf_ref, &
                               domain, dx, dtt, mshlf, coefs, init)
-        ! Update the backend on the climate grid and fill `out`, then its
-        ! elevation dependence, the uniform terms on the atmosphere, the
-        ! derived air-anomaly coefficients, the ocean terms and the transforms. The
+        ! Evaluate the terms (their coefficients), update the backend on the
+        ! climate grid and fill `out`, then its elevation dependence, the
+        ! uniform terms on the atmosphere, the derived air-anomaly
+        ! coefficients, the ocean terms and the transforms. The
         ! geometry is the domain's, on the climate grid, with its present-day
         ! surface (z_srf_ref); the marine shelf lends its parameters to the esm
         ! ocean, which is interpolated to the shelf base here. coefs is the
@@ -294,9 +295,12 @@ contains
 
         time = ts%time_rel
 
+        ! The value of every term's coefficient for this update.
+        call terms_eval(cl%terms, coefs)
+
         select case(trim(cl%method))
             case("snapshots")
-                call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, coefs=coefs, dx=dx)
+                call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, terms=cl%terms, dx=dx)
                 call snapshots_state_copy(out%now, cl%snapshots%now)
                 call snapshots_state_copy(out%ref, cl%snapshots%ref)
 
@@ -305,8 +309,7 @@ contains
                                 z_srf_ref, mshlf)
 
             case("rembo")
-                call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
-                                  coefs, is_init)
+                call rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, is_init)
         end select
 
         ! The elevation dependence of the atmosphere, to move it to another surface
@@ -329,28 +332,31 @@ contains
 
         ! The terms: the backend's ocean kept as the base of the ocean terms;
         ! the uniform terms on the atmosphere (rembo took them as its input);
-        ! the derived air anomaly of this update; the ocean terms; then the
-        ! transforms.
+        ! the derived air anomaly of this update, and the terms it drives
+        ! re-evaluated; the ocean terms; then the transforms.
         call terms_save_ocean(cl%terms, out)
-        if (.not. cl%mods%caps%anom_input) call terms_apply_atm(cl%terms, out, coefs)
+        if (.not. cl%mods%caps%anom_input) call terms_apply_atm(cl%terms, out)
         do k = 1, size(cl%dair)
             call coefs_set(coefs, cl%dair(k)%name, cl%dair(k)%factor * &
                  sum(out%now%tsl_ann - out%ref%tsl_ann, mask=cl%dair(k)%mask) / real(cl%dair(k)%n, wp))
         end do
-        call terms_apply_ocn(cl%terms, out, coefs)
+        call terms_eval(cl%terms, coefs, derived=.true.)
+        call terms_apply_ocn(cl%terms, out)
         call climate_mods_apply(cl%mods, out, time)
 
     end subroutine climate_update
 
     subroutine climate_apply_ocean(cl, out, coefs)
-        ! Re-apply the ocean terms on the backend's ocean of the last update
-        ! (idempotent): for a driver that sets a derived coefficient after the
-        ! climate update (the bipolar bridge, the OBM box temperatures). The
-        ! transforms do not touch the ocean, so nothing else is redone.
+        ! Re-evaluate the terms with a derived coefficient and re-apply the
+        ! ocean terms on the backend's ocean of the last update (idempotent):
+        ! for a driver that sets a derived coefficient after the climate update
+        ! (the bipolar bridge, the OBM box temperatures). The transforms do not
+        ! touch the ocean, so nothing else is redone.
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
         type(coefs_class),          intent(in)    :: coefs
-        call terms_apply_ocn(cl%terms, out, coefs)
+        call terms_eval(cl%terms, coefs, derived=.true.)
+        call terms_apply_ocn(cl%terms, out)
     end subroutine climate_apply_ocean
 
     subroutine snapshots_state_copy(dst, src)
@@ -854,8 +860,7 @@ contains
 
     ! ===== rembo backend ===================================================
 
-    subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, &
-                            coefs, init)
+    subroutine rembo_update(cl, out, ts, time, z_srf, H_ice, z_sl, domain, dx, init)
         ! REMBO's atmosphere and surface mass balance, and the ocean from snapshots
         ! (at `time`, as for the snapshots backend). REMBO needs the anomaly
         ! before it runs, so the uniform terms on tas are its input (not applied
@@ -870,7 +875,6 @@ contains
         real(wp),         intent(in) :: z_srf(:,:), H_ice(:,:), z_sl(:,:)
         character(len=*), intent(in) :: domain
         real(wp),         intent(in) :: dx
-        type(coefs_class),   intent(in) :: coefs
         logical,          intent(in) :: init
 
         integer :: nx, ny
@@ -879,7 +883,7 @@ contains
         ny = size(z_srf,2)
 
         ! The summer anomaly REMBO takes as its input: the uniform terms on tas.
-        cl%rembo%dT_sum = terms_uniform_dT(cl%terms, coefs, "tas")
+        cl%rembo%dT_sum = terms_uniform_dT(cl%terms, "tas")
         cl%rembo%dT_ann = rembo_clim_dT_ann(cl%rembo%dT_sum)
 
         ! Atmosphere and surface mass balance, at the current surface.
@@ -894,7 +898,7 @@ contains
 
         ! Ocean (depth profiles) from snapshots (ocean only); its terms are
         ! applied by climate_update.
-        call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, coefs=coefs, dx=dx)
+        call snapshots_update(cl%snapshots, z_srf=z_srf, time=time, terms=cl%terms, dx=dx)
         call snapshots_state_copy(out%now, cl%snapshots%now)
         call snapshots_state_copy(out%ref, cl%snapshots%ref)
 

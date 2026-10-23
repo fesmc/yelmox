@@ -16,14 +16,20 @@ module climate_terms
     ! that has it; unset keys from the template term of
     ! input/yelmox_defaults.nml.
     !
-    ! Order within a climate update (yelmox_climate): the backend (with the
-    ! snapshot terms) -> the uniform terms on the atmosphere (terms_apply_atm)
-    ! -> the derived coefficients (coefs_set by the climate, from the composed
-    ! atmosphere) -> the ocean terms (terms_apply_ocn) -> taper -> bias. The
-    ! ocean application is idempotent: it rebuilds the ocean from a copy of
-    ! the backend's (terms_save_ocean, after the backend), so a driver that
-    ! sets a derived coefficient later in the step (the bipolar bridge, the OBM
-    ! box temperatures) re-applies it.
+    ! The value f of each term's coefficient is evaluated here once per
+    ! update (terms_eval), kept in the term, read by the backends (the
+    ! snapshot terms, rembo's input) and the applications below, and written
+    ! for every term in one place (terms_write_step).
+    !
+    ! Order within a climate update (yelmox_climate): terms_eval -> the
+    ! backend (with the snapshot terms) -> the uniform terms on the atmosphere
+    ! (terms_apply_atm) -> the derived coefficients (coefs_set by the climate,
+    ! from the composed atmosphere; terms_eval of the terms they drive) -> the
+    ! ocean terms (terms_apply_ocn) -> taper -> bias. The ocean application is
+    ! idempotent: it rebuilds the ocean from a copy of the backend's
+    ! (terms_save_ocean, after the backend), so a driver that sets a derived
+    ! coefficient later in the step (the bipolar bridge, the OBM box
+    ! temperatures) re-evaluates and re-applies it.
     !
     ! Contracts, checked at init (terms_check) against what the backend
     ! supplies (climate_caps_class), an error naming the term:
@@ -85,7 +91,7 @@ module climate_terms
         real(wp) :: f_to = 1.0_wp                  ! [K]   uniform: to + f_to*f
         real(wp) :: f_so = 1.0_wp                  ! [psu] uniform: so + f_so*f
         logical  :: derived = .false.              ! the coefficient is derived (set by the model)
-        real(wp) :: f = 0.0_wp                     ! the coefficient value at the last application
+        real(wp) :: f = 0.0_wp                     ! the coefficient value (1 without one), terms_eval
     end type term_class
 
     type terms_class
@@ -99,7 +105,7 @@ module climate_terms
     end type terms_class
 
     public :: climate_caps_class, caps_need_atm, term_class, terms_class
-    public :: terms_init, terms_check, terms_save_ocean, terms_apply_atm, terms_apply_ocn
+    public :: terms_init, terms_check, terms_eval, terms_save_ocean, terms_apply_atm, terms_apply_ocn
     public :: terms_uniform_dT, terms_has_pattern, terms_write_step, coef_label
 
 contains
@@ -276,23 +282,47 @@ contains
 
     ! ===== application ======================================================
 
-    subroutine terms_apply_atm(terms, out, coefs)
+    subroutine terms_eval(terms, coefs, derived)
+        ! The value f of each term's coefficient from the registry (1 for a
+        ! term without one): every term, once per update before the backend.
+        ! With derived = .true., after the derived coefficients are set (by
+        ! the climate, or later in the step by the driver): only the uniform
+        ! and replace terms with a derived coefficient, applied after that
+        ! (terms_apply_ocn); a snapshot term keeps the value the backend applied.
+        type(terms_class), intent(inout) :: terms
+        type(coefs_class), intent(in)    :: coefs
+        logical,           intent(in), optional :: derived
+
+        logical :: only_derived
+        integer :: k
+
+        only_derived = .false.
+        if (present(derived)) only_derived = derived
+
+        do k = 1, terms%n
+            associate(t => terms%term(k))
+            if (only_derived .and. (.not. t%derived .or. trim(t%pattern) == "snapshots")) cycle
+            t%f = 1.0_wp
+            if (len_trim(t%coef) > 0) t%f = coefs_value(coefs, t%coef)
+            end associate
+        end do
+
+    end subroutine terms_eval
+
+    subroutine terms_apply_atm(terms, out)
         ! The uniform terms on the atmosphere: tas, ta_ann, tsl_ann + f_ta*f;
         ! pr, pr_ann * exp(beta_p*f_ta*f) (beta_p: the backend's sensitivity).
-        type(terms_class),       intent(inout) :: terms
+        type(terms_class),       intent(in)    :: terms
         type(climate_out_class), intent(inout) :: out
-        type(coefs_class),       intent(in)    :: coefs
 
-        real(wp) :: f, dTa
+        real(wp) :: dTa
         integer  :: k, m
 
         do k = 1, terms%n
             associate(t => terms%term(k), now => out%now)
             if (trim(t%pattern) /= "uniform") cycle
             if (.not. (t%on_tas .or. t%on_pr)) cycle
-            f   = coefs_value(coefs, t%coef)
-            t%f = f
-            dTa = t%f_ta*f
+            dTa = t%f_ta*t%f
             if (t%on_tas) then
                 now%tas    = now%tas + dTa
                 now%ta_ann = now%ta_ann + dTa
@@ -328,17 +358,15 @@ contains
 
     end subroutine terms_save_ocean
 
-    subroutine terms_apply_ocn(terms, out, coefs)
+    subroutine terms_apply_ocn(terms, out)
         ! The ocean terms on the saved base: a replace term sets the field to
         ! its coefficient at every depth, the uniform ones add f_to*f / f_so*f; the
         ! profiles to_ann/so_ann, or at the shelf base T_shlf/S_shlf and
         ! dT_shlf/dS_shlf (the climate has the ocean a term needs: terms_check).
         ! Idempotent (see the header).
-        type(terms_class),       intent(inout) :: terms
+        type(terms_class),       intent(in)    :: terms
         type(climate_out_class), intent(inout) :: out
-        type(coefs_class),       intent(in)    :: coefs
 
-        real(wp) :: f
         logical  :: any_ocn
         integer  :: k
 
@@ -369,10 +397,8 @@ contains
         do k = 1, terms%n
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "replace") cycle
-            f   = coefs_value(coefs, t%coef)
-            t%f = f
-            if (t%on_to) out%now%to_ann = f
-            if (t%on_so) out%now%so_ann = f
+            if (t%on_to) out%now%to_ann = t%f
+            if (t%on_so) out%now%so_ann = t%f
             end associate
         end do
 
@@ -381,32 +407,29 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "uniform") cycle
             if (.not. (t%on_to .or. t%on_so)) cycle
-            f   = coefs_value(coefs, t%coef)
-            t%f = f
             if (out%has_ocn_shelf) then
                 if (t%on_to) then
-                    out%now%T_shlf  = out%now%T_shlf  + t%f_to*f
-                    out%now%dT_shlf = out%now%dT_shlf + t%f_to*f
+                    out%now%T_shlf  = out%now%T_shlf  + t%f_to*t%f
+                    out%now%dT_shlf = out%now%dT_shlf + t%f_to*t%f
                 end if
                 if (t%on_so) then
-                    out%now%S_shlf  = out%now%S_shlf  + t%f_so*f
-                    out%now%dS_shlf = out%now%dS_shlf + t%f_so*f
+                    out%now%S_shlf  = out%now%S_shlf  + t%f_so*t%f
+                    out%now%dS_shlf = out%now%dS_shlf + t%f_so*t%f
                 end if
             else
-                if (t%on_to) out%now%to_ann = out%now%to_ann + t%f_to*f
-                if (t%on_so) out%now%so_ann = out%now%so_ann + t%f_so*f
+                if (t%on_to) out%now%to_ann = out%now%to_ann + t%f_to*t%f
+                if (t%on_so) out%now%so_ann = out%now%so_ann + t%f_so*t%f
             end if
             end associate
         end do
 
     end subroutine terms_apply_ocn
 
-    real(wp) function terms_uniform_dT(terms, coefs, field) result(dT)
+    real(wp) function terms_uniform_dT(terms, field) result(dT)
         ! The sum of gain*coefficient over the uniform terms on `field` (tas: f_ta,
         ! to: f_to, so: f_so): the anomaly a backend takes as its input (rembo
         ! dT_sum from tas).
         type(terms_class),   intent(in) :: terms
-        type(coefs_class),   intent(in) :: coefs
         character(len=*),    intent(in) :: field
         integer :: k
         dT = 0.0_wp
@@ -414,29 +437,27 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "uniform") cycle
             select case(trim(field))
-                case("tas"); if (t%on_tas) dT = dT + t%f_ta*coefs_value(coefs, t%coef)
-                case("to");  if (t%on_to)  dT = dT + t%f_to*coefs_value(coefs, t%coef)
-                case("so");  if (t%on_so)  dT = dT + t%f_so*coefs_value(coefs, t%coef)
+                case("tas"); if (t%on_tas) dT = dT + t%f_ta*t%f
+                case("to");  if (t%on_to)  dT = dT + t%f_to*t%f
+                case("so");  if (t%on_so)  dT = dT + t%f_so*t%f
             end select
             end associate
         end do
     end function terms_uniform_dT
 
     subroutine terms_write_step(terms, filename, ncid, n)
-        ! Record n of the uniform and replace terms into an open 2D output
-        ! file: the coefficient value applied, term_<name> (the snapshot terms are
-        ! written by the backend).
+        ! Record n of every term into an open 2D output file: the value of
+        ! its coefficient, term_<name> (1 for a snapshot term without one).
         type(terms_class), intent(in) :: terms
         character(len=*),  intent(in) :: filename
         integer,           intent(in) :: ncid, n
         integer :: k
         do k = 1, terms%n
             associate(t => terms%term(k))
-            if (trim(t%pattern) == "snapshots") cycle
             call nc_write(filename, "term_"//trim(t%name), t%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Coefficient "//trim(t%coef)//" of the "//trim(t%pattern)// &
-                                    " term "//trim(t%name))
+                          long_name="Coefficient "//trim(coef_label(t%coef))//" of the "// &
+                                    trim(t%pattern)//" term "//trim(t%name))
             end associate
         end do
     end subroutine terms_write_step

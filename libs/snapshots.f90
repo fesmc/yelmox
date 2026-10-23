@@ -25,7 +25,8 @@ module snapshots
     ! Terms (climate_terms, pattern snapshots): each spans two snapshots
     ! (snap0 -> snap1) and names a coefficient of the driver's registry
     ! ([forcing] coefs, kryos_forcing), or none (the constant 1); the value
-    ! of the coefficient is the position between them (0 at snap0, 1 at snap1).
+    ! of the coefficient is the position between them (0 at snap0, 1 at snap1),
+    ! evaluated by climate_terms (terms_eval) and read from the terms here.
     ! The reference is [forcing<sfx>] reference; the snapshots of a run are
     ! the reference and the snap0/snap1 of its terms. A field sums the terms
     ! that list it on top of the reference (Banderas et al., 2018, for two),
@@ -40,8 +41,7 @@ module snapshots
     use ncio
     use nml
     use varslice, only : varslice_class, varslice_init_nml, varslice_update, varslice_end
-    use kryos_forcing, only : coefs_class, coefs_value, coefs_has
-    use climate_terms, only : terms_class, term_class, coef_label
+    use climate_terms, only : terms_class
     use yelmox_nml,    only : VAR_DEFS_MAX, var_defs_find, forcing_var_defs, def_file => yelmox_defaults_file
     use gaussian_filter, only : filter_gaussian
     use coordinates, only : grid_class
@@ -153,14 +153,12 @@ module snapshots
         integer            :: n_snap, n_field, n_term
     end type
 
-    ! One snapshot term: two snapshots and the registry coefficient giving
-    ! the position between them.
+    ! One snapshot term: its position in the domain's terms (name, coefficient
+    ! and its value f there) and its two snapshots.
     type snap_term_class
-        character(len=64) :: name           ! the term's name
-        character(len=64) :: coef           ! its coefficient (kryos_forcing); "" = the constant 1
+        integer           :: k              ! position in terms%term
         integer           :: snap0, snap1   ! positions in snap (snap0 = 0: none,
                                             ! snap1 is the anomaly/ratio)
-        real(wp)          :: f              ! the coefficient value at the last update (output)
     end type
 
     ! The object callers hold.
@@ -188,14 +186,13 @@ contains
     ! Lifecycle
     ! =====================================================================
 
-    subroutine snapshots_init(sc, filename, domain, grid, time, south, coefs, terms, group, reference)
+    subroutine snapshots_init(sc, filename, domain, grid, time, south, terms, group, reference)
         ! `grid` is the climate grid: the snapshot fields are read on it, or
         ! remapped onto it online (var_defs groups with remap/grid_src). `time`
-        ! primes the time-varying snapshots. `coefs` is the driver's registry
-        ! (the coefficients of the terms were checked against it by terms_init);
-        ! `terms` the domain's terms, of which those with the snapshots
-        ! pattern are read here; `group` the backend group ([snapshots<sfx>])
-        ! and `reference` the reference snapshot ([forcing<sfx>] reference).
+        ! primes the time-varying snapshots. `terms` are the domain's terms
+        ! (climate_terms), of which those with the snapshots pattern are read
+        ! here; `group` the backend group ([snapshots<sfx>]) and `reference`
+        ! the reference snapshot ([forcing<sfx>] reference).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         character(len=*),      intent(IN)    :: filename
@@ -203,7 +200,6 @@ contains
         type(grid_class),      intent(IN)    :: grid
         real(dp),              intent(IN)    :: time
         logical,               intent(IN)    :: south     ! southern hemisphere
-        type(coefs_class),     intent(IN)    :: coefs
         type(terms_class),     intent(IN)    :: terms
         character(len=*),      intent(IN)    :: group, reference
 
@@ -216,7 +212,7 @@ contains
         ! snapshot specs and their bindings; then check the bindings against
         ! each other.
         call snapshots_par_load(sc, filename, trim(group), domain, trim(grid%name), terms, reference)
-        call snapshots_check_bindings(sc)
+        call snapshots_check_bindings(sc, terms)
 
         ! Load the snapshot fields (varslice), reduce them, and set the reference state.
         call snapshots_load_snapshots(sc, time, grid)
@@ -224,33 +220,25 @@ contains
         return
     end subroutine snapshots_init
 
-    subroutine snapshots_update(sc, z_srf, time, coefs, dx)
-        ! Pipeline: term positions from the registry (advanced by the driver
-        ! to `time`) -> refresh loads -> combine -> transform (the atmosphere,
-        ! if bound). The uniform and replace terms are applied by the caller
-        ! afterwards (climate_terms).
+    subroutine snapshots_update(sc, z_srf, time, terms, dx)
+        ! Pipeline: refresh loads -> combine (the position on each term: the
+        ! value f of its coefficient in `terms`, evaluated for this update by
+        ! terms_eval) -> transform (the atmosphere, if bound). The uniform and
+        ! replace terms are applied by the caller afterwards (climate_terms).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
         real(wp),              intent(IN)    :: z_srf(:,:)
         real(dp),              intent(IN)    :: time
-        type(coefs_class),     intent(IN)    :: coefs
+        type(terms_class),     intent(IN)    :: terms
         real(wp),              intent(IN), optional :: dx
 
-        integer :: k
-
-        ! 1. The position on each term: the current value of its coefficient (1 without).
-        do k = 1, sc%par%n_term
-            sc%term(k)%f = 1.0_wp
-            if (len_trim(sc%term(k)%coef) > 0) sc%term(k)%f = coefs_value(coefs, sc%term(k)%coef)
-        end do
-
-        ! 2. Refresh time-varying loads and re-reduce those snapshots.
+        ! 1. Refresh time-varying loads and re-reduce those snapshots.
         call snapshots_refresh_loads(sc, time)
 
-        ! 3. Combine the reduced snapshot states into `now`, per field.
-        call snapshots_combine(sc)
+        ! 2. Combine the reduced snapshot states into `now`, per field.
+        call snapshots_combine(sc, terms)
 
-        ! 4. Transform: inflate sea-level fields to the current model elevation
+        ! 3. Transform: inflate sea-level fields to the current model elevation
         !    (tsl -> tas), precip, annual/summer aggregates.
         if (sc%par%with_atm) call snapshots_transform(sc, z_srf)
 
@@ -291,10 +279,11 @@ contains
         return
     end subroutine snapshots_refresh_loads
 
-    subroutine snapshots_combine(sc)
+    subroutine snapshots_combine(sc, terms)
         ! Blend the reduced snapshot states into `now`, per field bound in the
         ! reference, from the reference baseline. Each term k on a field
-        ! (snap0_k -> snap1_k) adds with weight a_k = the value of its coefficient:
+        ! (snap0_k -> snap1_k) adds with weight a_k = the value of its
+        ! coefficient (terms, the f of terms_eval):
         !   linear (tas, to, so): now = ref + sum_k a_k*(snap1_k - snap0_k)
         !   ratio  (pr):          now = ref * prod_k (a_k*(snap1_k/snap0_k - 1) + 1)
         !   const  (zs):          now = ref
@@ -304,8 +293,10 @@ contains
         ! (snapshots_check_bindings).
         implicit none
         type(snapshots_class), intent(INOUT) :: sc
+        type(terms_class),     intent(IN)    :: terms
         integer  :: f, j, k, s0, s1
         logical  :: blended
+        real(wp) :: aa
         type(climate_state_class) :: none   ! the snap0 of a term with snap0 = ""
 
         do f = 1, sc%par%n_field
@@ -336,12 +327,13 @@ contains
                 k  = sc%registry(f)%term_k(j)
                 s0 = sc%term(k)%snap0
                 s1 = sc%term(k)%snap1
+                aa = terms%term(sc%term(k)%k)%f
                 if (s0 > 0) then
                     call add_term(sc%registry(f), sc%now, sc%snap(s0)%state, sc%snap(s1)%state, &
-                                  sc%term(k)%f, anomaly=.FALSE.)
+                                  aa, anomaly=.FALSE.)
                 else
                     call add_term(sc%registry(f), sc%now, none, sc%snap(s1)%state, &
-                                  sc%term(k)%f, anomaly=.TRUE.)
+                                  aa, anomaly=.TRUE.)
                 end if
             end do
         end do
@@ -522,22 +514,13 @@ contains
 
     subroutine snapshots_write_step(sc, filename, ncid, n)
         ! Write record n of the snapshots state into an open 2D output file
-        ! (axes from snapshots_write_init): the term positions and the surface
-        ! elevation. The climate as applied (after the climate modifiers) is
-        ! written by the caller (climate_write_2D).
+        ! (axes from snapshots_write_init): the surface elevation. The climate
+        ! as applied (after the climate modifiers) and the terms are written by
+        ! the caller (climate_write_2D).
         implicit none
         type(snapshots_class), intent(IN) :: sc
         character(len=*),      intent(IN) :: filename
         integer,               intent(IN) :: ncid, n
-
-        integer :: k
-
-        do k = 1, sc%par%n_term
-            call nc_write(filename, "term_"//trim(sc%term(k)%name), sc%term(k)%f, dim1="time", &
-                          start=[n], count=[1], ncid=ncid, units="1", &
-                          long_name="Position on the snapshot term "//trim(sc%term(k)%name)// &
-                                    " (coefficient "//trim(coef_label(sc%term(k)%coef))//")")
-        end do
 
         associate(now => sc%now)
         if (allocated(now%z_srf))   call write2D("z_srf",   now%z_srf,   "m",    "Surface elevation", &
@@ -635,9 +618,7 @@ contains
             associate(t => terms%term(k))
             if (trim(t%pattern) /= "snapshots") cycle
             i = i + 1
-            sc%term(i)%name  = t%name
-            sc%term(i)%coef  = t%coef
-            sc%term(i)%f     = 0.0_wp
+            sc%term(i)%k = k
             if (len_trim(t%snap0) > 0) call add_name(t%snap0)
             call add_name(t%snap1)
             end associate
@@ -703,7 +684,7 @@ contains
 
     end subroutine snapshots_par_load
 
-    subroutine snapshots_check_bindings(sc)
+    subroutine snapshots_check_bindings(sc, terms)
         ! Check the field bindings of the snapshots against each other (stop
         ! with an error on the first mismatch):
         !  - number of var_defs groups: tas 1 (monthly) or 2 ([ann, season]),
@@ -721,6 +702,7 @@ contains
         !  - every snapshot of a term on a blended (linear, ratio) field binds it.
         implicit none
         type(snapshots_class), intent(IN) :: sc
+        type(terms_class),     intent(IN) :: terms   ! the names of the terms (messages)
 
         integer :: s, f, j, k, n, iref
         logical :: state
@@ -798,7 +780,7 @@ contains
             integer,          intent(IN) :: s
             character(len=*), intent(IN) :: end_name
             if (sc%snap(s)%spec%nsrc(f) == 0) &
-                call binding_error("term "//trim(sc%term(k)%name)//" lists the field "// &
+                call binding_error("term "//trim(terms%term(sc%term(k)%k)%name)//" lists the field "// &
                                    trim(sc%registry(f)%name)//", but its "//end_name// &
                                    " snapshot "//trim(sc%snap(s)%spec%name)//" does not bind it.")
         end subroutine check_term_snapshot
