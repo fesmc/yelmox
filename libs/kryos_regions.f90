@@ -59,24 +59,34 @@ contains
     end subroutine domain_init_marine_ice
 
     subroutine negis_update_cb_ref(ylmo, ngs, time)
-        ! Northeast Greenland Ice Stream cb_ref modification: recompute cb_ref from
-        ! bed properties (calc_cb_ref), then scale the NEGIS parts
-        ! (region_centre/south/north) by time-dependent factors. Requires the [negis] cf_* parameters, loaded
-        ! in domain_init when [sim] use_negis is set.
+        ! Northeast Greenland Ice Stream cb_ref modification ([sim] use_negis,
+        ! Yelmo's till_method = -1): recompute cb_ref from bed properties
+        ! (calc_cb_ref), then scale the NEGIS parts (region_centre/south/north)
+        ! by their factors at the forcing time `time`: the centre by cf_centre,
+        ! the north part (paleo ice stream) by cf_north before -4 ka, the south
+        ! part by cf_south from -4 ka, and all parts by the ramp f_x, cf_0 before
+        ! -11 ka, linear to cf_1 at 0 ka, cf_1 after. The factors are functions
+        ! of the time only, so a restart continues them. Requires the [negis]
+        ! parameters, loaded by domain_negis_init.
         type(yelmo_class),  intent(inout) :: ylmo
-        type(negis_params), intent(inout) :: ngs
+        type(negis_params), intent(in)    :: ngs
         real(dp),           intent(in)    :: time
 
-        if (time < -11e3_wp) then
-            ngs%cf_x = ngs%cf_0
-        else
-            ngs%cf_x = ngs%cf_0 + (time - (-11e3_wp)) / (0.0_wp - (-11e3_wp)) * (ngs%cf_1 - ngs%cf_0)
-        end if
+        real(dp), parameter :: t_ramp0 = -11e3_dp   ! [yr] start of the cf_0 -> cf_1 ramp
+        real(dp), parameter :: t_ramp1 =   0.0_dp   ! [yr] end of the ramp
+        real(dp), parameter :: t_shift =  -4e3_dp   ! [yr] north part -> south part
+        real(wp) :: f_x, f_south, f_north
+        real(dp) :: w
 
-        if (time < -4e3_wp) then
-            ngs%cf_south = 1.0_wp
+        w   = min(1.0_dp, max(0.0_dp, (time - t_ramp0) / (t_ramp1 - t_ramp0)))
+        f_x = real(ngs%cf_0 + w*(ngs%cf_1 - ngs%cf_0), wp)
+
+        if (time < t_shift) then
+            f_north = ngs%cf_north
+            f_south = 1.0_wp
         else
-            ngs%cf_north = 1.0_wp
+            f_north = 1.0_wp
+            f_south = ngs%cf_south
         end if
 
         ! Recompute cb_ref like the standard till function.
@@ -85,10 +95,12 @@ contains
                 ylmo%dyn%par%till_cf_ref, ylmo%dyn%par%till_cf_min, ylmo%dyn%par%till_z0, ylmo%dyn%par%till_z1, &
                 ylmo%dyn%par%till_n_sd, ylmo%dyn%par%till_scale_zb, ylmo%dyn%par%till_scale_sed)
 
-        ! Apply the scaling of the NEGIS parts.
+        ! Apply the scaling of the NEGIS parts, then the ramp over all of them.
         where (ngs%mask_centre) ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * ngs%cf_centre
-        where (ngs%mask_south)  ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * ngs%cf_south
-        where (ngs%mask_north)  ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * ngs%cf_north
+        where (ngs%mask_south)  ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * f_south
+        where (ngs%mask_north)  ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * f_north
+        where (ngs%mask_centre .or. ngs%mask_south .or. ngs%mask_north) &
+            ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * f_x
 
     end subroutine negis_update_cb_ref
 

@@ -531,7 +531,7 @@ times counted from the start of the run (`time_init`).
 | `init_time_thrm` | [yr] | then equilibrate with the topography fixed (`0` = off) |
 | `relax` | bool | relax the topography towards the reference (`[relax]`) |
 | `opt` | bool | optimize the basal friction and the thermal-forcing correction (`[opt]`) |
-| `use_negis` | bool | NEGIS basal-friction modification (`[negis]`) |
+| `use_negis` | bool | NEGIS basal-friction modification (`[negis]`): `cb_ref` is set each step (Yelmo's `ytill.method = -1`) as the till friction of the bed with the NEGIS parts scaled, the centre by `cf_centre`, the north part by `cf_north` before 4 ka BP, the south part by `cf_south` from 4 ka BP, all parts by `cf_0` before 11 ka BP ramping linearly to `cf_1` at 0 ka, on the forcing time; not with the `cb_ref` optimization (`opt_cf`) |
 | `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |
 

@@ -124,15 +124,17 @@ module kryos
         real(dp) :: dt_cmip    = 1.0_dp
     end type domain_ctl
 
-    ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters.
+    ! NEGIS (Northeast Greenland Ice Stream) cb_ref modification parameters
+    ! ([negis]; [sim] use_negis). cb_ref is the till friction of the bed with
+    ! each NEGIS part scaled by its factor: the centre always, the north part
+    ! (paleo ice stream) before -4 ka, the south part from -4 ka; all parts by
+    ! the ramp cf_0 (before -11 ka) -> cf_1 (from 0 ka), on the forcing time.
     type negis_params
-        logical  :: use_negis_par = .false.
         real(wp) :: cf_0    = 1.0_wp
         real(wp) :: cf_1    = 1.0_wp
         real(wp) :: cf_centre = 1.0_wp
         real(wp) :: cf_north  = 1.0_wp
         real(wp) :: cf_south  = 1.0_wp
-        real(wp) :: cf_x    = 1.0_wp
         ! The NEGIS parts (selection expressions of the regions), and their
         ! masks on the Yelmo grid
         character(len=1000) :: region_centre = "", region_south = "", region_north = ""
@@ -304,6 +306,18 @@ contains
                         group="yelmo"//trim(sfx), reg=reg_y, &
                         topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
 
+        ! Relaxation parameters + the par-file ytopo values it restores; no-op
+        ! unless [sim] relax. Must follow yelmo_init (ytopo params known).
+        call domain_relax_init(dom, path_par, trim(sfx))
+
+        ! Optimization state (basal friction + thermal forcing); no-op unless
+        ! [sim] opt. Must follow yelmo_init (grid + till params known).
+        call domain_opt_init(dom, path_par, trim(sfx))
+
+        ! NEGIS cb_ref modification; no-op unless [sim] use_negis. Must follow
+        ! domain_opt_init (refuses the cb_ref optimization).
+        call domain_negis_init(dom, path_par, trim(sfx), reg_y)
+
         ! Where the reconstruction's ice is imposed (init_method = recon).
         if (trim(dom%ctl%init_method) == "recon") then
             dom%mask_recon = regions_select(reg_y, dom%ctl%recon_regions)
@@ -312,10 +326,6 @@ contains
         ! Prescribed ice in Yelmo's fixed and relaxation cells ([ice_bnd]),
         ! read on the Yelmo grid; no-op unless active.
         call ice_bnd_init(dom%ibnd, path_par, "ice_bnd"//trim(sfx), domain, grid_y, coefs)
-
-        ! NEGIS cb_ref modification: its parameters and the masks of its parts,
-        ! loaded when enabled, so it cannot silently run with defaults.
-        if (dom%ctl%use_negis) call negis_par_load(dom%ngs, path_par, trim(sfx), reg_y)
 
         call regions_end(reg_y)
 
@@ -410,30 +420,49 @@ contains
                            domain, trim(dom%ctl%grid_shelf), reg_m, cnst=dom%cnst)
         call regions_end(reg_m)
 
-        ! Relaxation parameters + the par-file ytopo values it restores; no-op
-        ! unless [sim] relax. Must follow yelmo_init (ytopo params known).
-        call domain_relax_init(dom, path_par, trim(sfx))
-
-        ! Optimization state (basal friction + thermal forcing); no-op unless
-        ! [sim] opt. Must follow yelmo_init (grid + till params known).
-        call domain_opt_init(dom, path_par, trim(sfx))
-
         ! Glacial smb scaling: load its group when enabled, so it cannot
         ! silently run with default parameters.
         if (dom%ctl%scale_glacial_smb) call glacial_smb_par_load(dom%gsmb, path_par, trim(sfx))
 
     end subroutine domain_init
 
+    subroutine domain_negis_init(dom, path_par, suffix, reg)
+        ! NEGIS cb_ref modification ([sim] use_negis): load its parameters and
+        ! the masks of its parts (so it cannot silently run with defaults), and
+        ! prepare Yelmo for external cb_ref (till_method = -1), which the
+        ! coupling sets each step (negis_update_cb_ref, as on the cold start).
+        ! Exclusive with the cb_ref optimization, the other external cb_ref.
+        ! No-op unless [sim] use_negis.
+        type(kryos_domain),  intent(inout) :: dom
+        character(len=*),    intent(in)    :: path_par
+        character(len=*),    intent(in)    :: suffix
+        type(regions_class), intent(in)    :: reg
+
+        if (.not. dom%ctl%use_negis) return
+
+        if (dom%ctl%opt) then
+            if (trim(dom%opt%opt_cf) /= "none") then
+                write(*,*) "domain_negis_init:: error: sim"//trim(suffix)//".use_negis sets cb_ref, &
+                           &as does the cb_ref optimization (opt"//trim(suffix)//".opt_cf = "// &
+                           trim(dom%opt%opt_cf)//"); use one of them (opt_cf = ""none"")."
+                stop 1
+            end if
+        end if
+
+        call negis_par_load(dom%ngs, path_par, suffix, reg)
+
+        ! cb_ref is set externally by the NEGIS modification from here on.
+        dom%yelmo%dyn%par%till_method = -1
+    end subroutine domain_negis_init
+
     subroutine negis_par_load(ngs, path_par, suffix, reg)
         ! Load the NEGIS cb_ref scaling parameters ([negis<suffix>]) and make the
-        ! masks of its parts from the regions on the Yelmo grid. Only read when
-        ! [sim] use_negis is set.
+        ! masks of its parts from the regions on the Yelmo grid.
         type(negis_params),  intent(inout) :: ngs
         character(len=*),    intent(in)    :: path_par
         character(len=*),    intent(in)    :: suffix
         type(regions_class), intent(in)    :: reg
 
-        ngs%use_negis_par = .true.
         call nml_read(path_par, "negis"//trim(suffix), "cf_0",      ngs%cf_0)
         call nml_read(path_par, "negis"//trim(suffix), "cf_1",      ngs%cf_1)
         call nml_read(path_par, "negis"//trim(suffix), "cf_centre", ngs%cf_centre)

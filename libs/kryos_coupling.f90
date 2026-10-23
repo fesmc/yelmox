@@ -365,9 +365,10 @@ contains
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
 
-        ! NEGIS: update cb_ref from bed properties + NEGIS scaling.
-        if (dom%ngs%use_negis_par) &
-            call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time)
+        ! NEGIS: cb_ref from the bed properties + the NEGIS scaling at the
+        ! forcing time (Yelmo's till_method = -1, set by domain_negis_init).
+        if (dom%ctl%use_negis) &
+            call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time_rel)
 
         if (.not. dom%ctl%with_ice_sheet) return
         if (ts%n == 0 .and. dom%yelmo%par%use_restart) return

@@ -20,7 +20,7 @@ module kryos_startup
     use smbpal,       only : smbpal_restart_write, smbpal_restart_read
     use surface_chion, only : surface_chion_restart_write, surface_chion_restart_read
     use kryos,        only : kryos_domain, remap, remap_method_smooth
-    use kryos_regions,  only : domain_init_marine_ice
+    use kryos_regions,  only : domain_init_marine_ice, negis_update_cb_ref
     use kryos_coupling, only : couple_yelmo_to_htopo, step_climate, &
                                step_surface, step_shelf, couple_to_yelmo, &
                                couple_isostasy_to_yelmo, couple_surface_to_yelmo, &
@@ -164,9 +164,11 @@ contains
         ! Assemble the Yelmo boundary state from the freshly produced outputs.
         call couple_to_yelmo(dom)
 
-        ! Cold-start friction guess for the optimization (restart restores cb_ref),
-        ! set before the state init so its first dynamics solve already uses it.
+        ! Cold-start friction guess for the optimization, or the NEGIS cb_ref
+        ! (restart restores cb_ref), set before the state init so its first
+        ! dynamics solve already uses it.
         call domain_opt_init_cb_ref(dom)
+        if (dom%ctl%use_negis) call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time_rel)
 
         ! Initialize state variables (dyn, therm, mat) with a cold base
         call yelmo_print_bound(dom%yelmo%bnd)
