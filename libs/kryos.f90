@@ -638,6 +638,13 @@ contains
         call nml_read(path_par, go, "write_htopo", ctl%write_htopo)
         call nml_read(path_par, go, "write_cmip",  ctl%write_cmip)
         call nml_read(path_par, go, "dt_cmip",     ctl%dt_cmip)
+
+        ! Effective switches: a component's files are written only when it runs
+        ! (an inactive component's fields are unset or static).
+        ctl%write_isos    = ctl%write_isos    .and. ctl%with_isostasy
+        ctl%write_shelf   = ctl%write_shelf   .and. ctl%with_shelf
+        ctl%write_surface = ctl%write_surface .and. ctl%with_surface
+        ctl%write_clim    = ctl%write_clim    .and. ctl%with_climate
     end subroutine domain_ctl_load
 
     ! ----- remap: identity-copy when src == dst, else via the coupler ---

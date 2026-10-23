@@ -48,7 +48,7 @@ program yelmox_bipolar
                                domain_write_1D
     use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
                                coefs_restart_due, coefs_restart_fldr, &
-                               coefs_restart_read, coefs_restart_write, coefs_write_step
+                               coefs_restart_read, coefs_restart_write
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
@@ -350,7 +350,7 @@ contains
 
         if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
         if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
-        if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+        if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, coefs, init=.TRUE.)
     end subroutine write_domain_init
 
     subroutine write_domain_step(dom, outfldr)
@@ -362,8 +362,7 @@ contains
 
         if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)
         if (do_2Dsm) call domain_write_step_sm(dom, trim(outfldr), ts%time)
-        if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time)
-        if (do_1D)   call coefs_write_step(coefs, dom%yelmo%reg%fnm, ts%time)
+        if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time, coefs)
     end subroutine write_domain_step
 
     subroutine write_run_restart(bundle)

@@ -23,7 +23,7 @@ program yelmox
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
                                coefs_restart_due, coefs_restart_fldr, &
-                               coefs_restart_read, coefs_write_step
+                               coefs_restart_read
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
@@ -130,7 +130,7 @@ program yelmox
     ! field set) and 1D timeseries.
     if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
     if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
-    if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
+    if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, coefs, init=.TRUE.)
     call domain_write_cmip(dom, trim(outfldr), ts, init=.TRUE.)
 
     ! === main time loop ===
@@ -155,8 +155,7 @@ program yelmox
         end if
 
         if (tm_1D%active .and. (timeout_check(tm_1D, ts%time) .or. ts%is_finished)) then
-            call domain_write_1D(dom, trim(outfldr), ts%time)
-            call coefs_write_step(coefs, dom%yelmo%reg%fnm, ts%time)
+            call domain_write_1D(dom, trim(outfldr), ts%time, coefs)
             call timer_write_totals(tmr, ts%time, "s", trim(outfldr)//"timing.txt", &
                                     init=timing_init)
             timing_init = .FALSE.
