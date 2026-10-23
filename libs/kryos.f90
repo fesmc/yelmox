@@ -369,10 +369,12 @@ contains
                              orbit_group="orbit"//trim(sfx))
 
         ! Alternative SMB (smb_simple) on the same grid, if selected. Unlike
-        ! smbpal (1D axes), smb_simple takes 2D projected coordinates.
+        ! smbpal (1D axes), smb_simple takes 2D projected coordinates, in
+        ! metres: the grid's axes are in the units of its description (e.g. km),
+        ! converted by its xy_conv.
         if (trim(dom%ctl%surface_method) == "smb_simple") then
-            call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x, wp), &
-                                 y=real(grid_s%y, wp), lat=lats_s, &
+            call smb_simple_init(dom%smbs, path_par, x=real(grid_s%x*grid_s%cs%xy_conv, wp), &
+                                 y=real(grid_s%y*grid_s%cs%xy_conv, wp), lat=lats_s, &
                                  group="smb_simple"//trim(sfx), units="m", &
                                  cnst=dom%cnst)
             ! {domain}/{grid_name} of the target-mask file: the domain name and
