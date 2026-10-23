@@ -227,7 +227,7 @@ reconstruction). The reference is taken at the current
 surface: a reference at its own elevation (snapshots: the surface of the
 reference snapshot) is moved there with the backend's monthly lapse rate and
 `beta_p`, as the climate itself. The ocean is unchanged. Refused for a backend
-without a reference atmosphere (rembo).
+that supplies the smb itself (esm with its smb; rembo).
 
 `outside` sets the climate where w < 1:
 
@@ -262,9 +262,9 @@ of `scripts/grl-paleo/params.sh`).
 ## Climate bias correction (`[bias]`)
 
 A spatial correction of the atmosphere, the last climate transform, applied
-on the climate grid to the monthly air temperature and precipitation of any
-backend except rembo (annual fields only), before the move to the surface
-grid's elevation:
+on the climate grid to the monthly air temperature and precipitation, before
+the move to the surface grid's elevation; refused for a backend that supplies
+the smb itself (esm with its smb; rembo):
 
     tas = tas + f_tas*dtas,    pr = pr*(1 + f_pr*(fpr - 1))
 
@@ -508,7 +508,7 @@ The components: which are active, with which model, how often.
 |---|---|---|
 | `with_ice_sheet`, `with_isostasy`, `with_climate`, `with_surface`, `with_shelf` | bool | components in the coupling sequence: the ice sheet, isostasy, the climate (atmosphere + ocean), the surface (mass balance + temperature) and the shelf base (melt + temperature); `with_surface` and `with_shelf` need `with_climate` |
 | `climate` | `snapshots`, `esm`, `rembo` | the climate backend |
-| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; chion runs the ITM, BESSI or PDD snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs; PDD's parameters are the group `[chion] nml_pdd` names, `[pdd_chion]` with `pdd_method = "cg05"` (Calov and Greve, 2005), smbpal's PDD; the surface temperature of ITM and PDD is chion's `chion_tsrf_annual`, the annual-mean air temperature warmed by `firn_fac` times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapshots); the climate's own smb (esm, rembo; required by rembo) |
+| `surface_method` | `chion` (default), `smbpal`, `smb_simple`, `climate` | chion or smbpal (ITM or PDD), both from the climate's temperature and precipitation; smbpal's ITM spins its snowpack up for `[smbpal] time_equil` years at the cold start; chion runs the ITM, BESSI or PDD snowpack (`[chion] model`) in daily steps (`[surface_chion]`, `[chion]`; ITM's parameters are the group `[chion] nml_itm` names: smbpal's `[itm]`, or for Greenland `[itm_chion]` (`alb_ice = 0.31`, calibrated to MAR); BESSI gets the surface shortwave as TOA insolation times `trans_sw`, the TOA insolation itself (chion's cloud-proxy longwave), the ice thickness, a constant `wind_speed` and `rel_hum`, and the air pressure from the surface elevation; its constants are `[chion_const]`, for Greenland `alpha_ice = 0.55`, calibrated to MAR; BESSI runs pass `surface_chion.time_equil=20`, converged within 0.3 Gt/yr of the par files' 100 yr, which ITM needs; PDD's parameters are the group `[chion] nml_pdd` names, `[pdd_chion]` with `pdd_method = "cg05"` (Calov and Greve, 2005), smbpal's PDD; the surface temperature of ITM and PDD is chion's `chion_tsrf_annual`, the annual-mean air temperature warmed by `firn_fac` times the annual refreezing, capped at freezing over ice); smb_simple (needs a sea-level air temperature: snapshots); the climate's own smb (esm, rembo; required by rembo) |
 | `dt_clim` | [yr] | climate update interval; `<= 0`: updated only at the cold start (and re-derived once on a restart) |
 | `dt_isos` | [yr] | isostasy update interval (> 0; 10 in all par files): FastIsostasy integrates the whole interval in one call, the bedrock is held in between |
 

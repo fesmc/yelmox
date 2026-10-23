@@ -40,14 +40,16 @@ the surface mass balance; the ocean comes from the snapshot backend.
   `f_to = 0.25`).
 - **Transient forcing.** The uniform terms on `tas` (`[term_<name>]
   pattern = "uniform"`) are an input of REMBO, not applied after it: their
-  sum `f_ta·f` is REMBO's summer air temperature anomaly `dT_sum`, the annual
-  `dT_ann = 1.3·dT_sum` (REMBO's winter factor 1.6); `pr` in their fields has
-  no effect (REMBO computes the precipitation). Snapshot terms on the
-  atmosphere are refused. Off in the par file (`[forcing] coefs = ""`,
+  sum `f_ta·f` is REMBO's summer air temperature anomaly `dT_sum`; the annual
+  anomaly REMBO applies with it, `dT_ann = (1+T_wintfac)/2·dT_sum` (its
+  seasonal cycle, winter = `T_wintfac`·summer), is a diagnostic. A uniform term
+  on `pr` is refused (REMBO computes the precipitation), as are snapshot terms
+  on the atmosphere. Off in the par file (`[forcing] coefs = ""`,
   `terms = ""`).
-- **Transforms.** `[taper]` and `[bias]` are refused at start-up (no reference
-  atmosphere, annual fields only); so is a derived `air_anomaly` coefficient (no
-  sea-level air temperature).
+- **Transforms.** `[taper]` and `[bias]` are refused at start-up: REMBO
+  supplies the smb itself, so a change of its atmosphere after it cannot reach
+  the surface. So is a derived `air_anomaly` coefficient (no sea-level air
+  temperature).
 - **Cold start.** REMBO is equilibrated (10 years) before its first update.
 
 ## Output

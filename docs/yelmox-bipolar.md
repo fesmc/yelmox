@@ -36,7 +36,7 @@ across both domains plus the OBM.
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
   (`coupling_obm2ism`, `obm_coupling_init`, `obm_exchange`). The OBM writes its own
-  1D output, `<obm_name>.nc` (`[ctrl] obm_name`, `nautilus` or `stommel`), on the
+  1D output, `<obm_name>.nc` (`[ctrl] obm_name = "nautilus"`), on the
   `[tm_1D]` cadence; its restart (`obm_restart.nc`) goes into the run restart
   bundle next to `bsl_restart.nc`.
 - **One restart bundle per run** — `restart-<kyr>-kyr/` holds the shared
@@ -62,7 +62,7 @@ call coefs_update(coefs, ts%time_rel, var=fvar) ! shared coefficients, once (fva
 
 if (active_north) then                         ! relaxation + optimization + isostasy, per domain
     call step_relax(dom_north, ts)
-    call step_optimize(dom_north, ts)
+    call step_optimize(dom_north, ts, dtt)
     call step_isostasy(dom_north, ts, bsl)
 end if
 (same for dom_south)
@@ -74,7 +74,7 @@ if (active_north) then                         ! ice sheet, hub, climate + smb, 
     call step_ice_bnd(dom_north, ts, coefs)
     call step_icesheet(dom_north, ts)
     call couple_yelmo_to_htopo(dom_north)
-    call step_climate(dom_north, ts, coefs)
+    call step_climate(dom_north, ts, dtt, coefs)
     call step_surface(dom_north, ts)
 end if
 (same for dom_south)
