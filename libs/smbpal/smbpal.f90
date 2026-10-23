@@ -171,7 +171,7 @@ contains
 
     end subroutine smbpal_init
 
-    subroutine smbpal_update_monthly_equil(smb,t2m,pr,z_srf,H_ice,time_bp,time_equil,sf)
+    subroutine smbpal_update_monthly_equil(smb,t2m,pr,z_srf,H_ice,time_bp,time_equil)
         ! Generate climate using monthly input data [nx,ny,nmon]
         
         implicit none 
@@ -181,7 +181,6 @@ contains
         real(prec), intent(IN) ::  z_srf(:,:), H_ice(:,:)
         real(dp),   intent(IN) :: time_bp       ! [yr] model time (relative to 1950, past < 0), for the orbit 
         real(prec), intent(IN) :: time_equil    ! years to equilibrate
-        real(prec), intent(IN), optional :: sf(:,:,:)
 
         ! Local variables
         integer :: n 
@@ -191,13 +190,13 @@ contains
         if (trim(smb%par%abl_method) .eq. "itm") then 
             ! The daily forcing is the same every year: prepare it once
             call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
-            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,sf)
+            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr)
             do n = 1, int(time_equil)
                 call smbpal_update_itm(smb,frc,z_srf,H_ice)
             end do
         else 
             do n = 1, int(time_equil) 
-                call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf)
+                call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp)
             end do 
         end if 
 
@@ -206,7 +205,7 @@ contains
     end subroutine smbpal_update_monthly_equil
 
 
-    subroutine smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf)
+    subroutine smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp)
         ! Generate climate using monthly input data [nx,ny,nmon]
 
         implicit none
@@ -217,7 +216,6 @@ contains
         real(prec),         intent(IN) :: z_srf(:,:)                ! [m] Surface elevation
         real(prec),         intent(IN) :: H_ice(:,:)                ! [m] Ice thickness
         real(dp),           intent(IN) :: time_bp                   ! [yr] Model time (relative to 1950, past < 0), for the orbit
-        real(prec),         intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields
 
         ! Local variables
         integer :: k
@@ -233,7 +231,7 @@ contains
 
             ! Generate daily climate from monthly input and run the year
             call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
-            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,sf)
+            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr)
             call smbpal_update_itm(smb,frc,z_srf,H_ice)
 
         else
@@ -247,11 +245,7 @@ contains
             t2m_ann = sum(t2m,dim=3) / 12.0 
             pr_ann  = sum(pr, dim=3) / 12.0 *real(ndays,prec)       ! [mm we/d] => [mm we/a]
 
-            if (present(sf)) then 
-                sf_ann  = sum(sf,dim=3) / 12.0 *real(ndays,prec)    ! [mm we/d] => [mm we/a]
-            else 
-                sf_ann  = pr_ann    ! Should be improved in the future 
-            end if 
+            sf_ann  = sum(calc_snowfall(smb%par,t2m,pr),dim=3) / 12.0 *real(ndays,prec)   ! [mm we/d] => [mm we/a]
 
             ! First calculate PDDs for the whole year (input to pdd)
             PDDs_ann = 0.0 
@@ -315,7 +309,7 @@ contains
 
     end subroutine smbpal_insol_update
 
-    subroutine smbpal_itm_forcing_init(frc,par,t2m,pr,sf)
+    subroutine smbpal_itm_forcing_init(frc,par,t2m,pr)
         ! Daily forcing of one itm year: the monthly fields interpolated to
         ! the forcing days. It depends only on the climate, so it is shared
         ! by all grid points and years.
@@ -326,7 +320,6 @@ contains
         type(smbpal_param_class),       intent(IN)  :: par 
         real(prec), intent(IN) :: t2m(:,:,:)                ! [K] Monthly temperature fields
         real(prec), intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
-        real(prec), intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
 
         ! Local variables
         integer :: nx, ny, k, n 
@@ -360,15 +353,8 @@ contains
         call convert_monthly_daily_3D(dble(pr),tmp,days=frc%days)
         frc%pr = tmp 
 
-        if (present(sf)) then 
-            call convert_monthly_daily_3D(dble(sf),tmp,days=frc%days)
-            frc%sf = tmp 
-            where(frc%sf .lt. 0.0) frc%sf = 0.0 
-        else 
-            do k = 1, ndays_daily 
-                frc%sf(:,:,k) = frc%pr(:,:,k) * calc_snowfrac(frc%t2m(:,:,k),par%sf_a,par%sf_b)
-            end do 
-        end if 
+        ! Snowfall from the daily temperature and precipitation
+        frc%sf = calc_snowfall(par,frc%t2m,frc%pr)
 
         return 
 
@@ -507,10 +493,6 @@ contains
         ann%pr   = pr_ann 
         ann%sf   = sf_ann
 
-        write(*,*) "smbpal_update_pdd"
-        write(*,*) "sf:  ", minval(ann%sf), maxval(ann%sf)
-        write(*,*) "t2m: ", minval(ann%t2m), maxval(ann%t2m)
-        
         ! Get ablation, runoff and refreezing [mm/a]
         call calc_ablation_pdd(ann%melt,ann%runoff,ann%refrz,ann%PDDs,ann%sf, &
                                 par%mm_snow,par%mm_ice,par%itm%Pmaxfrac)
@@ -606,6 +588,24 @@ contains
 
     end function calc_temp_surf
     
+    elemental function calc_snowfall(par,t2m,pr) result(sf)
+        ! Snowfall from precipitation and temperature: the one place
+        ! smbpal splits precipitation into snow and rain (itm on the
+        ! daily fields, pdd on the monthly fields).
+
+        implicit none 
+
+        type(smbpal_param_class), intent(IN) :: par 
+        real(prec),               intent(IN) :: t2m     ! [K]
+        real(prec),               intent(IN) :: pr      ! [mm we/d]
+        real(prec)                           :: sf      ! [mm we/d]
+
+        sf = pr * calc_snowfrac(t2m,par%sf_a,par%sf_b)
+
+        return 
+
+    end function calc_snowfall
+
     elemental function calc_snowfrac(t2m,a,b) result(f)
         ! Return the fraction of snow from total precipitation
         ! expected for a given temperature
