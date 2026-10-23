@@ -97,23 +97,23 @@ module esm_forcing
 
         ! === Atmosphere ===
         ! Monthly fields (but right now constant anomaly between months)
-        real(wp), allocatable :: t2m(:,:,:)       ! Monthly surface temperature [K]
-        real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation [mm/yr]
-        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr]
+        real(wp), allocatable :: t2m(:,:,:)       ! Monthly near-surface air temperature, at the model surface [K]
+        real(wp), allocatable :: pr(:,:,:)        ! Monthly precipitation, at the model surface [mm/d]
+        real(wp), allocatable :: smb(:,:,:)       ! Monthly SMB [mm/yr w.e.]
 
         ! Anomalies
-        real(wp), allocatable :: dts(:,:,:)       ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dpr(:,:,:)       ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr]
-        real(wp), allocatable :: dsmbdz(:,:)      ! SMB height anomaly [mm/yr*m]
-        real(wp), allocatable :: dts_var(:,:,:)   ! Surface temperature anomaly variability[K]
-        real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation relative anomaly variability [%]
+        real(wp), allocatable :: dts(:,:,:)       ! Near-surface air temperature anomaly [K]
+        real(wp), allocatable :: dpr(:,:,:)       ! Precipitation anomaly, a ratio to the reference [1]
+        real(wp), allocatable :: dsmb(:,:,:)      ! SMB anomaly [mm/yr w.e.]
+        real(wp), allocatable :: dsmbdz(:,:)      ! SMB elevation gradient [mm/yr w.e. per m]
+        real(wp), allocatable :: dts_var(:,:,:)   ! Near-surface air temperature anomaly, variability [K]
+        real(wp), allocatable :: dpr_var(:,:,:)   ! Precipitation anomaly, variability, a ratio [1]
 
         ! ===    Ocean   ===
-        real(wp), allocatable :: dto(:,:)         ! Surface temperature anomaly [K]
-        real(wp), allocatable :: dso(:,:)         ! Precipitation relative anomaly [%]
-        real(wp), allocatable :: dto_var(:,:)     ! Surface temperature anomaly variability [K]
-        real(wp), allocatable :: dso_var(:,:)     ! Precipitation relative anomaly variability [%]
+        real(wp), allocatable :: dto(:,:)         ! Ocean temperature anomaly at the shelf base [K]
+        real(wp), allocatable :: dso(:,:)         ! Ocean salinity anomaly at the shelf base [psu]
+        real(wp), allocatable :: dto_var(:,:)     ! Ocean temperature anomaly at the shelf base, variability [K]
+        real(wp), allocatable :: dso_var(:,:)     ! Ocean salinity anomaly at the shelf base, variability [psu]
         real(wp), allocatable :: Qd_ann(:,:)      ! Annual mean subglacial discharge [m3/s]
         real(wp), allocatable :: Qd_sum(:,:)      ! Summer mean subglacial discharge [m3/s]
         logical :: with_sgd_hist = .false.        ! Qd from the sgd_hist group (Greenland; its filename /= "none")
@@ -402,7 +402,9 @@ contains
     end function sgd_active
 
     subroutine esm_clim_update(esm,z_srf_ylm,time,time_ref,use_smb,south)
-        ! Routine to update reference climatology to the specific Antarctic elevation and ocean (neccessary?)
+        ! The reference climatology over time_ref: the atmosphere moved to the
+        ! model surface z_srf_ylm with the monthly lapse rate (pr with beta_p;
+        ! the smb without elevation change), and the reference ocean.
 
         implicit none
 

@@ -148,8 +148,9 @@ contains
 
     subroutine climate_mods_write_step(mods, filename, ncid, n)
         ! Record n of the active transforms' diagnostics, into an open 2D
-        ! output file: nothing at present (the taper and a static bias are
-        ! written once by climate_mods_write_init).
+        ! output file: the weighted annual temperature correction of a
+        ! time-dependent bias, bias_dtas_ann_now (the taper and a static bias
+        ! are written once by climate_mods_write_init).
         type(climate_mods_class), intent(in) :: mods
         character(len=*),         intent(in) :: filename
         integer,                  intent(in) :: ncid, n

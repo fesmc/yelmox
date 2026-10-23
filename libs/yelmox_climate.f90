@@ -449,7 +449,8 @@ contains
         ! climate grid), as applied (after the modifiers): the annual and,
         ! with monthly fields, summer near-surface air temperature, the annual
         ! precipitation, the annual ocean profiles (when the climate has them),
-        ! plus the backend's own fields and the modifiers' diagnostics.
+        ! plus the backend's own fields, the transforms' diagnostics and the
+        ! value of every term's coefficient (term_<name>).
         type(yelmox_climate_class), intent(in) :: cl
         type(climate_out_class),    intent(in) :: out
         character(len=*),           intent(in) :: filename
@@ -514,8 +515,8 @@ contains
                 call write2D("dsmbdz",   1e-3_wp*esm%dsmbdz, "m/a m-1 water equiv.", "SMB lapse rate", &
                              prec_rel=1e-4_wp)
             else
-                call write2D("dpr_ann", sum(esm%dpr, dim=3)/12.0_wp, "%", "Precipitation anomaly (ann)", &
-                             prec_rel=1e-4_wp)
+                call write2D("dpr_ann", sum(esm%dpr, dim=3)/12.0_wp, "1", &
+                             "Precipitation anomaly, ratio to the reference (ann)", prec_rel=1e-4_wp)
             end if
             call write2D("dto",    esm%dto,    "K",    "Shelf temperature anomaly", prec_abs=1e-3_wp)
             call write2D("dso",    esm%dso,    "PSU",  "Shelf salinity anomaly",    prec_rel=1e-4_wp)
