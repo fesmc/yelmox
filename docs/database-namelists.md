@@ -6,8 +6,8 @@ Most forcing in YelmoX is now loaded through the shared
 [`varslice`](https://github.com/fesmc/fesm-utils) reader. A **database namelist**
 is a small, static description of a dataset on disk: where the file lives, which
 variable to read, how to convert its units, and how its records map onto a time
-axis. The consuming modules — `varslice` itself, `esm_forcing`, `snapshots`,
-`ismip6` — all read the *same* group layout, so once you understand one group you
+axis. The consuming modules — `varslice` itself, `esm_forcing`, `snapshots`, the
+climate transforms `[taper]`/`[bias]` and `[ice_bnd]` — all read the *same* group layout, so once you understand one group you
 understand them all.
 
 The point of these files is to keep the *provenance* of every forcing field
@@ -236,7 +236,8 @@ not in the namelist.
   (`&gcm_ts_ref`, `&gcm_to_proj`, …) and supplies `{gcm}`/`{experiment}`. See
   [ESM forcing](climate-esm.md).
 - **`snapshots`** uses the same reader for its snapshot climate database.
-- **`ismip6`** uses it for the ISMIP6 atmosphere/ocean forcing files.
+- **`[taper]`, `[bias]`** and **`[ice_bnd]`** read their fields (weights, bias
+  fields, ice thickness) as groups of the same databases.
 
 Because they share the reader, the layout documented here is identical across all
 of them — a group is a group regardless of which module owns it.
