@@ -83,6 +83,8 @@ projection periods, optional climate variability and subglacial discharge.
 
 The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, `chion.nc`, ...),
 plus, with `[output] write_clim`, `esm.nc` (the ESM fields on the climate grid) and
-`esm_ts.nc` (the forcing averaged over the ice and the floating ice), and, with
+`esm_ts.nc` (the forcing averaged over the ice and the floating ice: `t2m_1d`
+and `pr_1d` as applied, with the variability, terms and transforms; `pr_1d`
+only without the esm smb; the anomalies of the esm), and, with
 `[output] write_cmip` (every `dt_cmip`), the CMIP-formatted `yelmo_cmip.nc` and
 `yelmo_ts_cmip.nc`.

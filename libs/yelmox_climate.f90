@@ -577,11 +577,15 @@ contains
 
         subroutine write_esm()
             ! Means of the forcing over the ice (atmosphere) and the floating ice
-            ! (ocean, at the shelf base).
+            ! (ocean, at the shelf base). The air temperature and precipitation
+            ! as applied (out%now: variability, terms and transforms included;
+            ! the precipitation only when the climate has it, not with the esm
+            ! smb); the anomalies those of the esm.
 
             ! Missing value of the ocean means: a field with no valid floating cell.
             real(wp), parameter :: mv_ocn = -9999.0_wp
             logical,  allocatable :: mask_tot(:,:), mask_flt(:,:)
+            logical  :: with_pr
             integer  :: npts_tot
             real(wp) :: t2m_1d, pr_1d, dt_1d, dpr_1d, dt_var_1d, dpr_var_1d
             real(wp) :: to_1d, so_1d, dto_1d, dso_1d, dto_var_1d, dso_var_1d
@@ -591,10 +595,11 @@ contains
             mask_tot = (H_ice > 0.0_wp)
             mask_flt = (H_ice > 0.0_wp .and. f_grnd == 0.0_wp)
             npts_tot = count(mask_tot)
+            with_pr  = allocated(out%now%pr_ann)
 
             if (npts_tot > 0) then
-                t2m_1d     = sum(esm%t2m_ann + sum(esm%dts, dim=3)/12.0_wp,  mask=mask_tot) / npts_tot
-                pr_1d      = sum(sum(esm%pr*esm%dpr, dim=3)/12.0_wp,          mask=mask_tot) / npts_tot
+                t2m_1d     = sum(out%now%ta_ann, mask=mask_tot) / npts_tot
+                if (with_pr) pr_1d = sum(out%now%pr_ann/365.0_wp, mask=mask_tot) / npts_tot
                 dt_1d      = sum(sum(esm%dts, dim=3)/12.0_wp,                 mask=mask_tot) / npts_tot
                 dpr_1d     = sum(100.0_wp * sum(esm%dpr, dim=3)/12.0_wp,      mask=mask_tot) / npts_tot
                 dt_var_1d  = sum(sum(esm%dts_var, dim=3)/12.0_wp,             mask=mask_tot) / npts_tot
@@ -616,6 +621,7 @@ contains
             end associate
 
             call write1D("t2m_1d",     t2m_1d,     "K",      "Mean ice surf. Temp.")
+            if (with_pr) &
             call write1D("pr_1d",      pr_1d,      "mm d-1", "Mean ice surf. Pr.")
             call write1D("dt_1d",      dt_1d,      "K",      "Mean ice surf. Temp. Anomaly")
             call write1D("dpr_1d",     dpr_1d,     "%",      "Mean ice surf. Pr. Anomaly")
