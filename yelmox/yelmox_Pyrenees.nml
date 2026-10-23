@@ -661,7 +661,7 @@
 ! are inert here; use_obs / tf_correction are False so no data files are read.
 &marine_shelf
     bmb_method      = "anom"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 2             ! 0: tf external, 1: T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 2             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp"
     find_ocean      = True          ! Find points connected to open ocean

@@ -515,41 +515,24 @@ contains
                                     mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3, &
                                     T_ref=mshlf%par%T0)
 
-        ! Calculate the thermal forcing, if desired 
-        ! (not used for pico, but good to diagnose anyway and needed for other methods)
+        ! Calculate the thermal forcing
+        ! (not used for pico, but good to diagnose anyway and needed for other methods).
+        ! tf_method and its combination with bmb_method are checked in marshelf_par_load.
         
         select case(mshlf%par%tf_method)
 
-            case(0)
-                ! tf_shlf defined externally, do nothing 
-
             case(1) 
                 ! Determine tf_shlf via T_shlf - T_fp
-
-                ! Consistency check 
-                if (trim(mshlf%par%bmb_method) .eq. "anom") then 
-                    write(error_unit,*) "marshelf_update:: Error: for bmb_method='anom', &
-                    &tf_method=1 cannot be used."
-                    write(error_unit,*) "bmb_method = ", trim(mshlf%par%bmb_method)
-                    write(error_unit,*) "tf_method  = ", mshlf%par%tf_method
-                    stop 
-                end if 
 
                 mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) &
                             + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
             case(2)
-                ! Calculate the thermal forcing specific to the anom method 
-                ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
-                ! Note: for bmb_method='anom', tf_method automatically set to 2. 
+                ! Thermal forcing as the ocean temperature anomaly relative to a
+                ! reference state (tf_shlf == dT_shlf), as bmb_method='anom' needs
+                ! (marshelf_par_load requires tf_method=2 for it)
 
                 mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
-
-            case DEFAULT 
-
-                write(*,*) "marshelf_update:: Error: tf_method not recognized."
-                write(*,*) "tf_method = ", mshlf%par%tf_method 
-                stop 
 
         end select 
         
@@ -644,7 +627,7 @@ contains
                         !where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp
 
                         call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
-                            mshlf%par%gamma_quad_nl,mshlf%par%omega)
+                            gamma2D,mshlf%par%omega)
 
                         ! jalv: beacuse of the previous limitation of tf_basin to 0, do the following line if want to play and allow some accretion
                         ! option 1: simply impose bmb_max where tf_basin is negative (quite brutal)
@@ -664,12 +647,6 @@ contains
                 ! Apply basin correction
                 mshlf%now%bmb_shlf = mshlf%now%bmb_shlf + mshlf%now%bmb_corr
                 
-            case DEFAULT 
-
-                write(*,*) "marshelf_update:: Error: bmb_method not recognized."
-                write(*,*) "bmb_method = ", trim(mshlf%par%bmb_method)
-                stop 
-
         end select 
 
         ! === Apply limitations ====
@@ -993,6 +970,39 @@ contains
             stop 
         end if 
 
+        select case(trim(par%bmb_method))
+            case("pico","lin","quad","quad-nl","lin-slope","quad-slope","quad-nl-slope","anom")
+                ! ok
+            case default
+                write(error_unit,*) "marshelf_par_load:: Error: bmb_method not recognized."
+                write(error_unit,*) "bmb_method = ", trim(par%bmb_method)
+                write(error_unit,*) "Options: pico, lin, quad, quad-nl, lin-slope, quad-slope, quad-nl-slope, anom."
+                error stop 1
+        end select
+
+        select case(par%tf_method)
+            case(1,2)
+                ! ok
+            case(0)
+                ! No external source of thermal forcing is connected: the ocean
+                ! forcing supplies T/S (and their anomalies) only.
+                write(error_unit,*) "marshelf_par_load:: Error: tf_method=0 (thermal forcing &
+                &defined externally) is not available: no external thermal forcing is &
+                &supplied to marine_shelf. Use tf_method=1 (T_shlf-T_fp_shlf) or 2 (dT_shlf)."
+                error stop 1
+            case default
+                write(error_unit,*) "marshelf_par_load:: Error: tf_method must be 1 or 2."
+                write(error_unit,*) "tf_method = ", par%tf_method
+                error stop 1
+        end select
+
+        if (trim(par%bmb_method) .eq. "anom" .and. par%tf_method .ne. 2) then
+            write(error_unit,*) "marshelf_par_load:: Error: bmb_method='anom' needs tf_method=2 &
+            &(thermal forcing as the ocean temperature anomaly dT_shlf)."
+            write(error_unit,*) "tf_method = ", par%tf_method
+            error stop 1
+        end if
+
         if (trim(par%bmb_method) .eq. "pico") then 
             ! pico far-field ocean fields should be interpolated at the ocean bed (z_bed)
             par%interp_depth  = "bed"
@@ -1067,7 +1077,9 @@ contains
 
     subroutine calc_shelf_slope(slope,z_base,dx)
         ! Calculate the slope of the ice shelf base centered on aa-node, 
-        ! where slope = sin(theta) = height/hypotenuse
+        ! slope = sin(theta) = g/sqrt(1+g^2), with g = |grad z_base| the
+        ! gradient magnitude (central differences in the interior, one-sided
+        ! differences at the domain borders)
 
         implicit none 
 
@@ -1077,12 +1089,10 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny, ip1, im1, jp1, jm1 
-        real(wp) :: dz, dx_2, hypot
+        real(wp) :: dzdx, dzdy, g
 
         nx = size(slope,1) 
         ny = size(slope,2) 
-
-        dx_2 = dx*2.0_wp 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -1091,15 +1101,25 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
 
-            ! Get mean vertical change in distance between x and y directions
-            dz =  0.5_wp*(z_base(ip1,j)-z_base(im1,j)) &
-                + 0.5_wp*(z_base(i,jp1)-z_base(i,jm1))
+            ! Gradient components over the available stencil width
+            ! (2dx in the interior, dx at the borders)
+            if (ip1 .gt. im1) then
+                dzdx = (z_base(ip1,j)-z_base(im1,j)) / (real(ip1-im1,wp)*dx)
+            else
+                dzdx = 0.0_wp
+            end if
 
-            ! Get hypotenuse 
-            hypot = sqrt(dz**2 + dx_2**2) 
+            if (jp1 .gt. jm1) then
+                dzdy = (z_base(i,jp1)-z_base(i,jm1)) / (real(jp1-jm1,wp)*dx)
+            else
+                dzdy = 0.0_wp
+            end if
 
-            ! Get slope == sin(theta) magnitude, independent of direction
-            slope(i,j) = abs(dz) / hypot 
+            ! Gradient magnitude, independent of direction
+            g = sqrt(dzdx**2 + dzdy**2)
+
+            ! slope == sin(theta)
+            slope(i,j) = g / sqrt(1.0_wp + g**2)
 
         end do 
         end do
