@@ -78,7 +78,9 @@ contains
         ! the box before it in that basin (Reese et al., 2018), with the
         ! overturning of box 1. Temperature and salinity of a box are
         ! computed per cell, with the cell's pressure (as in PISM), and the
-        ! melt from them.
+        ! melt from them. Partially grounded cells (0 < f_grnd < 1, H_ice > 0)
+        ! get the box-1 melt of their basin (box-1 mean T/S, the cell's
+        ! pressure), for the grounding-line melt of the ice-sheet model.
         !
         ! to, so : box-0 temperature [K] and salinity [PSU]
         ! is_ocn : cells connected to the open ocean (no land, no lakes)
@@ -96,9 +98,10 @@ contains
 
         ! Local variables
         integer  :: m, i, j, k, nx, ny, n_box_basin
-        logical  :: first_box
+        logical  :: first_box, is_box1
         real(wp) :: T_prev, S_prev, CC_basin, T_star, pm_point, bmb_floating
         real(wp), allocatable :: T0(:,:), S0(:,:)
+        real(wp), allocatable :: T1_basin(:,:), S1_basin(:,:)
         logical,  allocatable :: in_box(:,:)
 
         nx = size(f_grnd,1)
@@ -106,6 +109,8 @@ contains
 
         allocate(T0(nx,ny))
         allocate(S0(nx,ny))
+        allocate(T1_basin(nx,ny))
+        allocate(S1_basin(nx,ny))
         allocate(in_box(nx,ny))
 
         ! First, update the geometry 
@@ -128,6 +133,10 @@ contains
         pico%now%S_box = S0
         pico%now%CC    = 0.0_wp
 
+        ! Box-1 mean T/S of each basin; box 0 where a basin has no boxes
+        T1_basin = T0
+        S1_basin = S0
+
         ! 1. Box chain of each basin =====================================
 
         do m = 1, int(maxval(basins))
@@ -147,6 +156,8 @@ contains
 
                 in_box = (basins .eq. m .and. pico%now%boxes .eq. real(k,wp))
                 if (.not. any(in_box)) cycle
+
+                is_box1 = first_box
 
                 if (first_box) then
                     ! Box 1: from the box-0 input, solving for the overturning
@@ -192,6 +203,14 @@ contains
                 T_prev = sum(pico%now%T_box, mask=in_box) / real(count(in_box),wp)
                 S_prev = sum(pico%now%S_box, mask=in_box) / real(count(in_box),wp)
 
+                ! Keep the box-1 means for the partially grounded cells
+                if (is_box1) then
+                    where (basins .eq. m)
+                        T1_basin = T_prev
+                        S1_basin = S_prev
+                    end where
+                end if
+
             end do
 
             where (basins .eq. m) pico%now%CC = CC_basin
@@ -219,8 +238,18 @@ contains
                 ! No accretion allowed in  Box 1
                 if (pico%now%bmb_shlf(i,j) .gt. 0.0 .and. pico%now%boxes(i,j) .eq. 1.0) pico%now%bmb_shlf(i,j) = 0.0
 
+            else if (is_ocn(i,j) .and. f_grnd(i,j) .lt. 1.0 .and. H_ice(i,j) .gt. 0.0) then
+                ! Partially grounded ice connected to the open ocean: the box-1
+                ! melt of the basin at the cell's pressure (no accretion, as in box 1)
+
+                pm_point = calc_theta_pm(S1_basin(i,j),pico%par%a_pico,pico%par%b_pico,pico%par%c_pico, &
+                                         H_ice(i,j),pico%par%rho_ice_g)
+                bmb_floating = calc_melt_rate_pico(T1_basin(i,j),pm_point,pico%par%gamma_tstar, &
+                                                   pico%par%lambda_rho)
+                pico%now%bmb_shlf(i,j) = min(bmb_floating,0.0_wp)
+
             else 
-                ! Grounded or partially grounded point, land, or lake: no shelf melt
+                ! Fully grounded point, land, lake, or ice-free partially grounded point: no shelf melt
 
                 pico%now%bmb_shlf(i,j) = 0.0
                 
