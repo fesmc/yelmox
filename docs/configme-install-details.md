@@ -29,8 +29,9 @@ behalf.
 
 Each run writes the commands it executed to a `.install.sh` script in the
 checkout. The script below is the equivalent for the `dkrz_levante` machine with
-the `ifx` compiler and the v2.4 dependency pins (main until the v2.4 tags are
-set; FastIsostasy on dev); `$YELMOXROOT` stands for the install root.
+the `ifx` compiler and the `stable` dependency pins of main/stable (a tagged
+release, e.g. `configme install yelmox:v2.4`, checks out the dependency tags
+instead); `$YELMOXROOT` stands for the install root.
 
 ```bash
 #!/usr/bin/env bash
@@ -51,23 +52,23 @@ runme config init
 
 # --- clone components ---
 git clone git@github.com:fesmc/insol.git $YELMOXROOT/insol
-(cd $YELMOXROOT/insol && git checkout main)
+(cd $YELMOXROOT/insol && git checkout stable)
 git clone git@github.com:fesmc/fesm-utils.git $YELMOXROOT/fesm-utils
-(cd $YELMOXROOT/fesm-utils && git checkout main)
+(cd $YELMOXROOT/fesm-utils && git checkout stable)
 git clone git@github.com:fesmc/yelmo.git $YELMOXROOT/yelmo
-(cd $YELMOXROOT/yelmo && git checkout main)
+(cd $YELMOXROOT/yelmo && git checkout stable)
 git clone git@github.com:fesmc/FastHydrology.git $YELMOXROOT/yelmo/FastHydrology
-(cd $YELMOXROOT/yelmo/FastHydrology && git checkout main)
+(cd $YELMOXROOT/yelmo/FastHydrology && git checkout stable)
 git clone git@github.com:fesmc/elsa.git $YELMOXROOT/yelmo/elsa
-(cd $YELMOXROOT/yelmo/elsa && git checkout main)
+(cd $YELMOXROOT/yelmo/elsa && git checkout stable)
 git clone git@github.com:fesmc/tracer.git $YELMOXROOT/yelmo/tracer
-(cd $YELMOXROOT/yelmo/tracer && git checkout main)
+(cd $YELMOXROOT/yelmo/tracer && git checkout stable)
 git clone git@github.com:palma-ice/FastIsostasy.git $YELMOXROOT/FastIsostasy
-(cd $YELMOXROOT/FastIsostasy && git checkout dev)
+(cd $YELMOXROOT/FastIsostasy && git checkout stable)
 git clone git@github.com:alex-robinson/rembo1.git $YELMOXROOT/rembo1
-(cd $YELMOXROOT/rembo1 && git checkout main)
+(cd $YELMOXROOT/rembo1 && git checkout stable)
 git clone git@github.com:fesmc/chion.git $YELMOXROOT/chion
-(cd $YELMOXROOT/chion && git checkout main)
+(cd $YELMOXROOT/chion && git checkout stable)
 
 # --- manifest ---
 mkdir -p $YELMOXROOT/.configme  # write .configme/manifest.toml

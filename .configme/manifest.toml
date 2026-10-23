@@ -1,12 +1,12 @@
 # configme manifest for yelmox.
-# v2.4 pins: main until the v2.4 tags of each dependency are set (FastIsostasy
-# stays on dev for now; chion and insol have no dev branch).
+# Pins: stable (== main) for every dependency; a tagged release pins the
+# dependency tags.
 package = "yelmox"
 deps = [
-    "fesm-utils:main",
-    "yelmo:main",
-    "FastIsostasy:dev",
-    "rembo1:main",
-    "chion:main",
-    "insol:main",
+    "fesm-utils:stable",
+    "yelmo:stable",
+    "FastIsostasy:stable",
+    "rembo1:stable",
+    "chion:stable",
+    "insol:stable",
 ]

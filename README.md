@@ -14,6 +14,8 @@ See the [YelmoX documentation](https://fesmc.github.io/yelmox/) for installation
 > [rembo1](https://github.com/alex-robinson/rembo1),
 > [chion](https://github.com/fesmc/chion) (surface mass balance) and
 > [insol](https://github.com/fesmc/insol) (insolation). The versions are pinned in
-> `.configme/manifest.toml`, which `configme install yelmox` follows; the v2.4
-> release pins the v2.4 tag of each. All libraries must be built against the same
+> `.configme/manifest.toml`: on main/stable the `stable` branch of each
+> dependency, at a tagged release the dependency tags. Install either the latest
+> stable versions (`configme install yelmox`) or a fixed tagged release
+> (`configme install yelmox:v2.4`). All libraries must be built against the same
 > fesm-utils.
