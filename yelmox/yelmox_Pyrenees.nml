@@ -661,7 +661,7 @@
 ! are inert here; use_obs / tf_correction are False so no data files are read.
 &marine_shelf
     bmb_method      = "anom"        ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 2             ! 0: tf external, 1: T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 2             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp"
     find_ocean      = True          ! Find points connected to open ocean
@@ -670,7 +670,7 @@
     basins          = "domain"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "none"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "all"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there
     corr_method     = "none"  ! none, tf or bmb: corrections by region
     corr_names      = ""
     corr_values     = 0.0

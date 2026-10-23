@@ -11,42 +11,11 @@ module obm_defs
     type obm_param_class 
         ! Box volume
         real(preci) :: vol_n   ! North box
-        real(preci) :: vol_nd  ! North (deep) box
         real(preci) :: vol_t   ! Tropical box
         real(preci) :: vol_td  ! Tropical (deep) box
         real(preci) :: vol_s   ! South box
-        real(preci) :: vol_sd  ! South (deep) box
 
-        ! Box reference temperature
-        real(preci) :: t_ref_n   
-        real(preci) :: t_ref_nd  
-        real(preci) :: t_ref_t   
-        real(preci) :: t_ref_td  
-        real(preci) :: t_ref_s   
-        real(preci) :: t_ref_sd  
-
-        ! Atmosphere temperatures
-        real(preci) :: t_atm_n   
-        real(preci) :: t_atm_t  
-        real(preci) :: t_atm_s 
-
-        ! Box relaxation time scale
-        real(preci) :: tau_n   
-        real(preci) :: tau_nd  
-        real(preci) :: tau_t   
-        real(preci) :: tau_td  
-        real(preci) :: tau_s   
-        real(preci) :: tau_sd  
-        
-        ! Box salinities
-        real(preci) :: s_tot   ! [psu] Total mean salinity of North and South box 
-        
-        ! Other
-        real(preci) :: alpha   ! [g/K??]
-        real(preci) :: beta    ! [psu/K??]
-        real(preci) :: mu      ! [?]
-
-        ! Nautilus specific parameters
+        ! Nautilus parameters
         real(preci) :: specific_heat_capacity
         real(preci) :: density_of_seawater
         real(preci) :: therm_exp_coeff
@@ -70,7 +39,6 @@ module obm_defs
         real(preci) :: depth_t
         real(preci) :: depth_td
 
-        real(preci) :: m_init 
         real(preci) :: tn_init
         real(preci) :: tt_init
         real(preci) :: ttd_init
@@ -96,15 +64,15 @@ module obm_defs
     type obm_class
         type(obm_param_class) :: par 
 
-        real(preci) :: tn,tt,ts ! Box temperatures (surface)
-        real(preci) :: tnd,ttd,tsd ! Box temperatures (deep)
-        real(preci) :: sn,st,ss ! Box salinities (surface)
-        real(preci) :: snd,std,ssd ! Box salinities (deep)
-        real(preci) :: m    ! thc
-        real(preci) :: fn,ft,fs ! external fluxes
-        real(preci) :: phin,phit  ! atmospheric humidity fluxes between boxes
-        real(preci) :: thetan,thetat,thetas ! Atmospheric temperatures
-        real(preci) :: lambdan,lambdand,lambdat,lambdatd,lambdas,lambdasd   ! thermal coupling constants
+        real(preci) :: tn,tt,ts ! Box temperatures (surface) [degC]
+        real(preci) :: ttd      ! Box temperature (tropical deep) [degC]
+        real(preci) :: sn,st,ss ! Box salinities (surface) [psu]
+        real(preci) :: std      ! Box salinity (tropical deep) [psu]
+        real(preci) :: m        ! thc [m3/yr]
+        real(preci) :: fn,ft,fs ! external fluxes [Sv]
+        real(preci) :: phin,phit  ! atmospheric humidity fluxes between boxes [Sv]
+        real(preci) :: thetan,thetat,thetas ! Atmospheric temperatures [degC]
+        real(preci) :: lambdan,lambdat,lambdatd,lambdas   ! thermal coupling constants
 
     end type
 

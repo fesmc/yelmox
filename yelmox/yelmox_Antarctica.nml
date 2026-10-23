@@ -703,7 +703,7 @@
 
 &marine_shelf
     bmb_method      = "quad-nl"     ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 1             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 1             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -713,29 +713,15 @@
     basins          = "Zwally2012"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "region:Antarctica & zone:shelf_break_buffer"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there, e.g. "region:Antarctica & zone:shelf_break_buffer"
     corr_method     = "tf"  ! none, tf or bmb: corrections by region
     corr_names      = "b1" "b12" "b14" "b15"
     corr_values     = 0.3 0.3 -1.5 0.0
     ! corr_b<k>: Zwally2012 basin k (1 Ronne, 12 Ross, 14 Pine Island, 15 Abbott)
     corr_b1 = "Zwally2012:1"
-    corr_b2 = "Zwally2012:2"
-    corr_b3 = "Zwally2012:3"
-    corr_b4 = "Zwally2012:4"
-    corr_b5 = "Zwally2012:5"
-    corr_b6 = "Zwally2012:6"
-    corr_b7 = "Zwally2012:7"
-    corr_b8 = "Zwally2012:8"
-    corr_b9 = "Zwally2012:9"
-    corr_b10 = "Zwally2012:10"
-    corr_b11 = "Zwally2012:11"
     corr_b12 = "Zwally2012:12"
-    corr_b13 = "Zwally2012:13"
     corr_b14 = "Zwally2012:14"
     corr_b15 = "Zwally2012:15"
-    corr_b16 = "Zwally2012:16"
-    corr_b17 = "Zwally2012:17"
-    corr_b18 = "Zwally2012:18"
     
     tf_correction   = False        ! no grid-specific tf file: mshlf runs from the remapped climate forcing
     tf_path         = "ice_data/{domain}/{grid_name}/{grid_name}_OCEAN_ISMIP6_J20.nc"
@@ -776,8 +762,11 @@
     
 /
 
+! PICO box model (Reese et al., 2018), read only with bmb_method = "pico".
+! Not used or calibrated in the shipped configurations: the parameters are
+! the published defaults.
 &pico
-    n_box          = 5.0        ! Maximum number of boxes in PICO.  
+    n_box          = 5.0        ! Maximum number of boxes per basin
     a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.
     b_pico         = 0.0788     ! Constant coefficient of freezing equation [ºC]. Reese et al., (2018) suggest 0.0788.
     c_pico         = 7.77e-8    ! Pressure coefficient of freezing equation [ºC/Pa]. Reese et al., (2018) suggest 7.77e-8.

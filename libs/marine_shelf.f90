@@ -93,14 +93,12 @@ module marine_shelf
         real(wp) :: omega      =    1.346120e-2_wp ! [1/K] (rho_sw*cp_ocn)/(rho_ice*L_ice)
         real(wp) :: T0         =  273.15_wp  ! [K]   reference freezing temp
 
-        ! Internal parameter
-        logical :: use_restart
-
     end type 
 
     type marshelf_grid_class
-        real(wp), allocatable :: xc(:)
-        real(wp), allocatable :: yc(:)
+        real(wp), allocatable :: xc(:)          ! x-axis [xy_units]
+        real(wp), allocatable :: yc(:)          ! y-axis [xy_units]
+        character(len=16)     :: xy_units       ! "km", or "1" for cell indices
         integer :: nx 
         integer :: ny
     end type
@@ -129,7 +127,7 @@ module marine_shelf
         real(wp), allocatable :: tf_corr(:,:)           ! Thermal correction at the ice-shelf interface by data (ismip6)
         real(wp), allocatable :: tf_corr_basin(:,:)     ! Thermal correction at the ice-shelf interface by basin
         
-        real(wp), allocatable :: z_base(:,:)            ! Ice-shelf base elevation (relative to sea level)
+        real(wp), allocatable :: z_base(:,:)            ! [m] Ice-base elevation relative to the datum (present-day sea level; bed where grounded)
         real(wp), allocatable :: slope_base(:,:)        ! Ice-shelf base slope (slope=sin(theta)=length/hypotenuse)
 
         integer,  allocatable :: mask_ocn_ref(:,:) 
@@ -147,11 +145,6 @@ module marine_shelf
         type(pico_class)           :: pico  
     end type
 
-    interface marshelf_update_shelf
-        module procedure marshelf_update_shelf_2D
-        module procedure marshelf_update_shelf_3D
-    end interface
-
     private
     public :: marshelf_class
     public :: marshelf_update_shelf
@@ -165,53 +158,7 @@ module marine_shelf
 
 contains 
     
-    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
-                                                depth,to_ann,so_ann,dto_ann,tf_ann)
-        ! Calculate various 2D fields from 3D ocean fields representative 
-        ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
-
-        implicit none 
-
-        type(marshelf_class), intent(INOUT) :: mshlf
-        real(wp), intent(IN) :: H_ice(:,:) 
-        real(wp), intent(IN) :: z_bed(:,:) 
-        real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: z_sl(:,:)
-        real(wp), intent(IN) :: dx
-        real(wp), intent(IN), optional :: depth(:)
-        real(wp), intent(IN) :: to_ann(:,:)
-        real(wp), intent(IN) :: so_ann(:,:)
-        real(wp), intent(IN) :: dto_ann(:,:)
-        real(wp), intent(IN), optional :: tf_ann(:,:)
-
-        ! Local variables
-        integer :: i, j, nx, ny 
-
-        nx = size(H_ice,1) 
-        ny = size(H_ice,2) 
-
-        ! Loop over domain and update variables at each point (simply set value at each point)
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! 1. Set water properties ============================
-
-            mshlf%now%T_shlf(i,j)  = to_ann(i,j) 
-            mshlf%now%S_shlf(i,j)  = so_ann(i,j) 
-            mshlf%now%dT_shlf(i,j) = dto_ann(i,j)
-
-            if (present(tf_ann)) then 
-                mshlf%now%tf_shlf(i,j) = tf_ann(i,j)
-            end if 
-
-        end do 
-        end do  
-
-        return 
-
-    end subroutine marshelf_update_shelf_2D
-
-    subroutine marshelf_update_shelf_3D(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
+    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
                                     depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
@@ -275,7 +222,7 @@ contains
 
                 case DEFAULT
 
-                    write(*,*) "marshelf_update_shelf_3D:: Error: interp_depth method not recognized."
+                    write(*,*) "marshelf_update_shelf:: Error: interp_depth method not recognized."
                     write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
 
             end select
@@ -311,7 +258,7 @@ contains
             if (sum(wt_shlf) .gt. 0.0_wp) then 
                 wt_shlf = wt_shlf / sum(wt_shlf) 
             else 
-                write(*,*) "marshelf_update_shelf_3D:: Error: weighting should be > 0."
+                write(*,*) "marshelf_update_shelf:: Error: weighting should be > 0."
                 stop 
             end if 
 
@@ -330,7 +277,7 @@ contains
         
         return 
 
-    end subroutine marshelf_update_shelf_3D
+    end subroutine marshelf_update_shelf
 
     subroutine marshelf_interp_shelf(out2D,mshlf,in3d,H_ice,z_bed,f_grnd,z_sl,depth)
         ! Calculate 2D fields from 3D ocean fields representative
@@ -459,16 +406,14 @@ contains
         real(wp), intent(IN), optional :: z_srf(:,:)
 
         ! Local variables
-        integer :: i, j, nx, ny, ngr 
+        integer :: i, j, nx, ny 
 
-        logical,  allocatable :: is_grline(:,:)   
         real(wp), allocatable :: gamma2D(:,:)
         logical :: with_slope 
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
-        allocate(is_grline(nx,ny))
         allocate(gamma2D(nx,ny))
 
         ! Step 1: calculate geometry ===========================
@@ -509,46 +454,30 @@ contains
 
         ! 2. Calculate various fields of interest ============================
 
-        ! Calculate ocean water freezing point [K]
-        call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base, &
+        ! Calculate ocean water freezing point [K], at the depth of the ice
+        ! base below the current sea level
+        call calc_freezing_point(mshlf%now%T_fp_shlf,mshlf%now%S_shlf,mshlf%now%z_base-z_sl, &
                                     mshlf%par%lambda1,mshlf%par%lambda2,mshlf%par%lambda3, &
                                     T_ref=mshlf%par%T0)
 
-        ! Calculate the thermal forcing, if desired 
-        ! (not used for pico, but good to diagnose anyway and needed for other methods)
+        ! Calculate the thermal forcing
+        ! (not used for pico, but good to diagnose anyway and needed for other methods).
+        ! tf_method and its combination with bmb_method are checked in marshelf_par_load.
         
         select case(mshlf%par%tf_method)
 
-            case(0)
-                ! tf_shlf defined externally, do nothing 
-
             case(1) 
                 ! Determine tf_shlf via T_shlf - T_fp
-
-                ! Consistency check 
-                if (trim(mshlf%par%bmb_method) .eq. "anom") then 
-                    write(error_unit,*) "marshelf_update:: Error: for bmb_method='anom', &
-                    &tf_method=1 cannot be used."
-                    write(error_unit,*) "bmb_method = ", trim(mshlf%par%bmb_method)
-                    write(error_unit,*) "tf_method  = ", mshlf%par%tf_method
-                    stop 
-                end if 
 
                 mshlf%now%tf_shlf = (mshlf%now%T_shlf - mshlf%now%T_fp_shlf) &
                             + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
 
             case(2)
-                ! Calculate the thermal forcing specific to the anom method 
-                ! (assume that tf_shlf == dT_shlf == temp anomaly relative to a reference state)
-                ! Note: for bmb_method='anom', tf_method automatically set to 2. 
+                ! Thermal forcing as the ocean temperature anomaly relative to a
+                ! reference state (tf_shlf == dT_shlf), as bmb_method='anom' needs
+                ! (marshelf_par_load requires tf_method=2 for it)
 
                 mshlf%now%tf_shlf = mshlf%now%dT_shlf + mshlf%now%tf_corr + mshlf%now%tf_corr_basin
-
-            case DEFAULT 
-
-                write(*,*) "marshelf_update:: Error: tf_method not recognized."
-                write(*,*) "tf_method = ", mshlf%par%tf_method 
-                stop 
 
         end select 
         
@@ -574,8 +503,11 @@ contains
                 call calc_variable_basin_pico(mshlf%now%S_shlf_basin,mshlf%now%S_shlf, &
                                                         f_grnd,mshlf%now%basins,H_ice,mshlf%now%mask_ocn)
 
+                ! pico works on the cells connected to the open ocean (no land, no lakes)
                 call pico_update(mshlf%pico,mshlf%now%T_shlf_basin,mshlf%now%S_shlf_basin, &
-                                    H_ice,z_bed,f_grnd,z_sl,mshlf%now%basins,mshlf%now%mask_ocn,dx)
+                                    H_ice,f_grnd,mshlf%now%basins, &
+                                    (mshlf%now%mask_ocn .ne. mask_val_land .and. &
+                                     mshlf%now%mask_ocn .ne. mask_val_lake),dx)
 
                 mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
 
@@ -643,7 +575,7 @@ contains
                         !where(mshlf%now%tf_basin .lt. 0.0_wp) mshlf%now%tf_basin = 0.0_wp
 
                         call calc_bmb_quad_nl(mshlf%now%bmb_shlf,mshlf%now%tf_shlf,mshlf%now%tf_basin, &
-                            mshlf%par%gamma_quad_nl,mshlf%par%omega)
+                            gamma2D,mshlf%par%omega)
 
                         ! jalv: beacuse of the previous limitation of tf_basin to 0, do the following line if want to play and allow some accretion
                         ! option 1: simply impose bmb_max where tf_basin is negative (quite brutal)
@@ -663,12 +595,6 @@ contains
                 ! Apply basin correction
                 mshlf%now%bmb_shlf = mshlf%now%bmb_shlf + mshlf%now%bmb_corr
                 
-            case DEFAULT 
-
-                write(*,*) "marshelf_update:: Error: bmb_method not recognized."
-                write(*,*) "bmb_method = ", trim(mshlf%par%bmb_method)
-                stop 
-
         end select 
 
         ! === Apply limitations ====
@@ -693,18 +619,17 @@ contains
                                             mshlf%now%bmb_shlf = 0.0 
         
         ! Apply c_deep melt value to deep ocean points
-        ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
-        ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
-        ! high melt rates. 
-        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl,n_smth=0) 
+        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl) 
 
         return
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,reg,xc,yc,dx,cnst)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,reg,xc,yc,cnst)
         ! reg: the regions on the shelf grid, from which the masks, basins and
         ! corrections of the parameters (selection expressions) are made here.
+        ! xc, yc: the grid axes [km], written to the output; without them the
+        ! output axes are the cell indices.
 
         implicit none 
 
@@ -715,14 +640,12 @@ contains
         character(len=*), intent(IN)      :: domain
         character(len=*), intent(IN)      :: grid_name
         type(regions_class), intent(IN)   :: reg
-        real(wp), intent(IN), optional    :: xc(:)
-        real(wp), intent(IN), optional    :: yc(:)
-        real(wp), intent(IN), optional    :: dx 
+        real(wp), intent(IN), optional    :: xc(:)   ! [km]
+        real(wp), intent(IN), optional    :: yc(:)   ! [km]
         type(phys_const_class), intent(IN), optional :: cnst
 
         ! Local variables
-        integer  :: k
-        real(wp) :: grd_dx 
+        integer  :: i, k
         real(wp), parameter :: mv = -9999.0_wp   ! missing value marker
 
         ! Load parameters
@@ -748,22 +671,24 @@ contains
         allocate(mshlf%grd%xc(nx))
         allocate(mshlf%grd%yc(ny))
         
-        if (present(dx)) then
-            grd_dx = dx
-        else
-            grd_dx = 1.0
-        end if
-        
-        if (present(xc)) then
-            mshlf%grd%xc = xc
-        else
-            call axis_init(mshlf%grd%xc,x0=0.0_wp,dx=grd_dx)
+        if (present(xc) .neqv. present(yc)) then
+            write(error_unit,*) "marshelf_init:: Error: give both xc and yc, or neither."
+            error stop 1
         end if
 
-        if (present(yc)) then
-            mshlf%grd%yc = yc
+        if (present(xc)) then
+            if (size(xc) .ne. nx .or. size(yc) .ne. ny) then
+                write(error_unit,*) "marshelf_init:: Error: xc, yc do not match the grid size."
+                write(error_unit,*) "nx, ny = ", nx, ny, "; size(xc), size(yc) = ", size(xc), size(yc)
+                error stop 1
+            end if
+            mshlf%grd%xc       = xc
+            mshlf%grd%yc       = yc
+            mshlf%grd%xy_units = "km"
         else
-            call axis_init(mshlf%grd%yc,x0=0.0_wp,dx=grd_dx)
+            mshlf%grd%xc       = [(real(i,wp), i = 1, nx)]
+            mshlf%grd%yc       = [(real(i,wp), i = 1, ny)]
+            mshlf%grd%xy_units = "1"
         end if
         
         ! Allocate the object
@@ -836,9 +761,10 @@ contains
 
         if (trim(mshlf%par%bmb_method) .eq. "pico") then 
 
-            ! Initialize pico too 
+            ! Initialize pico too, from the group with the suffix of this
+            ! one (marine_shelf_south -> pico_south)
 
-            call pico_init(mshlf%pico,filename,nx,ny,domain,cnst=cnst)
+            call pico_init(mshlf%pico,filename,trim(pico_group(group)),nx,ny,domain,cnst=cnst)
 
         end if
 
@@ -868,10 +794,6 @@ contains
 
             call marshelf_restart_read(mshlf,mshlf%par%restart)
             
-            mshlf%par%use_restart = .TRUE.
-        
-        else
-            mshlf%par%use_restart = .FALSE.
         end if
 
         ! ============================================================
@@ -880,6 +802,27 @@ contains
         return 
 
     end subroutine marshelf_init
+
+    function pico_group(group) result(grp)
+        ! The pico par-file group that goes with the marine_shelf group:
+        ! "marine_shelf<sfx>" -> "pico<sfx>"; "pico" for any other name.
+
+        implicit none
+
+        character(len=*), intent(IN) :: group
+        character(len=len_trim(group)+4) :: grp
+
+        character(len=*), parameter :: base = "marine_shelf"
+
+        if (index(group,base) .eq. 1) then
+            grp = "pico"//group(len(base)+1:len_trim(group))
+        else
+            grp = "pico"
+        end if
+
+        return
+
+    end function pico_group
 
     subroutine marshelf_end(mshlf)
 
@@ -906,7 +849,7 @@ contains
 
         character(len=56) :: names(n_corr_max)
         real(wp)          :: values(n_corr_max)
-        integer           :: n, k
+        integer           :: n, n_val, k
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
@@ -927,13 +870,27 @@ contains
         ! Corrections by region: corr_names, corr_values and one expression
         ! corr_<name> per name
         call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
+        ! (values: a marker for the entries not given, to count them)
         names  = ""
-        values = 0.0_wp
+        values = huge(1.0_wp)
         call nml_read(filename,group,"corr_names",     names,              init=init_pars)
         call nml_read(filename,group,"corr_values",    values,             init=init_pars)
-        n = count(len_trim(names) .gt. 0)
+        n     = count(len_trim(names) .gt. 0)
+        n_val = count(values .ne. huge(1.0_wp))
+        ! One value per name, in the same order. Without names (corr_names = "")
+        ! corr_values is a placeholder and not checked.
+        if (n .gt. 0) then
+            if (n_val .ne. n .or. any(len_trim(names(1:n)) .eq. 0) &
+                             .or. any(values(1:n) .eq. huge(1.0_wp))) then
+                write(error_unit,*) "marshelf_par_load:: Error: corr_names and corr_values must &
+                &have the same number of entries."
+                write(error_unit,*) "group = ", trim(group)
+                write(error_unit,*) "n(corr_names) = ", n, ", n(corr_values) = ", n_val
+                error stop 1
+            end if
+        end if
         allocate(par%corr_names(n), par%corr_exprs(n), par%corr_values(n))
-        par%corr_names  = pack(names, len_trim(names) .gt. 0)
+        par%corr_names  = names(1:n)
         par%corr_values = values(1:n)
         do k = 1, n
             call nml_read(filename,group,"corr_"//trim(par%corr_names(k)),par%corr_exprs(k),init=init_pars)
@@ -992,6 +949,39 @@ contains
             stop 
         end if 
 
+        select case(trim(par%bmb_method))
+            case("pico","lin","quad","quad-nl","lin-slope","quad-slope","quad-nl-slope","anom")
+                ! ok
+            case default
+                write(error_unit,*) "marshelf_par_load:: Error: bmb_method not recognized."
+                write(error_unit,*) "bmb_method = ", trim(par%bmb_method)
+                write(error_unit,*) "Options: pico, lin, quad, quad-nl, lin-slope, quad-slope, quad-nl-slope, anom."
+                error stop 1
+        end select
+
+        select case(par%tf_method)
+            case(1,2)
+                ! ok
+            case(0)
+                ! No external source of thermal forcing is connected: the ocean
+                ! forcing supplies T/S (and their anomalies) only.
+                write(error_unit,*) "marshelf_par_load:: Error: tf_method=0 (thermal forcing &
+                &defined externally) is not available: no external thermal forcing is &
+                &supplied to marine_shelf. Use tf_method=1 (T_shlf-T_fp_shlf) or 2 (dT_shlf)."
+                error stop 1
+            case default
+                write(error_unit,*) "marshelf_par_load:: Error: tf_method must be 1 or 2."
+                write(error_unit,*) "tf_method = ", par%tf_method
+                error stop 1
+        end select
+
+        if (trim(par%bmb_method) .eq. "anom" .and. par%tf_method .ne. 2) then
+            write(error_unit,*) "marshelf_par_load:: Error: bmb_method='anom' needs tf_method=2 &
+            &(thermal forcing as the ocean temperature anomaly dT_shlf)."
+            write(error_unit,*) "tf_method = ", par%tf_method
+            error stop 1
+        end if
+
         if (trim(par%bmb_method) .eq. "pico") then 
             ! pico far-field ocean fields should be interpolated at the ocean bed (z_bed)
             par%interp_depth  = "bed"
@@ -1002,63 +992,19 @@ contains
 
     end subroutine marshelf_par_load
 
-    subroutine apply_c_deep(par,bmb,mask_ocn,z_bed,z_sl,n_smth)
-        ! Apply c_deep for killing ice in the deep ocean 
+    subroutine apply_c_deep(par,bmb,mask_ocn,z_bed,z_sl)
+        ! Apply c_deep for killing ice in the deep ocean: bmb = c_deep at
+        ! deep-ocean points deeper than depth_deep
         
         implicit none 
 
-        type(marshelf_param_class) :: par 
+        type(marshelf_param_class), intent(IN) :: par 
         real(wp), intent(INOUT)    :: bmb(:,:)  
         integer,  intent(IN)       :: mask_ocn(:,:) 
         real(wp), intent(IN)       :: z_bed(:,:) 
         real(wp), intent(IN)       :: z_sl(:,:)
-        integer,  intent(IN)       :: n_smth       ! Smoothing neighborhood radius in grid points
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(wp) :: n_pts 
-        logical,    allocatable :: is_c_deep(:,:) 
-        real(wp), allocatable :: bmb_tmp(:,:) 
-
-        nx = size(bmb,1)
-        ny = size(bmb,2) 
-
-        allocate(is_c_deep(nx,ny))
-        allocate(bmb_tmp(nx,ny))
-
-        if (n_smth .lt. 0 .or. n_smth .gt. 2) then 
-            write(*,*) "apply_c_deep:: Error: n_smth should be 0, 1, or 2."
-            write(*,*) "n_smth = ", n_smth 
-            stop 
-        end if 
-
-        ! Apply c_deep to appropriate regions or keep bmb, whichever is more negative
 
         where(mask_ocn .eq. mask_val_deep_ocean .and. z_sl-z_bed .ge. par%depth_deep) bmb = par%c_deep 
-
-        ! Make sure bmb transitions smoothly to c_deep value from neighbors 
-        
-        if (n_smth .gt. 0) then 
-            
-            ! Get size of neighborhood
-            n_pts = real( (2*n_smth+1)**2, wp) 
-
-            bmb_tmp = bmb 
-            do i = 1+n_smth, nx-n_smth
-            do j = 1+n_smth, ny-n_smth 
-
-                ! Apply a neighborhood average value, if deep ocean is in neighborhood of shallow ocean
-                if (is_c_deep(i,j) .and. &
-                    count(.not. is_c_deep(i-n_smth:i+n_smth,j-n_smth:j+n_smth)) .gt. 0) then
-
-                    bmb(i,j) = sum(bmb_tmp(i-n_smth:i+n_smth,j-n_smth:j+n_smth))/n_pts
-
-                end if 
-
-            end do 
-            end do 
-
-        end if 
 
         return 
 
@@ -1066,7 +1012,9 @@ contains
 
     subroutine calc_shelf_slope(slope,z_base,dx)
         ! Calculate the slope of the ice shelf base centered on aa-node, 
-        ! where slope = sin(theta) = height/hypotenuse
+        ! slope = sin(theta) = g/sqrt(1+g^2), with g = |grad z_base| the
+        ! gradient magnitude (central differences in the interior, one-sided
+        ! differences at the domain borders)
 
         implicit none 
 
@@ -1076,12 +1024,10 @@ contains
 
         ! Local variables 
         integer :: i, j, nx, ny, ip1, im1, jp1, jm1 
-        real(wp) :: dz, dx_2, hypot
+        real(wp) :: dzdx, dzdy, g
 
         nx = size(slope,1) 
         ny = size(slope,2) 
-
-        dx_2 = dx*2.0_wp 
 
         do j = 1, ny 
         do i = 1, nx 
@@ -1090,15 +1036,25 @@ contains
             jm1 = max(j-1,1)
             jp1 = min(j+1,ny)
 
-            ! Get mean vertical change in distance between x and y directions
-            dz =  0.5_wp*(z_base(ip1,j)-z_base(im1,j)) &
-                + 0.5_wp*(z_base(i,jp1)-z_base(i,jm1))
+            ! Gradient components over the available stencil width
+            ! (2dx in the interior, dx at the borders)
+            if (ip1 .gt. im1) then
+                dzdx = (z_base(ip1,j)-z_base(im1,j)) / (real(ip1-im1,wp)*dx)
+            else
+                dzdx = 0.0_wp
+            end if
 
-            ! Get hypotenuse 
-            hypot = sqrt(dz**2 + dx_2**2) 
+            if (jp1 .gt. jm1) then
+                dzdy = (z_base(i,jp1)-z_base(i,jm1)) / (real(jp1-jm1,wp)*dx)
+            else
+                dzdy = 0.0_wp
+            end if
 
-            ! Get slope == sin(theta) magnitude, independent of direction
-            slope(i,j) = abs(dz) / hypot 
+            ! Gradient magnitude, independent of direction
+            g = sqrt(dzdx**2 + dzdy**2)
+
+            ! slope == sin(theta)
+            slope(i,j) = g / sqrt(1.0_wp + g**2)
 
         end do 
         end do
@@ -1113,7 +1069,8 @@ contains
         ! 1: Grounding line (grounded side, including partially floating points)
         ! 2: Floating line  (first fully floating points adjacent to grounding line)
         ! 3: Open ocean 
-        ! 4: Lakes 
+        ! 4: Deep ocean (from mask_ocn_ref)
+        ! 5: Lakes (with find_ocean: floating points not connected to the open ocean)
 
         implicit none
 
@@ -1520,22 +1477,23 @@ contains
 
     end subroutine calc_shelf_variable_depth
 
-    elemental subroutine calc_freezing_point(to_fp,so,z_base,lambda1,lambda2,lambda3,T_ref)
+    elemental subroutine calc_freezing_point(to_fp,so,z_ice_sl,lambda1,lambda2,lambda3,T_ref)
         ! Calculate the water freezing point following 
         ! Favier et al (2019), Eq. 3
-        ! z_base is ice-base elevation, which is negative below sea level
+        ! z_ice_sl is the ice-base elevation relative to the current sea
+        ! level (z_base - z_sl), negative below the sea surface
 
         implicit none 
 
         real(wp), intent(OUT) :: to_fp
         real(wp), intent(IN)  :: so 
-        real(wp), intent(IN)  :: z_base 
+        real(wp), intent(IN)  :: z_ice_sl 
         real(wp), intent(IN)  :: lambda1 
         real(wp), intent(IN)  :: lambda2 
         real(wp), intent(IN)  :: lambda3 
         real(wp), intent(IN)  :: T_ref 
 
-        to_fp = lambda1*so + lambda2 + lambda3*z_base + T_ref 
+        to_fp = lambda1*so + lambda2 + lambda3*z_ice_sl + T_ref 
 
         return 
 
@@ -1710,13 +1668,12 @@ contains
 
                 var_mean = 0.0_wp
 
-                write(*,*) "Warning:: calc_variable_basin_pico:: no ice free points &
-                &available in this basin for calculating the basin-wide mean."
+                write(*,*) "Warning:: calc_variable_basin_pico:: no ice-free ocean points &
+                &(f_grnd=0, H_ice=0) available in this basin for calculating the basin-wide mean."
                 write(*,*) "basin = ", m
-                write(*,*) "n_flt = ", count(basins .eq. m .and. &
-                            (f_grnd .lt. 1.0 .and. H_ice .gt. 0.0) )
-                write(*,*) "n_ice = ", count(basins .eq. m .and. &
-                            (H_ice .gt. 0.0) )
+                write(*,*) "n_pts (basin)           = ", count(basins .eq. m)
+                write(*,*) "n_ocn (f_grnd=0)        = ", count(basins .eq. m .and. f_grnd .eq. 0.0)
+                write(*,*) "n_ice (H_ice>0)         = ", count(basins .eq. m .and. H_ice .gt. 0.0)
             end if
 
             ! Assign bedrock value to all points in the basin
@@ -1800,7 +1757,8 @@ contains
         now%z_base          = 0.0 
         now%slope_base      = 0.0 
         
-        ! By default set ocean points everywhere
+        ! Placeholder values (1 = grounding line): mask_ocn_ref is set by
+        ! marshelf_init, mask_ocn by marshelf_update
         now%mask_ocn_ref    = 1
         now%mask_ocn        = 1
 
@@ -1890,8 +1848,8 @@ contains
             call nc_write_attr(filename, "grid_name", trim(mshlf%par%grid_name))
 
             ! Add grid axis variables to netcdf file
-            call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
-            call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
+            call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2),units=trim(mshlf%grd%xy_units))
+            call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2),units=trim(mshlf%grd%xy_units))
             call nc_write_dim(filename,"month", x=1,dx=1,nx=12,       units="month")            
             call nc_write_dim(filename,"time",  x=time,dx=1.0_dp,nx=1,units="years",unlimited=.TRUE.)
 
@@ -1923,35 +1881,35 @@ contains
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"bmb_corr",mshlf%now%bmb_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="1", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="1", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="1", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
 
         ! Close the netcdf file
@@ -2111,71 +2069,7 @@ contains
 
     end subroutine parse_path
     
-    function interp_linear(x,y,xout) result(yout)
-        ! Simple linear interpolation of a point
-
-        implicit none 
- 
-        real(wp), dimension(:), intent(IN) :: x, y
-        real(wp), intent(IN) :: xout
-        real(wp) :: yout 
-        integer :: i, j, n, nout 
-        real(wp) :: alph
-
-        n    = size(x) 
-
-        if (xout .lt. x(1)) then
-            yout = y(1)
-        else if (xout .gt. x(n)) then
-            yout = y(n)
-        else
-            do j = 1, n 
-                if (x(j) .ge. xout) exit 
-            end do
-
-            if (j .eq. 1) then 
-                yout = y(1) 
-            else if (j .eq. n+1) then 
-                yout = y(n)
-            else 
-                alph = (xout - x(j-1)) / (x(j) - x(j-1))
-                yout = y(j-1) + alph*(y(j) - y(j-1))
-            end if 
-        end if 
-
-        return 
-
-    end function interp_linear
     
-    subroutine axis_init(x,x0,dx)
-
-        implicit none 
-
-        real(wp) :: x(:)
-        real(wp), optional :: x0, dx
-        real(wp) :: dx_tmp 
-        integer :: i, nx  
-
-        nx = size(x) 
-
-        do i = 1, nx 
-            x(i) = real(i-1,wp)
-        end do 
-
-        dx_tmp = 1.d0 
-        if (present(dx)) dx_tmp = dx 
-        
-        x = x*dx_tmp  
-
-        if (present(x0)) then 
-            x = x + x0 
-        else
-            x = x + (-(nx-1.0)/2.0*dx_tmp)
-        end if 
-
-        return 
-    end subroutine axis_init
-
     subroutine ocn_variable_extrapolation(var, H_ice, basin_mask, depth, z_bed)
 
         ! First we convert to mv (missing values) the regions where there is ice or no ocean data information.
@@ -2281,57 +2175,5 @@ contains
         return
     
     end subroutine ocn_variable_extrapolation
-
-    subroutine fill_missing_2d(var, mv)
-        ! Fill any remaining missing values in a 2D field
-        ! by iteratively averaging surrounding valid points
-        
-        implicit none
-        
-        real(wp), intent(INOUT) :: var(:,:)
-        real(wp), intent(IN)    :: mv
-        
-        ! Local variables
-        integer  :: i, j, nx, ny
-        real(wp) :: tmp_sum, tmp_count
-        logical  :: mv_found
-        
-        nx = size(var, 1)
-        ny = size(var, 2)
-        
-        mv_found = .TRUE.
-        do while (mv_found)
-            mv_found = .FALSE.
-            do j = 2, ny-1
-            do i = 2, nx-1
-                if (var(i,j) .lt. (mv + 100.0_wp)) then
-                    mv_found = .TRUE.
-                    tmp_sum   = 0.0_wp
-                    tmp_count = 0.0_wp
-                    if (var(i+1,j) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i+1,j)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (var(i-1,j) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i-1,j)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (var(i,j+1) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i,j+1)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (var(i,j-1) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i,j-1)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (tmp_count .gt. 0.0_wp) var(i,j) = tmp_sum / tmp_count
-                end if
-            end do
-            end do
-        end do
-        
-        return
-        
-    end subroutine fill_missing_2d
 
 end module marine_shelf

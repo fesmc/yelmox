@@ -14,7 +14,7 @@ contains
 
 function obm_temperature_kelvin(obm_temp, name) result(t_K)
     ! A box-model ocean temperature in K, the unit of the ice-sheet ocean
-    ! forcing: nautilus works in degC, stommel in K.
+    ! forcing: nautilus works in degC.
     implicit none
     real(wp),         intent(in) :: obm_temp
     character(len=*), intent(in) :: name
@@ -22,8 +22,6 @@ function obm_temperature_kelvin(obm_temp, name) result(t_K)
     real(wp), parameter :: deg2kelvin = 273.15
 
     select case(trim(name))
-        case("stommel")
-            t_K = obm_temp
         case("nautilus")
             t_K = obm_temp + deg2kelvin
         case DEFAULT

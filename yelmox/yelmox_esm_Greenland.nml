@@ -709,7 +709,7 @@
 
 &marine_shelf
     bmb_method      = "anom" ! "pico", "anom", "lin", "quad", "quad-nl", "*-slope"
-    tf_method       = 2             ! 0: tf defined externally, 1: calculate as T_shlf-t_fp_shlf, 2: use dT_shlf
+    tf_method       = 2             ! 1: T_shlf-T_fp_shlf, 2: dT_shlf (needed by bmb_method="anom")
     interp_depth    = "shlf"        ! "shlf", "bed", "const"
     interp_method   = "interp"      ! "mean", "layer", "interp" ! Same method is used for salinity
     find_ocean      = True          ! Find which points are connected to open ocean (ie, ignore subglacial lakes)
@@ -719,7 +719,7 @@
     basins          = "ismip7"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "~region:Greenland | zone:open_ocean"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "none"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there
     corr_method     = "none"  ! none, tf or bmb: corrections by region
     corr_names      = ""
     corr_values     = 0.0
@@ -763,6 +763,9 @@
 
 /
 
+! PICO box model (Reese et al., 2018), read only with bmb_method = "pico".
+! Not used or calibrated in the shipped configurations: the parameters are
+! the published defaults.
 &pico
     n_box          = 5.0        ! Maximum number of boxes in PICO.
     a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.

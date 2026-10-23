@@ -4,7 +4,6 @@ module obm
     use nml 
     use obm_defs
     use nautilus
-    use stommel    
 
     implicit none 
 
@@ -35,18 +34,12 @@ contains
         character(len=512):: path_par, name
         character(len=*), intent(in) :: restart
 
-        select case(name)
-            case("stommel")
-                if (trim(restart) /= "None") then
-                    write(*,*) "obm_init:: error: the stommel OBM has no restart support; &
-                               &got restart = "//trim(restart)
-                    stop 1
-                end if
-                call stommel_init(obm_object, path_par, name)
+        select case(trim(name))
             case("nautilus")
                 call nautilus_init(obm_object, path_par, name, restart)
             case DEFAULT
-                ! do nothing
+                write(*,*) "obm_init:: error: unknown ocean box model '"//trim(name)//"' (options: nautilus)."
+                error stop 1
         end select
 
         return
@@ -59,13 +52,12 @@ contains
         character(len=512):: name
         real(wp) :: dt
 
-        select case(name)
-            case("stommel")
-                call stommel_update(obm_object, dt)
+        select case(trim(name))
             case("nautilus")
                 call nautilus_update(obm_object, dt)
             case DEFAULT
-                ! do nothing
+                write(*,*) "obm_update:: error: unknown ocean box model '"//trim(name)//"' (options: nautilus)."
+                error stop 1
         end select
 
         return
@@ -98,13 +90,13 @@ contains
         integer    :: ncid, n
         real(dp) :: t_prev 
 
-        select case(name)
-                case("stommel")
-                        factor = 1
+        select case(trim(name))
                 case("nautilus")
+                        ! overturning m in m3/yr -> Sv
                         factor = 365*24*60*60 * 1e6
                 case DEFAULT
-                        factor = 1
+                        write(*,*) "write_obm_update:: error: unknown ocean box model '"//trim(name)//"' (options: nautilus)."
+                        error stop 1
         end select
 
         ! Open the file for writing
@@ -148,11 +140,11 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"phit",obm_object%phit, units="Sv",long_name="Freshwater transport from southern to tropical box", &
                 dim1="time",start=[n],ncid=ncid) 
-        call nc_write(filename,"thetan",obm_object%thetan,units="K",long_name="North Atlantic box air temperature", &
+        call nc_write(filename,"thetan",obm_object%thetan,units="degC",long_name="North Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"thetat",obm_object%thetat,units="K",long_name="Tropical Atlantic box air temperature", &
+        call nc_write(filename,"thetat",obm_object%thetat,units="degC",long_name="Tropical Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid) 
-        call nc_write(filename,"thetas",obm_object%thetas,units="K",long_name="South Atlantic box air temperature", &
+        call nc_write(filename,"thetas",obm_object%thetas,units="degC",long_name="South Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid) 
 
         ! Close the netcdf file
@@ -179,7 +171,7 @@ contains
         initialize_file = .TRUE. 
         if (present(init)) initialize_file = init
 
-        ! Write all stommel data to file, so that it can be
+        ! Write all box-model data to file, so that it can be
         ! read later to restart a simulation.
         
         ! == Initialize netcdf file ==============================================
@@ -227,7 +219,7 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"ss",obm_object%ss,units="psu",long_name="South Atlantic box salinity", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"m",obm_object%m,units="Sv",long_name="Thermo Haline Circulation", &
+        call nc_write(filename,"m",obm_object%m,units="m3/yr",long_name="Thermo Haline Circulation", &
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"fn",obm_object%fn,units="Sv",long_name="(external) North Atlantic box fresh water flux", &
                 dim1="time",start=[n],ncid=ncid)
@@ -239,11 +231,11 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"phit",obm_object%phit,units="Sv",long_name="Freshwater transport from southern to tropical box", &
                 dim1="time",start=[n],ncid=ncid) 
-        call nc_write(filename,"thetan",obm_object%thetan,units="K",long_name="North Atlantic box air temperature", &
+        call nc_write(filename,"thetan",obm_object%thetan,units="degC",long_name="North Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"thetat",obm_object%thetat,units="K",long_name="Tropical Atlantic box air temperature", &
+        call nc_write(filename,"thetat",obm_object%thetat,units="degC",long_name="Tropical Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"thetas",obm_object%thetas,units="K",long_name="South Atlantic box air temperature", &
+        call nc_write(filename,"thetas",obm_object%thetas,units="degC",long_name="South Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
                 
         ! Close the netcdf file
