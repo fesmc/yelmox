@@ -16,3 +16,6 @@
 | 12 | hyd_C_frz         | xc, yc            | m/s          | Freeze-on capacity at the bed (ice equivalent)           | 1e-4r |
 | 13 | hyd_Q_diss        | xc, yc            | W/m^2        | Heat dissipated by basal water flow                      | 1e-4r |
 | 14 | hyd_Q_sens        | xc, yc            | W/m^2        | Sensible heat of basal water flow                        | 1e-4r |
+| 15 | hyd_diss_face     | xc, yc            | kg/m^2/s     | K24 face-assembled dissipation (Picard warm-start state) | 1e-4r |
+| 16 | hyd_k24_abs_g     | xc, yc            | -            | K24 routing-potential gradient of the last update        | 1e-4r |
+| 17 | hyd_k24_phi0      | xc, yc            | Pa           | K24 geometric potential of the last update               | 1e-4r |

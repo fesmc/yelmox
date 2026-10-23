@@ -36,7 +36,7 @@
     log_timestep    = False 
     log_mb_check    = False             ! Print global mass-budget check (residual) every timestep
     disable_kill    = False             ! Disable automatic kill if unstable
-    zeta_scale      = "exp"             ! "linear", "exp", "tanh"
+    zeta_scale      = "exp"             ! "linear", "exp", "tanh", "exp-inv"
     zeta_exp        = 2.0  
     nz_aa           = 10                ! Vertical resolution in ice
     dt_method       = 2                 ! 0: no internal timestep, 1: adaptive, cfl, 2: adaptive, pc
@@ -80,8 +80,9 @@
     gl_sep              = 1                 ! 1: binary f_grnd, linear f_grnd_acx/acy; 3: grounded area of H_grnd bilinear between cell centres (Leguy et al., 2021)
     gz_nx               = 15                ! [-] Subgrid points per side (gz_nx*gz_nx) of the grounding-zone melt, bmb_gl_method = "pmpt"
 
+    dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz), defines mask_grz
+
     ! bmb_gl_method = pmpt
-    dist_grz            = 200.0             ! [km] Radius to consider part of "grounding-line zone" (grz)
     gz_Hg0              = 0.0               ! Grounding zone, limit of penetration of bmb_grnd 
     gz_Hg1              = 0.0               ! Grounding zone, limit of penetration of bmb_shlf 
     
@@ -286,7 +287,6 @@
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
@@ -335,7 +335,6 @@
     method          = "enth"            ! "enth","temp","robin","robin-cold","linear","fixed"
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     advecxy_order   = 2                 ! Horizontal advection order: 1=upwind, 2=flux-limited 2nd-order upwind
     advecxy_cfl     = 0.5               ! [--] Target Courant number per horizontal-advection sub-step (CFL_safe)
     advecxy_nmax    = 10                ! [--] Max horizontal-advection sub-steps (safety cap; warns if hit)

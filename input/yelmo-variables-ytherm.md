@@ -10,17 +10,16 @@
 |  6 | f_pmp             | xc, yc            | -                 | Fraction of cell at pressure melting point                        | 1e-4  |
 |  7 | bmb_grnd          | xc, yc            | m/yr              | Grounded basal mass balance                                       | 1e-4  |
 |  8 | Q_strn            | xc, yc, zeta      | J yr^-1 m^-3      | Internal strain heat production                                   | 1e-4r |
-|  9 | dQsdT             | xc, yc, zeta      | yr^-1             | Change of internal heat production w.r.t. T                       | 1e-4r |
-| 10 | Q_b               | xc, yc            | mW m^-2           | Basal friction heat production                                    | 1e-4r |
-| 11 | Q_ice_b           | xc, yc            | mW m^-2           | Basal ice heat flux                                               | 1e-4r |
-| 12 | T_prime_b         | xc, yc            | K                 | Homologous temperature at the base                                | 1e-3  |
-| 13 | cp                | xc, yc, zeta      | J kg^-1 K^-1      | Specific heat capacity                                            | 1e-4r |
-| 14 | kt                | xc, yc, zeta      | J yr^-1 m^-1 K^-1 | Heat conductivity                                                 | 1e-4r |
-| 15 | H_cts             | xc, yc            | m                 | Height of the CTS (cold-temperate surface)                        | 1e-3  |
-| 16 | advecxy           | xc, yc, zeta      | J kg^-1 yr^-1     | Horizontal advection of enth (of T_ice in K yr^-1 if method=temp) | 1e-4r |
-| 17 | Q_rock            | xc, yc            | mW m^-2           | Heat flux from bedrock                                            | 1e-4r |
-| 18 | T_rock            | xc, yc, zeta_rock | K                 | Bedrock temperature                                               | 1e-3  |
-| 19 | bmb_grnd_star     | xc, yc            | m/yr              | Grounded bmb of a base held at T_pmp (capacity rule)              | 1e-4  |
-| 20 | bc_b              | xc, yc            | -                 | Basal BC used: 0 none, 1 held at T_pmp, 2 flux                    | -     |
-| 21 | bmb_clamp         | xc, yc            | m/yr              | Freeze-on removed by the capacity clamp                           | 1e-4  |
-| 22 | melt_int          | xc, yc            | m/yr              | Englacial water drained to the bed                                | 1e-4  |
+|  9 | Q_b               | xc, yc            | mW m^-2           | Basal friction heat production                                    | 1e-4r |
+| 10 | Q_ice_b           | xc, yc            | mW m^-2           | Basal ice heat flux                                               | 1e-4r |
+| 11 | T_prime_b         | xc, yc            | K                 | Homologous temperature at the base                                | 1e-3  |
+| 12 | cp                | xc, yc, zeta      | J kg^-1 K^-1      | Specific heat capacity                                            | 1e-4r |
+| 13 | kt                | xc, yc, zeta      | J yr^-1 m^-1 K^-1 | Heat conductivity                                                 | 1e-4r |
+| 14 | H_cts             | xc, yc            | m                 | Height of the CTS (cold-temperate surface)                        | 1e-3  |
+| 15 | advecxy           | xc, yc, zeta      | J kg^-1 yr^-1     | Horizontal advection of enth (of T_ice in K yr^-1 if method=temp) | 1e-4r |
+| 16 | Q_rock            | xc, yc            | mW m^-2           | Heat flux from bedrock                                            | 1e-4r |
+| 17 | T_rock            | xc, yc, zeta_rock | K                 | Bedrock temperature                                               | 1e-3  |
+| 18 | bmb_grnd_star     | xc, yc            | m/yr              | Grounded bmb of a base held at T_pmp (capacity rule)              | 1e-4  |
+| 19 | bc_b              | xc, yc            | -                 | Basal BC used: 0 none, 1 held at T_pmp, 2 flux                    | -     |
+| 20 | bmb_clamp         | xc, yc            | m/yr              | Freeze-on removed by the capacity clamp                           | 1e-4  |
+| 21 | melt_int          | xc, yc            | m/yr              | Englacial water drained to the bed                                | 1e-4  |
