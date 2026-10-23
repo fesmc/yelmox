@@ -22,11 +22,9 @@ module sediments
         integer            :: method
         character(len=512) :: obs_path
         character(len=56)  :: obs_name 
-        real(wp)           :: sed_limit
     end type 
 
     type sediments_state_class
-        real(wp), allocatable :: cb(:,:)        ! [deg] Till strength
         real(wp), allocatable :: H(:,:)         ! [m] Sediment thickness
     end type 
 
@@ -38,8 +36,6 @@ module sediments
     private
     public :: sediments_class
     public :: sediments_init 
-    public :: sediments_update
-    public :: sediments_end 
 
 contains 
 
@@ -137,36 +133,6 @@ contains
     end subroutine sediments_init
 
 
-    subroutine sediments_update(sed,year_bp)
-
-        implicit none 
-
-        type(sediments_class) :: sed 
-
-        real(dp) :: year_bp 
-
-        ! === To do ====
-
-
-        return 
-
-    end subroutine sediments_update
-
-
-    subroutine sediments_end(sed)
-
-        implicit none 
-
-        type(sediments_class) :: sed
-
-        ! Deallocate sediments state object
-        call sediments_deallocate(sed%now)
-
-        return 
-
-    end subroutine sediments_end
-
-
     subroutine sediments_par_load(par,filename,domain,grid_name,init,group)
 
         type(sediments_param_class), intent(OUT) :: par
@@ -187,7 +153,7 @@ contains
         end if
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE. 
+        if (present(init)) init_pars = init
         
         call nml_read(filename,nml_group,"method",     par%method,      init=init_pars)
         call nml_read(filename,nml_group,"obs_path",   par%obs_path,    init=init_pars)

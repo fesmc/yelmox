@@ -13,7 +13,6 @@
     implicit none 
 
     integer, parameter :: ndays = 360   ! 360-day year
-    integer, parameter :: ndays_mon = 30   ! 30 days per month  
 
     ! itm: daily forcing interpolated from the monthly fields at ndays_daily
     ! days, snowpack budget every dt_itm days, annual PDDs from every dt_pdd days
@@ -30,6 +29,7 @@
         real(prec) :: sigma_snow, sigma_melt, sigma_land
         real(prec) :: sf_a, sf_b, firn_fac  
         real(prec) :: mm_snow, mm_ice 
+        real(prec) :: time_equil                ! [yr] cold-start snowpack spin-up (itm)
 
         real(prec), allocatable :: x(:), y(:)
         real(prec), allocatable :: lats(:,:)           ! Latitude of domain [deg N]
@@ -63,7 +63,7 @@
 
     type smbpal_class
         type(smbpal_param_class) :: par 
-        type(smbpal_state_class) :: now, mon(12), ann
+        type(smbpal_state_class) :: now, ann
         type(smbpal_insol_class) :: ins
     end type
 
@@ -95,11 +95,9 @@
     
     private
     public :: smbpal_class
-    public :: smbpal_init 
-    public :: smbpal_update_2temp, smbpal_update_monthly 
+    public :: smbpal_init
+    public :: smbpal_update_monthly
     public :: smbpal_update_monthly_equil
-    public :: smbpal_end
-    public :: smbpal_write_init, smbpal_write
     public :: smbpal_restart_write, smbpal_restart_read
 
 contains 
@@ -114,7 +112,7 @@ contains
         character(len=*),  intent(IN), optional :: group, itm_group, orbit_group
 
         ! Local variables
-        integer :: nx, ny, m  
+        integer :: nx, ny
         character(len=32) :: nml_group, itm_nml_group, orbit_nml_group
 
         ! Make sure we know the namelist group for the smbpal block
@@ -158,10 +156,6 @@ contains
         ! Allocate the smbpal object 
         call smbpal_allocate(smb%now,nx,ny)
         call smbpal_allocate(smb%ann,nx,ny)
-    
-        do m = 1, 12 
-            call smbpal_allocate(smb%mon(m),nx,ny)
-        end do 
 
         ! Initialize the state variables 
         smb%now%H_snow = smb%par%itm%H_snow_max 
@@ -178,53 +172,9 @@ contains
 
     end subroutine smbpal_init
 
-    subroutine smbpal_update_2temp(smb,t2m_ann,t2m_sum,pr_ann,z_srf,H_ice,time_bp,sf_ann, &
-                                   file_out,file_out_mon,write_init,calc_mon,write_now)
-        ! Generate climate using two points in year (Tsum,Tann)
-
-        implicit none 
-        
-        type(smbpal_class), intent(INOUT) :: smb
-        real(prec), intent(IN) :: t2m_ann(:,:), t2m_sum(:,:)
-        real(prec), intent(IN) ::  pr_ann(:,:), z_srf(:,:), H_ice(:,:)
-        real(dp),   intent(IN) :: time_bp       ! [yr] model time (relative to 1950, past < 0), for the orbit 
-        real(prec), intent(IN), optional :: sf_ann(:,:)
-        character(len=*), intent(IN), optional :: file_out      ! Annual output
-        character(len=*), intent(IN), optional :: file_out_mon  ! Monthly output
-        logical, intent(IN), optional :: write_init, calc_mon, write_now
-
-        ! Local variables
-        real(prec), allocatable :: t2m(:,:,:), pr(:,:,:), sf(:,:,:) 
-        integer :: day, m
-        real(prec) :: dt 
-
-        allocate(t2m(size(t2m_ann,1),size(t2m_ann,2),12))
-        allocate( pr(size(t2m_ann,1),size(t2m_ann,2),12))
-        allocate( sf(size(t2m_ann,1),size(t2m_ann,2),12))
-        
-        do m = 1, 12
-            ! Determine t2m, pr, sf and S today 
-            day = m*30
-            t2m(:,:,m) = t2m_ann-(t2m_sum-t2m_ann)*cos(2.0*pi*real(day-15)/real(ndays))
-        
-            pr(:,:,m)  = pr_ann
-            if (present(sf_ann)) then 
-                sf(:,:,m) = sf_ann
-            else 
-                sf(:,:,m) = pr(:,:,m) * calc_snowfrac(t2m(:,:,m),smb%par%sf_a,smb%par%sf_b)
-            end if 
-
-        end do  
-
-        ! Call monthly interface
-        call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf, &
-                        file_out,file_out_mon,write_init,calc_mon,write_now)
-        return 
-
-    end subroutine smbpal_update_2temp
-
-    subroutine smbpal_update_monthly_equil(smb,t2m,pr,z_srf,H_ice,time_bp,time_equil,sf)
-        ! Generate climate using monthly input data [nx,ny,nmon]
+    subroutine smbpal_update_monthly_equil(smb,t2m,pr,z_srf,H_ice,time_bp)
+        ! Cold-start snowpack: par%time_equil years under the monthly
+        ! climate [nx,ny,nmon] and geometry
         
         implicit none 
         
@@ -232,8 +182,6 @@ contains
         real(prec), intent(IN) :: t2m(:,:,:), pr(:,:,:)
         real(prec), intent(IN) ::  z_srf(:,:), H_ice(:,:)
         real(dp),   intent(IN) :: time_bp       ! [yr] model time (relative to 1950, past < 0), for the orbit 
-        real(prec), intent(IN) :: time_equil    ! years to equilibrate
-        real(prec), intent(IN), optional :: sf(:,:,:)
 
         ! Local variables
         integer :: n 
@@ -243,13 +191,13 @@ contains
         if (trim(smb%par%abl_method) .eq. "itm") then 
             ! The daily forcing is the same every year: prepare it once
             call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
-            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,sf)
-            do n = 1, int(time_equil) 
-                call smbpal_update_itm(smb,frc,z_srf,H_ice,calc_monthly=.FALSE.)
-            end do 
+            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr)
+            do n = 1, int(smb%par%time_equil)
+                call smbpal_update_itm(smb,frc,z_srf,H_ice)
+            end do
         else 
-            do n = 1, int(time_equil) 
-                call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf)
+            do n = 1, int(smb%par%time_equil) 
+                call smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp)
             end do 
         end if 
 
@@ -258,67 +206,34 @@ contains
     end subroutine smbpal_update_monthly_equil
 
 
-    subroutine smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp,sf, &
-                        file_out,file_out_mon,write_init,calc_mon,write_now)
+    subroutine smbpal_update_monthly(smb,t2m,pr,z_srf,H_ice,time_bp)
         ! Generate climate using monthly input data [nx,ny,nmon]
-        
-        implicit none 
-        
+
+        implicit none
+
         type(smbpal_class), intent(INOUT) :: smb
         real(prec),         intent(IN) :: t2m(:,:,:)                ! [K] Monthly temperature fields
-        real(prec),         intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
-        real(prec),         intent(IN) :: z_srf(:,:)                ! [m] Surface elevation 
-        real(prec),         intent(IN) :: H_ice(:,:)                ! [m] Ice thickness 
-        real(dp),           intent(IN) :: time_bp                   ! [yr] Model time (relative to 1950, past < 0), for the orbit 
-        real(prec),         intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
-        character(len=*),   intent(IN), optional :: file_out        ! Annual output filename
-        character(len=*),   intent(IN), optional :: file_out_mon    ! Monthly output filename
-        logical,            intent(IN), optional :: write_init      ! Flag for whether to initialize writing of output file
-        logical,            intent(IN), optional :: calc_mon        ! Flag for whether to calculate monthly averages (itm only)
-        logical,            intent(IN), optional :: write_now       ! Flag for whether to write the current time to file
+        real(prec),         intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields
+        real(prec),         intent(IN) :: z_srf(:,:)                ! [m] Surface elevation
+        real(prec),         intent(IN) :: H_ice(:,:)                ! [m] Ice thickness
+        real(dp),           intent(IN) :: time_bp                   ! [yr] Model time (relative to 1950, past < 0), for the orbit
 
         ! Local variables
-        logical :: init_now, write_out_now
-        logical :: calc_monthly, init_mon, write_mon
-        integer :: k, m 
-        type(smbpal_itm_forcing_class) :: frc 
-        
+        integer :: k
+        type(smbpal_itm_forcing_class) :: frc
+
         real(prec), allocatable :: tmp4(:,:)
-        real(prec), allocatable :: t2m_ann(:,:), pr_ann(:,:), sf_ann(:,:) 
-        real(prec), allocatable :: PDDs_ann(:,:) 
-
-        write_out_now = .FALSE. 
-        if (present(write_now) .and. present(file_out)) write_out_now = write_now 
-
-        ! Determine whether this is first time running (for output)
-        init_now = .FALSE. 
-        if (write_out_now .and. present(write_init)) init_now = write_init 
+        real(prec), allocatable :: t2m_ann(:,:), pr_ann(:,:), sf_ann(:,:)
+        real(prec), allocatable :: PDDs_ann(:,:)
 
         allocate(tmp4(size(t2m,1),size(t2m,2)))
 
-        if (trim(smb%par%abl_method) .eq. "itm") then 
-            
-            calc_monthly = .FALSE. 
-            if (present(calc_mon))     calc_monthly = calc_mon 
-            if (present(file_out_mon)) calc_monthly = .TRUE. 
+        if (trim(smb%par%abl_method) .eq. "itm") then
 
             ! Generate daily climate from monthly input and run the year
             call smbpal_insol_update(smb%ins,orbit_pars_now(smb%par%orbit,smb%ins%is,time_bp))
-            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr,sf)
-            call smbpal_update_itm(smb,frc,z_srf,H_ice,calc_monthly)
-
-            ! Monthly I/O 
-            write_mon = .FALSE. 
-            if (present(write_now)) write_mon = write_now 
-            init_mon = .FALSE. 
-            if (present(write_init)) init_mon = write_init 
-
-            if (write_mon .and. calc_monthly .and. present(file_out_mon)) then
-                if (init_mon) call smbpal_write_init(smb%par,file_out_mon,z_srf,H_ice)
-                do m = 1, 12
-                    call smbpal_write(smb%mon(m),file_out_mon,time_bp=time_bp,step="mon",nstep=m)
-                end do 
-            end if 
+            call smbpal_itm_forcing_init(frc,smb%par,t2m,pr)
+            call smbpal_update_itm(smb,frc,z_srf,H_ice)
 
         else
             ! PDD method 
@@ -331,11 +246,7 @@ contains
             t2m_ann = sum(t2m,dim=3) / 12.0 
             pr_ann  = sum(pr, dim=3) / 12.0 *real(ndays,prec)       ! [mm we/d] => [mm we/a]
 
-            if (present(sf)) then 
-                sf_ann  = sum(sf,dim=3) / 12.0 *real(ndays,prec)    ! [mm we/d] => [mm we/a]
-            else 
-                sf_ann  = pr_ann    ! Should be improved in the future 
-            end if 
+            sf_ann  = sum(calc_snowfall(smb%par,t2m,pr),dim=3) / 12.0 *real(ndays,prec)   ! [mm we/d] => [mm we/a]
 
             ! First calculate PDDs for the whole year (input to pdd)
             PDDs_ann = 0.0 
@@ -358,16 +269,9 @@ contains
 
             ! Note: annual values are output with units of [mm/a]
 
-        end if 
-        
-        ! Annual I/O 
-        if (write_out_now) then
-            if (init_now) call smbpal_write_init(smb%par,file_out,z_srf,H_ice)
-            call smbpal_write(smb%ann,file_out,time_bp=time_bp,step="ann")
+        end if
 
-        end if 
-
-        return 
+        return
 
     end subroutine smbpal_update_monthly
 
@@ -406,7 +310,7 @@ contains
 
     end subroutine smbpal_insol_update
 
-    subroutine smbpal_itm_forcing_init(frc,par,t2m,pr,sf)
+    subroutine smbpal_itm_forcing_init(frc,par,t2m,pr)
         ! Daily forcing of one itm year: the monthly fields interpolated to
         ! the forcing days. It depends only on the climate, so it is shared
         ! by all grid points and years.
@@ -417,7 +321,6 @@ contains
         type(smbpal_param_class),       intent(IN)  :: par 
         real(prec), intent(IN) :: t2m(:,:,:)                ! [K] Monthly temperature fields
         real(prec), intent(IN) :: pr(:,:,:)                 ! [mm we/d] Monthly precipitation rate fields 
-        real(prec), intent(IN), optional :: sf(:,:,:)       ! [mm we/d] Monthly snowfall rate fields 
 
         ! Local variables
         integer :: nx, ny, k, n 
@@ -451,55 +354,42 @@ contains
         call convert_monthly_daily_3D(dble(pr),tmp,days=frc%days)
         frc%pr = tmp 
 
-        if (present(sf)) then 
-            call convert_monthly_daily_3D(dble(sf),tmp,days=frc%days)
-            frc%sf = tmp 
-            where(frc%sf .lt. 0.0) frc%sf = 0.0 
-        else 
-            do k = 1, ndays_daily 
-                frc%sf(:,:,k) = frc%pr(:,:,k) * calc_snowfrac(frc%t2m(:,:,k),par%sf_a,par%sf_b)
-            end do 
-        end if 
+        ! Snowfall from the daily temperature and precipitation
+        frc%sf = calc_snowfall(par,frc%t2m,frc%pr)
 
         return 
 
     end subroutine smbpal_itm_forcing_init
 
-    subroutine smbpal_update_itm(smb,frc,z_srf,H_ice,calc_monthly)
+    subroutine smbpal_update_itm(smb,frc,z_srf,H_ice)
         ! One itm year from the daily forcing frc. Grid points are
         ! independent, so the year is integrated point by point in parallel.
 
-        implicit none 
-        
+        implicit none
+
         type(smbpal_class),             intent(INOUT) :: smb
-        type(smbpal_itm_forcing_class), intent(IN)    :: frc 
+        type(smbpal_itm_forcing_class), intent(IN)    :: frc
         real(prec),                     intent(IN)    :: z_srf(:,:), H_ice(:,:)
-        logical,                        intent(IN)    :: calc_monthly
 
         ! Local variables
-        integer :: i, j, m, nx, ny 
-        type(smbpal_point_class) :: now, ann, mon(12)
+        integer :: i, j, nx, ny
+        type(smbpal_point_class) :: now, ann
 
         nx = size(z_srf,1)
         ny = size(z_srf,2)
 
-        !$omp parallel do collapse(2) private(i,j,m,now,ann,mon)
-        do j = 1, ny 
-        do i = 1, nx 
-            
+        !$omp parallel do collapse(2) private(i,j,now,ann)
+        do j = 1, ny
+        do i = 1, nx
+
             now = smbpal_point_get(smb%now,i,j)
 
-            call smbpal_itm_point(now,ann,mon,smb%par,frc,smb%ins%S(:,i,j),i,j,z_srf(i,j),H_ice(i,j),calc_monthly)
+            call smbpal_itm_point(now,ann,smb%par,frc,smb%ins%S(:,i,j),i,j,z_srf(i,j),H_ice(i,j))
 
             call smbpal_point_set(smb%now,i,j,now)
             call smbpal_point_set(smb%ann,i,j,ann)
-            if (calc_monthly) then 
-                do m = 1, 12 
-                    call smbpal_point_set(smb%mon(m),i,j,mon(m))
-                end do 
-            end if 
 
-        end do 
+        end do
         end do 
         !$omp end parallel do
 
@@ -507,25 +397,22 @@ contains
 
     end subroutine smbpal_update_itm
 
-    subroutine smbpal_itm_point(now,ann,mon,par,frc,S,i,j,z_srf,H_ice,calc_monthly)
+    subroutine smbpal_itm_point(now,ann,par,frc,S,i,j,z_srf,H_ice)
         ! One itm year at grid point (i,j): the annual PDDs, then the
-        ! snowpack budget every dt_itm days, averaged over the year
-        ! (and the months, if calc_monthly). 
+        ! snowpack budget every dt_itm days, averaged over the year.
 
-        implicit none 
+        implicit none
 
         type(smbpal_point_class),       intent(INOUT) :: now        ! State, carried between years
         type(smbpal_point_class),       intent(INOUT) :: ann        ! Annual mean
-        type(smbpal_point_class),       intent(INOUT) :: mon(12)    ! Monthly means (if calc_monthly)
-        type(smbpal_param_class),       intent(IN)    :: par 
-        type(smbpal_itm_forcing_class), intent(IN)    :: frc 
+        type(smbpal_param_class),       intent(IN)    :: par
+        type(smbpal_itm_forcing_class), intent(IN)    :: frc
         real(prec),                     intent(IN)    :: S(nstep_itm)   ! [W/m2] TOA insolation of each itm step
-        integer,                        intent(IN)    :: i, j 
-        real(prec),                     intent(IN)    :: z_srf, H_ice 
-        logical,                        intent(IN)    :: calc_monthly
+        integer,                        intent(IN)    :: i, j
+        real(prec),                     intent(IN)    :: z_srf, H_ice
 
         ! Local variables
-        integer :: n, day, k1, mnow, mday 
+        integer :: n, day, k1
         real(prec) :: dt    ! [days]
         real(prec) :: teff 
         
@@ -544,14 +431,10 @@ contains
             now%PDDs = now%PDDs + teff*real(dt_pdd,prec)
         end do 
 
-        ! Initialize averaging 
+        ! Initialize averaging
         ann = smbpal_point_class()
-        if (calc_monthly) mon = smbpal_point_class()
 
-        mnow = 1 
-        mday = 0 
-
-        do n = 1, nstep_itm 
+        do n = 1, nstep_itm
 
             ! Determine t2m, pr, sf and S today 
             day = 1 + (n-1)*dt_itm
@@ -567,21 +450,10 @@ contains
                                            now%pr,now%sf,now%H_snow,now%alb_s,now%smbi, &
                                            now%smb,now%melt,now%runoff,now%refrz,now%melt_net)
 
-            ! Sum for averages 
-            ann = ann + now 
+            ! Sum for averages
+            ann = ann + now
 
-            if (calc_monthly) then 
-                mon(mnow) = mon(mnow) + now 
-
-                mday = mday + dt_itm 
-                if (mday .eq. ndays_mon) then 
-                    mon(mnow) = mon(mnow) / (real(ndays_mon)/dt)
-                    mnow = mnow + 1
-                    mday = 0 
-                end if 
-            end if 
-    
-        end do 
+        end do
 
         ! Finalize annual average 
         ann = ann / (real(ndays)/dt)
@@ -622,10 +494,6 @@ contains
         ann%pr   = pr_ann 
         ann%sf   = sf_ann
 
-        write(*,*) "smbpal_update_pdd"
-        write(*,*) "sf:  ", minval(ann%sf), maxval(ann%sf)
-        write(*,*) "t2m: ", minval(ann%t2m), maxval(ann%t2m)
-        
         ! Get ablation, runoff and refreezing [mm/a]
         call calc_ablation_pdd(ann%melt,ann%runoff,ann%refrz,ann%PDDs,ann%sf, &
                                 par%mm_snow,par%mm_ice,par%itm%Pmaxfrac)
@@ -647,31 +515,15 @@ contains
 
     end subroutine smbpal_update_pdd
 
-    subroutine smbpal_end(smbpal)
-
-        implicit none 
-
-        type(smbpal_class) :: smbpal 
-
-        ! Deallocate smbpal state object
-        call smbpal_deallocate(smbpal%now)
-	
-        return 
-
-    end subroutine smbpal_end
-
-! "Fix TSURF calculations!!!" 
-
     subroutine smbpal_par_load(par,filename,init,group,itm_group)
 
         type(smbpal_param_class)     :: par
-        character(len=*), intent(IN) :: filename 
-        logical, optional :: init 
-        logical :: init_pars 
+        character(len=*), intent(IN) :: filename
+        logical, optional :: init
+        logical :: init_pars
         character(len=*),  intent(IN), optional :: group, itm_group
 
-        ! Local variables 
-        integer :: file_unit 
+        ! Local variables
         character(len=32) :: nml_group, itm_nml_group
 
         ! Make sure we know the namelist group for the smbpal block
@@ -689,7 +541,7 @@ contains
         end if
 
         init_pars = .FALSE.
-        if (present(init)) init_pars = .TRUE.
+        if (present(init)) init_pars = init
 
         call nml_read(filename,nml_group,"abl_method",par%abl_method,init=init_pars)
         call nml_read(filename,nml_group,"sigma_snow",par%sigma_snow,init=init_pars)
@@ -700,54 +552,10 @@ contains
         call nml_read(filename,nml_group,"firn_fac",par%firn_fac,init=init_pars)
         call nml_read(filename,nml_group,"mm_snow",par%mm_snow,init=init_pars)
         call nml_read(filename,nml_group,"mm_ice",par%mm_ice,init=init_pars)
+        call nml_read(filename,nml_group,"time_equil",par%time_equil,init=init_pars)
 
         ! Also load itm parameters
-        call itm_par_load(par%itm,filename,init=init,group=itm_nml_group)
-
-        ! Local parameter definitions (identical to object)
-        ! character(len=16)  :: abl_method
-        ! real(prec)         :: sigma_snow, sigma_melt, sigma_land
-        ! real(prec)         :: sf_a, sf_b, firn_fac 
-        ! real(prec)         :: mm_snow, mm_ice 
-
-        ! namelist /smbpal/ &
-        !     abl_method, sigma_snow, sigma_melt, sigma_land, &
-        !     sf_a, sf_b, firn_fac, mm_snow, mm_ice 
-                
-        ! ! Store initial values in local parameter values 
-        ! abl_method  = par%abl_method
-        ! sigma_snow  = par%sigma_snow 
-        ! sigma_melt  = par%sigma_melt 
-        ! sigma_land  = par%sigma_land 
-        ! sf_a        = par%sf_a 
-        ! sf_b        = par%sf_b 
-        ! firn_fac    = par%firn_fac 
-        ! mm_snow     = par%mm_snow 
-        ! mm_ice      = par%mm_ice 
-
-        ! Read parameters from input namelist file
-        ! inquire(file=trim(filename),NUMBER=file_unit)
-        ! if (file_unit .gt. 0) then 
-        !     read(file_unit,nml=smbpal)
-        ! else
-        !     open(7,file=trim(filename))
-        !     read(7,nml=smbpal)
-        !     close(7)
-        ! end if 
-
-        ! ! Store local parameter values in output object
-        ! par%abl_method  = abl_method
-        ! par%sigma_snow  = sigma_snow 
-        ! par%sigma_melt  = sigma_melt 
-        ! par%sigma_land  = sigma_land 
-        ! par%sf_a        = sf_a 
-        ! par%sf_b        = sf_b 
-        ! par%firn_fac    = firn_fac 
-        ! par%mm_snow     = mm_snow 
-        ! par%mm_ice      = mm_ice 
-
-        ! ! Also load itm parameters
-        ! call itm_par_load(par%itm,filename)
+        call itm_par_load(par%itm,filename,init=init_pars,group=itm_nml_group)
 
         return
 
@@ -782,6 +590,24 @@ contains
 
     end function calc_temp_surf
     
+    elemental function calc_snowfall(par,t2m,pr) result(sf)
+        ! Snowfall from precipitation and temperature: the one place
+        ! smbpal splits precipitation into snow and rain (itm on the
+        ! daily fields, pdd on the monthly fields).
+
+        implicit none 
+
+        type(smbpal_param_class), intent(IN) :: par 
+        real(prec),               intent(IN) :: t2m     ! [K]
+        real(prec),               intent(IN) :: pr      ! [mm we/d]
+        real(prec)                           :: sf      ! [mm we/d]
+
+        sf = pr * calc_snowfrac(t2m,par%sf_a,par%sf_b)
+
+        return 
+
+    end function calc_snowfall
+
     elemental function calc_snowfrac(t2m,a,b) result(f)
         ! Return the fraction of snow from total precipitation
         ! expected for a given temperature
@@ -802,128 +628,6 @@ contains
     ! smbpal I/O
     !
     ! =======================================================
-
-    subroutine smbpal_write_init(par,filename,z_srf,H_ice)
-
-        implicit none 
-
-        type(smbpal_param_class), intent(IN) :: par 
-        character(len=*),         intent(IN) :: filename 
-        real(prec), intent(IN), optional :: z_srf(:,:), H_ice(:,:) 
-
-        call nc_create(filename)
-        call nc_write_dim(filename,"xc",x=par%x)
-        call nc_write_dim(filename,"yc",x=par%y)
-        call nc_write_dim(filename,"day",  x=1,nx=360,dx=1)
-        call nc_write_dim(filename,"month",x=1,nx=12,dx=1)
-        call nc_write_dim(filename,"time",x=0.0,units="kiloyears",unlimited=.TRUE.)
-        
-        ! Write the 2D latitude field to file
-        call nc_write(filename,"lat2D",par%lats,dim1="xc",dim2="yc")
-
-        if (present(z_srf)) call nc_write(filename,"z_srf",z_srf,dim1="xc",dim2="yc")
-        if (present(H_ice)) call nc_write(filename,"H_ice",H_ice,dim1="xc",dim2="yc")
-
-        return 
-
-    end subroutine smbpal_write_init
-
-    subroutine smbpal_write(now,filename,time_bp,step,nstep)
-
-        implicit none 
-
-        type(smbpal_state_class), intent(IN) :: now 
-        character(len=*),         intent(IN) :: filename 
-        real(dp),                 intent(IN) :: time_bp  
-        character(len=*),         intent(IN) :: step  
-        integer, intent(IN), optional        :: nstep 
-
-        ! Local variables 
-        real(dp) :: ka_bp 
-        integer :: ndat, nx, ny, nt   
-        real(dp), allocatable :: time(:) 
-        character(len=56) :: step_name 
-
-        ka_bp = time_bp * 1e-3 
-
-        if (trim(step) .ne. "ann" .and. trim(step) .ne. "mon" .and. trim(step) .ne. "day") then 
-            write(*,*) "smbpal_write:: error: step should be one of: ann, mon or day."
-            stop 
-        end if 
-
-        nx = size(now%t2m,1)
-        ny = size(now%t2m,2)
-
-        ! Determine timestep to be written 
-        nt = nc_size(filename,"time")
-        allocate(time(nt))
-        call nc_read(filename,"time",time)
-        
-        if (maxval(time) .lt. ka_bp) then 
-            ndat = nt+1 
-        else 
-            ndat = minloc(abs(time-ka_bp),1)
-        end if 
-
-        ! Write the variables
-        if (trim(step) .eq. "ann") then 
-            ! Write the annual mean with time as 3rd dimension 
-
-            ! Update the timestep 
-            call nc_write(filename,"time",ka_bp,dim1="time",start=[ndat],count=[1])
-
-            call nc_write(filename,"t2m",now%t2m,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Near-surface temperature",units="K")
-            call nc_write(filename,"S",now%S,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Solar insolation (TOA)",units="W m**-2")
-            call nc_write(filename,"pr",now%pr,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Precipitation",units="mm d**-1")
-            call nc_write(filename,"sf",now%sf,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Snowfall",units="mm d**-1")
-            call nc_write(filename,"PDDs",now%PDDs,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Positive degree days",units="d K")
-            call nc_write(filename,"tsrf",now%tsrf,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Ice surface temperature",units="K")
-
-            call nc_write(filename,"H_snow",now%H_snow,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Snowpack thickness",units="mm w.e.")
-            call nc_write(filename,"alb_s",now%alb_s,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Surface albedo",units="1")
-            call nc_write(filename,"smbi",now%smbi,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Surface mass balance (ice)",units="mm d**-1")
-            call nc_write(filename,"smb",now%smb,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Surface mass balance (snow)",units="mm d**-1")
-            call nc_write(filename,"melt",now%melt,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Total melt",units="mm d**-1")
-            call nc_write(filename,"runoff",now%runoff,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Net runoff",units="mm d**-1")
-            call nc_write(filename,"refrz",now%refrz,dim1="xc",dim2="yc",dim3="time", &
-                          start=[1,1,ndat],count=[nx,ny,1],long_name="Refreezing",units="mm d**-1")
-            
-        else 
-            ! Write the step along the year (mon or day)
-
-            if (.not. present(nstep)) then 
-                write(*,*) "smbpal_write:: error: nstep must be given for 'day' or 'mon' writing."
-                stop 
-            end if 
-
-            step_name = "day" 
-            if (trim(step) .eq. "mon") step_name = "month" 
-
-            ! Update the timestep 
-            call nc_write(filename,"time",ka_bp,dim1="time",start=[1],count=[1])
-
-            call nc_write(filename,"t2m",now%t2m,dim1="xc",dim2="yc",dim3=trim(step_name), &
-                          start=[1,1,nstep],count=[nx,ny,1])
-            call nc_write(filename,"S",now%S,dim1="xc",dim2="yc",dim3=trim(step_name), &
-                          start=[1,1,nstep],count=[nx,ny,1])
-
-        end if 
-
-        return 
-
-    end subroutine smbpal_write
 
     subroutine smbpal_restart_write(smb,filename,time)
         ! Write the prognostic snowpack state carried across timesteps
