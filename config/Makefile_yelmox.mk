@@ -9,26 +9,11 @@
 $(objdir)/geothermal.o: $(libdir)/geothermal.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-$(objdir)/latinhypercube.o: $(libdir)/latinhypercube.f90
-	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
 $(objdir)/marine_shelf.o: $(libdir)/marine_shelf.f90 $(objdir)/pico.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 $(objdir)/esm_forcing.o: $(libdir)/esm_forcing.f90 $(objdir)/marine_shelf.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-
-# $(objdir)/isostasy.o: $(libdir)/isostasy.f90 $(objdir)/nml.o
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-#$(objdir)/ncio.o: $(libdir)/ncio.f90
-#	$(FC) $(DFLAGS) $(FFLAGS) $(INC_NC) -c -o $@ $<
-
-# $(objdir)/nml.o: $(libdir)/nml.f90
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-# $(objdir)/gaussian_filter.o: $(libdir)/gaussian_filter.f90
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 $(objdir)/sediments.o: $(libdir)/sediments.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -37,7 +22,7 @@ $(objdir)/sediments.o: $(libdir)/sediments.f90
 $(objdir)/yelmox_nml.o: $(libdir)/yelmox_nml.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# The terms of the forcing (series x pattern) and the backend capabilities.
+# The terms of the forcing (coefficient x pattern) and the backend capabilities.
 $(objdir)/climate_terms.o: $(libdir)/climate_terms.f90 $(objdir)/climate_out.o \
 						$(objdir)/kryos_forcing.o $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -48,7 +33,7 @@ $(objdir)/snapshots.o: $(libdir)/snapshots.f90 $(objdir)/kryos_forcing.o $(objdi
 $(objdir)/climate_out.o: $(libdir)/climate_out.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
-# Climate modifiers on climate_out after the backend (anom, ocn_fraction, bias), fixed order.
+# Climate transforms on climate_out after the backend and the terms (taper, bias), fixed order.
 $(objdir)/climate_mods.o: $(libdir)/climate_mods.f90 $(objdir)/climate_out.o \
 						$(objdir)/climate_terms.o $(objdir)/yelmox_nml.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
@@ -74,7 +59,7 @@ $(objdir)/ice_bnd.o: $(libdir)/ice_bnd.f90 $(objdir)/kryos_forcing.o $(objdir)/y
 
 # Kryos: the domain (kryos_domain + config + init + remap) and the modules built
 # on it -- region-specific physics, per-step coupling, cold start + restarts,
-# output, and the driver-owned indices registry.
+# output, and the driver-owned coefficient registry.
 $(objdir)/kryos.o: $(libdir)/kryos.f90 $(objdir)/marine_shelf.o \
 						$(objdir)/climate_out.o $(objdir)/yelmox_climate.o $(objdir)/kryos_forcing.o \
 						$(objdir)/ice_bnd.o $(objdir)/smbpal.o $(objdir)/smb_simple.o \
@@ -101,7 +86,8 @@ $(objdir)/kryos_startup.o: $(libdir)/kryos_startup.f90 $(objdir)/kryos.o \
 $(objdir)/cmip_output.o: $(libdir)/cmip_output.f90 $(objdir)/marine_shelf.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) -c -o $@ $<
 
-$(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)/cmip_output.o
+$(objdir)/kryos_output.o: $(libdir)/kryos_output.f90 $(objdir)/kryos.o $(objdir)/cmip_output.o \
+						$(objdir)/kryos_forcing.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
 
 # Bipolar ocean coupling: bridge over kryos_domain + the obm box model. Lives
@@ -112,24 +98,6 @@ $(objdir)/obm_coupling.o: yelmox_bipolar/obm_coupling.f90 $(objdir)/kryos.o \
 						$(objdir)/yelmox_nml.o \
 						$(objdir)/obm_defs.o $(objdir)/ice2ocean.o $(objdir)/ocean2ice.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) $(INC_YELMO) $(INC_ISOSTASY) $(INC_CHION) $(INC_INSOL) -c -o $@ $<
-
-# $(objdir)/stommel.o: $(libdir)/stommel.f90 $(objdir)/yelmo_defs.o
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-# $(objdir)/timeout.o: $(libdir)/timeout.f90 $(objdir)/nml.o
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-# $(objdir)/timer.o: $(libdir)/timer.f90
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-# $(objdir)/timestepping.o: $(libdir)/timestepping.f90 $(objdir)/nml.o $(objdir)/ncio.o
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-# $(objdir)/varslice.o: $(libdir)/varslice.f90 $(objdir)/nml.o $(objdir)/ncio.o
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
-
-# $(objdir)/xarray.o: $(libdir)/xarray.f90 $(objdir)/nml.o $(objdir)/ncio.o
-# 	$(FC) $(DFLAGS) $(FFLAGS) -c -o $@ $<
 
 # The orbit of the insolation ([orbit]): elements from the insol library.
 $(objdir)/orbit_forcing.o: $(libdir)/orbit_forcing.f90 $(objdir)/yelmox_nml.o
@@ -179,11 +147,9 @@ $(objdir)/ice2ocean.o: $(libdir)/obm/ice2ocean.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 $(objdir)/ocean2ice.o: $(libdir)/obm/ocean2ice.f90
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-$(objdir)/stommel.o: $(libdir)/obm/stommel.f90
+$(objdir)/nautilus.o: $(libdir)/obm/nautilus.f90 $(objdir)/obm_defs.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-$(objdir)/nautilus.o: $(libdir)/obm/nautilus.f90
-	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
-$(objdir)/obm.o: $(libdir)/obm/obm.f90
+$(objdir)/obm.o: $(libdir)/obm/obm.f90 $(objdir)/obm_defs.o $(objdir)/nautilus.o
 	$(FC) $(DFLAGS) $(FFLAGS) $(INC_FESMUTILS) -c -o $@ $<
 
 #############################################################
@@ -227,7 +193,6 @@ yelmox_libs = 			$(objdir)/geothermal.o \
 obm_libs = 				$(objdir)/obm_defs.o\
 						$(objdir)/ice2ocean.o\
 						$(objdir)/ocean2ice.o\
-						$(objdir)/stommel.o\
 						$(objdir)/nautilus.o\
 						$(objdir)/obm.o\
 						$(objdir)/obm_coupling.o
