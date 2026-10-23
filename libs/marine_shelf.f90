@@ -99,8 +99,9 @@ module marine_shelf
     end type 
 
     type marshelf_grid_class
-        real(wp), allocatable :: xc(:)
-        real(wp), allocatable :: yc(:)
+        real(wp), allocatable :: xc(:)          ! x-axis [xy_units]
+        real(wp), allocatable :: yc(:)          ! y-axis [xy_units]
+        character(len=16)     :: xy_units       ! "km", or "1" for cell indices
         integer :: nx 
         integer :: ny
     end type
@@ -683,9 +684,11 @@ contains
         
     end subroutine marshelf_update
 
-    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,reg,xc,yc,dx,cnst)
+    subroutine marshelf_init(mshlf,filename,group,nx,ny,domain,grid_name,reg,xc,yc,cnst)
         ! reg: the regions on the shelf grid, from which the masks, basins and
         ! corrections of the parameters (selection expressions) are made here.
+        ! xc, yc: the grid axes [km], written to the output; without them the
+        ! output axes are the cell indices.
 
         implicit none 
 
@@ -696,14 +699,12 @@ contains
         character(len=*), intent(IN)      :: domain
         character(len=*), intent(IN)      :: grid_name
         type(regions_class), intent(IN)   :: reg
-        real(wp), intent(IN), optional    :: xc(:)
-        real(wp), intent(IN), optional    :: yc(:)
-        real(wp), intent(IN), optional    :: dx 
+        real(wp), intent(IN), optional    :: xc(:)   ! [km]
+        real(wp), intent(IN), optional    :: yc(:)   ! [km]
         type(phys_const_class), intent(IN), optional :: cnst
 
         ! Local variables
-        integer  :: k
-        real(wp) :: grd_dx 
+        integer  :: i, k
         real(wp), parameter :: mv = -9999.0_wp   ! missing value marker
 
         ! Load parameters
@@ -729,22 +730,24 @@ contains
         allocate(mshlf%grd%xc(nx))
         allocate(mshlf%grd%yc(ny))
         
-        if (present(dx)) then
-            grd_dx = dx
-        else
-            grd_dx = 1.0
-        end if
-        
-        if (present(xc)) then
-            mshlf%grd%xc = xc
-        else
-            call axis_init(mshlf%grd%xc,x0=0.0_wp,dx=grd_dx)
+        if (present(xc) .neqv. present(yc)) then
+            write(error_unit,*) "marshelf_init:: Error: give both xc and yc, or neither."
+            error stop 1
         end if
 
-        if (present(yc)) then
-            mshlf%grd%yc = yc
+        if (present(xc)) then
+            if (size(xc) .ne. nx .or. size(yc) .ne. ny) then
+                write(error_unit,*) "marshelf_init:: Error: xc, yc do not match the grid size."
+                write(error_unit,*) "nx, ny = ", nx, ny, "; size(xc), size(yc) = ", size(xc), size(yc)
+                error stop 1
+            end if
+            mshlf%grd%xc       = xc
+            mshlf%grd%yc       = yc
+            mshlf%grd%xy_units = "km"
         else
-            call axis_init(mshlf%grd%yc,x0=0.0_wp,dx=grd_dx)
+            mshlf%grd%xc       = [(real(i,wp), i = 1, nx)]
+            mshlf%grd%yc       = [(real(i,wp), i = 1, ny)]
+            mshlf%grd%xy_units = "1"
         end if
         
         ! Allocate the object
@@ -1937,8 +1940,8 @@ contains
             call nc_write_attr(filename, "grid_name", trim(mshlf%par%grid_name))
 
             ! Add grid axis variables to netcdf file
-            call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2)*1e-3,units="km")
-            call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2)*1e-3,units="km")
+            call nc_write_dim(filename,xnm,x=mshlf%grd%xc(i1:i2),units=trim(mshlf%grd%xy_units))
+            call nc_write_dim(filename,ynm,x=mshlf%grd%yc(j1:j2),units=trim(mshlf%grd%xy_units))
             call nc_write_dim(filename,"month", x=1,dx=1,nx=12,       units="month")            
             call nc_write_dim(filename,"time",  x=time,dx=1.0_dp,nx=1,units="years",unlimited=.TRUE.)
 
@@ -1970,35 +1973,35 @@ contains
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"bmb_corr",mshlf%now%bmb_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"T_shlf",mshlf%now%T_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"dT_shlf",mshlf%now%dT_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"S_shlf",mshlf%now%S_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
         call nc_write(filename,"dS_shlf",mshlf%now%dS_shlf(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"T_fp_shlf",mshlf%now%T_fp_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"T_shlf_basin",mshlf%now%T_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"S_shlf_basin",mshlf%now%S_shlf_basin(i1:i2,j1:j2),start=[1,1,n],units="PSU", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_shlf",mshlf%now%tf_shlf(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_basin",mshlf%now%tf_basin(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_corr",mshlf%now%tf_corr(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"tf_corr_basin",mshlf%now%tf_corr_basin(i1:i2,j1:j2),start=[1,1,n],units="K", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"z_base",mshlf%now%z_base(i1:i2,j1:j2),start=[1,1,n],units="m", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"slope_base",mshlf%now%slope_base(i1:i2,j1:j2),start=[1,1,n],units="1", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"mask_ocn_ref",mshlf%now%mask_ocn_ref(i1:i2,j1:j2),start=[1,1,n],units="1", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
-        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="m/yr", &
+        call nc_write(filename,"mask_ocn",mshlf%now%mask_ocn(i1:i2,j1:j2),start=[1,1,n],units="1", &
                                         dim1=xnm,dim2=ynm,dim3="time",ncid=ncid,grid_mapping=grid_mapping_name)
 
         ! Close the netcdf file
@@ -2194,35 +2197,6 @@ contains
 
     end function interp_linear
     
-    subroutine axis_init(x,x0,dx)
-
-        implicit none 
-
-        real(wp) :: x(:)
-        real(wp), optional :: x0, dx
-        real(wp) :: dx_tmp 
-        integer :: i, nx  
-
-        nx = size(x) 
-
-        do i = 1, nx 
-            x(i) = real(i-1,wp)
-        end do 
-
-        dx_tmp = 1.d0 
-        if (present(dx)) dx_tmp = dx 
-        
-        x = x*dx_tmp  
-
-        if (present(x0)) then 
-            x = x + x0 
-        else
-            x = x + (-(nx-1.0)/2.0*dx_tmp)
-        end if 
-
-        return 
-    end subroutine axis_init
-
     subroutine ocn_variable_extrapolation(var, H_ice, basin_mask, depth, z_bed)
 
         ! First we convert to mv (missing values) the regions where there is ice or no ocean data information.
