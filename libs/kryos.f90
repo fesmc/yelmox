@@ -653,6 +653,14 @@ contains
         ! require a [negis<suffix>] / [glacial_smb<suffix>] group.
         call nml_read(path_par, gs, "use_negis",         ctl%use_negis)
         call nml_read(path_par, gs, "scale_glacial_smb", ctl%scale_glacial_smb)
+        ! The glacial index of scale_glacial_smb is the climate's annual air
+        ! temperature against its reference, which rembo does not supply.
+        if (ctl%scale_glacial_smb .and. trim(ctl%climate) == "rembo") then
+            write(*,*) "domain_ctl_load:: error: "//trim(gs)//".scale_glacial_smb needs the &
+                       &reference annual air temperature of the climate; climate = rembo has none &
+                       &(REMBO supplies its own atmosphere and smb). Set scale_glacial_smb = False."
+            stop 1
+        end if
         call nml_read(path_par, gs, "lim_pd_ice",        ctl%lim_pd_ice)
 
         ! Per-module output switches ([output<suffix>]); every key is required.

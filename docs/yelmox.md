@@ -532,7 +532,7 @@ times counted from the start of the run (`time_init`).
 | `relax` | bool | relax the topography towards the reference (`[relax]`) |
 | `opt` | bool | optimize the basal friction and the thermal-forcing correction (`[opt]`) |
 | `use_negis` | bool | NEGIS basal-friction modification (`[negis]`): `cb_ref` is set each step (Yelmo's `ytill.method = -1`) as the till friction of the bed with the NEGIS parts scaled, the centre by `cf_centre`, the north part by `cf_north` before 4 ka BP, the south part by `cf_south` from 4 ka BP, all parts by `cf_0` before 11 ka BP ramping linearly to `cf_1` at 0 ka, on the forcing time; not with the `cb_ref` optimization (`opt_cf`) |
-| `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`) |
+| `scale_glacial_smb` | bool | reduce negative glacial smb (`[glacial_smb]`: `dt_lgm`, `lat_lim`, `fac_lim`), by a glacial index from the climate's annual air temperature against its reference; refused with `climate = rembo` (no reference) |
 | `lim_pd_ice` | bool | extra melt (4 m/yr) outside the present-day ice extent |
 
 A spin-up usually sets `relax` and `opt` together: the relaxation holds the

@@ -41,16 +41,9 @@
     opt                     = False     ! optimize cb_ref and tf_corr ([opt])
 
     use_negis               = False   ! NEGIS cb_ref modification (needs [negis] group)
-    scale_glacial_smb       = False   ! Reduce negative glacial smb (unused with REMBO)
+    scale_glacial_smb       = False   ! Reduce negative glacial smb (refused with REMBO: no reference air temperature)
     lim_pd_ice              = True    ! Extra melt outside PD ice extent
 /
-
-! [sim] scale_glacial_smb = True reads this group (all keys required):
-! &glacial_smb
-!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
-!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
-!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
-! /
 
 &output
     write_yelmo   = True         ! per-module 2D + 1D output switches
