@@ -10,7 +10,7 @@ module climate_rembo
 
     use precision,      only : wp
     use rembo_sclimate, only : rembo_init, rembo_update, rembo_equilibrate, &
-                               rembo_ann, rembo_restart_write
+                               rembo_ann, rembo_restart_write, rembo_dT_ann
 
     implicit none
 
@@ -20,6 +20,7 @@ module climate_rembo
 
     public :: rembo_clim_init
     public :: rembo_clim_update
+    public :: rembo_clim_dT_ann
     public :: rembo_clim_restart_write
 
 contains
@@ -68,6 +69,17 @@ contains
         tsrf   = real(rembo_ann%T_srf, wp)
 
     end subroutine rembo_clim_update
+
+    function rembo_clim_dT_ann(dT_summer) result(dT_ann)
+        ! The annual mean air temperature anomaly [K] REMBO applies for the
+        ! summer anomaly dT_summer [K] (its seasonal cycle, T_wintfac of its
+        ! parameters). After rembo_clim_init.
+        real(wp), intent(in) :: dT_summer
+        real(wp) :: dT_ann
+
+        dT_ann = real(rembo_dT_ann(real(dT_summer, dp)), wp)
+
+    end function rembo_clim_dT_ann
 
     subroutine rembo_clim_restart_write(filename, time, z_srf, H_ice, z_sl)
         ! REMBO's restart, with the geometry on its grid.

@@ -37,7 +37,8 @@ module yelmox_climate
                               terms_uniform_dT, terms_write_step
     use climate_mods,  only : climate_mods_class, climate_mods_init, &
                               climate_mods_apply, climate_mods_write_init, climate_mods_write_step
-    use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_restart_write
+    use climate_rembo, only : rembo_clim_init, rembo_clim_update, rembo_clim_dT_ann, &
+                              rembo_clim_restart_write
     use regions,       only : regions_class, regions_basin_ids, regions_select
     use yelmox_nml,    only : VAR_DEFS_MAX, forcing_var_defs, def_file => yelmox_defaults_file
 
@@ -62,7 +63,7 @@ module yelmox_climate
     type rembo_state_class
         real(wp), allocatable :: ta_sum(:,:)     ! [K] near-surface air temperature (summer)
         real(wp) :: dT_sum = 0.0_wp              ! [K] summer air temperature anomaly
-        real(wp) :: dT_ann = 0.0_wp              ! [K] annual air temperature anomaly
+        real(wp) :: dT_ann = 0.0_wp              ! [K] annual air temperature anomaly (REMBO's, of dT_sum)
     end type rembo_state_class
 
     ! A derived coefficient this domain computes: the mean sea-level air anomaly
@@ -859,7 +860,8 @@ contains
         ! (at `time`, as for the snapshots backend). REMBO needs the anomaly
         ! before it runs, so the uniform terms on tas are its input (not applied
         ! after it): their sum f_ta*f is the summer air temperature anomaly
-        ! dT_sum, the annual dT_ann = 1.3*dT_sum (REMBO's winter factor 1.6).
+        ! dT_sum; dT_ann is the annual mean anomaly REMBO applies with it (its
+        ! seasonal cycle, rembo_clim_dT_ann), a diagnostic.
         ! Its ocean comes from the snapshots and the ocean terms (climate_update).
         type(yelmox_climate_class), intent(inout) :: cl
         type(climate_out_class),    intent(inout) :: out
@@ -878,7 +880,7 @@ contains
 
         ! The summer anomaly REMBO takes as its input: the uniform terms on tas.
         cl%rembo%dT_sum = terms_uniform_dT(cl%terms, coefs, "tas")
-        cl%rembo%dT_ann = 1.3_wp * cl%rembo%dT_sum
+        cl%rembo%dT_ann = rembo_clim_dT_ann(cl%rembo%dT_sum)
 
         ! Atmosphere and surface mass balance, at the current surface.
         if (.not. allocated(out%now%ta_ann)) then
