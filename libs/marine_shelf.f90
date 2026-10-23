@@ -558,8 +558,11 @@ contains
                 call calc_variable_basin_pico(mshlf%now%S_shlf_basin,mshlf%now%S_shlf, &
                                                         f_grnd,mshlf%now%basins,H_ice,mshlf%now%mask_ocn)
 
+                ! pico works on the cells connected to the open ocean (no land, no lakes)
                 call pico_update(mshlf%pico,mshlf%now%T_shlf_basin,mshlf%now%S_shlf_basin, &
-                                    H_ice,z_bed,f_grnd,z_sl,mshlf%now%basins,mshlf%now%mask_ocn,dx)
+                                    H_ice,f_grnd,mshlf%now%basins, &
+                                    (mshlf%now%mask_ocn .ne. mask_val_land .and. &
+                                     mshlf%now%mask_ocn .ne. mask_val_lake),dx)
 
                 mshlf%now%bmb_shlf = mshlf%pico%now%bmb_shlf
 
@@ -814,9 +817,10 @@ contains
 
         if (trim(mshlf%par%bmb_method) .eq. "pico") then 
 
-            ! Initialize pico too 
+            ! Initialize pico too, from the group with the suffix of this
+            ! one (marine_shelf_south -> pico_south)
 
-            call pico_init(mshlf%pico,filename,nx,ny,domain,cnst=cnst)
+            call pico_init(mshlf%pico,filename,trim(pico_group(group)),nx,ny,domain,cnst=cnst)
 
         end if
 
@@ -858,6 +862,27 @@ contains
         return 
 
     end subroutine marshelf_init
+
+    function pico_group(group) result(grp)
+        ! The pico par-file group that goes with the marine_shelf group:
+        ! "marine_shelf<sfx>" -> "pico<sfx>"; "pico" for any other name.
+
+        implicit none
+
+        character(len=*), intent(IN) :: group
+        character(len=len_trim(group)+4) :: grp
+
+        character(len=*), parameter :: base = "marine_shelf"
+
+        if (index(group,base) .eq. 1) then
+            grp = "pico"//group(len(base)+1:len_trim(group))
+        else
+            grp = "pico"
+        end if
+
+        return
+
+    end function pico_group
 
     subroutine marshelf_end(mshlf)
 

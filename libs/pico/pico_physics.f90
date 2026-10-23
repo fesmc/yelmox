@@ -27,7 +27,6 @@ module pico_physics
     public :: calc_overtuning
     public :: calc_theta_pm
     public :: calc_T_pm
-    public :: apply_c_deep
     public :: calc_melt_rate_pico
 
 contains 
@@ -99,7 +98,9 @@ contains
 
     end function calc_shelf_Sbox_1
 
-    ! Calc T and S for box n>1
+    ! Calc T and S for box n>1: on input T_box, S_box are the mean
+    ! temperature and salinity of box n-1, on output those of box n.
+    ! Melting cools and freshens: S_n = S_n-1 - (S_n-1/lambda_rho)*(T_n-1 - T_n)
     subroutine calc_shelf_TS_box_n(T_box, S_box, A_box, T_star, CC, a_pico, gamma_tstar, lambda_rho)
 
         implicit none
@@ -120,13 +121,12 @@ contains
         ! Temperature for Box i > 1
         fac = (CC + g1 - g2 * a_pico * S_box)
         if (abs(fac) .lt. 1e-6) then 
-            write(*,*) "fac! ", fac 
-            stop 
-            fac = 1e-6
+            write(*,*) "calc_shelf_TS_box_n:: Error: denominator too small, fac = ", fac 
+            error stop 1
         end if 
 
         T_box = T_box +      g1 * T_star / fac
-        S_box = S_box - s1 * g1 * T_star / fac
+        S_box = S_box + s1 * g1 * T_star / fac
 
         return
 
@@ -201,70 +201,5 @@ contains
         return
 
     end function calc_melt_rate_pico
-
-    subroutine apply_c_deep(bmb,c_deep,depth_deep,mask_ocn,z_bed,z_sl,n_smth)
-        ! Apply c_deep for killing ice in the deep ocean 
-
-        implicit none
-
-        real(prec), intent(INOUT)  :: bmb(:,:)
-        real(prec), intent(IN)     :: c_deep, depth_deep
-        integer,    intent(IN)     :: mask_ocn(:,:)
-        real(prec), intent(IN)     :: z_bed(:,:)
-        real(prec), intent(IN)     :: z_sl(:,:)
-        integer,    intent(IN)     :: n_smth       ! Smoothing neighborhood radius in grid points
-
-        ! Local variables 
-        integer :: i, j, nx, ny
-        real(prec) :: n_pts
-        logical,    allocatable :: is_c_deep(:,:)
-        real(prec), allocatable :: bmb_tmp(:,:)
-
-        nx = size(bmb,1)
-        ny = size(bmb,2)
-
-        allocate(is_c_deep(nx,ny))
-        allocate(bmb_tmp(nx,ny))
-
-        if (n_smth .lt. 0 .or. n_smth .gt. 2) then
-            write(*,*) "apply_c_deep:: Error: n_smth should be 0, 1, or 2."
-            write(*,*) "n_smth = ", n_smth
-            stop
-        end if
-
-        ! Apply c_deep to appropriate regions or keep bmb, whichever is more negative
-
-        where(mask_ocn .eq. 2 .and. z_sl-z_bed .ge. depth_deep) bmb = c_deep
-        ! jablasco: parche
-            !bmb = min(bmb,par%c_deep)
-
-
-        ! Make sure bmb transitions smoothly to c_deep value from neighbors 
-
-        if (n_smth .gt. 0) then
-
-            ! Get size of neighborhood
-            n_pts = real( (2*n_smth+1)**2, prec)
-
-            bmb_tmp = bmb
-            do i = 1+n_smth, nx-n_smth
-            do j = 1+n_smth, ny-n_smth
-
-                ! Apply a neighborhood average value, if deep ocean is in neighborhood of shallow ocean
-                if (is_c_deep(i,j) .and. &
-                    count(.not. is_c_deep(i-n_smth:i+n_smth,j-n_smth:j+n_smth)) .gt. 0) then
-
-                    bmb(i,j) = sum(bmb_tmp(i-n_smth:i+n_smth,j-n_smth:j+n_smth))/n_pts
-
-                end if
-
-            end do
-            end do
-
-        end if
-
-        return
-
-    end subroutine apply_c_deep
 
 end module pico_physics
