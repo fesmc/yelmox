@@ -40,7 +40,9 @@ module climate_terms
     !     surface (caps_need_atm, the predicate of the transforms too): not
     !     with a backend that supplies the surface mass balance (esm with its
     !     smb), which a post-hoc anomaly cannot reach; rembo takes the uniform
-    !     tas terms as its input (dT_sum, terms_uniform_dT) and refuses pr;
+    !     tas terms as its input (dT_sum, terms_uniform_dT) and ignores pr in
+    !     them (it computes its own precipitation; a notice at init, an error
+    !     only for a term on pr alone, which would have no effect);
     !   - a derived coefficient is computed after the atmosphere, so its term may
     !     touch to and so only;
     !   - a uniform term on to or so needs an ocean (profiles or at the shelf
@@ -229,9 +231,20 @@ contains
                         call term_error(t, "pattern snapshots needs the snapshot backend; climate = "// &
                                            trim(caps%name)//" reads no snapshots.")
                 case("uniform")
-                    ! rembo takes the terms on tas as its input, not after it.
-                    if (t%on_pr .or. (t%on_tas .and. .not. caps%anom_input)) &
+                    if (caps%anom_input) then
+                        ! rembo: the terms on tas are its input (not applied
+                        ! after it); it computes its own precipitation.
+                        if (t%on_pr) then
+                            if (.not. (t%on_tas .or. t%on_to .or. t%on_so)) &
+                                call term_error(t, "lists only pr, which climate = "//trim(caps%name)// &
+                                                   " ignores (it computes its own precipitation): &
+                                                   &the term has no effect.")
+                            write(*,*) "terms_check:: ["//trim(t%group)//"] climate = "//trim(caps%name)// &
+                                       " ignores pr in this term (it computes its own precipitation)."
+                        end if
+                    else if (t%on_tas .or. t%on_pr) then
                         call caps_need_atm(caps, "["//trim(t%group)//"] (a uniform term on tas/pr)")
+                    end if
                     if ((t%on_to .or. t%on_so) .and. .not. (caps%has_ocn_prof .or. caps%has_ocn_shelf)) &
                         call term_error(t, "lists to or so, but climate = "//trim(caps%name)// &
                                            " has no ocean (neither profiles nor at the shelf base).")

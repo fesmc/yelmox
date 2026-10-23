@@ -87,7 +87,8 @@ precipitation response to a uniform term leaves `pr` out of its fields.
 
 Backend variants. **esm** replaces 2-3 by its own calendar-time anomaly and
 refuses terms on `tas`/`pr` when it supplies the smb (`surface_method =
-"climate"`); ocean terms apply at the shelf base. **rembo** takes the uniform
+"climate"`); ocean terms apply at the shelf base. **rembo** ignores `pr` in a
+uniform term (a notice at init) and takes the uniform
 `tas` term as its input: ΔT_sum = f_ta α, and REMBO's annual mean
 ΔT_ann = (1 + T_wintfac)/2 ΔT_sum (its seasonal cycle, a diagnostic); its ocean from
 the snapshot backend as now.
