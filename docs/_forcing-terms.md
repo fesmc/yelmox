@@ -88,7 +88,8 @@ precipitation response to a uniform term leaves `pr` out of its fields.
 Backend variants. **esm** replaces 2-3 by its own calendar-time anomaly and
 refuses terms on `tas`/`pr` when it supplies the smb (`surface_method =
 "climate"`); ocean terms apply at the shelf base. **rembo** takes the uniform
-`tas` term as its input: ΔT_sum = f_ta α, ΔT_ann = 1.3 ΔT_sum; its ocean from
+`tas` term as its input: ΔT_sum = f_ta α, and REMBO's annual mean
+ΔT_ann = (1 + T_wintfac)/2 ΔT_sum (its seasonal cycle, a diagnostic); its ocean from
 the snapshot backend as now.
 
 ## 3. Concepts and contracts
@@ -143,7 +144,13 @@ One term = one coefficient × one pattern, on an explicit list of fields:
 Contracts, checked at init with an error naming the term: every field is
 bound by `snap0` (if given), `snap1` and the reference; `snap1` of a term
 without `snap0` is a sea-level anomaly or ratio (no `zs`); `replace` once
-per field; a derived coefficient on the ocean only.
+per field, on ocean profiles; a uniform term on `to`/`so` needs an ocean
+(profiles or at the shelf base); a derived coefficient on the ocean only.
+One predicate of the backend serves the uniform terms on `tas`/`pr` and the
+transforms (`[taper]`, `[bias]`), which change the atmosphere after the
+backend: its atmosphere must drive the surface (monthly `tas` and `pr`, now
+and reference). They are refused when the backend supplies the smb itself
+(esm with its smb; rembo, which takes the uniform `tas` terms as its input).
 
 ### 3.5 Transforms and other consumers
 
@@ -234,7 +241,7 @@ par-files plan's `-p` arrays shrink to.
 |---|---|
 | `[indices] names`, `var_defs` | `[forcing] coefs`, `[forcing] var_defs` (the one list) |
 | `[idx_<name>]` | `[coef_<name>]` (+ `method = "derived"`, `from`, `factor`, `region`, `anomaly`) |
-| `[snap]` | `[snapshots]`: `lapse`, `f_p`, `grid_global`, `combine`; `ref_name` → `[forcing] reference`; `snapshots`, `axes`, `fields` dropped (derived from the terms) |
+| `[snap]` | `[snapshots]`: `lapse`, `f_p`, `grid_global`; `combine` and `f_p_ne` removed (no effect); `ref_name` → `[forcing] reference`; `snapshots`, `axes`, `fields` dropped (derived from the terms) |
 | `[snap_<name>]` | `[snapshot_<name>]` |
 | `[snap_axis_<name>]` `lo`, `hi`, `index` | `[term_<name>]` `snap0`, `snap1`, `coef`, `fields` |
 | `[snap_field_<name>]` `blend`, `axes` | dropped: the rule is fixed by field, the fields are listed by the term |
@@ -286,7 +293,7 @@ can produce the same term structure.
 | File | Change |
 |---|---|
 | `libs/kryos_forcing.f90` | `indices_class` → `coefs_class`: `[forcing] coefs`, `[coef_<name>]`; kind `derived` (no tsgen; value set by `coefs_set(coefs, name, value)`), restart and output as now |
-| `libs/snapshots.f90` | `[snapshots]`, `[forcing] reference`, terms read from `[term_<name>]` (snapshot pattern); the snapshot set derived from the terms; `combine` per field by the fixed rule; `snap_field` registry → the term's field list |
+| `libs/snapshots.f90` | `[snapshots]`, `[forcing] reference`, terms read from `[term_<name>]` (snapshot pattern); the snapshot set derived from the terms; the blend per field by the fixed rule; `snap_field` registry → the term's field list |
 | `libs/climate_mods.f90` | `anom`, `ocn_fraction`, `ocn_obm` removed; `terms_apply_uniform` (uniform and replace terms on `climate_out`), `taper`, `bias` (time axis) stay; `derived_update` computes `air_anomaly` after the atmosphere |
 | `libs/yelmox_climate.f90` | step order: backend (snapshot terms) → uniform `tas`/`pr` terms → derived coefficients → ocean terms → taper → bias; contract checks at init |
 | `yelmox_bipolar/obm_coupling.f90` | sets the `obm_*` derived coefficients from the boxes where `obm2ism` ran; `[ocn_obm_<sfx>]` removed |
@@ -325,5 +332,4 @@ Taper, bias, orbit, sea level, border ice stay outside the sum.
 
 Open: the group names `[forcing]`, `[snapshots]`, prefixes `term_`,
 `snapshot_` (as on the mock-up unless changed; `series_` became `coef_` on
-2026-10-22); whether
-`[snapshots] combine` keeps a use.
+2026-10-22). (`[snapshots] combine` had no use and was removed.)

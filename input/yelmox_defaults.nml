@@ -110,11 +110,9 @@
     ! The reference and the terms: [forcing<sfx>]; the snapshots are the
     ! reference and the snap0/snap1 of the snapshot terms.
     grid_global = "GLOBAL-1DEG"     ! global grid of the paleoclimate products ({grid_global})
-    combine     = "anomaly"         ! anomaly | absolute
     fields      = "tas" "pr" "to" "so" "zs"  ! the fields a snapshot may bind
     lapse       = 0.0080 0.0065     ! [K m-1] lapse rates: annual, summer
     f_p         = 0.05              ! [K-1] precipitation-temperature scaling (beta_p)
-    f_p_ne      = 1.0               ! NE-Greenland multiplier of beta_p (not active)
 /
 
 &snapshot

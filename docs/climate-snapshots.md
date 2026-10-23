@@ -51,17 +51,16 @@ the mean air temperature anomaly (the derived coefficient `dTo`):
 The snapshots of the run are the reference and the `snap0`/`snap1` of its
 terms (no list): `pd`, `picontrol` and `lgm` here. Every key of `[snapshots]`
 and `[snapshot_<name>]` has a default in `input/yelmox_defaults.nml` (see
-[Defaults](#defaults)): `combine = "anomaly"` (snapshots as anomalies from the
-reference), `fields = "tas" "pr" "to" "so" "zs"` (the fields a snapshot may
-bind), `grid_global = "GLOBAL-1DEG"`, ... Two kinds of group:
+[Defaults](#defaults)): `fields = "tas" "pr" "to" "so" "zs"` (the fields a
+snapshot may bind), `grid_global = "GLOBAL-1DEG"`, ... Two kinds of group:
 
 - **Rules**, `[snapshots]`: the lapse rates `lapse` (annual, summer) and the
   precipitation sensitivity `f_p` (β_p), used in the sea-level reduction of
   the snapshots, the uniform terms and the move to the model surface.
 - **Snapshots**, `[snapshot_<name>]`: `exp` (the experiment, `{exp}` in the
   database paths), `monthly` (default `True`), `clim_sigma`/`ocn_sigma` ([km]
-  Gaussian smoothing of the atmosphere and the ocean at loading, the land mask
-  following the smoothed elevation; default 0), `tas_season` and, per field,
+  Gaussian smoothing of the atmosphere, with its elevation, and the ocean at
+  loading; default 0), `tas_season` and, per field,
   the database group(s) holding it (see [Database](#database)).
 
 ### Database
