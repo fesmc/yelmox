@@ -390,6 +390,8 @@ annotated git tag. Dates are release (tag) dates.
   hard-coded 30Gb, which broke OpenMP jobs on Levante's shared partition).
 - Yelmo's internal output (regional 1D files) goes to the domain's output folder; the
   numerics/speed metrics are in Yelmo's `yelmo_metrics.nc`.
+- FastIsostasy `[isos] dt_method = "rkc"` (Runge-Kutta-Chebyshev) available;
+  the par files keep `tsit54`.
 
 ### Fixed
 - Exact restarts (bit-for-bit with the continuous run, `yelmox` and `yelmox_bipolar`): the

@@ -3,10 +3,10 @@
 # dependency tags.
 package = "yelmox"
 deps = [
-    "fesm-utils:stable",
-    "yelmo:stable",
-    "FastIsostasy:stable",
-    "rembo1:stable",
-    "chion:stable",
-    "insol:stable",
+    "fesm-utils:v1.4",
+    "yelmo:v2.4",
+    "FastIsostasy:v0.3-fesmc",
+    "rembo1:v1.3",
+    "chion:v0.2.0",
+    "insol:v1.2.0",
 ]
