@@ -62,13 +62,13 @@ the domain once per step with the coupling sequence written out in the time loop
 
 ```fortran
 call step_relax(dom, ts)          ! topography relaxation (relax)
-call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
+call step_optimize(dom, ts, dtt)  ! cb_ref/tf_corr optimization (opt)
 call step_isostasy(dom, ts, bsl)  ! bedrock + sea level (dt_isos cadence)
 call couple_to_yelmo(dom)         ! bedrock now; smb + shelf melt lag one step
 call step_ice_bnd(dom, ts, coefs) ! prescribed ice in the fixed/relaxation cells ([ice_bnd])
 call step_icesheet(dom, ts)       ! yelmo_update
 call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
-call step_climate(dom, ts, coefs) ! climate (dt_clim cadence)
+call step_climate(dom, ts, dtt, coefs) ! climate (dt_clim cadence)
 call step_surface(dom, ts)        ! surface mass balance + temperature
 call step_shelf(dom, ts)          ! shelf-base melt + temperature
 ```

@@ -99,9 +99,9 @@ program yelmox
     call coefs_init(coefs, path_par, ts%time_rel)
     if (trim(restart) /= "None") call coefs_restart_read(coefs, trim(restart))
 
-    ! Initialize the domain: sub-models + hi-res hub + coupler maps. The domain
-    ! reads the timeline values it needs from the same [run_step] group.
-    call domain_init(dom, path_par, ts%time, coefs, timeline_group=trim(run_step))
+    ! Initialize the domain: sub-models + hi-res hub + coupler maps, at the
+    ! start of the timeline ([run_step] group).
+    call domain_init(dom, path_par, ts, coefs, timeline_group=trim(run_step))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))
@@ -110,7 +110,7 @@ program yelmox
     ! (incl. the shared bsl) and continue its state: the hi-res hub rebuilt
     ! from the restored models, the climate (and a stateless surface)
     ! re-derived from it (see domain_startup).
-    call domain_startup(dom, ts, bsl, trim(restart), coefs)
+    call domain_startup(dom, ts, dtt, bsl, trim(restart), coefs)
 
     write(*,*)
     write(*,*) "yelmox: domain initialized"
@@ -189,7 +189,7 @@ program yelmox
         ! === coupling sequence ===
         call step_relax(dom, ts)          ! topography relaxation (relax)
         call timer_step(tmr, tt_relax)
-        call step_optimize(dom, ts)       ! cb_ref/tf_corr optimization (opt)
+        call step_optimize(dom, ts, dtt)  ! cb_ref/tf_corr optimization (opt)
         call timer_step(tmr, tt_optimize)
         call step_isostasy(dom, ts, bsl)  ! bedrock + sea level, this step
         call timer_step(tmr, tt_isostasy)
@@ -200,7 +200,7 @@ program yelmox
         call timer_step(tmr, tt_icesheet)
         call couple_yelmo_to_htopo(dom)   ! hi-res geometry from the models
         call timer_step(tmr, tt_couple_htopo)
-        call step_climate(dom, ts, coefs)        ! climate (dt_clim cadence)
+        call step_climate(dom, ts, dtt, coefs)   ! climate (dt_clim cadence)
         call timer_step(tmr, tt_climate)
         call step_surface(dom, ts)        ! surface mass balance + temperature
         call timer_step(tmr, tt_surface)

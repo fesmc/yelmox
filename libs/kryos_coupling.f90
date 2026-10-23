@@ -46,10 +46,10 @@ contains
                           dom%rlx%topo_rel0, dom%rlx%topo_rel_tau0)
     end subroutine step_relax
 
-    subroutine step_optimize(dom, ts)
+    subroutine step_optimize(dom, ts, dtt)
         ! Optimization ([sim] opt), within the [opt] time windows: nudge the
         ! basal-friction field cb_ref and the marine thermal-forcing correction
-        ! tf_corr toward present-day observations.
+        ! tf_corr toward present-day observations, over the step dtt.
         !
         ! cb_ref is a Yelmo-grid control, optimized in place. tf_corr lives on the
         ! marine_shelf grid; the observational targets (H_ice/H_grnd) live on the
@@ -58,6 +58,7 @@ contains
         ! both remaps are copies.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        real(dp),          intent(in)    :: dtt   ! [yr] the driver's time step
 
         real(wp), allocatable :: tf_corr_y(:,:), tf_corr_m(:,:)
         character(len=256) :: gm, gy
@@ -76,7 +77,7 @@ contains
                     dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%uxy_s, dom%yelmo%dta%pd%H_grnd, &
                     dom%opt%cf_min, dom%opt%cf_max, dom%yelmo%tpo%par%dx, &
                     dom%opt%sigma_err, dom%opt%sigma_vel, dom%opt%tau_c, dom%opt%H0, &
-                    dt=dom%ctl%dtt, fill_method=dom%opt%fill_method, fill_dist=dom%opt%sigma_err, &
+                    dt=dtt, fill_method=dom%opt%fill_method, fill_dist=dom%opt%sigma_err, &
                     cb_tgt=dom%yelmo%dyn%now%cb_tgt)
         end if
 
@@ -92,13 +93,13 @@ contains
                 call optimize_tf_corr_basin(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
                         dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%bnd%basins, &
                         dom%opt%H_grnd_lim, dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                        dom%opt%tf_basins, dt=dom%ctl%dtt)
+                        dom%opt%tf_basins, dt=dtt)
             case ("L21-points")
                 call optimize_tf_corr(tf_corr_y, dom%yelmo%tpo%now%H_ice, dom%yelmo%tpo%now%H_grnd, &
                         dom%yelmo%tpo%now%dHidt, dom%yelmo%dta%pd%H_ice, dom%yelmo%dta%pd%H_grnd, &
                         dom%opt%H_grnd_lim, dom%yelmo%bnd%basins, dom%opt%basin_fill, &
                         dom%opt%tau_m, dom%opt%m_temp, dom%opt%tf_min, dom%opt%tf_max, &
-                        dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dom%ctl%dtt)
+                        dom%yelmo%tpo%par%dx, sigma=dom%opt%tf_sigma, dt=dtt)
             end select
             call remap(dom, tf_corr_y, gy, tf_corr_m, gm, "bilin")
             dom%mshlf%now%tf_corr = tf_corr_m
@@ -265,7 +266,7 @@ contains
                        &reference, so the two must describe the same bedrock."
             write(*,*) "  On a restart this usually means isos_restart.nc came from a run with a &
                        &different topography than the one Yelmo is reading now."
-            stop
+            error stop 1
         end if
     end subroutine check_isostasy_reference
 
@@ -371,19 +372,18 @@ contains
             call negis_update_cb_ref(dom%yelmo, dom%ngs, ts%time_rel)
 
         if (.not. dom%ctl%with_ice_sheet) return
-        if (ts%n == 0 .and. dom%yelmo%par%use_restart) return
 
         call yelmo_update(dom%yelmo, ts%time)
     end subroutine step_icesheet
 
-    subroutine step_climate(dom, ts, coefs, init, force)
+    subroutine step_climate(dom, ts, dtt, coefs, init, force)
         ! Run climate on grid_clim, on the dt_clim cadence: the hub geometry
         ! remapped to grid_clim, atmosphere/ocean (and, by backend, surface mass
         ! balance and discharge) produced by the climate backend and its
         ! terms into dom%clim, read by step_surface, step_shelf and
-        ! couple_climate_to_yelmo. coefs is the driver-owned coefficient
-        ! registry (advanced to this step; the climate sets its derived
-        ! coefficients in it).
+        ! couple_climate_to_yelmo. dtt is the driver's time step. coefs is the
+        ! driver-owned coefficient registry (advanced to this step; the climate
+        ! sets its derived coefficients in it).
         ! init=.true. marks the cold start: the backend's own initialization
         ! (the REMBO equilibration), with an update regardless of the cadence.
         ! force=.true. updates regardless of the cadence, without that
@@ -391,6 +391,7 @@ contains
         ! a cold-start change of the geometry (recon).
         type(kryos_domain),    intent(inout) :: dom
         type(tstep_class),     intent(in)    :: ts
+        real(dp),              intent(in)    :: dtt
         type(coefs_class),     intent(inout) :: coefs
         logical,               intent(in), optional :: init
         logical,               intent(in), optional :: force
@@ -425,7 +426,7 @@ contains
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
                             z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
-                            dtt=dom%ctl%dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
+                            dtt=dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)

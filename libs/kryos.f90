@@ -22,6 +22,7 @@ module kryos
 
     use precision,    only : dp
     use nml,          only : nml_read, nml_replace
+    use timestepping, only : tstep_class
     use coords,       only : grid_class, grid_cdo_read_desc
     use phys_constants, only : phys_const_class, phys_const_load
     use yelmo,        only : yelmo_class, wp, yelmo_init, yelmo_init_grid, ytopo_input_class
@@ -54,9 +55,6 @@ module kryos
     type domain_ctl
         ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
         character(len=512) :: path_par = ""
-        ! Shared timeline (read from the driver's timeline group, e.g. [ctrl]).
-        character(len=56) :: tstep_method = "const"
-        real(dp) :: dtt         = 10.0_dp
         ! Components ([comps]): which are active in the coupling sequence, with
         ! which model, how often.
         logical :: with_ice_sheet = .true.
@@ -218,7 +216,7 @@ contains
         if (dt > 0.0_dp) due = (mod(nint(time*100), nint(dt*100)) == 0)
     end function cadence_due
 
-    subroutine domain_init(dom, path_par, time, coefs, group_suffix, timeline_group)
+    subroutine domain_init(dom, path_par, ts, coefs, group_suffix, timeline_group)
         ! Initialize all sub-models of one domain, load the hi-res reference hub,
         ! prime the Yelmo<->hub maps, and place marine_shelf on its configured grid.
         ! The barystatic sea level (bsl) is NOT a domain sub-model: it is a shared,
@@ -237,15 +235,18 @@ contains
         ! ytopo, ...) stay shared: they are named by pointer fields inside the
         ! [yelmo<suffix>] block, so the nml decides whether they are shared.
         !
-        ! timeline_group (optional, default "ctrl") names the group holding the
-        ! run's shared timeline -- the same group the driver passes to
-        ! tstep_init -- from which the domain reads tstep_method/dtt itself.
+        ! ts is the driver's timeline at the start: Yelmo starts at the model
+        ! time, the climate at the forcing time (time_rel). timeline_group
+        ! (optional, default "ctrl") names the group holding it -- the same
+        ! group the driver passes to tstep_init -- for the climate backends
+        ! that read it (esm). The time step stays the driver's (dtt), passed to
+        ! the steps that need it.
         !
         ! coefs is the driver's coefficient registry (shared by every domain);
         ! the climate checks the coefficients it names against it.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: path_par
-        real(dp),         intent(in)    :: time       ! model time
+        type(tstep_class),  intent(in)  :: ts
         type(coefs_class),   intent(in) :: coefs
         character(len=*), intent(in), optional :: group_suffix
         character(len=*), intent(in), optional :: timeline_group
@@ -265,7 +266,7 @@ contains
         if (present(timeline_group)) tgroup = trim(timeline_group)
 
         ! --- domain definition + run control ---
-        call domain_ctl_load(dom%ctl, path_par, trim(sfx), trim(tgroup))
+        call domain_ctl_load(dom%ctl, path_par, trim(sfx))
         domain = trim(dom%ctl%domain)
 
         ! --- physical constants of the domain, handed to every component ---
@@ -301,7 +302,7 @@ contains
 
         call domain_regions_load(reg_y, dom, path_par, trim(sfx), grid_y)
 
-        call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=time, &
+        call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=ts%time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
                         group="yelmo"//trim(sfx), reg=reg_y, &
                         topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
@@ -359,7 +360,7 @@ contains
         dom%ctl%south = (sum(grid_c%lat) / size(grid_c%lat) < 0.0_wp)
         call domain_regions_load(reg_c, dom, path_par, trim(sfx), grid_c)
         call climate_init(dom%cl, dom%ctl%climate, path_par, domain, grid_c, &
-                          time, reg_c, dom%ctl%south, sfx=trim(sfx), &
+                          ts%time_rel, reg_c, dom%ctl%south, sfx=trim(sfx), &
                           timeline_group=trim(tgroup), &
                           smb_direct=(trim(dom%ctl%surface_method) == "climate"), coefs=coefs)
         call regions_end(reg_c)
@@ -532,27 +533,19 @@ contains
         dom%yelmo%dyn%par%till_method = -1
     end subroutine domain_opt_init
 
-    subroutine domain_ctl_load(ctl, path_par, suffix, timeline_group)
+    subroutine domain_ctl_load(ctl, path_par, suffix)
         ! Load this domain's definition, components, simulation conditions and
         ! output config ([domain], [comps], [sim], [output]). All groups
         ! carry an optional domain suffix (e.g. "_north"), so several domains can
         ! coexist in one parameter file without group.name collisions (matters
-        ! for runme -p). The shared timeline is driver-owned (tstep_init); the
-        ! values the domain logic needs (tstep_method, dtt) are read from the
-        ! same timeline_group here, so nothing is injected after init.
+        ! for runme -p). The shared timeline is driver-owned (tstep_init).
         type(domain_ctl), intent(inout) :: ctl
         character(len=*), intent(in)    :: path_par
         character(len=*), intent(in)    :: suffix
-        character(len=*), intent(in)    :: timeline_group
 
         character(len=256) :: gd, gc, gs, go
 
         ctl%path_par = trim(path_par)
-
-        ! Shared timeline values used by the domain logic (dt_clim cadence,
-        ! optimization dt, domain-specific startup).
-        call nml_read(path_par, timeline_group, "tstep_method", ctl%tstep_method)
-        call nml_read(path_par, timeline_group, "dtt",          ctl%dtt)
 
         ! Domain definition ([domain<suffix>]): name and the grid of every
         ! component. The hub's topography and masks are read by htopo_init.

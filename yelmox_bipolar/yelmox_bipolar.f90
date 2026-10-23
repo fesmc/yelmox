@@ -215,7 +215,7 @@ program yelmox_bipolar
         if (active_north) then
             call step_relax(dom_north, ts)
             call timer_step(tmr, tt_relax)
-            call step_optimize(dom_north, ts)
+            call step_optimize(dom_north, ts, dtt)
             call timer_step(tmr, tt_optimize)
             call step_isostasy(dom_north, ts, bsl)
             call timer_step(tmr, tt_isostasy)
@@ -223,7 +223,7 @@ program yelmox_bipolar
         if (active_south) then
             call step_relax(dom_south, ts)
             call timer_step(tmr, tt_relax)
-            call step_optimize(dom_south, ts)
+            call step_optimize(dom_south, ts, dtt)
             call timer_step(tmr, tt_optimize)
             call step_isostasy(dom_south, ts, bsl)
             call timer_step(tmr, tt_isostasy)
@@ -242,7 +242,7 @@ program yelmox_bipolar
             call timer_step(tmr, tt_icesheet)
             call couple_yelmo_to_htopo(dom_north)
             call timer_step(tmr, tt_couple_htopo)
-            call step_climate(dom_north, ts, coefs)
+            call step_climate(dom_north, ts, dtt, coefs)
             call timer_step(tmr, tt_climate)
             call step_surface(dom_north, ts)
             call timer_step(tmr, tt_surface)
@@ -255,7 +255,7 @@ program yelmox_bipolar
             call timer_step(tmr, tt_icesheet)
             call couple_yelmo_to_htopo(dom_south)
             call timer_step(tmr, tt_couple_htopo)
-            call step_climate(dom_south, ts, coefs)
+            call step_climate(dom_south, ts, dtt, coefs)
             call timer_step(tmr, tt_climate)
             call step_surface(dom_south, ts)
             call timer_step(tmr, tt_surface)
@@ -314,7 +314,7 @@ contains
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(out)   :: outfldr
 
-        call domain_init(dom, path_par, ts%time, coefs, group_suffix=suffix)
+        call domain_init(dom, path_par, ts, coefs, group_suffix=suffix)
 
         ! Each domain writes to a subfolder named after its domain.
         outfldr = trim(dom%ctl%domain)//"/"
@@ -327,9 +327,9 @@ contains
         ! bsl was already initialized/restored once by the driver (bsl_startup
         ! above).
         if (trim(restart) == "None") then
-            call domain_startup(dom, ts, bsl, "None", coefs, restore_bsl=.false.)
+            call domain_startup(dom, ts, dtt, bsl, "None", coefs, restore_bsl=.false.)
         else
-            call domain_startup(dom, ts, bsl, trim(restart)//"/"//trim(dom%ctl%domain), coefs, &
+            call domain_startup(dom, ts, dtt, bsl, trim(restart)//"/"//trim(dom%ctl%domain), coefs, &
                                 restore_bsl=.false.)
         end if
 

@@ -54,7 +54,7 @@ contains
         call bsl_restart_read(bsl, trim(fldr)//"/bsl_restart.nc")
     end subroutine bsl_startup
 
-    subroutine domain_startup(dom, ts, bsl, restart, coefs, restore_bsl)
+    subroutine domain_startup(dom, ts, dtt, bsl, restart, coefs, restore_bsl)
         ! Establish the domain state after domain_init: cold start (restart
         ! == "None") builds the initial boundary state; otherwise the domain's
         ! restart bundle (folder `restart`) is restored and the hi-res hub rebuilt
@@ -63,7 +63,8 @@ contains
         ! bundle folder -- the single-domain convention, where the run-level
         ! bsl_restart.nc lives in the domain's bundle. Multi-domain drivers
         ! restore the bsl once themselves (bsl_startup) and pass .false..
-        ! coefs is the driver-owned coefficient registry (restored by the driver).
+        ! coefs is the driver-owned coefficient registry (restored by the driver);
+        ! dtt the driver's time step.
         !
         ! A restart continues the state at the top of the time loop of the run
         ! that wrote the bundle, so nothing is stepped here: the stateful
@@ -80,6 +81,7 @@ contains
         ! (force), so also with dt_clim <= 0 (never updated after the cold start).
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        real(dp),          intent(in)    :: dtt
         type(bsl_class),   intent(inout) :: bsl
         character(len=*),  intent(in)    :: restart
         type(coefs_class),   intent(inout) :: coefs
@@ -91,12 +93,12 @@ contains
         if (present(restore_bsl)) do_bsl = restore_bsl
 
         if (trim(restart) == "None") then
-            call domain_init_state(dom, ts, bsl, coefs)
+            call domain_init_state(dom, ts, dtt, bsl, coefs)
         else
             if (do_bsl) call bsl_startup(bsl, trim(restart))
             call domain_restart_read(dom, trim(restart), ts, bsl, surface_restored)
             call couple_yelmo_to_htopo(dom)
-            call step_climate(dom, ts, coefs, force=.true.)
+            call step_climate(dom, ts, dtt, coefs, force=.true.)
             if (.not. surface_restored) call step_surface(dom, ts)
         end if
     end subroutine domain_startup
@@ -126,16 +128,17 @@ contains
         call coefs_restart_write(coefs, trim(bundle), time)
     end subroutine run_restart_write
 
-    subroutine domain_init_state(dom, ts, bsl, coefs)
+    subroutine domain_init_state(dom, ts, dtt, bsl, coefs)
         ! Build the initial boundary state and initialize the Yelmo state
         ! variables, then run the domain-specific cold-start setup.
         ! bsl is the shared, driver-owned sea level; the driver has already called
         ! bsl_update for the initial time, so this routine only consumes it. The
         ! coefficient registry (coefs) gives the startup climate its initial
         ! coefficient values (the terms), keeping the cold-start state consistent with
-        ! the loop.
+        ! the loop. dtt is the driver's time step.
         type(kryos_domain),  intent(inout) :: dom
         type(tstep_class), intent(in)    :: ts
+        real(dp),          intent(in)    :: dtt
         type(bsl_class),   intent(inout) :: bsl
         type(coefs_class),   intent(inout) :: coefs
 
@@ -155,7 +158,7 @@ contains
         ! Climate on grid_clim (init: snapshots at time_rel), then the
         ! surface mass balance on grid_surface (init=.true. runs the smbpal ITM
         ! equilibration before the first update).
-        call step_climate(dom, ts, coefs, init=.true.)
+        call step_climate(dom, ts, dtt, coefs, init=.true.)
         call step_surface(dom, ts, init=.true.)
 
         ! Marine shelf through the (already refreshed) hub.
@@ -175,7 +178,7 @@ contains
         call yelmo_init_state(dom%yelmo, time=ts%time, thrm_method="robin-cold")
 
         ! Cold-start ice state ([sim] init_*). Cold start only; restart skips it.
-        call domain_init_ice(dom, ts, coefs)
+        call domain_init_ice(dom, ts, dtt, coefs)
 
         ! The hub follows the initialized ice state, so the initial output and
         ! restart bundle see it.
@@ -245,16 +248,18 @@ contains
                                    dom%yelmo%thrm, dom%yelmo%bnd)
     end subroutine domain_init_isostasy
 
-    subroutine domain_init_ice(dom, ts, coefs)
+    subroutine domain_init_ice(dom, ts, dtt, coefs)
         ! Cold-start ice state, after yelmo_init_state ([sim]): no ice where
         ! the present-day bed is ocean (init_kill_shelves), LGM-like marine ice
         ! (init_marine_H), then init_method -- none, a short equilibration with
         ! constant boundaries (equil), or the ice reconstruction recon_path as the
         ! initial ice (recon) or only as the reference ice (recon_ref) -- and last
-        ! an equilibration with topography fixed (init_time_thrm > 0). coefs is
-        ! the coefficient registry, for the climate refresh of recon.
+        ! an equilibration with topography fixed (init_time_thrm > 0, in steps of
+        ! the driver's dtt). coefs is the coefficient registry, for the climate
+        ! refresh of recon.
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
+        real(dp),           intent(in)    :: dtt
         type(coefs_class),   intent(inout) :: coefs
 
         if (dom%ctl%init_kill_shelves) then
@@ -271,22 +276,23 @@ contains
                     call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%init_equil_time, &
                                             dt=1.0_wp, topo_fixed=.FALSE.)
             case("recon", "recon_ref")
-                call domain_init_recon(dom, ts, coefs)
+                call domain_init_recon(dom, ts, dtt, coefs)
         end select
 
         if (dom%ctl%with_ice_sheet .and. dom%ctl%init_time_thrm > 0.0_wp) &
             call yelmo_update_equil(dom%yelmo, ts%time, time_tot=dom%ctl%init_time_thrm, &
-                                    dt=real(dom%ctl%dtt,wp), topo_fixed=.TRUE.)
+                                    dt=real(dtt,wp), topo_fixed=.TRUE.)
 
     end subroutine domain_init_ice
 
-    subroutine domain_init_recon(dom, ts, coefs)
+    subroutine domain_init_recon(dom, ts, dtt, coefs)
         ! Start from an ice reconstruction (recon_path, e.g. ICE-6G_C at the LGM):
         ! it becomes the reference ice thickness and, with recon, the initial ice
         ! on the recon_regions (bed > -500 m). Then refresh the surface
         ! and (via the hub) the climate/smb, and stabilize the dynamic fields.
         type(kryos_domain), intent(inout) :: dom
         type(tstep_class),  intent(in)    :: ts
+        real(dp),           intent(in)    :: dtt
         type(coefs_class),   intent(inout) :: coefs
 
         integer  :: nx, ny, k
@@ -327,7 +333,7 @@ contains
         ! Refresh the hub and climate/smb to reflect the new geometry, then land
         ! the smb on the Yelmo grid for the stabilization below.
         call couple_yelmo_to_htopo(dom)
-        call step_climate(dom, ts, coefs, force=.true.)
+        call step_climate(dom, ts, dtt, coefs, force=.true.)
         call step_surface(dom, ts)
         call couple_surface_to_yelmo(dom)
 
