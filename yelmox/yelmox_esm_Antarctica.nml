@@ -701,7 +701,7 @@
     basins          = "Zwally2012"  ! basin ids: <set>, <set>.group, None or domain (one basin)
     mask_ocean      = "zone:open_ocean"  ! mask_ocn_ref: ocean (else land)
     mask_deep_ocean = "~region:Antarctica | zone:open_ocean | zone:shelf_break_buffer"  ! mask_ocn_ref: deep ocean (c_deep), over ocean
-    mask_pico_deep  = "region:Antarctica & zone:shelf_break_buffer"  ! pico: bmb averaged with c_deep there
+    mask_pico_deep  = "none"  ! pico only (bmb_method="pico"): bmb averaged with c_deep there, e.g. "region:Antarctica & zone:shelf_break_buffer"
     corr_method     = "bmb"  ! none, tf or bmb: corrections by region
     corr_names      = "b12"
     corr_values     = 0.0
@@ -746,8 +746,11 @@
     
 /
 
+! PICO box model (Reese et al., 2018), read only with bmb_method = "pico".
+! Not used or calibrated in the shipped configurations: the parameters are
+! the published defaults.
 &pico
-    n_box          = 5.0        ! Maximum number of boxes in PICO.  
+    n_box          = 5.0        ! Maximum number of boxes per basin
     a_pico         = -0.0572    ! Salinity coefficient of freezing equation [ºC/PSU]. Reese et al., (2018) suggest −0.0572.
     b_pico         = 0.0788     ! Constant coefficient of freezing equation [ºC]. Reese et al., (2018) suggest 0.0788.
     c_pico         = 7.77e-8    ! Pressure coefficient of freezing equation [ºC/Pa]. Reese et al., (2018) suggest 7.77e-8.
