@@ -973,6 +973,15 @@ annotated git tag. Dates are release (tag) dates.
 - The original single-grid scripts and par files kept for the ports
   (`scripts/ant-paleo/legacy/`, `scripts/ismip7/legacy/`).
 
+## [v2.3.1] - 2026-07-25
+
+### Fixed
+- `yelmox_rembo`: writing `rembo_ts.nc` aborted in ncio (`nf90_inq_dimid` for
+  `xc`) because `yelmo_write_step_model_metrics` also emits the 2D `pc_tau_max`
+  field, which needs `xc`/`yc` dims absent from the 1D timeseries file. The
+  metrics call is disabled for now; numerics/speed diagnostics will move to a
+  dedicated `yelmo_metrics.nc`.
+
 ## [v2.3] - 2026-07-15
 
 ### Added
