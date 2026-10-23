@@ -47,7 +47,6 @@ module pico
         real(wp), allocatable   :: d_shlf(:,:)          ! Shelf distance to grl
         real(wp), allocatable   :: d_if(:,:)            ! Shelf distance to ice front
         real(wp), allocatable   :: r_shlf(:,:)          ! Relative ice shelf position
-        real(wp), allocatable   :: n_shlf(:,:)          ! Max number of boxes per basin
         real(wp), allocatable   :: A_box(:,:)           ! Area of box
         real(wp), allocatable   :: boxes(:,:)           ! Box number of ice shelf
         real(wp), allocatable   :: bmb_shlf(:,:)        ! Shelf basal mass balance [m/a]
@@ -396,7 +395,6 @@ contains
         allocate(now%T_box(nx,ny))
         allocate(now%S_box(nx,ny))
         allocate(now%d_shlf(nx,ny))
-        allocate(now%n_shlf(nx,ny))
         allocate(now%d_if(nx,ny))
         allocate(now%r_shlf(nx,ny))
         allocate(now%A_box(nx,ny))
@@ -410,7 +408,6 @@ contains
         now%d_shlf   = 0.0
         now%d_if     = 0.0
         now%r_shlf   = 0.0
-        now%n_shlf   = 0.0
         now%A_box    = 0.0
         now%bmb_shlf = 0.0
         now%CC       = 0.0
@@ -432,7 +429,6 @@ contains
         if (allocated(now%d_shlf))   deallocate(now%d_shlf)
         if (allocated(now%d_if))     deallocate(now%d_if)
         if (allocated(now%r_shlf))   deallocate(now%r_shlf)
-        if (allocated(now%n_shlf))   deallocate(now%n_shlf)
         if (allocated(now%A_box))    deallocate(now%A_box)
         if (allocated(now%bmb_shlf)) deallocate(now%bmb_shlf)
         if (allocated(now%CC))       deallocate(now%CC)

@@ -26,7 +26,6 @@ module pico_physics
     public :: calc_shelf_TS_box_n
     public :: calc_overtuning
     public :: calc_theta_pm
-    public :: calc_T_pm
     public :: calc_melt_rate_pico
 
 contains 
@@ -163,28 +162,6 @@ contains
         return
 
     end function calc_theta_pm
-
-    ! equation 5 in the PICO paper.
-    ! calculate pressure melting point from in-situ temperature
-    function calc_T_pm(so,H_ice,rho_ice_g) result(T_pm)
-
-        implicit none
-
-        real(prec), intent(IN)     :: so, H_ice
-        real(prec), intent(IN)     :: rho_ice_g
-        real(prec) :: T_pm
-        real(prec) :: a_situ, b_situ, c_situ
-
-        ! in-situ pressure melting point from Jenkins et al. 2010 paper
-        a_situ = -0.0573         ! K/PSU
-        b_situ = 0.0832 + 273.15 ! K
-        c_situ = 7.53e-8         ! K/bar
-
-        T_pm = a_situ*so + b_situ - c_situ*rho_ice_g*H_ice
-
-        return
-
-    end function calc_T_pm
 
     function calc_melt_rate_pico(T_box,pm_point,gamma_tstar,lambda_rho) result(bmb)
 

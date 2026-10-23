@@ -93,9 +93,6 @@ module marine_shelf
         real(wp) :: omega      =    1.346120e-2_wp ! [1/K] (rho_sw*cp_ocn)/(rho_ice*L_ice)
         real(wp) :: T0         =  273.15_wp  ! [K]   reference freezing temp
 
-        ! Internal parameter
-        logical :: use_restart
-
     end type 
 
     type marshelf_grid_class
@@ -148,11 +145,6 @@ module marine_shelf
         type(pico_class)           :: pico  
     end type
 
-    interface marshelf_update_shelf
-        module procedure marshelf_update_shelf_2D
-        module procedure marshelf_update_shelf_3D
-    end interface
-
     private
     public :: marshelf_class
     public :: marshelf_update_shelf
@@ -166,53 +158,7 @@ module marine_shelf
 
 contains 
     
-    subroutine marshelf_update_shelf_2D(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
-                                                depth,to_ann,so_ann,dto_ann,tf_ann)
-        ! Calculate various 2D fields from 3D ocean fields representative 
-        ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
-
-        implicit none 
-
-        type(marshelf_class), intent(INOUT) :: mshlf
-        real(wp), intent(IN) :: H_ice(:,:) 
-        real(wp), intent(IN) :: z_bed(:,:) 
-        real(wp), intent(IN) :: f_grnd(:,:)
-        real(wp), intent(IN) :: z_sl(:,:)
-        real(wp), intent(IN) :: dx
-        real(wp), intent(IN), optional :: depth(:)
-        real(wp), intent(IN) :: to_ann(:,:)
-        real(wp), intent(IN) :: so_ann(:,:)
-        real(wp), intent(IN) :: dto_ann(:,:)
-        real(wp), intent(IN), optional :: tf_ann(:,:)
-
-        ! Local variables
-        integer :: i, j, nx, ny 
-
-        nx = size(H_ice,1) 
-        ny = size(H_ice,2) 
-
-        ! Loop over domain and update variables at each point (simply set value at each point)
-        do j = 1, ny 
-        do i = 1, nx 
-
-            ! 1. Set water properties ============================
-
-            mshlf%now%T_shlf(i,j)  = to_ann(i,j) 
-            mshlf%now%S_shlf(i,j)  = so_ann(i,j) 
-            mshlf%now%dT_shlf(i,j) = dto_ann(i,j)
-
-            if (present(tf_ann)) then 
-                mshlf%now%tf_shlf(i,j) = tf_ann(i,j)
-            end if 
-
-        end do 
-        end do  
-
-        return 
-
-    end subroutine marshelf_update_shelf_2D
-
-    subroutine marshelf_update_shelf_3D(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
+    subroutine marshelf_update_shelf(mshlf,H_ice,z_bed,f_grnd,z_sl,dx, &
                                     depth,to_ann,so_ann,dto_ann,tf_ann)
         ! Calculate various 2D fields from 3D ocean fields representative 
         ! for the ice-shelf interface: T_shlf, dT_shlf, S_shlf 
@@ -276,7 +222,7 @@ contains
 
                 case DEFAULT
 
-                    write(*,*) "marshelf_update_shelf_3D:: Error: interp_depth method not recognized."
+                    write(*,*) "marshelf_update_shelf:: Error: interp_depth method not recognized."
                     write(*,*) "interp_depth = ", trim(mshlf%par%interp_depth)
 
             end select
@@ -312,7 +258,7 @@ contains
             if (sum(wt_shlf) .gt. 0.0_wp) then 
                 wt_shlf = wt_shlf / sum(wt_shlf) 
             else 
-                write(*,*) "marshelf_update_shelf_3D:: Error: weighting should be > 0."
+                write(*,*) "marshelf_update_shelf:: Error: weighting should be > 0."
                 stop 
             end if 
 
@@ -331,7 +277,7 @@ contains
         
         return 
 
-    end subroutine marshelf_update_shelf_3D
+    end subroutine marshelf_update_shelf
 
     subroutine marshelf_interp_shelf(out2D,mshlf,in3d,H_ice,z_bed,f_grnd,z_sl,depth)
         ! Calculate 2D fields from 3D ocean fields representative
@@ -460,16 +406,14 @@ contains
         real(wp), intent(IN), optional :: z_srf(:,:)
 
         ! Local variables
-        integer :: i, j, nx, ny, ngr 
+        integer :: i, j, nx, ny 
 
-        logical,  allocatable :: is_grline(:,:)   
         real(wp), allocatable :: gamma2D(:,:)
         logical :: with_slope 
 
         nx = size(f_grnd,1)
         ny = size(f_grnd,2) 
 
-        allocate(is_grline(nx,ny))
         allocate(gamma2D(nx,ny))
 
         ! Step 1: calculate geometry ===========================
@@ -675,10 +619,7 @@ contains
                                             mshlf%now%bmb_shlf = 0.0 
         
         ! Apply c_deep melt value to deep ocean points
-        ! n_smth can be zero when c_deep is a relatively small value (like -1 m/a). For
-        ! c_deep = -50 m/a, n_smth=2 is more appropriate to ensure a smooth transition to 
-        ! high melt rates. 
-        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl,n_smth=0) 
+        call apply_c_deep(mshlf%par,mshlf%now%bmb_shlf,mshlf%now%mask_ocn,z_bed,z_sl) 
 
         return
         
@@ -853,10 +794,6 @@ contains
 
             call marshelf_restart_read(mshlf,mshlf%par%restart)
             
-            mshlf%par%use_restart = .TRUE.
-        
-        else
-            mshlf%par%use_restart = .FALSE.
         end if
 
         ! ============================================================
@@ -912,7 +849,7 @@ contains
 
         character(len=56) :: names(n_corr_max)
         real(wp)          :: values(n_corr_max)
-        integer           :: n, k
+        integer           :: n, n_val, k
 
         init_pars = .FALSE.
         if (present(init)) init_pars = .TRUE. 
@@ -933,13 +870,27 @@ contains
         ! Corrections by region: corr_names, corr_values and one expression
         ! corr_<name> per name
         call nml_read(filename,group,"corr_method",    par%corr_method,    init=init_pars)   
+        ! (values: a marker for the entries not given, to count them)
         names  = ""
-        values = 0.0_wp
+        values = huge(1.0_wp)
         call nml_read(filename,group,"corr_names",     names,              init=init_pars)
         call nml_read(filename,group,"corr_values",    values,             init=init_pars)
-        n = count(len_trim(names) .gt. 0)
+        n     = count(len_trim(names) .gt. 0)
+        n_val = count(values .ne. huge(1.0_wp))
+        ! One value per name, in the same order. Without names (corr_names = "")
+        ! corr_values is a placeholder and not checked.
+        if (n .gt. 0) then
+            if (n_val .ne. n .or. any(len_trim(names(1:n)) .eq. 0) &
+                             .or. any(values(1:n) .eq. huge(1.0_wp))) then
+                write(error_unit,*) "marshelf_par_load:: Error: corr_names and corr_values must &
+                &have the same number of entries."
+                write(error_unit,*) "group = ", trim(group)
+                write(error_unit,*) "n(corr_names) = ", n, ", n(corr_values) = ", n_val
+                error stop 1
+            end if
+        end if
         allocate(par%corr_names(n), par%corr_exprs(n), par%corr_values(n))
-        par%corr_names  = pack(names, len_trim(names) .gt. 0)
+        par%corr_names  = names(1:n)
         par%corr_values = values(1:n)
         do k = 1, n
             call nml_read(filename,group,"corr_"//trim(par%corr_names(k)),par%corr_exprs(k),init=init_pars)
@@ -1041,63 +992,19 @@ contains
 
     end subroutine marshelf_par_load
 
-    subroutine apply_c_deep(par,bmb,mask_ocn,z_bed,z_sl,n_smth)
-        ! Apply c_deep for killing ice in the deep ocean 
+    subroutine apply_c_deep(par,bmb,mask_ocn,z_bed,z_sl)
+        ! Apply c_deep for killing ice in the deep ocean: bmb = c_deep at
+        ! deep-ocean points deeper than depth_deep
         
         implicit none 
 
-        type(marshelf_param_class) :: par 
+        type(marshelf_param_class), intent(IN) :: par 
         real(wp), intent(INOUT)    :: bmb(:,:)  
         integer,  intent(IN)       :: mask_ocn(:,:) 
         real(wp), intent(IN)       :: z_bed(:,:) 
         real(wp), intent(IN)       :: z_sl(:,:)
-        integer,  intent(IN)       :: n_smth       ! Smoothing neighborhood radius in grid points
-
-        ! Local variables 
-        integer :: i, j, nx, ny 
-        real(wp) :: n_pts 
-        logical,    allocatable :: is_c_deep(:,:) 
-        real(wp), allocatable :: bmb_tmp(:,:) 
-
-        nx = size(bmb,1)
-        ny = size(bmb,2) 
-
-        allocate(is_c_deep(nx,ny))
-        allocate(bmb_tmp(nx,ny))
-
-        if (n_smth .lt. 0 .or. n_smth .gt. 2) then 
-            write(*,*) "apply_c_deep:: Error: n_smth should be 0, 1, or 2."
-            write(*,*) "n_smth = ", n_smth 
-            stop 
-        end if 
-
-        ! Apply c_deep to appropriate regions or keep bmb, whichever is more negative
 
         where(mask_ocn .eq. mask_val_deep_ocean .and. z_sl-z_bed .ge. par%depth_deep) bmb = par%c_deep 
-
-        ! Make sure bmb transitions smoothly to c_deep value from neighbors 
-        
-        if (n_smth .gt. 0) then 
-            
-            ! Get size of neighborhood
-            n_pts = real( (2*n_smth+1)**2, wp) 
-
-            bmb_tmp = bmb 
-            do i = 1+n_smth, nx-n_smth
-            do j = 1+n_smth, ny-n_smth 
-
-                ! Apply a neighborhood average value, if deep ocean is in neighborhood of shallow ocean
-                if (is_c_deep(i,j) .and. &
-                    count(.not. is_c_deep(i-n_smth:i+n_smth,j-n_smth:j+n_smth)) .gt. 0) then
-
-                    bmb(i,j) = sum(bmb_tmp(i-n_smth:i+n_smth,j-n_smth:j+n_smth))/n_pts
-
-                end if 
-
-            end do 
-            end do 
-
-        end if 
 
         return 
 
@@ -1162,7 +1069,8 @@ contains
         ! 1: Grounding line (grounded side, including partially floating points)
         ! 2: Floating line  (first fully floating points adjacent to grounding line)
         ! 3: Open ocean 
-        ! 4: Lakes 
+        ! 4: Deep ocean (from mask_ocn_ref)
+        ! 5: Lakes (with find_ocean: floating points not connected to the open ocean)
 
         implicit none
 
@@ -1760,13 +1668,12 @@ contains
 
                 var_mean = 0.0_wp
 
-                write(*,*) "Warning:: calc_variable_basin_pico:: no ice free points &
-                &available in this basin for calculating the basin-wide mean."
+                write(*,*) "Warning:: calc_variable_basin_pico:: no ice-free ocean points &
+                &(f_grnd=0, H_ice=0) available in this basin for calculating the basin-wide mean."
                 write(*,*) "basin = ", m
-                write(*,*) "n_flt = ", count(basins .eq. m .and. &
-                            (f_grnd .lt. 1.0 .and. H_ice .gt. 0.0) )
-                write(*,*) "n_ice = ", count(basins .eq. m .and. &
-                            (H_ice .gt. 0.0) )
+                write(*,*) "n_pts (basin)           = ", count(basins .eq. m)
+                write(*,*) "n_ocn (f_grnd=0)        = ", count(basins .eq. m .and. f_grnd .eq. 0.0)
+                write(*,*) "n_ice (H_ice>0)         = ", count(basins .eq. m .and. H_ice .gt. 0.0)
             end if
 
             ! Assign bedrock value to all points in the basin
@@ -1850,7 +1757,8 @@ contains
         now%z_base          = 0.0 
         now%slope_base      = 0.0 
         
-        ! By default set ocean points everywhere
+        ! Placeholder values (1 = grounding line): mask_ocn_ref is set by
+        ! marshelf_init, mask_ocn by marshelf_update
         now%mask_ocn_ref    = 1
         now%mask_ocn        = 1
 
@@ -2161,41 +2069,6 @@ contains
 
     end subroutine parse_path
     
-    function interp_linear(x,y,xout) result(yout)
-        ! Simple linear interpolation of a point
-
-        implicit none 
- 
-        real(wp), dimension(:), intent(IN) :: x, y
-        real(wp), intent(IN) :: xout
-        real(wp) :: yout 
-        integer :: i, j, n, nout 
-        real(wp) :: alph
-
-        n    = size(x) 
-
-        if (xout .lt. x(1)) then
-            yout = y(1)
-        else if (xout .gt. x(n)) then
-            yout = y(n)
-        else
-            do j = 1, n 
-                if (x(j) .ge. xout) exit 
-            end do
-
-            if (j .eq. 1) then 
-                yout = y(1) 
-            else if (j .eq. n+1) then 
-                yout = y(n)
-            else 
-                alph = (xout - x(j-1)) / (x(j) - x(j-1))
-                yout = y(j-1) + alph*(y(j) - y(j-1))
-            end if 
-        end if 
-
-        return 
-
-    end function interp_linear
     
     subroutine ocn_variable_extrapolation(var, H_ice, basin_mask, depth, z_bed)
 
@@ -2302,57 +2175,5 @@ contains
         return
     
     end subroutine ocn_variable_extrapolation
-
-    subroutine fill_missing_2d(var, mv)
-        ! Fill any remaining missing values in a 2D field
-        ! by iteratively averaging surrounding valid points
-        
-        implicit none
-        
-        real(wp), intent(INOUT) :: var(:,:)
-        real(wp), intent(IN)    :: mv
-        
-        ! Local variables
-        integer  :: i, j, nx, ny
-        real(wp) :: tmp_sum, tmp_count
-        logical  :: mv_found
-        
-        nx = size(var, 1)
-        ny = size(var, 2)
-        
-        mv_found = .TRUE.
-        do while (mv_found)
-            mv_found = .FALSE.
-            do j = 2, ny-1
-            do i = 2, nx-1
-                if (var(i,j) .lt. (mv + 100.0_wp)) then
-                    mv_found = .TRUE.
-                    tmp_sum   = 0.0_wp
-                    tmp_count = 0.0_wp
-                    if (var(i+1,j) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i+1,j)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (var(i-1,j) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i-1,j)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (var(i,j+1) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i,j+1)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (var(i,j-1) .gt. (mv + 100.0_wp)) then
-                        tmp_sum   = tmp_sum + var(i,j-1)
-                        tmp_count = tmp_count + 1.0_wp
-                    end if
-                    if (tmp_count .gt. 0.0_wp) var(i,j) = tmp_sum / tmp_count
-                end if
-            end do
-            end do
-        end do
-        
-        return
-        
-    end subroutine fill_missing_2d
 
 end module marine_shelf
