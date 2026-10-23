@@ -28,7 +28,7 @@
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
     active_obm       = False            ! Run the shared ocean box model?
-    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus"/"stommel")
+    obm_name         = "nautilus"       ! OBM parameter block name ("nautilus")
 
     ism2obm          = False            ! Ice sheet -> OBM freshwater flux coupling?
     couple_fwf_north = False            ! North freshwater flux -> obm%fn?
@@ -360,7 +360,6 @@
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
@@ -381,7 +380,6 @@
 &ytherm
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function 
     strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
@@ -433,6 +431,13 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_south] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
 /
+
+! [sim_south] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb_south
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
 
 &output_south
     write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
@@ -733,6 +738,7 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
 
 /
 
@@ -792,7 +798,6 @@
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
     itm_c           = -75.0
     itm_t           =  10.0
     itm_b           =  -2.0 
@@ -950,6 +955,13 @@
     scale_glacial_smb       = False   ! Reduce negative glacial smb (needs [glacial_smb_north] group)
     lim_pd_ice              = False   ! Extra melt outside PD ice extent
 /
+
+! [sim_north] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb_north
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
 
 &output_north
     write_yelmo   = True
@@ -1238,6 +1250,7 @@
 
     mm_snow = 3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
 
 /
 
@@ -1296,7 +1309,6 @@
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
     itm_c           = -45.0
     itm_t           =  10.0
     itm_b           =  -2.0 

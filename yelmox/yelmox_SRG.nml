@@ -45,6 +45,13 @@
     lim_pd_ice              = False
 /
 
+! [sim] scale_glacial_smb = True reads this group (all keys required):
+! &glacial_smb
+!     dt_lgm  = -8.0    ! [K] domain-mean cooling of a full glacial (glacial index 1)
+!     lat_lim = 55.0    ! [deg] negative smb is reduced above this latitude
+!     fac_lim = 0.9     ! [1] maximum reduction of the negative smb
+! /
+
 &output
     write_yelmo   = True         ! per-module 2D + 1D output switches (climber-x: <module>_<grid>.nc)
     write_isos    = True
@@ -460,7 +467,6 @@
 /
 
 &ymat
-    flow_law                = "glen"        ! Only "glen" is possible right now
     rf_method               = 1             ! -1: set externally; 0: rf_const everywhere; 1: standard function 
     rf_const                = 1e-18         ! [Pa^-3 a^-1]
     rf_use_eismint2         = False         ! Only applied for rf_method=1
@@ -481,7 +487,6 @@
 &ytherm
     qb_method       = 2                 ! 1: faces, 2: faces to quadrature nodes, 3: simple-stagger, 4: quadrature (1, 2: energy-consistent)
     dt_method       = "FE"              ! "FE", "AB", "SAM"
-    solver_advec    = "impl-upwind"     ! "expl", "impl-upwind"
     gamma           = 1.0               ! [K] Scalar for the pressure melting point decay function
     strain_heating  = "full"          ! "full": from 3D viscosity and strain rate, "sia": SIA approx., "none": no strain heating
     use_const_cp    = False             ! Use specified constant value of heat capacity?
@@ -596,6 +601,7 @@
 
     mm_snow = 4.424 !3.0         ! PDD snow melt factor [mm w.e./K-d]
     mm_ice  = 7.0 !8.0         ! PDD ice melt factor  [mm w.e./K-d]
+    time_equil  = 100.0   ! [yr] Cold-start snowpack spin-up, itm (annual cycles)
     
 /
 
@@ -607,7 +613,6 @@
     ! ## ITM 
     trans_a         =  0.46 
     trans_b         =  6e-5
-    trans_c         =  0.01
     itm_c           = -15.0
     itm_t           =  10.0
     itm_b           =  -2.0 
