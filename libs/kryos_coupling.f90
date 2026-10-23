@@ -435,8 +435,7 @@ contains
         call remap(dom, dom%topo%ref%z_srf, gh, z_srf_ref_c, gc, mth)
 
         call climate_update(dom%cl, dom%clim, ts, z_srf_c, H_ice_c, z_bed_c, f_grnd_c, z_sl_c, &
-                            z_srf_ref_c, domain=dom%ctl%domain, dx=dom%ctl%dx_clim, &
-                            dtt=dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
+                            z_srf_ref_c, dtt=dtt, mshlf=dom%mshlf, coefs=coefs, init=is_init)
     end subroutine step_climate
 
     subroutine step_surface(dom, ts, init)
@@ -500,8 +499,7 @@ contains
             call remap(dom, dom%topo%H_ice,  gh, H_ice_s, gs, mth)
             call remap_atm_to_surface(dom, z_srf_s, tas_s, pr_s)
             if (is_init .and. trim(dom%smb%par%abl_method) == "itm") then
-                call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, &
-                        ts%time_rel, time_equil=100.0_wp)
+                call smbpal_update_monthly_equil(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
             end if
             call smbpal_update_monthly(dom%smb, tas_s, pr_s, z_srf_s, H_ice_s, ts%time_rel)
         end if

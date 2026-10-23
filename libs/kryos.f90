@@ -423,7 +423,8 @@ contains
         call domain_regions_load(reg_m, dom, path_par, trim(sfx), grid_m)
 
         call marshelf_init(dom%mshlf, path_par, "marine_shelf"//trim(sfx), nx_m, ny_m, &
-                           domain, trim(dom%ctl%grid_shelf), reg_m, cnst=dom%cnst)
+                           domain, trim(dom%ctl%grid_shelf), reg_m, &
+                           xc=real(grid_m%G%x, wp), yc=real(grid_m%G%y, wp), cnst=dom%cnst)
         call regions_end(reg_m)
 
         ! Glacial smb scaling: load its group when enabled, so it cannot
