@@ -478,10 +478,11 @@ contains
         ! Two steps, mirroring yelmo's native init-from-restart:
         !   - yelmo_restart_read_topo_bnd loads the geometry [tpo]+[bnd]
         !     (H_ice, z_bed, ...);
-        !   - yelmo_restart_init loads [dyn,therm,mat] + mask_bed, activates the
+        !   - yelmo_restart_init loads [dyn,therm,mat], activates the
         !     predictor-corrector and initializes the passive-tracer backends
         !     (elsa, tracer) from their sidecar files.
-        ! The topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) are reconciled below.
+        ! The topo diagnostics (f_ice/f_grnd/H_grnd/z_srf, mask_bed) are
+        ! recomputed below (calc_ytopo_diagnostic).
         !
         ! Only when the ice sheet is active. With with_ice_sheet=False the spin-up
         ! wrote no yelmo_restart.nc (see the matching guard in domain_restart_write),
@@ -517,7 +518,7 @@ contains
         if (trim(dom%ctl%surface_method) == "chion") &
             call surface_chion_restart_read(dom%schn, trim(fldr)//"/chion_restart.nc", surface_restored)
 
-        ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf) from the
+        ! Reconcile Yelmo topo diagnostics (f_ice/f_grnd/H_grnd/z_srf, mask_bed) from the
         ! restored H_ice and the isostasy-updated z_bed/z_sl, then recompute the
         ! regional aggregates -- so the first 1D output after a restart reflects
         ! the restored state instead of the stale cold-start diagnostics.
