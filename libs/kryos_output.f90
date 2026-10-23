@@ -356,7 +356,7 @@ contains
                       prec_abs=1e-4_wp)
         call io_var2D(filename, "H_snow", sc%ann%H_snow, n, ncid, "mm w.e.", "Snowpack thickness (end of year)", &
                       prec_abs=0.1_wp)
-        call io_var2D(filename, "mask",   sc%ann%mask,   n, ncid, "1", "chion active (z_srf > z_sl)")
+        call io_var2D(filename, "mask",   sc%ann%mask,   n, ncid, "1", "chion active (land or ice)")
         call nc_close(ncid)
     end subroutine surface_chion_write_step
 

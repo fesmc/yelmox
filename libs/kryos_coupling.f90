@@ -109,11 +109,11 @@ contains
     subroutine step_isostasy(dom, ts, bsl)
         ! Run isostasy on its own grid, on the dt_isos cadence (FastIsostasy
         ! integrates the whole interval; the bedrock is held in between): ice load
-        ! from Yelmo (bilin). The bedrock /
+        ! from Yelmo, conservative onto a coarser grid_isos, bilinear onto a finer
+        ! one (remap_method_smooth; a copy when equal). The bedrock /
         ! sea-surface outputs stay on grid_isos (in dom%isos%out); they are landed
-        ! on the Yelmo grid by couple_isostasy_to_yelmo (in step_icesheet, before
-        ! yelmo_update). Assumes grid_isos is at least as fine as grid_ice
-        ! (identity when equal). bsl is the shared, driver-owned sea level (already
+        ! on the Yelmo grid by couple_isostasy_to_yelmo (in couple_to_yelmo, before
+        ! step_icesheet). bsl is the shared, driver-owned sea level (already
         ! updated for this step by the driver); isos_update reads it and, under
         ! fastiso/mixed, writes back the prognostic bsl_now -- so with several
         ! domains sharing one bsl the sea level integrates every domain's ice load.

@@ -53,7 +53,12 @@ module kryos
     character(len=*), parameter :: PHYS_CONST_FILE = "input/yelmo_phys_const.nml"
 
     type domain_ctl
-        ! Parameter file (kept for sub-steps that reload from it, e.g. LGM startup).
+        ! The values below are placeholders: every key domain_ctl_load reads
+        ! ([domain], [comps], [sim], [output]) is required in the par file
+        ! (nml_read stops on a missing key), the init_method keys for their
+        ! method only. The dx_* and south are derived by domain_init.
+        !
+        ! Parameter file (kept for sub-steps that reload from it, e.g. the recon startup).
         character(len=512) :: path_par = ""
         ! Components ([comps]): which are active in the coupling sequence, with
         ! which model, how often.
@@ -584,7 +589,6 @@ contains
             stop 1
         end if
         call nml_read(path_par, gc, "climate",        ctl%climate)
-        ctl%surface_method = "chion"
         call nml_read(path_par, gc, "surface_method", ctl%surface_method)
         select case(trim(ctl%surface_method))
             case("chion", "smbpal", "climate")
@@ -650,7 +654,7 @@ contains
         call nml_read(path_par, gs, "scale_glacial_smb", ctl%scale_glacial_smb)
         call nml_read(path_par, gs, "lim_pd_ice",        ctl%lim_pd_ice)
 
-        ! Per-module output switches ([output<suffix>]); default = write everything.
+        ! Per-module output switches ([output<suffix>]); every key is required.
         go = "output"//trim(suffix)
         call nml_read(path_par, go, "write_yelmo", ctl%write_yelmo)
         call nml_read(path_par, go, "write_isos",  ctl%write_isos)
