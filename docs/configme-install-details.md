@@ -29,8 +29,8 @@ behalf.
 
 Each run writes the commands it executed to a `.install.sh` script in the
 checkout. The script below is the equivalent for the `dkrz_levante` machine with
-the `ifx` compiler and the dependency pins of the development branch (a release
-pins tags); `$YELMOXROOT` stands for the install root.
+the `ifx` compiler and the v2.4 dependency pins (main until the v2.4 tags are
+set; FastIsostasy on dev); `$YELMOXROOT` stands for the install root.
 
 ```bash
 #!/usr/bin/env bash
@@ -53,19 +53,19 @@ runme config init
 git clone git@github.com:fesmc/insol.git $YELMOXROOT/insol
 (cd $YELMOXROOT/insol && git checkout main)
 git clone git@github.com:fesmc/fesm-utils.git $YELMOXROOT/fesm-utils
-(cd $YELMOXROOT/fesm-utils && git checkout dev)
+(cd $YELMOXROOT/fesm-utils && git checkout main)
 git clone git@github.com:fesmc/yelmo.git $YELMOXROOT/yelmo
-(cd $YELMOXROOT/yelmo && git checkout dev)
+(cd $YELMOXROOT/yelmo && git checkout main)
 git clone git@github.com:fesmc/FastHydrology.git $YELMOXROOT/yelmo/FastHydrology
-(cd $YELMOXROOT/yelmo/FastHydrology && git checkout dev)
+(cd $YELMOXROOT/yelmo/FastHydrology && git checkout main)
 git clone git@github.com:fesmc/elsa.git $YELMOXROOT/yelmo/elsa
-(cd $YELMOXROOT/yelmo/elsa && git checkout dev)
+(cd $YELMOXROOT/yelmo/elsa && git checkout main)
 git clone git@github.com:fesmc/tracer.git $YELMOXROOT/yelmo/tracer
-(cd $YELMOXROOT/yelmo/tracer && git checkout dev)
+(cd $YELMOXROOT/yelmo/tracer && git checkout main)
 git clone git@github.com:palma-ice/FastIsostasy.git $YELMOXROOT/FastIsostasy
 (cd $YELMOXROOT/FastIsostasy && git checkout dev)
 git clone git@github.com:alex-robinson/rembo1.git $YELMOXROOT/rembo1
-(cd $YELMOXROOT/rembo1 && git checkout dev)
+(cd $YELMOXROOT/rembo1 && git checkout main)
 git clone git@github.com:fesmc/chion.git $YELMOXROOT/chion
 (cd $YELMOXROOT/chion && git checkout main)
 

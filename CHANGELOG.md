@@ -3,7 +3,7 @@
 All notable changes to YelmoX are recorded here. Each version corresponds to an
 annotated git tag. Dates are release (tag) dates.
 
-## [Unreleased]
+## [v2.4] - 2026-10-23
 
 ### Added
 - The forcing as terms (docs `yelmox.md`, `climate-snapshots.md`): the climate at the
@@ -147,9 +147,9 @@ annotated git tag. Dates are release (tag) dates.
 
 ### Changed
 - Dependencies: fesm-utils, yelmo (with FastHydrology), FastIsostasy, rembo1, chion and
-  insol at their v2.4 versions (`.configme/manifest.toml`). Existing builds need `make
-  clean` once (stale `htopo.mod`, `insolation.mod`, `interp1D.mod` in
-  `libyelmox/include`).
+  insol at the v2.4-era versions pinned in `.configme/manifest.toml` (tags set at
+  release). Existing builds need `make clean` once (stale `htopo.mod`,
+  `insolation.mod`, `interp1D.mod` in `libyelmox/include`).
 - One driver for the regional runs: `yelmox_esm` and `yelmox_rembo` are removed; `yelmox`
   chooses the climate backend at runtime, `[comps] climate = "snapshots" | "esm" |
   "rembo"` (replaces `make CLIMATE=`; `yelmox_snapesm.x` gone). REMBO is linked with `make
