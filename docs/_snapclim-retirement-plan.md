@@ -4,7 +4,8 @@ Note (2026-10-20): the variant par files named here became `-p` arrays in
 scripts (`docs/_par-files-plan.md`).
 Names since renamed (2026-10-22): series → coef (`[forcing] coefs`, `[coef_<name>]`, `[term] coef`).
 
-Status: design draft (2026-10-17), not started. The leading `_` keeps quarto
+Status: done; snapclim removed 2026-10-19 (dev 663a275), the regional configs
+run on snapshots (design draft of 2026-10-17). The leading `_` keeps quarto
 from rendering it. Superseded where they differ by `_forcing-design.md`
 (2026-10-18).
 
