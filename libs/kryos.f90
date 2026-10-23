@@ -287,8 +287,10 @@ contains
         ! relaxation, basins; Yelmo's mask_border then sets the border).
         call grid_cdo_read_desc(grid_y, trim(dom%ctl%grid_ice), MAP_FLDR)
         call grid_cdo_read_desc(grid_h, trim(dom%ctl%grid_hub), MAP_FLDR)
-        dom%ctl%dx_hub = dom%yelmo%grd%G%dx * (grid_h%G%dx / grid_y%G%dx)
         call yelmo_init_grid(dom%yelmo%grd, grid_y)
+        ! Hub grid spacing in Yelmo units, scaled by the resolution ratio (as
+        ! the other components' below; needs the Yelmo grid).
+        dom%ctl%dx_hub = dom%yelmo%grd%G%dx * (grid_h%G%dx / grid_y%G%dx)
 
         call remap(dom, dom%topo%ref%z_bed,    dom%ctl%grid_hub, topo_y%z_bed,    dom%ctl%grid_ice, "con")
         call remap(dom, dom%topo%ref%H_ice,    dom%ctl%grid_hub, topo_y%H_ice,    dom%ctl%grid_ice, "con")
