@@ -289,7 +289,9 @@ contains
 
         ! --- ice sheet on grid_ice, with the hub's topography and the regions ---
         ! The hub topography is both Yelmo's initial state and its present-day
-        ! reference (H_ice_ref, z_bed_ref, optimization target). Each component
+        ! reference (H_ice_ref, z_bed_ref, optimization target). It is prepared
+        ! by the hub ([topo] z_bed_f_sd, remove_lakes, H_ice_min, grad_lim_zb),
+        ! so Yelmo takes it as given (prepared). Each component
         ! gets the regions ([regions], the files of the hub grid) on its own grid
         ! and makes its masks from them ([yelmo_masks]: where ice is allowed,
         ! relaxation, basins; Yelmo's mask_border then sets the border).
@@ -310,7 +312,7 @@ contains
         call yelmo_init(dom%yelmo, filename=path_par, grid_def="none", time=ts%time, &
                         domain=domain, grid_name=dom%ctl%grid_ice, &
                         group="yelmo"//trim(sfx), reg=reg_y, &
-                        topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst)
+                        topo_init=topo_y, topo_pd=topo_y, cnst=dom%cnst, prepared=.true.)
 
         ! Relaxation parameters + the par-file ytopo values it restores; no-op
         ! unless [sim] relax. Must follow yelmo_init (ytopo params known).

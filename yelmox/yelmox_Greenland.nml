@@ -80,6 +80,10 @@
     path  = "fesmdata/{domain}/{grid_name}/{grid_name}_TOPO-BedMachine-v6.nc"
     vars  = "z_bed" "z_srf" "H_ice" "z_bed_sd"
     remap = "con"
+    z_bed_f_sd   = 0.0                  ! Preparation of the reference (hub): z_bed = z_bed + f_sd*z_bed_sd
+    remove_lakes = True                 ! Remove englacial lakes (sea level 0)
+    H_ice_min    = 1.0                  ! [m] Remove ice thinner than this
+    grad_lim_zb  = 0.5                  ! [m/m] Limit the bed gradient (dzb/dx)
 /
 
 &regions
