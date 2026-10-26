@@ -5,16 +5,20 @@ module kryos_forcing
     ! ([forcing] coefs = "alpha" "beta"), each defined by a group
     ! [coef_<name>] (from the par file, else the first of the [forcing]
     ! var_defs files that has it), read by name by its consumers (the terms
-    ! of the climate, ice_bnd, the OBM forcing). Two kinds:
+    ! of the climate, ice_bnd, the OBM forcing). Three kinds:
     !   - tsgen coefficients (method const, ramp-*, sin, series, feedback ...):
     !     advanced once per step on the forcing time with the response
     !     variable (ice volume);
+    !   - scaled (method = "scaled"): factor x a tsgen coefficient (coef),
+    !     e.g. a regional amplification of a global anomaly, set right after
+    !     the tsgen coefficients (a term on the atmosphere may use it);
     !   - derived (method = "derived"): computed each step by the model from
     !     its own state (from = air_anomaly: the mean sea-level air anomaly of
     !     the climate update; obm_north/obm_south: a box temperature of the
     !     bipolar ocean box model), set by its producer with coefs_set after
-    !     the atmosphere of the step is composed. No tsgen state, no restart
-    !     file, no kill switch: it is recomputed.
+    !     the atmosphere of the step is composed.
+    ! Scaled and derived coefficients have no tsgen state, no restart file and
+    ! no kill switch: they are recomputed.
     ! One registry per run, held by the driver like bsl -- deliberately NOT
     ! part of kryos_domain, so every domain of a multi-domain driver reads the
     ! same coefficients. The registry also holds the kill switch (any
@@ -44,16 +48,19 @@ module kryos_forcing
         logical           :: anomaly = .true.    ! obm_*: the box temperature minus its initial value
     end type derived_spec
 
-    ! One coefficient, tsgen or derived.
+    ! One coefficient: tsgen, scaled or derived.
     type coef_class
         character(len=64)  :: name
+        character(len=8)   :: kind             = "tsgen"  ! tsgen | scaled | derived
         character(len=32)  :: units            = "1"      ! label of coef_<name> in the 1D output
         real(wp)           :: restart_every_df = 0.0_wp   ! [f] |Δf| between restarts; 0 = off
         real(wp)           :: f_last_restart   = 0.0_wp   ! f at the last restart mark
-        real(wp)           :: f                = 0.0_wp   ! the current value (both kinds)
-        logical            :: derived          = .false.
-        type(derived_spec) :: drv
-        type(tsgen_class)  :: tsg                         ! tsgen coefficients only
+        real(wp)           :: f                = 0.0_wp   ! the current value (every kind)
+        type(tsgen_class)  :: tsg                         ! tsgen only
+        character(len=64)  :: source           = ""       ! scaled: the tsgen coefficient it scales
+        real(wp)           :: factor           = 1.0_wp   ! scaled: f = factor * f(source)
+        integer            :: k_source         = 0        ! scaled: the position of the source
+        type(derived_spec) :: drv                         ! derived only
     end type coef_class
 
     ! The registry.
@@ -64,7 +71,7 @@ module kryos_forcing
 
     public :: coefs_class, derived_spec
     public :: coefs_init, coefs_update, coefs_value, coefs_has
-    public :: coefs_set, coefs_is_derived, coefs_derived
+    public :: coefs_set, coefs_is_derived, coefs_derived, coefs_varies, coefs_check_used
     public :: coefs_uses_derived, coefs_set_obm
     public :: coefs_kill, coefs_restart_due, coefs_restart_fldr
     public :: coefs_restart_write, coefs_restart_read, coefs_write_step
@@ -78,9 +85,12 @@ contains
         ! [coef_<name>] at `time` (the forcing time). The group is read from
         ! the par file if it has it, else from the first of the [forcing]
         ! var_defs files that does (var_defs_find). Per coefficient, besides
-        ! the tsgen keys: restart_every_df and units; a derived coefficient
-        ! (method = "derived") reads from, factor, region, anomaly instead and
-        ! starts at 0. Unset keys from the defaults file (the template [coef]).
+        ! the tsgen keys: restart_every_df and units; a scaled coefficient
+        ! (method = "scaled") reads coef and factor instead (its source, a
+        ! tsgen coefficient of the registry, resolved once all are read); a
+        ! derived coefficient (method = "derived") reads from, factor, region,
+        ! anomaly and starts at 0. Unset keys from the defaults file (the
+        ! template [coef]).
         ! An absent [forcing] group or an empty list give an empty registry.
         ! On a restart run the caller then calls coefs_restart_read.
         type(coefs_class), intent(inout) :: coefs
@@ -121,8 +131,19 @@ contains
             call nml_read(trim(gfile), trim(group), "restart_every_df", c%restart_every_df, &
                           defaults_file=def_file, defaults_group="coef")
 
-            if (trim(method) == "derived") then
-                c%derived = .true.
+            if (trim(method) == "scaled") then
+                c%kind = "scaled"
+                call nml_read(trim(gfile), trim(group), "coef",   c%source, init=.true., &
+                              defaults_file=def_file, defaults_group="coef")
+                call nml_read(trim(gfile), trim(group), "factor", c%factor, &
+                              defaults_file=def_file, defaults_group="coef")
+                if (c%restart_every_df > 0.0_wp) then
+                    write(*,*) "coefs_init:: error: ["//trim(group)//"] restart_every_df > 0 on a "// &
+                               "scaled coefficient; the forcing-increment restarts follow tsgen coefficients only."
+                    error stop 1
+                end if
+            else if (trim(method) == "derived") then
+                c%kind = "derived"
                 call nml_read(trim(gfile), trim(group), "from",    c%drv%from,    init=.true., &
                               defaults_file=def_file, defaults_group="coef")
                 call nml_read(trim(gfile), trim(group), "factor",  c%drv%factor, &
@@ -157,22 +178,65 @@ contains
             c%f_last_restart = c%f
             end associate
         end do
+
+        ! The source of each scaled coefficient: a tsgen coefficient of the
+        ! registry (a derived one is set after the atmosphere, too late).
+        do k = 1, n
+            associate(c => coefs%coef(k))
+            if (c%kind /= "scaled") cycle
+            c%k_source = coef_position(coefs, c%source)
+            if (c%k_source == 0) then
+                write(*,*) "coefs_init:: error: [coef_"//trim(c%name)//"] coef = '"//trim(c%source)// &
+                           "' is not in [forcing] coefs."
+                error stop 1
+            end if
+            if (coefs%coef(c%k_source)%kind /= "tsgen") then
+                write(*,*) "coefs_init:: error: [coef_"//trim(c%name)//"] coef = '"//trim(c%source)// &
+                           "' is a "//trim(coefs%coef(c%k_source)%kind)//" coefficient; a scaled "// &
+                           "coefficient scales a tsgen one."
+                error stop 1
+            end if
+            end associate
+        end do
+        call scaled_update(coefs)
+        do k = 1, n
+            associate(c => coefs%coef(k))
+            if (c%kind /= "scaled") cycle
+            c%f_last_restart = c%f
+            write(*,*) "coefs_init:: "//trim(c%name)//" (scaled: ", c%factor, " x "//trim(c%source)// &
+                       "), f =", c%f
+            end associate
+        end do
     end subroutine coefs_init
+
+    subroutine scaled_update(coefs)
+        ! Every scaled coefficient from the current value of its source.
+        type(coefs_class), intent(inout) :: coefs
+        integer :: k
+        do k = 1, size(coefs%coef)
+            associate(c => coefs%coef(k))
+            if (c%kind /= "scaled") cycle
+            c%f = c%factor * coefs%coef(c%k_source)%f
+            end associate
+        end do
+    end subroutine scaled_update
 
     subroutine coefs_update(coefs, time, var)
         ! Advance every tsgen coefficient to `time` (the forcing time). `var` is
         ! the model response variable (ice volume [Gt]) that feedback methods
-        ! and the kill switch consume; ignored by open-loop ones. Derived
-        ! coefficients keep their value until their producer sets them this step.
+        ! and the kill switch consume; ignored by open-loop ones. Then the
+        ! scaled coefficients from them. Derived coefficients keep their value
+        ! until their producer sets them this step.
         type(coefs_class), intent(inout) :: coefs
         real(dp),          intent(in)    :: time
         real(wp),          intent(in)    :: var
         integer :: k
         do k = 1, size(coefs%coef)
-            if (coefs%coef(k)%derived) cycle
+            if (coefs%coef(k)%kind /= "tsgen") cycle
             call tsgen_update(coefs%coef(k)%tsg, time, var=var)
             coefs%coef(k)%f = coefs%coef(k)%tsg%f_now
         end do
+        call scaled_update(coefs)
     end subroutine coefs_update
 
     subroutine coefs_set(coefs, name, value)
@@ -187,8 +251,9 @@ contains
             write(*,*) "coefs_set:: error: unknown coefficient '"//trim(name)//"' (not in [forcing] coefs)."
             error stop 1
         end if
-        if (.not. coefs%coef(k)%derived) then
-            write(*,*) "coefs_set:: error: coefficient '"//trim(name)//"' is a tsgen coefficient, not derived."
+        if (coefs%coef(k)%kind /= "derived") then
+            write(*,*) "coefs_set:: error: coefficient '"//trim(name)//"' is a "// &
+                       trim(coefs%coef(k)%kind)//" coefficient, not derived."
             error stop 1
         end if
         coefs%coef(k)%f = value
@@ -201,7 +266,7 @@ contains
         integer :: k
         uses = .false.
         do k = 1, size(coefs%coef)
-            if (coefs%coef(k)%derived .and. trim(coefs%coef(k)%drv%from) == trim(from)) uses = .true.
+            if (coefs%coef(k)%kind == "derived" .and. trim(coefs%coef(k)%drv%from) == trim(from)) uses = .true.
         end do
     end function coefs_uses_derived
 
@@ -215,7 +280,7 @@ contains
         integer :: k
         do k = 1, size(coefs%coef)
             associate(c => coefs%coef(k))
-            if (.not. (c%derived .and. trim(c%drv%from) == trim(from))) cycle
+            if (.not. (c%kind == "derived" .and. trim(c%drv%from) == trim(from))) cycle
             c%f = theta
             if (c%drv%anomaly) c%f = theta - theta_init
             end associate
@@ -233,8 +298,53 @@ contains
         ! Is the coefficient `name` derived (set by the model)? Stops on an unknown name.
         type(coefs_class), intent(in) :: coefs
         character(len=*),  intent(in) :: name
-        derived = coefs%coef(coef_checked(coefs, name, "coefs_is_derived"))%derived
+        derived = coefs%coef(coef_checked(coefs, name, "coefs_is_derived"))%kind == "derived"
     end function coefs_is_derived
+
+    logical function coefs_varies(coefs, name) result(varies)
+        ! May the coefficient `name` change in time? A tsgen coefficient unless
+        ! it is a const without rate, noise or window; a scaled one as its
+        ! source; a derived one always. Stops on an unknown name.
+        type(coefs_class), intent(in) :: coefs
+        character(len=*),  intent(in) :: name
+        integer :: k
+        k = coef_checked(coefs, name, "coefs_varies")
+        if (coefs%coef(k)%kind == "scaled") k = coefs%coef(k)%k_source
+        if (coefs%coef(k)%kind == "derived") then
+            varies = .true.
+            return
+        end if
+        associate(p => coefs%coef(k)%tsg%par)
+        varies = trim(p%method) /= "const" .or. p%df_dt_max /= 0.0_wp .or. p%sigma /= 0.0_wp &
+                 .or. (p%win_t1 > p%win_t0 .and. p%win_fac /= 1.0_wp)
+        end associate
+    end function coefs_varies
+
+    subroutine coefs_check_used(coefs, used)
+        ! Every coefficient of the registry is used: named by a consumer (the
+        ! list `used`, collected by the driver from the terms of its domains,
+        ! ice_bnd and the OBM forcing) or the source of a scaled coefficient
+        ! that is. Stops on the first unused one: listed in [forcing] coefs
+        ! but read by nothing, it is a sign of a setup half changed.
+        type(coefs_class), intent(in) :: coefs
+        character(len=*),  intent(in) :: used(:)
+        logical, allocatable :: is_used(:)
+        integer :: k
+        allocate(is_used(size(coefs%coef)))
+        do k = 1, size(coefs%coef)
+            is_used(k) = any(used == coefs%coef(k)%name)
+        end do
+        do k = 1, size(coefs%coef)
+            if (coefs%coef(k)%kind == "scaled" .and. is_used(k)) is_used(coefs%coef(k)%k_source) = .true.
+        end do
+        do k = 1, size(coefs%coef)
+            if (is_used(k)) cycle
+            write(*,*) "coefs_check_used:: error: coefficient '"//trim(coefs%coef(k)%name)// &
+                       "' is in [forcing] coefs, but no term, ice_bnd or the OBM forcing of the run "// &
+                       "uses it; remove it from the list (or add the term that uses it)."
+            error stop 1
+        end do
+    end subroutine coefs_check_used
 
     function coefs_derived(coefs, name) result(drv)
         ! The definition (from, factor, region, anomaly) of the derived
@@ -244,8 +354,9 @@ contains
         type(derived_spec) :: drv
         integer :: k
         k = coef_checked(coefs, name, "coefs_derived")
-        if (.not. coefs%coef(k)%derived) then
-            write(*,*) "coefs_derived:: error: coefficient '"//trim(name)//"' is a tsgen coefficient, not derived."
+        if (coefs%coef(k)%kind /= "derived") then
+            write(*,*) "coefs_derived:: error: coefficient '"//trim(name)//"' is a "// &
+                       trim(coefs%coef(k)%kind)//" coefficient, not derived."
             error stop 1
         end if
         drv = coefs%coef(k)%drv
@@ -287,7 +398,7 @@ contains
         integer :: k
         kill = .false.
         do k = 1, size(coefs%coef)
-            if (coefs%coef(k)%derived) cycle
+            if (coefs%coef(k)%kind /= "tsgen") cycle
             kill = kill .or. coefs%coef(k)%tsg%kill
         end do
     end function coefs_kill
@@ -327,14 +438,14 @@ contains
 
     subroutine coefs_restart_write(coefs, fldr, time)
         ! The state of every tsgen coefficient in the bundle folder fldr:
-        ! coef_<name>_restart.nc. Derived coefficients are recomputed, not
-        ! restarted.
+        ! coef_<name>_restart.nc. Scaled and derived coefficients are
+        ! recomputed, not restarted.
         type(coefs_class), intent(in) :: coefs
         character(len=*),  intent(in) :: fldr
         real(dp),          intent(in) :: time
         integer :: k
         do k = 1, size(coefs%coef)
-            if (coefs%coef(k)%derived) cycle
+            if (coefs%coef(k)%kind /= "tsgen") cycle
             call tsgen_restart_write(trim(coef_restart_file(fldr, coefs%coef(k)%name)), &
                                      coefs%coef(k)%tsg, time)
         end do
@@ -346,7 +457,8 @@ contains
         ! rename holds series_<name>_restart.nc instead of coef_<name>_restart.nc;
         ! it is read when the new name is absent. A coefficient without a
         ! restart file (a bundle from a run without it) keeps its cold-start
-        ! state, i.e. starts at the restart time.
+        ! state, i.e. starts at the restart time. The scaled coefficients then
+        ! follow their restored sources.
         type(coefs_class), intent(inout) :: coefs
         character(len=*),  intent(in)    :: fldr
         character(len=1024) :: fnm, fnm_old
@@ -355,7 +467,7 @@ contains
 
         do k = 1, size(coefs%coef)
             associate(c => coefs%coef(k))
-            if (c%derived) cycle
+            if (c%kind /= "tsgen") cycle
             fnm = coef_restart_file(fldr, c%name)
             inquire(file=trim(fnm), exist=found)
             if (.not. found) then
@@ -377,6 +489,10 @@ contains
                            "; coefficient "//trim(c%name)//" keeps its cold-start state."
             end if
             end associate
+        end do
+        call scaled_update(coefs)
+        do k = 1, size(coefs%coef)
+            if (coefs%coef(k)%kind == "scaled") coefs%coef(k)%f_last_restart = coefs%coef(k)%f
         end do
     end subroutine coefs_restart_read
 
@@ -411,7 +527,7 @@ contains
             call nc_write(filename, trim(vnm), c%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(c%units), &
                           long_name="Coefficient "//trim(c%name))
-            if (c%derived) cycle
+            if (c%kind /= "tsgen") cycle
             call nc_write(filename, trim(vnm)//"_df_dt", c%tsg%df_dt, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(c%units)//"/yr", &
                           long_name="Rate of change of coefficient "//trim(c%name))

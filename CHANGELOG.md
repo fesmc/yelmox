@@ -6,6 +6,11 @@ annotated git tag. Dates are release (tag) dates.
 ## [Unreleased]
 
 ### Added
+- Coefficients of kind `scaled` (`[coef_<name>] method = "scaled"`, `coef`, `factor`):
+  `factor` x a tsgen coefficient of the registry, set right after it each step (terms on
+  the atmosphere may use it), recomputed on a restart; `coefs_varies` and
+  `coefs_check_used` in `libs/kryos_forcing.f90` (the coefficient kind is now
+  `tsgen | scaled | derived`). `tests/test_coefs.f90` covers them.
 - `yelmox_bipolar/params.sh`: the coupling setups of yelmox_bipolar as runme `-p` arrays
   (uncoupled, box model alone, box model -> both ice sheets, Greenland -> box model,
   Greenland <-> box model, Antarctica <-> box model, fully coupled) and the modifier

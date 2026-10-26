@@ -44,9 +44,10 @@
 
 &coef
     ! A coefficient: tsgen (fesm-utils tsgen), advanced on the forcing time
-    ! time_rel, or derived (method = "derived"), set each step by the model.
+    ! time_rel; scaled (method = "scaled"), factor x a tsgen coefficient; or
+    ! derived (method = "derived"), set each step by the model.
     ! method = "series" reads it from a time series file (series_file).
-    method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1|derived
+    method           = "const"       ! const|ramp-slope|ramp-time|ramp-time-step|sin|series|exp|PI42|H312b|H312PID|H321PID|PID1|scaled|derived
     sigma            = 0.0           ! [f] std. dev. of gaussian noise added to the coefficient
     ! method series
     series_file      = ""            ! table (time, f) or netcdf file of the series
@@ -66,10 +67,12 @@
     f_min            = 0.0           ! [f] lower bound; the value of const (f_min + df_dt_max*t, clamped)
     f_max            = 1.0           ! [f] upper bound
     f_conv           = 0.0           ! [f] value held after convergence (ramp-time-step)
+    ! scaled: factor * a tsgen coefficient, set right after it (atmosphere terms may use it)
+    coef             = ""            ! the tsgen coefficient it scales ([forcing] coefs)
     ! derived: computed by the model after the atmosphere of the step is composed
     from             = ""            ! air_anomaly: factor * mean sea-level air anomaly of the climate update over region;
                                      ! obm_north, obm_south: the box temperature of the bipolar ocean box model [K]
-    factor           = 1.0           ! [1] air_anomaly: value = factor * mean(tsl_ann - tsl_ann_ref)
+    factor           = 1.0           ! [1] scaled: value = factor * coef; air_anomaly: value = factor * mean(tsl_ann - tsl_ann_ref)
     region           = "all"         ! air_anomaly: cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
     anomaly          = True          ! obm_*: the box temperature minus its initial value (False: the temperature itself)
     ! yelmox
