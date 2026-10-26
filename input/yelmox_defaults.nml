@@ -184,8 +184,11 @@
 ! ===== Ocean box model forcing (yelmox_bipolar) =====
 
 &obm_forcing
-    ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init +
-    ! ampl_i * gain * f (north, tropics, south) and the vapour fluxes.
-    coef  = ""          ! the global mean air temperature anomaly [K], a coefficient ([forcing] coefs)
-    gain  = 1.0         ! [1] dT_glob = gain * f
+    ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init + dT_i
+    ! (north, tropics, south) and the vapour fluxes, from coefficients
+    ! ([forcing] coefs) [K].
+    coef_north   = ""   ! dT_north, the northern box (e.g. dTa_north, scaled from gmt)
+    coef_tropics = ""   ! dT_tropics, the tropical box
+    coef_south   = ""   ! dT_south, the southern box
+    coef         = ""   ! the global mean air temperature anomaly: the vapour fluxes
 /

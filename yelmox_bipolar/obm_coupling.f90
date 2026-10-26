@@ -10,8 +10,9 @@ module obm_coupling
     ! without kind conversion.
     !
     ! The three exchanges:
-    !   atm2obm  : global mean air temperature anomaly ([obm_forcing], a
-    !              coefficient of the driver's registry) -> obm box air temperatures/vapor
+    !   atm2obm  : air temperature anomalies ([obm_forcing], coefficients of the
+    !              driver's registry: one per box, and the global one) -> obm
+    !              box air temperatures/vapor
     !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs,
     !              per hemisphere ([ctrl] couple_fwf_north, couple_fwf_south)
     !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
@@ -51,10 +52,9 @@ module obm_coupling
         logical :: active_obm = .false.
         logical :: atm2obm    = .false.
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
-        ! atm2obm: the global mean air temperature anomaly dT_glob = gain * coef
-        ! ([obm_forcing], a coefficient).
-        character(len=64)  :: forcing_coef  = ""
-        real(wp)           :: forcing_gain  = 1.0_wp
+        ! atm2obm: the coefficients of [obm_forcing], the air temperature
+        ! anomaly of each box and the global one (the vapour fluxes) [K].
+        character(len=64)  :: coef_north = "", coef_tropics = "", coef_south = "", coef_global = ""
         ! ism2obm: the freshwater flux of each hemisphere into its box, its
         ! definition and the hydrographic masks.
         logical            :: couple_fwf_north = .false.
@@ -70,7 +70,11 @@ module obm_coupling
         real(dp)           :: hyster_positive_branch_time = 0.0_dp
     end type obm_coupling_ctl
 
-    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
+    ! The keys of [obm_forcing], in the order of obm_forcing_coefs.
+    character(len=12), parameter :: OBM_FORCING_KEYS(4) = &
+        [character(len=12) :: "coef_north", "coef_tropics", "coef_south", "coef"]
+
+    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange, obm_forcing_coefs
     public :: coupling_atm2obm, coupling_ism2obm, coupling_obm2ism
     public :: update_bipolar_hyster_forcing
 
@@ -94,8 +98,10 @@ contains
 
         if (oc%atm2obm) then
             call nml_validate(path_par, def_file, "obm_forcing")
-            call nml_read(path_par, "obm_forcing", "coef",  oc%forcing_coef, defaults_file=def_file)
-            call nml_read(path_par, "obm_forcing", "gain",  oc%forcing_gain,  defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef_north",   oc%coef_north,   defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef_tropics", oc%coef_tropics, defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef_south",   oc%coef_south,   defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef",         oc%coef_global,  defaults_file=def_file)
         end if
 
         if (oc%couple_fwf_north .or. oc%couple_fwf_south) then
@@ -126,7 +132,7 @@ contains
         ! Check the exchanges against what the run holds, then load the
         ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
         ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
-        ! the coefficient of [obm_forcing] in the registry; the freshwater flux
+        ! the coefficients of [obm_forcing] in the registry; the freshwater flux
         ! of a hemisphere its domain. The ocean terms of the domains against the
         ! shared coefficients (check_domain_ocean, and an air-anomaly coefficient
         ! set by one domain only). Only touches a domain when it is active, so
@@ -138,6 +144,7 @@ contains
         logical,                intent(in)    :: active_north, active_south
 
         logical :: obm2ism
+        character(len=64), allocatable :: names(:)
         integer :: k
 
         ! obm2ism: a coefficient derived from a box (obm_north, obm_south), used by
@@ -151,11 +158,13 @@ contains
                        &ocean box model ([ctrl] active_obm = True)."
             error stop 1
         end if
-        if (oc%atm2obm .and. .not. coefs_has(coefs, oc%forcing_coef)) then
-            write(*,*) "obm_coupling_init:: error: [obm_forcing] coef = '"// &
-                       trim(oc%forcing_coef)//"' is not in [forcing] coefs (needed by atm2obm)."
+        names = obm_forcing_coefs(oc)
+        do k = 1, size(names)
+            if (coefs_has(coefs, names(k))) cycle
+            write(*,*) "obm_coupling_init:: error: [obm_forcing] "//trim(OBM_FORCING_KEYS(k))// &
+                       " = '"//trim(names(k))//"' is not in [forcing] coefs (needed by atm2obm)."
             error stop 1
-        end if
+        end do
         if (oc%couple_fwf_north .and. .not. active_north) then
             write(*,*) "obm_coupling_init:: error: couple_fwf_north needs active_north."
             error stop 1
@@ -188,8 +197,9 @@ contains
         end if
 
         if (oc%atm2obm) &
-            write(*,*) "obm_coupling_init:: atm2obm from coefficient "//trim(oc%forcing_coef)// &
-                       ", gain =", oc%forcing_gain
+            write(*,*) "obm_coupling_init:: atm2obm from the coefficients "//trim(oc%coef_north)// &
+                       ", "//trim(oc%coef_tropics)//", "//trim(oc%coef_south)//" (boxes), "// &
+                       trim(oc%coef_global)//" (vapour fluxes)"
 
         ! The masks are on the Yelmo grid of their domain: {domain}/{grid_name}
         ! of the paths are its name and grid_ice.
@@ -251,6 +261,19 @@ contains
         end if
     end subroutine check_domain_ocean
 
+    function obm_forcing_coefs(oc) result(names)
+        ! The coefficients atm2obm reads ([obm_forcing]): the air temperature
+        ! anomaly of the north, tropics and south box and the global one; none
+        ! without atm2obm.
+        type(obm_coupling_ctl), intent(in) :: oc
+        character(len=64), allocatable :: names(:)
+        if (oc%atm2obm) then
+            names = [character(len=64) :: oc%coef_north, oc%coef_tropics, oc%coef_south, oc%coef_global]
+        else
+            allocate(names(0))
+        end if
+    end function obm_forcing_coefs
+
     subroutine obm_exchange(oc, obm, coefs, dom_north, dom_south, active_north, active_south, &
                             time, time_init, dtt)
         ! One coupling pass, in the yelmox_bipolar order: atmosphere -> obm,
@@ -267,7 +290,8 @@ contains
         real(dp),               intent(in)    :: time, time_init, dtt
 
         if (oc%atm2obm) &
-            call coupling_atm2obm(obm, oc%forcing_gain*coefs_value(coefs, oc%forcing_coef))
+            call coupling_atm2obm(obm, coefs_value(coefs, oc%coef_north), coefs_value(coefs, oc%coef_tropics), &
+                                  coefs_value(coefs, oc%coef_south), coefs_value(coefs, oc%coef_global))
 
         if (oc%couple_fwf_north) &
             call coupling_ism2obm(dom_north, obm, oc%hydro_mask_north, "north", oc%fwf_definition)
@@ -286,19 +310,19 @@ contains
         if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, coefs)
     end subroutine obm_exchange
 
-    subroutine coupling_atm2obm(obm, dT_glob)
-        ! Atmosphere -> OBM: the box-model air temperatures of every box from the
-        ! global mean air temperature anomaly dT_glob [K] with the regional
-        ! amplification factors (Zickfeld et al., 2004), theta_i = theta_i_init
-        ! + ampl_i * dT_glob (north, tropics, south), and the vapor fluxes,
-        ! phin (tropics -> north) and phit (south -> tropics), linear in dT_glob
-        ! by the hydrological sensitivities.
+    subroutine coupling_atm2obm(obm, dT_north, dT_tropics, dT_south, dT_glob)
+        ! Atmosphere -> OBM: the box-model air temperatures of every box from
+        ! its air temperature anomaly [K] (e.g. the global one amplified,
+        ! Zickfeld et al., 2004: the scaled coefficients dTa_north, dTa_tropics,
+        ! dTa_south), theta_i = theta_i_init + dT_i, and the vapor fluxes, phin
+        ! (tropics -> north) and phit (south -> tropics), linear in the global
+        ! mean air temperature anomaly dT_glob by the hydrological sensitivities.
         type(obm_class), intent(inout) :: obm
-        real(wp),        intent(in)    :: dT_glob
+        real(wp),        intent(in)    :: dT_north, dT_tropics, dT_south, dT_glob
 
-        obm%thetan = obm%par%thetan_init + obm%par%thermal_ampl_north  *dT_glob
-        obm%thetat = obm%par%thetat_init + obm%par%thermal_ampl_tropics*dT_glob
-        obm%thetas = obm%par%thetas_init + obm%par%thermal_ampl_south  *dT_glob
+        obm%thetan = obm%par%thetan_init + dT_north
+        obm%thetat = obm%par%thetat_init + dT_tropics
+        obm%thetas = obm%par%thetas_init + dT_south
         obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob
         obm%phit   = obm%par%phit_init   + obm%par%hs*obm%par%psh*dT_glob
     end subroutine coupling_atm2obm

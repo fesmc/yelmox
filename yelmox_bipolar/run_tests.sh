@@ -30,12 +30,12 @@ TIMEOUT="${TIMEOUT:-3600}"               # per-test wall-clock cap [s]
 # The consistency checks of obm_coupling_init: overrides that break a rule,
 # after a setup, and the error each must stop with.
 chk_other_box=("forcing_north.terms==regional_north,obm_south")
-chk_box_and_air=("forcing.coefs==gmt,dTo,obm_north,obm_south"
+chk_box_and_air=("forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo,obm_north,obm_south"
                  "forcing_north.terms==regional_north,ocean,obm_north")
 chk_shared_air=("forcing_south.terms==regional_south,ocean")
-checks=("bip_full+chk_other_box"      "is derived from the box obm_south"
-        "bip_full+chk_box_and_air"    "(its ocean from the box) and"
-        "bip_uncoupled+chk_shared_air" "is used by the terms of both domains")
+checks=("bip_full+chk_other_box"         "is derived from the box obm_south"
+        "bip_full+chk_box_and_air"       "(its ocean from the box) and"
+        "bip_uncoupled+chk_shared_air"   "is used by the terms of both domains")
 
 setups=("$@")
 run_checks=0

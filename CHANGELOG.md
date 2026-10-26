@@ -21,6 +21,12 @@ annotated git tag. Dates are release (tag) dates.
   the setups table and the rules behind it.
 
 ### Changed
+- yelmox_bipolar: the regional amplification of `gmt` is set once, in the scaled library
+  coefficients `dTa_north` (1.07), `dTa_tropics` (0.79) and `dTa_south` (0.86 x `gmt`;
+  Zickfeld et al., 2004), read by the domains (`term_regional_north`/`_south` on them,
+  their `f_ta` dropped) and by the box model (`[obm_forcing] coef_north`, `coef_tropics`,
+  `coef_south`; `coef` the global anomaly of the vapour fluxes; `gain` removed);
+  `[nautilus] thermal_ampl_*` removed. No change in answers.
 - yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is
   switched by `couple_fwf_north`/`couple_fwf_south` alone (an error without the box
   model or without the domain of that hemisphere).

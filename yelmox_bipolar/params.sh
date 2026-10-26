@@ -6,10 +6,12 @@
 #     runme -rs -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml \
 #         -o output/bip-full -p "${bip_full[@]}"
 #
-# The par file itself is the uncoupled setup. The exchanges with the ocean box
-# model (OBM, [ctrl] active_obm = True):
-#   atmosphere -> OBM  [ctrl] atm2obm: gmt -> the box air temperatures and
-#                      vapour fluxes ([obm_forcing])
+# The par file itself is the uncoupled setup. One coefficient, gmt, drives
+# everything through its regional amplifications, the scaled coefficients
+# dTa_north, dTa_tropics, dTa_south of the library (factor x gmt). The
+# exchanges with the ocean box model (OBM, [ctrl] active_obm = True):
+#   atmosphere -> OBM  [ctrl] atm2obm: dTa_north/tropics/south -> the box air
+#                      temperatures, gmt -> the vapour fluxes ([obm_forcing])
 #   ice sheet  -> OBM  [ctrl] couple_fwf_north/south: the freshwater flux of a
 #                      domain into its box (needs the hydrographic masks
 #                      [ctrl] hydro_mask_north/south)
@@ -17,6 +19,8 @@
 #                      temperature from its box, in place of the term ocean;
 #                      the coefficient of the same name in [forcing] coefs
 # The OBM does not act on the atmosphere of the domains: gmt alone drives it.
+# [forcing] coefs lists exactly the coefficients the run reads (checked at
+# init): the dTa_* of the active domains, all three with atm2obm.
 # Other combinations follow from these, e.g. bip_full without
 # ctrl.couple_fwf_south=True: Greenland <-> OBM -> Antarctica.
 
@@ -29,13 +33,14 @@ bip_obm_only=(
     "ctrl.active_south=False"
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south"
 )
 
 # 3. OBM -> both ice sheets (one-way): the ocean of each domain from its box.
 bip_obm_to_ice=(
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
-    "forcing.coefs==gmt,obm_north,obm_south"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,obm_north,obm_south"
     "forcing_north.terms==regional_north,obm_north"
     "forcing_south.terms==regional_south,obm_south"
 )
@@ -47,6 +52,7 @@ bip_gis_to_obm=(
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_north=True"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo"
 )
 
 # 5. Greenland <-> OBM.
@@ -55,7 +61,7 @@ bip_gis_obm=(
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_north=True"
-    "forcing.coefs==gmt,obm_north"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,obm_north"
     "forcing_north.terms==regional_north,obm_north"
 )
 
@@ -65,7 +71,7 @@ bip_ais_obm=(
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_south=True"
-    "forcing.coefs==gmt,obm_south"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,obm_south"
     "forcing_south.terms==regional_south,obm_south"
 )
 
@@ -75,7 +81,7 @@ bip_full=(
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_north=True"
     "ctrl.couple_fwf_south=True"
-    "forcing.coefs==gmt,obm_north,obm_south"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,obm_north,obm_south"
     "forcing_north.terms==regional_north,obm_north"
     "forcing_south.terms==regional_south,obm_south"
 )

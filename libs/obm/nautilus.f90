@@ -66,10 +66,6 @@ module nautilus
         call nml_read(filename, group, "depth_td", ntls%par%depth_td)
         call nml_read(filename, group, "depth_s", ntls%par%depth_s)
 
-        call nml_read(filename, group, "thermal_ampl_north", ntls%par%thermal_ampl_north)
-        call nml_read(filename, group, "thermal_ampl_tropics", ntls%par%thermal_ampl_tropics)
-        call nml_read(filename, group, "thermal_ampl_south", ntls%par%thermal_ampl_south)
-
         call nml_read(filename, group, "nh_hydro_sensitivity", ntls%par%hn)
         call nml_read(filename, group, "sh_hydro_sensitivity", ntls%par%hs)
         call nml_read(filename, group, "nh_temp_constant", ntls%par%pnh)
@@ -77,7 +73,7 @@ module nautilus
         
 
         ! Initial state: the *_init parameters, which stay the cold-start values
-        ! (the reference of the atmospheric forcing, theta_i_init + ampl_i*dT,
+        ! (the reference of the atmospheric forcing, theta_i_init + dT_i,
         ! and of the box anomaly of the derived series obm_north/obm_south,
         ! tn - tn_init); on a restart the
         ! state is then taken from the restart file.

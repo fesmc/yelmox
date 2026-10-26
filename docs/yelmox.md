@@ -159,7 +159,10 @@ time-series generator (`method`: `const`, `ramp-slope`, `ramp-time`,
 `ramp-time-step`, `sin`, `series` from a table or netCDF file, optionally
 normalised with `norm_t0`/`norm_t1` to 0 at t0 and 1 at t1, each one time or a
 window t0 t1 whose mean is taken, `exp`, the PI/PID feedback controllers on the
-response, the ice volume in Gt; see the fesm-utils tsgen docs), or
+response, the ice volume in Gt; see the fesm-utils tsgen docs), **scaled**
+(`method = "scaled"`: `factor` × the tsgen coefficient `coef`, set right
+after it each step, so a term on the atmosphere may use it; e.g. a regional
+amplification of a global anomaly, `[coef_dTa_north]` of the library), or
 **derived** (`method = "derived"`), computed by the model after the atmosphere
 of the update is composed:
 
@@ -176,7 +179,7 @@ regions on the climate grid (`[regions]`, e.g. `"zone:open_ocean"`,
 init. The run stops when a coefficient trips its kill switch (`with_kill`), and
 writes a restart bundle `restart-<n>` each time a coefficient moves by more than
 its `restart_every_df`. Each tsgen coefficient restarts from
-`coef_<name>_restart.nc` in the bundle (a derived one is recomputed; an older
+`coef_<name>_restart.nc` in the bundle (a scaled or derived one is recomputed; an older
 bundle's `series_<name>_restart.nc` is still read, with a note); every
 coefficient is written to the 1D output `yelmo_ts.nc` (with `[output]
 write_yelmo`) as `coef_<name>` (tsgen ones also `coef_<name>_df_dt`), labelled
