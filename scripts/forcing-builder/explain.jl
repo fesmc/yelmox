@@ -103,6 +103,8 @@ function describe_coef(io, name, rg, p, ser, tl, f)
     if m == "derived"
         println(io, "    ", derived_text(name, p), "; set by the model, not tabulated here (terms on to, so only)")
         return
+    elseif m == "scaled"
+        println(io, "    $name = ", fnum(p["factor"]), " x ", string(get(p, "coef", "")), " (set right after it; not restarted)")
     elseif m == "series"
         println(io, "    $name = S(tau), S: ", p["series_file"], p["norm"] ? @sprintf("; normalised: 0 at %s, 1 at %s", string(p["norm_t0"]), string(p["norm_t1"])) : "")
     elseif is_feedback(m)
@@ -200,21 +202,38 @@ function main()
     # coefficients
     snames = names_of(val(groups, "forcing", "coefs", ""))
     println(io, "Coefficients: ", isempty(snames) ? "none" : join(snames, ", "))
-    curves = Dict{String,Vector{Float64}}()      # the tabulated coefficients (tsgen)
+    curves = Dict{String,Vector{Float64}}()      # the tabulated coefficients (tsgen, scaled)
     derived = Set{String}()
+    cwarns = String[]
+    # tsgen first: a scaled coefficient follows its source, wherever listed
+    pars = Dict(n => coef_par(groups["coef_" * n]) for n in snames if haskey(groups, "coef_" * n))
+    for n in snames
+        haskey(pars, n) || continue
+        m = string(pars[n]["method"])
+        m in ("derived", "scaled") && continue
+        curves[n] = tabulate(pars[n], tl.tf, tl.tf[1]; ser=load_tsgen_series(pars[n], dirs))
+    end
     for n in snames
         g = "coef_" * n
         haskey(groups, g) || (println(io, "  [$g]: missing"); continue)
-        p = coef_par(groups[g])
-        if string(p["method"]) == "derived"
+        p = pars[n]
+        m = string(p["method"])
+        if m == "derived"
             push!(derived, n)
             describe_coef(io, n, groups[g], p, nothing, tl, Float64[])
             continue
+        elseif m == "scaled"
+            src = string(get(p, "coef", ""))
+            if haskey(curves, src) && haskey(pars, src) && !(string(pars[src]["method"]) in ("derived", "scaled"))
+                curves[n] = Float64(p["factor"]) .* curves[src]
+            else
+                push!(cwarns, "[$g]: coef \"$src\" is not a tsgen coefficient of the run")
+                curves[n] = fill(NaN, length(tl.tf))
+            end
+            describe_coef(io, n, groups[g], p, nothing, tl, curves[n])
+            continue
         end
-        ser = load_tsgen_series(p, dirs)
-        f = tabulate(p, tl.tf, tl.tf[1]; ser=ser)
-        curves[n] = f
-        describe_coef(io, n, groups[g], p, ser, tl, f)
+        describe_coef(io, n, groups[g], p, load_tsgen_series(p, dirs), tl, curves[n])
     end
     println(io)
 
@@ -223,7 +242,7 @@ function main()
     ref = string(val(groups, "forcing", "reference", "pd"))
     tnames = names_of(val(groups, "forcing", "terms", ""))
     terms = [term_of(groups, n) for n in tnames if haskey(groups, "term_" * n)]
-    warns = String[]
+    warns = copy(cwarns)
     for n in tnames; haskey(groups, "term_" * n) || push!(warns, "[term_$n]: missing"); end
     snaps = String[]
     if cl in ("snapshots", "rembo")

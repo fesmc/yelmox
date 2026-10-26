@@ -3,6 +3,49 @@
 All notable changes to YelmoX are recorded here. Each version corresponds to an
 annotated git tag. Dates are release (tag) dates.
 
+## [Unreleased]
+
+### Added
+- Coefficients of kind `scaled` (`[coef_<name>] method = "scaled"`, `coef`, `factor`):
+  `factor` x a tsgen coefficient of the registry, set right after it each step (terms on
+  the atmosphere may use it), recomputed on a restart; `coefs_varies` and
+  `coefs_check_used` in `libs/kryos_forcing.f90` (the coefficient kind is now
+  `tsgen | scaled | derived`). `tests/test_coefs.f90` covers them.
+- `yelmox_bipolar/params.sh`: the coupling setups of yelmox_bipolar as runme `-p` arrays
+  (uncoupled, box model alone, box model -> both ice sheets, Greenland -> box model,
+  Greenland <-> box model, Antarctica <-> box model, fully coupled) and the modifier
+  `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
+  every setup and the consistency checks (each must stop with its error), or the setups
+  named (`setup+modifier`).
+- Docs `yelmox-bipolar.md`: "Coupling setups", the exchanges (diagram), their switches,
+  the setups table and the rules behind it.
+
+### Changed
+- yelmox_bipolar: the regional amplification of `gmt` is set once, in the scaled library
+  coefficients `dTa_north` (1.07), `dTa_tropics` (0.79) and `dTa_south` (0.86 x `gmt`;
+  Zickfeld et al., 2004), read by the domains (`term_regional_north`/`_south` on them,
+  their `f_ta` dropped) and by the box model (`[obm_forcing] coef_north`, `coef_tropics`,
+  `coef_south`; `coef` the global anomaly of the vapour fluxes; `gain` removed);
+  `[nautilus] thermal_ampl_*` removed. No change in answers.
+- yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is
+  switched by `couple_fwf_north`/`couple_fwf_south` alone (an error without the box
+  model or without the domain of that hemisphere).
+- Consistency checks at init: every coefficient of `[forcing] coefs` is read by the run
+  (a term of an active domain, `[ice_bnd]`, the OBM forcing, or the source of a scaled
+  coefficient that is; `coefs_check_used`, both drivers); in yelmox_bipolar, with the box
+  model on, `atm2obm` when the atmosphere of a domain changes in time. yelmox_bipolar
+  runs its checks before the startup of the domains (`setup_domain`, checks,
+  `start_domain`).
+- yelmox_bipolar: consistency checks of the ocean terms at init (`obm_coupling_init`): an
+  error for a box coefficient of the other hemisphere (`obm_south` in the north), for a
+  domain with its ocean both from a box and from the air anomaly (`obm_north` with
+  `ocean`), and for an air-anomaly coefficient used by both domains (`dTo`: the
+  coefficients are shared, the second domain would overwrite the first).
+- yelmox_bipolar par file: the north without the term `lgm` and the coefficient `alpha`
+  (zero at present day, so no change in answers): one coefficient, `gmt`, drives the box
+  model and both domains (`[forcing] coefs = "gmt" "dTo"`, `[forcing_north] terms =
+  "regional_north" "ocean"`); the forcing and coupling comments point to the setups.
+
 ## [v2.4] - 2026-10-23
 
 ### Added

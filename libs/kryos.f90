@@ -185,7 +185,7 @@ module kryos
 
     public :: MAP_FLDR
     public :: domain_ctl, negis_params, glacial_smb_params, domain_relax, kryos_domain
-    public :: domain_init
+    public :: domain_init, domain_coefs_used
     public :: cadence_due
     ! remap is used by every coupling step, and by drivers to move fields
     ! between the hub/Yelmo grids and their own grid.
@@ -432,6 +432,20 @@ contains
         if (dom%ctl%scale_glacial_smb) call glacial_smb_par_load(dom%gsmb, path_par, trim(sfx))
 
     end subroutine domain_init
+
+    function domain_coefs_used(dom) result(names)
+        ! The coefficients the domain reads: those of its climate terms and of
+        ! [ice_bnd] (method scaled); for the check of the coefficient registry
+        ! (coefs_check_used) by the driver.
+        type(kryos_domain), intent(in) :: dom
+        character(len=64), allocatable :: names(:)
+        integer :: k
+        allocate(names(0))
+        do k = 1, dom%cl%terms%n
+            if (len_trim(dom%cl%terms%term(k)%coef) > 0) names = [names, dom%cl%terms%term(k)%coef]
+        end do
+        if (dom%ibnd%active .and. trim(dom%ibnd%method) == "scaled") names = [names, dom%ibnd%coef]
+    end function domain_coefs_used
 
     subroutine domain_negis_init(dom, path_par, suffix, reg)
         ! NEGIS cb_ref modification ([sim] use_negis): load its parameters and

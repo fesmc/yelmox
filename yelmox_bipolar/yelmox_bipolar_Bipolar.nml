@@ -27,18 +27,24 @@
     write_lossless  = False             ! write all output lossless (ignore per-field precision), e.g. for bit-for-bit comparisons
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
+    ! The coupling setups (uncoupled, box model alone, one-way, two-way, per
+    ! hemisphere) as runme -p arrays: yelmox_bipolar/params.sh.
     active_obm       = False            ! Run the shared ocean box model?
     obm_name         = "nautilus"       ! OBM parameter block name ("nautilus")
 
-    ism2obm          = False            ! Ice sheet -> OBM freshwater flux coupling?
-    couple_fwf_north = False            ! North freshwater flux -> obm%fn?
-    couple_fwf_south = False            ! South freshwater flux -> obm%fs?
+    ! Atmosphere -> OBM
+    atm2obm          = False            ! dTa_north/tropics/south, gmt ([obm_forcing]) -> OBM box air temperatures and vapour fluxes?
+
+    ! Ice sheet -> OBM (freshwater flux)
+    couple_fwf_north = False            ! North domain freshwater flux -> northern box (obm%fn)?
+    couple_fwf_south = False            ! South domain freshwater flux -> southern box (obm%fs)?
     fwf_definition   = "dVdt"           ! "dVdt", "mb", "ablation"
     hydro_mask_north = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"   ! {domain}, {grid_name}: the domain's name and grid_ice
     hydro_mask_south = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"
 
-    atm2obm          = False            ! Global air temperature anomaly ([obm_forcing]) -> OBM box air temperatures?
-                                        ! OBM ocean temperature -> ice sheet: a coefficient derived from a box (from = obm_north/obm_south)
+    ! OBM -> ice sheet (ocean temperature): no switch here; the term obm_north
+    ! ([forcing_north] terms) or obm_south ([forcing_south] terms), with its
+    ! coefficient in [forcing] coefs.
 /
 
 ! ===== Output timing =====
@@ -89,29 +95,24 @@
 ! ===== Forcing =====
 
 &forcing
-    ! The forcing (docs/_forcing-terms.md): the coefficients, shared by both
-    ! domains and the OBM, on the forcing time time_rel; each a group
-    ! [coef_<name>] (this file, then the var_defs files: input/forcing_db.nml).
-    ! The reference snapshot and the terms of each domain: [forcing_north],
-    ! [forcing_south].
-    coefs = "alpha" "gmt" "dTo"
-/
-
-&coef_alpha
-    ! alpha of this setup: the orbital record alpha_orbital_r2020 normalised to
-    ! 0 at present (piControl) and 1 at 21 ka (LGM), the weight of the LGM
-    ! anomaly (term_lgm of the north).
-    method      = "series"
-    series_file = "input/alpha_orbital_r2020.dat"
-    norm_t0     = 0.0
-    norm_t1     = -21e3
+    ! The coefficients, shared by both domains and the OBM, on the forcing time
+    ! time_rel; each a group [coef_<name>] (this file, then the var_defs files:
+    ! input/forcing_db.nml). Every coefficient a term or [obm_forcing] uses
+    ! must be listed, and only those. One coefficient, gmt, drives the box
+    ! model and both domains, through its regional amplifications dTa_north,
+    ! dTa_south (and dTa_tropics with atm2obm): scaled coefficients of the
+    ! library, factor x gmt (Zickfeld et al., 2004). dTo is derived (the ocean
+    ! of the north, term ocean). The reference snapshot and the terms of each
+    ! domain: [forcing_north], [forcing_south]. Docs: yelmox-bipolar.md.
+    coefs = "gmt" "dTa_north" "dTa_south" "dTo"
 /
 
 
 &coef_gmt
-    ! Global mean air temperature anomaly [K]: the OBM forcing ([obm_forcing])
-    ! and, with the regional gains, the uniform anomaly of each domain
-    ! ([term_regional_north], [term_regional_south]). Zero here (present day).
+    ! Global mean air temperature anomaly [K]: through dTa_north, dTa_tropics,
+    ! dTa_south the OBM box air temperatures ([obm_forcing]) and the uniform
+    ! anomaly of each domain ([term_regional_north], [term_regional_south]);
+    ! the OBM vapour fluxes. Zero here (present day).
     ! A time series instead, e.g.:
     !   method = "series", series_file = "input/<gmt series>.dat"
     method      = "const"
@@ -121,10 +122,11 @@
 
 &obm_forcing
     ! [ctrl] atm2obm: the OBM box air temperatures theta_i = theta_i_init +
-    ! ampl_i * gain * f (ampl_i: [nautilus] thermal_ampl_north/tropics/
-    ! south, Zickfeld et al., 2004) and the vapour fluxes.
-    coef  = "gmt"     ! global mean air temperature anomaly [K], a coefficient ([forcing] coefs)
-    gain  = 1.0       ! [1] dT_glob = gain * coef
+    ! dT_i and the vapour fluxes, from coefficients ([forcing] coefs) [K].
+    coef_north   = "dTa_north"      ! the northern box
+    coef_tropics = "dTa_tropics"    ! the tropical box
+    coef_south   = "dTa_south"      ! the southern box
+    coef         = "gmt"            ! the global mean: the vapour fluxes
 /
 
 ! ===== Ocean box model =====
@@ -144,10 +146,6 @@
     haline_exp_coeff = 8e-4             ! [psu-1] Haline expansion coefficient
     reference_salinity = 35             ! [psu] Reference salinity
     overturning_threshold = 0.25         ! [Sv] Minimum value for overturning
-
-    thermal_ampl_north = 1.07           ! Regional temperature constants (Zickfeld et al. 2004, OD)
-    thermal_ampl_tropics = 0.79
-    thermal_ampl_south = 0.86
 
     nh_temp_constant = 1.07             ! Regional temperature constants
     sh_temp_constant = 0.93
@@ -684,22 +682,20 @@
 ! ===== Climate =====
 
 &forcing_south
-    ! The forcing of the southern domain: the reference snapshot and the terms.
-    ! regional_south: the global anomaly gmt times the OBM's southern
-    ! amplification. The OBM southern box into the ocean instead: a
-    ! coefficient derived from it (method = "derived", from = "obm_south") with a replace
-    ! or uniform term on to.
+    ! The forcing of the southern domain: the reference snapshot and the terms
+    ! ([term_<name>]: this file, then input/forcing_db.nml).
+    !   regional_south  dTa_south (0.86 x gmt) on tas and pr; the ocean stays at the reference
+    ! Coupled to the box model: add obm_south (the ocean from the southern box)
+    ! and list obm_south in [forcing] coefs (yelmox_bipolar/params.sh).
     reference = "pd_ant"
     terms     = "regional_south"
 /
 
 &term_regional_south
-    ! Uniform anomaly from the global one, f_ta = [nautilus] thermal_ampl_south
-    ! (zero while gmt = 0).
-    coef    = "gmt"
+    ! The regional anomaly dTa_south, the southern box's (atm2obm), uniform.
+    coef    = "dTa_south"
     pattern = "uniform"
     fields  = "tas" "pr"
-    f_ta    = 0.86    ! [K]
 /
 
 &snapshots_south
@@ -1194,29 +1190,27 @@
 ! ===== Climate =====
 
 &forcing_north
-    ! The forcing of the northern domain: the reference snapshot and the terms.
-    ! lgm: PMIP3 lgm - picontrol weighted by alpha (library);
-    ! regional_north: the global anomaly gmt times the OBM's northern
-    ! amplification; ocean: the profiles plus 0.25 x the mean sea-level air
-    ! anomaly (coefficient dTo, derived). The OBM northern box into the ocean
-    ! instead of `ocean`: a coefficient derived from it (from = "obm_north") with
-    ! a replace or uniform term on to.
+    ! The forcing of the northern domain: the reference snapshot and the terms
+    ! ([term_<name>]: this file, then input/forcing_db.nml).
+    !   regional_north  dTa_north (1.07 x gmt) on tas and pr
+    !   ocean           to + dTo, dTo = 0.25 x the mean sea-level air anomaly (library)
+    ! Coupled to the box model: obm_north (the ocean from the northern box) in
+    ! place of ocean, never both (obm_north replaces to, ocean would add to it),
+    ! and obm_north in [forcing] coefs (yelmox_bipolar/params.sh).
     reference = "pd_grl"
-    terms     = "lgm" "regional_north" "ocean"
+    terms     = "regional_north" "ocean"
 /
 
 &term_regional_north
-    ! Uniform anomaly from the global one, f_ta = [nautilus] thermal_ampl_north
-    ! (zero while gmt = 0).
-    coef    = "gmt"
+    ! The regional anomaly dTa_north, the northern box's (atm2obm), uniform.
+    coef    = "dTa_north"
     pattern = "uniform"
     fields  = "tas" "pr"
-    f_ta    = 1.07    ! [K]
 /
 
 &snapshots_north
     ! Snapshot backend of the north: present day (MAR v3.14 1961-1990, ORAS5;
-    ! [snapshot_pd_grl]) and PMIP3 piControl and LGM (library) on the term lgm.
+    ! [snapshot_pd_grl]).
     lapse      = 0.0080 0.0065
     f_p        = 0.06
 /

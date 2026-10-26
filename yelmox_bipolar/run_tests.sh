@@ -1,100 +1,139 @@
 #!/usr/bin/env bash
 #
-# Smoke tests for the yelmox_bipolar bipolar driver (ocean-coupling port).
+# Smoke tests for the yelmox_bipolar driver: the coupling setups of
+# yelmox_bipolar/params.sh, each a short run (the par file's time_init to
+# time_end) that must reach "yelmox_bipolar: run complete", and the
+# consistency checks at init, each a setup that must stop with its error.
 #
-# Runs short bipolar simulations LOCALLY through the usual runme workflow: `-r`
-# runs the executable directly (use `-rs` instead to submit to a queue). Each
-# test writes to its own directory under tmp/. Run by hand with:
+# Runs LOCALLY through the usual runme workflow: `-r` runs the executable
+# directly, one test after the other. Each test writes to its own directory
+# under $OUT. Run by hand with:
 #
-#     bash yelmox_bipolar/run_tests.sh              # tests 1 + 2
-#     RUN_FWF=1 bash yelmox_bipolar/run_tests.sh    # also the freshwater-flux test
+#     bash yelmox_bipolar/run_tests.sh                     # every setup and check
+#     bash yelmox_bipolar/run_tests.sh bip_full bip_gis_obm
+#     bash yelmox_bipolar/run_tests.sh bip_full+bip_ocean_anomaly   # a setup + a modifier
 #
 # Prerequisites:
-#   - ice-sheet input data for GRL-16KM (north/Greenland) and ANT-32KM
-#     (south/Antarctica) present under ice_data/.
-#   - for Test 3 only: the hydrographic masks referenced by [ctrl]
-#     hydro_mask_north/south (…_HYDRO-BASINS_zickfeld2004.nc).
+#   - ice-sheet input data for the north (Greenland, GRL-16KM) and the south
+#     (Antarctica, ANT-32KM) under ice_data/ and fesmdata/.
+#   - for the setups with couple_fwf_north/south: the hydrographic masks of
+#     [ctrl] hydro_mask_north/south (…_HYDRO-BASINS_zickfeld2004.nc).
 
 cd "$(dirname "$0")/.." || exit 1        # repo root
+source yelmox_bipolar/params.sh
 
 NML="yelmox_bipolar/yelmox_bipolar_Bipolar.nml"
 EXE="bipolar"
-RUN_FWF="${RUN_FWF:-0}"
+OUT="${OUT:-tmp/bipolar-tests}"
+TIMEOUT="${TIMEOUT:-3600}"               # per-test wall-clock cap [s]
+
+# The consistency checks of obm_coupling_init: overrides that break a rule,
+# after a setup, and the error each must stop with.
+chk_other_box=("forcing_north.terms==regional_north,obm_south")
+chk_box_and_air=("forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo,obm_north,obm_south"
+                 "forcing_north.terms==regional_north,ocean,obm_north")
+chk_shared_air=("forcing_south.terms==regional_south,ocean")
+chk_box_unforced=("ctrl.active_obm=True" "coef_gmt.method=ramp-slope")
+chk_unused=("forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo")
+checks=("bip_full+chk_other_box"         "is derived from the box obm_south"
+        "bip_full+chk_box_and_air"       "(its ocean from the box) and"
+        "bip_uncoupled+chk_shared_air"   "is used by the terms of both domains"
+        "bip_uncoupled+chk_box_unforced" "box model is not forced by the atmosphere"
+        "bip_uncoupled+chk_unused"       "'dTa_tropics' is in [forcing] coefs, but no term")
+
+setups=("$@")
+run_checks=0
+if [ ${#setups[@]} -eq 0 ]; then
+    setups=("${bip_setups[@]}" "bip_full+bip_ocean_anomaly")
+    run_checks=1
+fi
 
 echo "=== building yelmox_bipolar ==="
 make yelmox_bipolar || { echo "build failed"; exit 1; }
 
 status=0
-TIMEOUT="${TIMEOUT:-3600}"               # per-test wall-clock cap [s]
+summary=()
+result() {
+    # result <PASS|FAIL> <test> <message>
+    echo "  [$1] $2${3:+ ($3)}"
+    summary+=("$1 $2")
+    [ "$1" = "PASS" ] || status=1
+}
+
+log_has() {
+    # log_has <log> <text>: the text in the log, with the lines joined (a long
+    # list-directed write may wrap onto a new record with a leading blank).
+    awk 'BEGIN { ORS = "" } { sub(/^ /, ""); print }' "$1" 2>/dev/null | grep -qF -- "$2"
+}
+
 run_test() {
-    # run_test <label> <outdir> <extra runme -p args...>
-    local label="$1" outdir="$2"; shift 2
+    # run_test <test> [<expected error>]: <test> names the -p arrays, joined by
+    # "+"; with an expected error the run must stop at init with it.
+    local test="$1" expect="${2:-}" outdir="$OUT/${1//+/_}" name
+    local -a params=() names=()
+    IFS="+" read -r -a names <<< "$test"
+    for name in "${names[@]}"; do
+        if ! declare -p "$name" >/dev/null 2>&1; then
+            result FAIL "$test" "no array $name"; return
+        fi
+        eval 'params+=("${'"$name"'[@]}")'
+    done
+
     echo
     echo "=================================================================="
-    echo "  $label"
+    echo "  $test${expect:+  (must stop: $expect)}"
     echo "  -> $outdir"
+    echo "  -p ${params[*]}"
     echo "=================================================================="
     rm -rf "$outdir"                     # fresh dir so the test is re-runnable
 
     # runme -r launches the executable in the BACKGROUND (…/out.out &) and returns
     # immediately, so poll the run log for a clean finish vs. an abort. Keep this
     # shell alive meanwhile, otherwise the backgrounded job is killed on exit.
-    if ! runme -r -e "$EXE" -n "$NML" -o "$outdir" "$@"; then
-        echo "  [FAIL] $label (runme could not stage/launch the run)"; status=1; return
+    local -a pargs=()
+    [ ${#params[@]} -gt 0 ] && pargs=(-p "${params[@]}")
+    if ! runme -r -e "$EXE" -n "$NML" -o "$outdir" "${pargs[@]}"; then
+        result FAIL "$test" "runme could not stage/launch the run"; return
     fi
 
     local log="$outdir/out.out" waited=0
     while true; do
         if grep -q "yelmox_bipolar: run complete" "$log" 2>/dev/null; then
-            echo "  [PASS] $label (run complete)"; return
+            if [ -n "$expect" ]; then
+                result FAIL "$test" "ran to completion, expected an error at init"
+            else
+                result PASS "$test"
+            fi
+            return
         fi
-        if grep -qE "STOP [0-9]+|Fortran runtime error|Backtrace for" "$log" 2>/dev/null; then
-            echo "  [FAIL] $label (aborted: $(grep -m1 -oE 'STOP [0-9]+|Fortran runtime error.*' "$log"))"
-            echo "         Note: a Yelmo 'STOP 9' at time=0 is its own stability kill"
-            echo "         (yelmo_check_kill), a property of the nml/data, not the driver."
-            status=1; return
-        fi
-        if ! pgrep -f "yelmox_bipolar.x" >/dev/null 2>&1; then
-            echo "  [FAIL] $label (process exited without a completion marker; see $log)"; status=1; return
+        if grep -qE "STOP [0-9]+|Fortran runtime error|Backtrace for|forrtl: severe" "$log" 2>/dev/null \
+           || ! pgrep -f "yelmox_bipolar.x" >/dev/null 2>&1; then
+            sleep 2                      # let the log flush
+            if [ -n "$expect" ] && log_has "$log" "$expect"; then
+                result PASS "$test" "stopped with the expected error"
+            else
+                result FAIL "$test" "stopped, see $log"
+                grep -m3 -E ":: error|STOP [0-9]+|forrtl" "$log" | sed 's/^/         /'
+            fi
+            return
         fi
         sleep 10; waited=$((waited + 10))
         if [ "$waited" -ge "$TIMEOUT" ]; then
-            echo "  [FAIL] $label (timeout after ${TIMEOUT}s; still running, see $log)"; status=1; return
+            result FAIL "$test" "timeout after ${TIMEOUT}s; still running, see $log"; return
         fi
     done
 }
 
-# --- Test 1: baseline, ocean coupling OFF (two independent domains) -----------
-# Confirms the refactor (shared bsl + explicit north/south) runs with no
-# regression vs. the pre-port behaviour. Uses the nml defaults (active_obm=False).
-run_test "Test 1: coupling OFF (baseline)" "tmp/mgbi_test1_baseline"
-
-# --- Test 2: ocean box model ON; atmosphere <-> ocean <-> ice ----------------
-# Exercises obm_update + atm2obm (global coefficient gmt) + obm2ism (box-model ocean
-# temperature fed into marine_shelf through the coefficients derived from the boxes
-# and the replace terms term_obm_north/south, in place of the ocean term from
-# the air anomaly). Freshwater flux (ism2obm) is OFF here because it needs
-# the hydrographic mask files, which are not in every checkout (see Test 3).
-OBM_ON="ctrl.active_obm=True ctrl.atm2obm=True forcing.coefs==alpha,gmt,obm_north,obm_south forcing_north.terms==lgm,regional_north,obm_north forcing_south.terms==regional_south,obm_south"
-run_test "Test 2: OBM on (atm2obm + obm2ism, no fwf)" "tmp/mgbi_test2_obm" \
-    -p $OBM_ON
-
-# --- Test 3: FULL coupling incl. freshwater flux (ism2obm) --------------------
-# Needs the hydrographic masks referenced by [ctrl] hydro_mask_north/south.
-# Disabled by default; run with RUN_FWF=1 once those files exist.
-if [ "$RUN_FWF" = "1" ]; then
-    run_test "Test 3: FULL coupling (+ ism2obm/fwf)" "tmp/mgbi_test3_fullcouple" \
-        -p $OBM_ON \
-           ctrl.ism2obm=True ctrl.couple_fwf_north=True ctrl.couple_fwf_south=True
-else
-    echo
-    echo "=== Test 3 (full fwf coupling) skipped; set RUN_FWF=1 to enable (needs hydro masks) ==="
+for test in "${setups[@]}"; do
+    run_test "$test"
+done
+if [ "$run_checks" = "1" ]; then
+    for ((i = 0; i < ${#checks[@]}; i += 2)); do
+        run_test "${checks[i]}" "${checks[i+1]}"
+    done
 fi
 
 echo
-if [ "$status" = "0" ]; then
-    echo "=== all requested mgbi smoke tests PASSED ==="
-else
-    echo "=== some mgbi smoke tests FAILED (see [FAIL] above) ==="
-fi
+echo "=== summary ==="
+printf '  %s\n' "${summary[@]}"
 exit "$status"

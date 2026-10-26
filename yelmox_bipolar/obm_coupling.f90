@@ -10,9 +10,11 @@ module obm_coupling
     ! without kind conversion.
     !
     ! The three exchanges:
-    !   atm2obm  : global mean air temperature anomaly ([obm_forcing], a
-    !              coefficient of the driver's registry) -> obm box air temperatures/vapor
-    !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
+    !   atm2obm  : air temperature anomalies ([obm_forcing], coefficients of the
+    !              driver's registry: one per box, and the global one) -> obm
+    !              box air temperatures/vapor
+    !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs,
+    !              per hemisphere ([ctrl] couple_fwf_north, couple_fwf_south)
     !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
     !              to_ann (marine-shelf forcing), through the coefficients
     !              derived from the boxes (obm_north, obm_south) and the domains' ocean
@@ -34,7 +36,7 @@ module obm_coupling
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
     use kryos_forcing, only : coefs_class, coefs_has, coefs_value, coefs_uses_derived, &
-                              coefs_set_obm
+                              coefs_set_obm, coefs_derived, derived_spec, coefs_varies
     use yelmox_climate, only : climate_apply_ocean
     use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
@@ -45,16 +47,16 @@ module obm_coupling
     private
 
     type obm_coupling_ctl
-        ! Which exchanges are active ([ctrl]; obm2ism: a coefficient derived from a box).
+        ! Which exchanges are active ([ctrl]; ism2obm: couple_fwf_north/south below;
+        ! obm2ism: a coefficient derived from a box).
         logical :: active_obm = .false.
-        logical :: ism2obm    = .false.
         logical :: atm2obm    = .false.
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
-        ! atm2obm: the global mean air temperature anomaly dT_glob = gain * coef
-        ! ([obm_forcing], a coefficient).
-        character(len=64)  :: forcing_coef  = ""
-        real(wp)           :: forcing_gain  = 1.0_wp
-        ! ism2obm: freshwater-flux definition + per-hemisphere hydrographic masks.
+        ! atm2obm: the coefficients of [obm_forcing], the air temperature
+        ! anomaly of each box and the global one (the vapour fluxes) [K].
+        character(len=64)  :: coef_north = "", coef_tropics = "", coef_south = "", coef_global = ""
+        ! ism2obm: the freshwater flux of each hemisphere into its box, its
+        ! definition and the hydrographic masks.
         logical            :: couple_fwf_north = .false.
         logical            :: couple_fwf_south = .false.
         character(len=512) :: fwf_definition   = "dVdt"
@@ -68,7 +70,11 @@ module obm_coupling
         real(dp)           :: hyster_positive_branch_time = 0.0_dp
     end type obm_coupling_ctl
 
-    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange
+    ! The keys of [obm_forcing], in the order of obm_forcing_coefs.
+    character(len=12), parameter :: OBM_FORCING_KEYS(4) = &
+        [character(len=12) :: "coef_north", "coef_tropics", "coef_south", "coef"]
+
+    public :: obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange, obm_forcing_coefs
     public :: coupling_atm2obm, coupling_ism2obm, coupling_obm2ism
     public :: update_bipolar_hyster_forcing
 
@@ -84,20 +90,21 @@ contains
         type(obm_coupling_ctl), intent(inout) :: oc
         character(len=*),       intent(in)    :: path_par
 
-        call nml_read(path_par, "ctrl", "active_obm", oc%active_obm)
-        call nml_read(path_par, "ctrl", "ism2obm",    oc%ism2obm)
-        call nml_read(path_par, "ctrl", "atm2obm",    oc%atm2obm)
-        call nml_read(path_par, "ctrl", "obm_name",   oc%obm_name)
+        call nml_read(path_par, "ctrl", "active_obm",       oc%active_obm)
+        call nml_read(path_par, "ctrl", "atm2obm",          oc%atm2obm)
+        call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
+        call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
+        call nml_read(path_par, "ctrl", "obm_name",         oc%obm_name)
 
         if (oc%atm2obm) then
             call nml_validate(path_par, def_file, "obm_forcing")
-            call nml_read(path_par, "obm_forcing", "coef",  oc%forcing_coef, defaults_file=def_file)
-            call nml_read(path_par, "obm_forcing", "gain",  oc%forcing_gain,  defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef_north",   oc%coef_north,   defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef_tropics", oc%coef_tropics, defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef_south",   oc%coef_south,   defaults_file=def_file)
+            call nml_read(path_par, "obm_forcing", "coef",         oc%coef_global,  defaults_file=def_file)
         end if
 
-        if (oc%ism2obm) then
-            call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
-            call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
+        if (oc%couple_fwf_north .or. oc%couple_fwf_south) then
             call nml_read(path_par, "ctrl", "fwf_definition",   oc%fwf_definition)
             select case(trim(oc%fwf_definition))
                 case("dVdt", "mb", "ablation")
@@ -125,57 +132,173 @@ contains
         ! Check the exchanges against what the run holds, then load the
         ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
         ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
-        ! the coefficient of [obm_forcing] in the registry; ism2obm an ice-sheet
-        ! domain. Only touches a domain when it is active, so an inactive domain
-        ! may be uninitialized. Call after the coefficients and the domains.
+        ! the coefficients of [obm_forcing] in the registry; the freshwater flux
+        ! of a hemisphere its domain. The ocean terms of the domains against the
+        ! shared coefficients (check_domain_ocean, and an air-anomaly coefficient
+        ! set by one domain only). Only touches a domain when it is active, so
+        ! an inactive domain may be uninitialized. Call after the coefficients
+        ! and the domains.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(coefs_class),      intent(in)    :: coefs
         type(kryos_domain),     intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
 
         logical :: obm2ism
+        character(len=64), allocatable :: names(:)
+        integer :: k
 
         ! obm2ism: a coefficient derived from a box (obm_north, obm_south), used by
         ! the ocean terms of a domain.
         obm2ism = coefs_uses_derived(coefs, "obm_north") .or. coefs_uses_derived(coefs, "obm_south")
 
-        if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%ism2obm .or. obm2ism)) then
-            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and the coefficients derived &
-                       &from the boxes (obm_north, obm_south) need the ocean box model &
-                       &([ctrl] active_obm = True)."
+        if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%couple_fwf_north .or. &
+                                       oc%couple_fwf_south .or. obm2ism)) then
+            write(*,*) "obm_coupling_init:: error: atm2obm, couple_fwf_north/south and the &
+                       &coefficients derived from the boxes (obm_north, obm_south) need the &
+                       &ocean box model ([ctrl] active_obm = True)."
             error stop 1
         end if
-        if (oc%atm2obm .and. .not. coefs_has(coefs, oc%forcing_coef)) then
-            write(*,*) "obm_coupling_init:: error: [obm_forcing] coef = '"// &
-                       trim(oc%forcing_coef)//"' is not in [forcing] coefs (needed by atm2obm)."
+        names = obm_forcing_coefs(oc)
+        do k = 1, size(names)
+            if (coefs_has(coefs, names(k))) cycle
+            write(*,*) "obm_coupling_init:: error: [obm_forcing] "//trim(OBM_FORCING_KEYS(k))// &
+                       " = '"//trim(names(k))//"' is not in [forcing] coefs (needed by atm2obm)."
+            error stop 1
+        end do
+        if (oc%couple_fwf_north .and. .not. active_north) then
+            write(*,*) "obm_coupling_init:: error: couple_fwf_north needs active_north."
             error stop 1
         end if
-        if (oc%ism2obm .and. .not. (active_north .or. active_south)) then
-            write(*,*) "obm_coupling_init:: error: ism2obm needs active_north or active_south."
+        if (oc%couple_fwf_south .and. .not. active_south) then
+            write(*,*) "obm_coupling_init:: error: couple_fwf_south needs active_south."
             error stop 1
+        end if
+
+        if (active_north) call check_domain_ocean(dom_north, coefs, "north")
+        if (active_south) call check_domain_ocean(dom_south, coefs, "south")
+
+        ! The box model sees the forcing of the ice sheets: with an atmosphere
+        ! of a domain that changes in time, atm2obm forces the boxes too.
+        if (oc%active_obm .and. .not. oc%atm2obm) then
+            if (active_north) call check_box_forced(dom_north, coefs, "north")
+            if (active_south) call check_box_forced(dom_south, coefs, "south")
+        end if
+
+        ! A coefficient derived from the air anomaly is set by the climate of
+        ! the domain whose terms use it. The coefficients are shared and
+        ! obm_exchange re-applies the ocean terms of both domains after both
+        ! climate updates, so a coefficient set by both would give the first
+        ! domain the anomaly of the second.
+        if (active_north .and. active_south .and. allocated(dom_north%cl%dair) .and. &
+            allocated(dom_south%cl%dair)) then
+            do k = 1, size(dom_north%cl%dair)
+                if (any(dom_south%cl%dair%name == dom_north%cl%dair(k)%name)) then
+                    write(*,*) "obm_coupling_init:: error: the coefficient "// &
+                               trim(dom_north%cl%dair(k)%name)//" (derived from the air &
+                               &anomaly) is used by the terms of both domains; the &
+                               &coefficients are shared, so each domain needs a coefficient &
+                               &of its own (e.g. [coef_dTo_south] as [coef_dTo])."
+                    error stop 1
+                end if
+            end do
         end if
 
         if (oc%atm2obm) &
-            write(*,*) "obm_coupling_init:: atm2obm from coefficient "//trim(oc%forcing_coef)// &
-                       ", gain =", oc%forcing_gain
-
-        if (.not. oc%ism2obm) return
+            write(*,*) "obm_coupling_init:: atm2obm from the coefficients "//trim(oc%coef_north)// &
+                       ", "//trim(oc%coef_tropics)//", "//trim(oc%coef_south)//" (boxes), "// &
+                       trim(oc%coef_global)//" (vapour fluxes)"
 
         ! The masks are on the Yelmo grid of their domain: {domain}/{grid_name}
         ! of the paths are its name and grid_ice.
-        if (oc%couple_fwf_north .and. active_north) then
+        if (oc%couple_fwf_north) then
             call nml_replace(oc%hydro_mask_north_path, "{domain}",    trim(dom_north%ctl%domain))
             call nml_replace(oc%hydro_mask_north_path, "{grid_name}", trim(dom_north%ctl%grid_ice))
             allocate(oc%hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_north_path, "mask", oc%hydro_mask_north)
         end if
-        if (oc%couple_fwf_south .and. active_south) then
+        if (oc%couple_fwf_south) then
             call nml_replace(oc%hydro_mask_south_path, "{domain}",    trim(dom_south%ctl%domain))
             call nml_replace(oc%hydro_mask_south_path, "{grid_name}", trim(dom_south%ctl%grid_ice))
             allocate(oc%hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
         end if
     end subroutine obm_coupling_init
+
+    subroutine check_domain_ocean(dom, coefs, hemisphere)
+        ! The ocean terms of a domain against the box model: a coefficient
+        ! derived from a box is that of the domain's hemisphere (obm_north for
+        ! the north), and an ocean from a box takes no anomaly from the air on
+        ! top (the box follows the air already, through atm2obm).
+        type(kryos_domain), intent(in) :: dom
+        type(coefs_class),  intent(in) :: coefs
+        character(len=*),   intent(in) :: hemisphere    ! north | south
+
+        type(derived_spec) :: drv
+        character(len=64)  :: box_term, air_term
+        integer :: k
+
+        box_term = ""
+        air_term = ""
+        do k = 1, dom%cl%terms%n
+            associate(t => dom%cl%terms%term(k))
+            if (.not. (t%on_to .and. t%derived)) cycle
+            drv = coefs_derived(coefs, t%coef)
+            select case(trim(drv%from))
+                case("obm_north", "obm_south")
+                    if (trim(drv%from) /= "obm_"//trim(hemisphere)) then
+                        write(*,*) "obm_coupling_init:: error: ["//trim(t%group)//"] coef "// &
+                                   trim(t%coef)//" is derived from the box "//trim(drv%from)// &
+                                   "; the "//trim(hemisphere)//" domain takes its ocean from &
+                                   &obm_"//trim(hemisphere)//"."
+                        error stop 1
+                    end if
+                    box_term = t%group
+                case("air_anomaly")
+                    air_term = t%group
+            end select
+            end associate
+        end do
+
+        if (len_trim(box_term) > 0 .and. len_trim(air_term) > 0) then
+            write(*,*) "obm_coupling_init:: error: the "//trim(hemisphere)//" domain has both ["// &
+                       trim(box_term)//"] (its ocean from the box) and ["//trim(air_term)// &
+                       "] (an ocean anomaly from the air); the box follows the air already, &
+                       &use one of them (e.g. obm_"//trim(hemisphere)//" in place of ocean)."
+            error stop 1
+        end if
+    end subroutine check_domain_ocean
+
+    subroutine check_box_forced(dom, coefs, hemisphere)
+        ! Without atm2obm the box model keeps its initial air temperatures: an
+        ! error if a term of the domain changes its atmosphere in time.
+        type(kryos_domain), intent(in) :: dom
+        type(coefs_class),  intent(in) :: coefs
+        character(len=*),   intent(in) :: hemisphere    ! north | south
+        integer :: k
+        do k = 1, dom%cl%terms%n
+            associate(t => dom%cl%terms%term(k))
+            if (.not. (t%on_tas .or. t%on_pr) .or. len_trim(t%coef) == 0) cycle
+            if (.not. coefs_varies(coefs, t%coef)) cycle
+            write(*,*) "obm_coupling_init:: error: ["//trim(t%group)//"] of the "//trim(hemisphere)// &
+                       " domain changes its atmosphere in time (coef "//trim(t%coef)//"), but the &
+                       &box model is not forced by the atmosphere: set [ctrl] atm2obm = True."
+            error stop 1
+            end associate
+        end do
+    end subroutine check_box_forced
+
+    function obm_forcing_coefs(oc) result(names)
+        ! The coefficients atm2obm reads ([obm_forcing]): the air temperature
+        ! anomaly of the north, tropics and south box and the global one; none
+        ! without atm2obm.
+        type(obm_coupling_ctl), intent(in) :: oc
+        character(len=64), allocatable :: names(:)
+        if (oc%atm2obm) then
+            names = [character(len=64) :: oc%coef_north, oc%coef_tropics, oc%coef_south, oc%coef_global]
+        else
+            allocate(names(0))
+        end if
+    end function obm_forcing_coefs
 
     subroutine obm_exchange(oc, obm, coefs, dom_north, dom_south, active_north, active_south, &
                             time, time_init, dtt)
@@ -193,14 +316,13 @@ contains
         real(dp),               intent(in)    :: time, time_init, dtt
 
         if (oc%atm2obm) &
-            call coupling_atm2obm(obm, oc%forcing_gain*coefs_value(coefs, oc%forcing_coef))
+            call coupling_atm2obm(obm, coefs_value(coefs, oc%coef_north), coefs_value(coefs, oc%coef_tropics), &
+                                  coefs_value(coefs, oc%coef_south), coefs_value(coefs, oc%coef_global))
 
-        if (oc%ism2obm) then
-            if (oc%couple_fwf_north .and. active_north) &
-                call coupling_ism2obm(dom_north, obm, oc%hydro_mask_north, "north", oc%fwf_definition)
-            if (oc%couple_fwf_south .and. active_south) &
-                call coupling_ism2obm(dom_south, obm, oc%hydro_mask_south, "south", oc%fwf_definition)
-        end if
+        if (oc%couple_fwf_north) &
+            call coupling_ism2obm(dom_north, obm, oc%hydro_mask_north, "north", oc%fwf_definition)
+        if (oc%couple_fwf_south) &
+            call coupling_ism2obm(dom_south, obm, oc%hydro_mask_south, "south", oc%fwf_definition)
 
         if (trim(oc%obm_name) == "nautilus" .and. oc%hyster_on) &
             call update_bipolar_hyster_forcing(time, time_init, obm, dtt, &
@@ -214,19 +336,19 @@ contains
         if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, coefs)
     end subroutine obm_exchange
 
-    subroutine coupling_atm2obm(obm, dT_glob)
-        ! Atmosphere -> OBM: the box-model air temperatures of every box from the
-        ! global mean air temperature anomaly dT_glob [K] with the regional
-        ! amplification factors (Zickfeld et al., 2004), theta_i = theta_i_init
-        ! + ampl_i * dT_glob (north, tropics, south), and the vapor fluxes,
-        ! phin (tropics -> north) and phit (south -> tropics), linear in dT_glob
-        ! by the hydrological sensitivities.
+    subroutine coupling_atm2obm(obm, dT_north, dT_tropics, dT_south, dT_glob)
+        ! Atmosphere -> OBM: the box-model air temperatures of every box from
+        ! its air temperature anomaly [K] (e.g. the global one amplified,
+        ! Zickfeld et al., 2004: the scaled coefficients dTa_north, dTa_tropics,
+        ! dTa_south), theta_i = theta_i_init + dT_i, and the vapor fluxes, phin
+        ! (tropics -> north) and phit (south -> tropics), linear in the global
+        ! mean air temperature anomaly dT_glob by the hydrological sensitivities.
         type(obm_class), intent(inout) :: obm
-        real(wp),        intent(in)    :: dT_glob
+        real(wp),        intent(in)    :: dT_north, dT_tropics, dT_south, dT_glob
 
-        obm%thetan = obm%par%thetan_init + obm%par%thermal_ampl_north  *dT_glob
-        obm%thetat = obm%par%thetat_init + obm%par%thermal_ampl_tropics*dT_glob
-        obm%thetas = obm%par%thetas_init + obm%par%thermal_ampl_south  *dT_glob
+        obm%thetan = obm%par%thetan_init + dT_north
+        obm%thetat = obm%par%thetat_init + dT_tropics
+        obm%thetas = obm%par%thetas_init + dT_south
         obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob
         obm%phit   = obm%par%phit_init   + obm%par%hs*obm%par%psh*dT_glob
     end subroutine coupling_atm2obm
