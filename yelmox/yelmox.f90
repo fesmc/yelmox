@@ -14,7 +14,7 @@ program yelmox
     use precision, only : dp
     use yelmo, only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update
-    use kryos,          only : kryos_domain, domain_init
+    use kryos,          only : kryos_domain, domain_init, domain_coefs_used
     use yelmox_climate, only : climate_end
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
@@ -23,7 +23,7 @@ program yelmox
     use kryos_startup,  only : domain_startup, run_restart_write
     use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
                                coefs_restart_due, coefs_restart_fldr, &
-                               coefs_restart_read
+                               coefs_restart_read, coefs_check_used
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
                                domain_write_1D, domain_write_cmip
@@ -102,6 +102,9 @@ program yelmox
     ! Initialize the domain: sub-models + hi-res hub + coupler maps, at the
     ! start of the timeline ([run_step] group).
     call domain_init(dom, path_par, ts, coefs, timeline_group=trim(run_step))
+
+    ! Every coefficient of [forcing] coefs is read by the domain.
+    call coefs_check_used(coefs, domain_coefs_used(dom))
 
     ! Define regions of interest for 1D output (must precede the first yelmo_update).
     call domain_regions_init(dom, trim(outfldr))

@@ -35,7 +35,7 @@ program yelmox_bipolar
     use precision,    only : dp
     use yelmo,        only : yelmo_load_command_line_args, wp, yelmo_end
     use fastisostasy, only : bsl_class, bsl_init, bsl_update, bsl_restart_write
-    use kryos,          only : kryos_domain, domain_init
+    use kryos,          only : kryos_domain, domain_init, domain_coefs_used
     use yelmox_climate, only : climate_end
     use kryos_regions,  only : domain_regions_init
     use kryos_coupling, only : step_relax, step_optimize, step_isostasy, couple_to_yelmo, &
@@ -48,12 +48,12 @@ program yelmox_bipolar
                                domain_write_1D
     use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
                                coefs_restart_due, coefs_restart_fldr, &
-                               coefs_restart_read, coefs_restart_write
+                               coefs_restart_read, coefs_restart_write, coefs_check_used
     use obm_defs,     only : obm_class
     use obm,          only : obm_init, obm_update, &
                              write_obm_init, write_obm_update, write_obm_restart
     use obm_coupling, only : obm_coupling_ctl, obm_ctl_load, obm_coupling_init, obm_exchange, &
-                             coupling_obm2ism
+                             coupling_obm2ism, obm_forcing_coefs
     use timer,        only : timer_class, timer_init, timer_step, &
                              timer_print_totals, timer_write_totals
 
@@ -150,11 +150,16 @@ program yelmox_bipolar
     if (active_north) call setup_domain(dom_north, "_north", outfldr_north)
     if (active_south) call setup_domain(dom_south, "_south", outfldr_south)
 
-    ! The ocean couplings checked against the coefficients and the domains
-    ! (the derived coefficients obm_north/obm_south and the terms on them),
-    ! and the hydrographic masks (Yelmo grid) restricting the freshwater flux
-    ! per domain.
+    ! The consistency of the setup, before the startup of the domains: the
+    ! ocean couplings against the coefficients and the domains (the derived
+    ! coefficients obm_north/obm_south and the terms on them), the
+    ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
+    ! domain, and every coefficient of [forcing] coefs read by the run.
     call obm_coupling_init(oc, coefs, dom_north, dom_south, active_north, active_south)
+    call coefs_check_used(coefs, run_coefs_used())
+
+    if (active_north) call start_domain(dom_north, "_north", outfldr_north)
+    if (active_south) call start_domain(dom_south, "_south", outfldr_south)
 
     ! === Output + restart schedules (shared cadence, from [tm_2D]/[tm_2Dsm]/
     !     [tm_1D]/[tm_rst]; a restart bundle is always written at time_end) ===
@@ -308,8 +313,7 @@ contains
 
     subroutine setup_domain(dom, suffix, outfldr)
         ! Initialize one hemisphere: sub-models + hi-res hub + coupler maps, its
-        ! output folder + regions, and the initial (cold) or restored state. The
-        ! shared bsl was already initialized/restored by the driver above.
+        ! output folder + regions.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: suffix
         character(len=*), intent(out)   :: outfldr
@@ -321,6 +325,14 @@ contains
         call execute_command_line('mkdir -p "'//trim(outfldr)//'"')
 
         call domain_regions_init(dom, trim(outfldr))
+    end subroutine setup_domain
+
+    subroutine start_domain(dom, suffix, outfldr)
+        ! The initial (cold) or restored state of one hemisphere. The shared
+        ! bsl was already initialized/restored by the driver above.
+        type(kryos_domain), intent(inout) :: dom
+        character(len=*), intent(in)    :: suffix
+        character(len=*), intent(in)    :: outfldr
 
         ! Cold start or restart from the domain's subfolder of the run bundle
         ! (state continued, climate re-derived: see domain_startup); the shared
@@ -341,7 +353,15 @@ contains
         write(*,*) "  coupler maps: ", dom%cpl%nmaps
         write(*,*) "  output dir  : "//trim(outfldr)
         write(*,*)
-    end subroutine setup_domain
+    end subroutine start_domain
+
+    function run_coefs_used() result(names)
+        ! The coefficients the run reads: the OBM forcing and the active domains.
+        character(len=64), allocatable :: names(:)
+        names = obm_forcing_coefs(oc)
+        if (active_north) names = [names, domain_coefs_used(dom_north)]
+        if (active_south) names = [names, domain_coefs_used(dom_south)]
+    end function run_coefs_used
 
     subroutine write_domain_init(dom, outfldr)
         ! Create the 2D + 1D output files.

@@ -36,7 +36,7 @@ module obm_coupling
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
     use kryos_forcing, only : coefs_class, coefs_has, coefs_value, coefs_uses_derived, &
-                              coefs_set_obm, coefs_derived, derived_spec
+                              coefs_set_obm, coefs_derived, derived_spec, coefs_varies
     use yelmox_climate, only : climate_apply_ocean
     use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
@@ -177,6 +177,13 @@ contains
         if (active_north) call check_domain_ocean(dom_north, coefs, "north")
         if (active_south) call check_domain_ocean(dom_south, coefs, "south")
 
+        ! The box model sees the forcing of the ice sheets: with an atmosphere
+        ! of a domain that changes in time, atm2obm forces the boxes too.
+        if (oc%active_obm .and. .not. oc%atm2obm) then
+            if (active_north) call check_box_forced(dom_north, coefs, "north")
+            if (active_south) call check_box_forced(dom_south, coefs, "south")
+        end if
+
         ! A coefficient derived from the air anomaly is set by the climate of
         ! the domain whose terms use it. The coefficients are shared and
         ! obm_exchange re-applies the ocean terms of both domains after both
@@ -260,6 +267,25 @@ contains
             error stop 1
         end if
     end subroutine check_domain_ocean
+
+    subroutine check_box_forced(dom, coefs, hemisphere)
+        ! Without atm2obm the box model keeps its initial air temperatures: an
+        ! error if a term of the domain changes its atmosphere in time.
+        type(kryos_domain), intent(in) :: dom
+        type(coefs_class),  intent(in) :: coefs
+        character(len=*),   intent(in) :: hemisphere    ! north | south
+        integer :: k
+        do k = 1, dom%cl%terms%n
+            associate(t => dom%cl%terms%term(k))
+            if (.not. (t%on_tas .or. t%on_pr) .or. len_trim(t%coef) == 0) cycle
+            if (.not. coefs_varies(coefs, t%coef)) cycle
+            write(*,*) "obm_coupling_init:: error: ["//trim(t%group)//"] of the "//trim(hemisphere)// &
+                       " domain changes its atmosphere in time (coef "//trim(t%coef)//"), but the &
+                       &box model is not forced by the atmosphere: set [ctrl] atm2obm = True."
+            error stop 1
+            end associate
+        end do
+    end subroutine check_box_forced
 
     function obm_forcing_coefs(oc) result(names)
         ! The coefficients atm2obm reads ([obm_forcing]): the air temperature

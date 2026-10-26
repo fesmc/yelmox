@@ -71,10 +71,13 @@ runme -rs -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml -o output/bip-
 ```
 
 Further `-p` arguments go after the array (a later value wins). The rules
-behind the table, checked at init where noted:
+behind the table, checked at init (before the startup of the domains) where
+noted:
 
 - Every coefficient a term or `[obm_forcing]` uses is listed in `[forcing]
-  coefs` (an error at init otherwise): with `atm2obm` all three `dTa_*`.
+  coefs`, and only those (errors at init): with `atm2obm` all three `dTa_*`;
+  without it no `dTa_tropics`, and no `dTa_*` of an inactive domain; no `dTo`
+  once `obm_north` replaces `ocean`.
   `dTa_*` (scaled from `gmt`) and `obm_north`/`obm_south` (set by the box
   model each step) are library coefficients (`input/forcing_db.nml`).
 - `obm_north` takes the place of `ocean`, never both: `obm_north` replaces `to`
@@ -83,6 +86,9 @@ behind the table, checked at init where noted:
   an air-anomaly coefficient). Likewise `obm_south` in the south.
 - A domain takes its ocean from the box of its own hemisphere: the north from
   `obm_north`, the south from `obm_south` (an error at init otherwise).
+- With the box model on and an atmosphere that changes in time (a varying
+  `gmt`), `atm2obm` is on too: the boxes would keep their initial air
+  temperatures otherwise (an error at init).
 - `couple_fwf_north`/`couple_fwf_south` need the box model and the domain of
   their hemisphere (errors at init), and the hydrographic masks `[ctrl]
   hydro_mask_north`/`hydro_mask_south` on the Yelmo grid of the domain
@@ -114,8 +120,10 @@ Variations on a setup:
 
 ## What's distinct
 
-- **Two `kryos_domain`s** (`dom_north`, `dom_south`), each set up via `setup_domain`
-  → `domain_startup`. Either can be individually deactivated (`active_north` /
+- **Two `kryos_domain`s** (`dom_north`, `dom_south`), each set up via
+  `setup_domain`, then, after the consistency checks of the run
+  (`obm_coupling_init`, `coefs_check_used`), started (`start_domain` →
+  `domain_startup`). Either can be individually deactivated (`active_north` /
   `active_south`); with neither, the ocean box model runs alone (`active_obm`,
   forced by `atm2obm` or not; no freshwater flux, no terms on the box coefficients).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup

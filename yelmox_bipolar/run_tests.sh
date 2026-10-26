@@ -33,9 +33,13 @@ chk_other_box=("forcing_north.terms==regional_north,obm_south")
 chk_box_and_air=("forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo,obm_north,obm_south"
                  "forcing_north.terms==regional_north,ocean,obm_north")
 chk_shared_air=("forcing_south.terms==regional_south,ocean")
+chk_box_unforced=("ctrl.active_obm=True" "coef_gmt.method=ramp-slope")
+chk_unused=("forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo")
 checks=("bip_full+chk_other_box"         "is derived from the box obm_south"
         "bip_full+chk_box_and_air"       "(its ocean from the box) and"
-        "bip_uncoupled+chk_shared_air"   "is used by the terms of both domains")
+        "bip_uncoupled+chk_shared_air"   "is used by the terms of both domains"
+        "bip_uncoupled+chk_box_unforced" "box model is not forced by the atmosphere"
+        "bip_uncoupled+chk_unused"       "'dTa_tropics' is in [forcing] coefs, but no term")
 
 setups=("$@")
 run_checks=0

@@ -197,7 +197,9 @@ with `units`.
 snapshots of a run are the reference and the `snap0`/`snap1` of its terms: no
 list. Checked at init, with an error naming the term: every coefficient and
 snapshot named exists, every field is bound by its snapshots and the reference,
-a `replace` once per field, a derived coefficient on the ocean only; a backend that
+a `replace` once per field, a derived coefficient on the ocean only, every
+coefficient of `[forcing] coefs` used (by a term, `[ice_bnd]`, the OBM forcing
+of yelmox_bipolar, or as the `coef` of a scaled coefficient that is); a backend that
 supplies the smb (esm with `surface_method = "climate"`) refuses terms on
 `tas`/`pr`. The value of each term's coefficient is written to the climate's 2D
 file as `term_<name>`.
