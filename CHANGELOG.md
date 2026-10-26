@@ -11,6 +11,8 @@ annotated git tag. Dates are release (tag) dates.
   Greenland <-> box model, Antarctica <-> box model, fully coupled) and the modifier
   `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
   every setup, or those named (`setup+modifier`).
+- Docs `yelmox-bipolar.md`: "Coupling setups", the exchanges (diagram), their switches,
+  the setups table and the rules behind it.
 
 ### Changed
 - yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is

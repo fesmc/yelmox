@@ -229,7 +229,8 @@ GRL paleo A reads: T = T_pd + α (T_lgm − T_pic), P = P_pd [1 + α (P_lgm/P_pi
 | ANT paleo | as GRL A on `pd` (ANT) | |
 | Pyrenees | `alpha` (t2018 orbital record, normalised 0 at 0, 1 at −21 ka) | `uniform` (α, uniform, tas pr, f_ta = −10) |
 | Hysteresis | `gamma` ramp or PI42 | `warming` (γ, uniform, tas pr to, f_to = 0.25) |
-| Bipolar north | `alpha` (r2020 orbital record, normalised), `gmt` [K], `tn` derived obm_north | `lgm` (α), `regional` (gmt, uniform, f_ta = 1.07), `ocean` (tn, replace, to) |
+| Bipolar north, uncoupled | `gmt` [K], `dTo` (derived, 0.25) | `regional_north` (gmt, uniform, tas pr, f_ta = 1.07), `ocean` |
+| Bipolar north, coupled | `gmt` [K], `obm_north` (derived, the northern box) | `regional_north`, `obm_north` (replace, to); setups in `yelmox_bipolar/params.sh` |
 | Present day | none | none |
 
 A term is one group in the library or the par file; an experiment adds or
@@ -258,7 +259,7 @@ Coefficients are named by their symbol in the equation (`alpha`, `beta`,
 `gamma`, ...), never by an interpretation of the record; which record a
 symbol loads is the setup's, in its par file: `[coef_alpha]` is `alpha_combined_125kyr`
 (as is) in the paleo bases, `alpha_orbital_r2020` (normalised 0 at 0, 1 at
-21 ka) in `yelmox_Greenland.nml` and the bipolar north, `alpha_orbital_t2018`
+21 ka) in `yelmox_Greenland.nml`, `alpha_orbital_t2018`
 (normalised) in `yelmox_Pyrenees.nml`, the constant 1 in LIS and North. The
 library keeps a default `coef_alpha` (combined) for a par file without one,
 and the physical or shaped coefficients `coef_dTo` (derived, 0.25),
