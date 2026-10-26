@@ -73,8 +73,11 @@ behind the table, checked at init where noted:
   coefs` (an error at init otherwise). `obm_north`/`obm_south` are library
   coefficients (`input/forcing_db.nml`), set by the box model each step.
 - `obm_north` takes the place of `ocean`, never both: `obm_north` replaces `to`
-  (`pattern = "replace"`) and `ocean` would add 0.25 × the air anomaly on top.
-  Likewise `obm_south` in the south.
+  (`pattern = "replace"`) and `ocean` would add 0.25 × the air anomaly on top
+  (an error at init: a domain with an ocean term on a box coefficient and one on
+  an air-anomaly coefficient). Likewise `obm_south` in the south.
+- A domain takes its ocean from the box of its own hemisphere: the north from
+  `obm_north`, the south from `obm_south` (an error at init otherwise).
 - `couple_fwf_north`/`couple_fwf_south` need the box model and the domain of
   their hemisphere (errors at init), and the hydrographic masks `[ctrl]
   hydro_mask_north`/`hydro_mask_south` on the Yelmo grid of the domain
@@ -85,7 +88,8 @@ behind the table, checked at init where noted:
 - `dTo` (term `ocean`) is the mean air anomaly of the domain whose climate
   sets it, the north. The coefficients are shared, so a second domain with an
   ocean anomaly from its own air needs a coefficient of its own (a group
-  `[coef_dTo_south]` as `[coef_dTo]`, and a term on it), not `dTo`.
+  `[coef_dTo_south]` as `[coef_dTo]`, and a term on it), not `dTo` (an error at
+  init: an air-anomaly coefficient used by the terms of both domains).
 
 Variations on a setup:
 

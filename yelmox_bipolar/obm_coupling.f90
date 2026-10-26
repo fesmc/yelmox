@@ -35,7 +35,7 @@ module obm_coupling
     use yelmo,         only : wp
     use kryos,         only : kryos_domain
     use kryos_forcing, only : coefs_class, coefs_has, coefs_value, coefs_uses_derived, &
-                              coefs_set_obm
+                              coefs_set_obm, coefs_derived, derived_spec
     use yelmox_climate, only : climate_apply_ocean
     use yelmox_nml,    only : def_file => yelmox_defaults_file
     use obm_defs,      only : obm_class
@@ -127,15 +127,18 @@ contains
         ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
         ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
         ! the coefficient of [obm_forcing] in the registry; the freshwater flux
-        ! of a hemisphere its domain. Only touches a domain when it is active,
-        ! so an inactive domain may be uninitialized. Call after the
-        ! coefficients and the domains.
+        ! of a hemisphere its domain. The ocean terms of the domains against the
+        ! shared coefficients (check_domain_ocean, and an air-anomaly coefficient
+        ! set by one domain only). Only touches a domain when it is active, so
+        ! an inactive domain may be uninitialized. Call after the coefficients
+        ! and the domains.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(coefs_class),      intent(in)    :: coefs
         type(kryos_domain),     intent(in)    :: dom_north, dom_south
         logical,                intent(in)    :: active_north, active_south
 
         logical :: obm2ism
+        integer :: k
 
         ! obm2ism: a coefficient derived from a box (obm_north, obm_south), used by
         ! the ocean terms of a domain.
@@ -162,6 +165,28 @@ contains
             error stop 1
         end if
 
+        if (active_north) call check_domain_ocean(dom_north, coefs, "north")
+        if (active_south) call check_domain_ocean(dom_south, coefs, "south")
+
+        ! A coefficient derived from the air anomaly is set by the climate of
+        ! the domain whose terms use it. The coefficients are shared and
+        ! obm_exchange re-applies the ocean terms of both domains after both
+        ! climate updates, so a coefficient set by both would give the first
+        ! domain the anomaly of the second.
+        if (active_north .and. active_south .and. allocated(dom_north%cl%dair) .and. &
+            allocated(dom_south%cl%dair)) then
+            do k = 1, size(dom_north%cl%dair)
+                if (any(dom_south%cl%dair%name == dom_north%cl%dair(k)%name)) then
+                    write(*,*) "obm_coupling_init:: error: the coefficient "// &
+                               trim(dom_north%cl%dair(k)%name)//" (derived from the air &
+                               &anomaly) is used by the terms of both domains; the &
+                               &coefficients are shared, so each domain needs a coefficient &
+                               &of its own (e.g. [coef_dTo_south] as [coef_dTo])."
+                    error stop 1
+                end if
+            end do
+        end if
+
         if (oc%atm2obm) &
             write(*,*) "obm_coupling_init:: atm2obm from coefficient "//trim(oc%forcing_coef)// &
                        ", gain =", oc%forcing_gain
@@ -181,6 +206,50 @@ contains
             call nc_read(oc%hydro_mask_south_path, "mask", oc%hydro_mask_south)
         end if
     end subroutine obm_coupling_init
+
+    subroutine check_domain_ocean(dom, coefs, hemisphere)
+        ! The ocean terms of a domain against the box model: a coefficient
+        ! derived from a box is that of the domain's hemisphere (obm_north for
+        ! the north), and an ocean from a box takes no anomaly from the air on
+        ! top (the box follows the air already, through atm2obm).
+        type(kryos_domain), intent(in) :: dom
+        type(coefs_class),  intent(in) :: coefs
+        character(len=*),   intent(in) :: hemisphere    ! north | south
+
+        type(derived_spec) :: drv
+        character(len=64)  :: box_term, air_term
+        integer :: k
+
+        box_term = ""
+        air_term = ""
+        do k = 1, dom%cl%terms%n
+            associate(t => dom%cl%terms%term(k))
+            if (.not. (t%on_to .and. t%derived)) cycle
+            drv = coefs_derived(coefs, t%coef)
+            select case(trim(drv%from))
+                case("obm_north", "obm_south")
+                    if (trim(drv%from) /= "obm_"//trim(hemisphere)) then
+                        write(*,*) "obm_coupling_init:: error: ["//trim(t%group)//"] coef "// &
+                                   trim(t%coef)//" is derived from the box "//trim(drv%from)// &
+                                   "; the "//trim(hemisphere)//" domain takes its ocean from &
+                                   &obm_"//trim(hemisphere)//"."
+                        error stop 1
+                    end if
+                    box_term = t%group
+                case("air_anomaly")
+                    air_term = t%group
+            end select
+            end associate
+        end do
+
+        if (len_trim(box_term) > 0 .and. len_trim(air_term) > 0) then
+            write(*,*) "obm_coupling_init:: error: the "//trim(hemisphere)//" domain has both ["// &
+                       trim(box_term)//"] (its ocean from the box) and ["//trim(air_term)// &
+                       "] (an ocean anomaly from the air); the box follows the air already, &
+                       &use one of them (e.g. obm_"//trim(hemisphere)//" in place of ocean)."
+            error stop 1
+        end if
+    end subroutine check_domain_ocean
 
     subroutine obm_exchange(oc, obm, coefs, dom_north, dom_south, active_north, active_south, &
                             time, time_init, dtt)

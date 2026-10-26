@@ -10,7 +10,8 @@ annotated git tag. Dates are release (tag) dates.
   (uncoupled, box model alone, box model -> both ice sheets, Greenland -> box model,
   Greenland <-> box model, Antarctica <-> box model, fully coupled) and the modifier
   `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
-  every setup, or those named (`setup+modifier`).
+  every setup and the consistency checks (each must stop with its error), or the setups
+  named (`setup+modifier`).
 - Docs `yelmox-bipolar.md`: "Coupling setups", the exchanges (diagram), their switches,
   the setups table and the rules behind it.
 
@@ -18,6 +19,11 @@ annotated git tag. Dates are release (tag) dates.
 - yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is
   switched by `couple_fwf_north`/`couple_fwf_south` alone (an error without the box
   model or without the domain of that hemisphere).
+- yelmox_bipolar: consistency checks of the ocean terms at init (`obm_coupling_init`): an
+  error for a box coefficient of the other hemisphere (`obm_south` in the north), for a
+  domain with its ocean both from a box and from the air anomaly (`obm_north` with
+  `ocean`), and for an air-anomaly coefficient used by both domains (`dTo`: the
+  coefficients are shared, the second domain would overwrite the first).
 - yelmox_bipolar par file: the north without the term `lgm` and the coefficient `alpha`
   (zero at present day, so no change in answers): one coefficient, `gmt`, drives the box
   model and both domains (`[forcing] coefs = "gmt" "dTo"`, `[forcing_north] terms =
