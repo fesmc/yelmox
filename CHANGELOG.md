@@ -9,6 +9,10 @@ annotated git tag. Dates are release (tag) dates.
 - yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is
   switched by `couple_fwf_north`/`couple_fwf_south` alone (an error without the box
   model or without the domain of that hemisphere).
+- yelmox_bipolar par file: the north without the term `lgm` and the coefficient `alpha`
+  (zero at present day, so no change in answers): one coefficient, `gmt`, drives the box
+  model and both domains (`[forcing] coefs = "gmt" "dTo"`, `[forcing_north] terms =
+  "regional_north" "ocean"`); the forcing and coupling comments point to the setups.
 
 ## [v2.4] - 2026-10-23
 
