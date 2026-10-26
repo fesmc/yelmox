@@ -5,6 +5,13 @@ annotated git tag. Dates are release (tag) dates.
 
 ## [Unreleased]
 
+### Added
+- `yelmox_bipolar/params.sh`: the coupling setups of yelmox_bipolar as runme `-p` arrays
+  (uncoupled, box model alone, box model -> both ice sheets, Greenland -> box model,
+  Greenland <-> box model, Antarctica <-> box model, fully coupled) and the modifier
+  `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
+  every setup, or those named (`setup+modifier`).
+
 ### Changed
 - yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is
   switched by `couple_fwf_north`/`couple_fwf_south` alone (an error without the box
