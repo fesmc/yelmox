@@ -12,7 +12,8 @@ module obm_coupling
     ! The three exchanges:
     !   atm2obm  : global mean air temperature anomaly ([obm_forcing], a
     !              coefficient of the driver's registry) -> obm box air temperatures/vapor
-    !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs
+    !   ism2obm  : ice-sheet freshwater flux (calc_fwf)  -> obm%fn / obm%fs,
+    !              per hemisphere ([ctrl] couple_fwf_north, couple_fwf_south)
     !   obm2ism  : obm box ocean temperature -> the domain's ocean temperature
     !              to_ann (marine-shelf forcing), through the coefficients
     !              derived from the boxes (obm_north, obm_south) and the domains' ocean
@@ -45,16 +46,17 @@ module obm_coupling
     private
 
     type obm_coupling_ctl
-        ! Which exchanges are active ([ctrl]; obm2ism: a coefficient derived from a box).
+        ! Which exchanges are active ([ctrl]; ism2obm: couple_fwf_north/south below;
+        ! obm2ism: a coefficient derived from a box).
         logical :: active_obm = .false.
-        logical :: ism2obm    = .false.
         logical :: atm2obm    = .false.
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
         ! atm2obm: the global mean air temperature anomaly dT_glob = gain * coef
         ! ([obm_forcing], a coefficient).
         character(len=64)  :: forcing_coef  = ""
         real(wp)           :: forcing_gain  = 1.0_wp
-        ! ism2obm: freshwater-flux definition + per-hemisphere hydrographic masks.
+        ! ism2obm: the freshwater flux of each hemisphere into its box, its
+        ! definition and the hydrographic masks.
         logical            :: couple_fwf_north = .false.
         logical            :: couple_fwf_south = .false.
         character(len=512) :: fwf_definition   = "dVdt"
@@ -84,10 +86,11 @@ contains
         type(obm_coupling_ctl), intent(inout) :: oc
         character(len=*),       intent(in)    :: path_par
 
-        call nml_read(path_par, "ctrl", "active_obm", oc%active_obm)
-        call nml_read(path_par, "ctrl", "ism2obm",    oc%ism2obm)
-        call nml_read(path_par, "ctrl", "atm2obm",    oc%atm2obm)
-        call nml_read(path_par, "ctrl", "obm_name",   oc%obm_name)
+        call nml_read(path_par, "ctrl", "active_obm",       oc%active_obm)
+        call nml_read(path_par, "ctrl", "atm2obm",          oc%atm2obm)
+        call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
+        call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
+        call nml_read(path_par, "ctrl", "obm_name",         oc%obm_name)
 
         if (oc%atm2obm) then
             call nml_validate(path_par, def_file, "obm_forcing")
@@ -95,9 +98,7 @@ contains
             call nml_read(path_par, "obm_forcing", "gain",  oc%forcing_gain,  defaults_file=def_file)
         end if
 
-        if (oc%ism2obm) then
-            call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
-            call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
+        if (oc%couple_fwf_north .or. oc%couple_fwf_south) then
             call nml_read(path_par, "ctrl", "fwf_definition",   oc%fwf_definition)
             select case(trim(oc%fwf_definition))
                 case("dVdt", "mb", "ablation")
@@ -125,9 +126,10 @@ contains
         ! Check the exchanges against what the run holds, then load the
         ! hydrographic masks (Yelmo grid) restricting the freshwater flux per
         ! hemisphere. Every exchange needs the box model (active_obm); atm2obm
-        ! the coefficient of [obm_forcing] in the registry; ism2obm an ice-sheet
-        ! domain. Only touches a domain when it is active, so an inactive domain
-        ! may be uninitialized. Call after the coefficients and the domains.
+        ! the coefficient of [obm_forcing] in the registry; the freshwater flux
+        ! of a hemisphere its domain. Only touches a domain when it is active,
+        ! so an inactive domain may be uninitialized. Call after the
+        ! coefficients and the domains.
         type(obm_coupling_ctl), intent(inout) :: oc
         type(coefs_class),      intent(in)    :: coefs
         type(kryos_domain),     intent(in)    :: dom_north, dom_south
@@ -139,10 +141,11 @@ contains
         ! the ocean terms of a domain.
         obm2ism = coefs_uses_derived(coefs, "obm_north") .or. coefs_uses_derived(coefs, "obm_south")
 
-        if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%ism2obm .or. obm2ism)) then
-            write(*,*) "obm_coupling_init:: error: atm2obm, ism2obm and the coefficients derived &
-                       &from the boxes (obm_north, obm_south) need the ocean box model &
-                       &([ctrl] active_obm = True)."
+        if (.not. oc%active_obm .and. (oc%atm2obm .or. oc%couple_fwf_north .or. &
+                                       oc%couple_fwf_south .or. obm2ism)) then
+            write(*,*) "obm_coupling_init:: error: atm2obm, couple_fwf_north/south and the &
+                       &coefficients derived from the boxes (obm_north, obm_south) need the &
+                       &ocean box model ([ctrl] active_obm = True)."
             error stop 1
         end if
         if (oc%atm2obm .and. .not. coefs_has(coefs, oc%forcing_coef)) then
@@ -150,8 +153,12 @@ contains
                        trim(oc%forcing_coef)//"' is not in [forcing] coefs (needed by atm2obm)."
             error stop 1
         end if
-        if (oc%ism2obm .and. .not. (active_north .or. active_south)) then
-            write(*,*) "obm_coupling_init:: error: ism2obm needs active_north or active_south."
+        if (oc%couple_fwf_north .and. .not. active_north) then
+            write(*,*) "obm_coupling_init:: error: couple_fwf_north needs active_north."
+            error stop 1
+        end if
+        if (oc%couple_fwf_south .and. .not. active_south) then
+            write(*,*) "obm_coupling_init:: error: couple_fwf_south needs active_south."
             error stop 1
         end if
 
@@ -159,17 +166,15 @@ contains
             write(*,*) "obm_coupling_init:: atm2obm from coefficient "//trim(oc%forcing_coef)// &
                        ", gain =", oc%forcing_gain
 
-        if (.not. oc%ism2obm) return
-
         ! The masks are on the Yelmo grid of their domain: {domain}/{grid_name}
         ! of the paths are its name and grid_ice.
-        if (oc%couple_fwf_north .and. active_north) then
+        if (oc%couple_fwf_north) then
             call nml_replace(oc%hydro_mask_north_path, "{domain}",    trim(dom_north%ctl%domain))
             call nml_replace(oc%hydro_mask_north_path, "{grid_name}", trim(dom_north%ctl%grid_ice))
             allocate(oc%hydro_mask_north(dom_north%yelmo%grd%G%nx, dom_north%yelmo%grd%G%ny))
             call nc_read(oc%hydro_mask_north_path, "mask", oc%hydro_mask_north)
         end if
-        if (oc%couple_fwf_south .and. active_south) then
+        if (oc%couple_fwf_south) then
             call nml_replace(oc%hydro_mask_south_path, "{domain}",    trim(dom_south%ctl%domain))
             call nml_replace(oc%hydro_mask_south_path, "{grid_name}", trim(dom_south%ctl%grid_ice))
             allocate(oc%hydro_mask_south(dom_south%yelmo%grd%G%nx, dom_south%yelmo%grd%G%ny))
@@ -195,12 +200,10 @@ contains
         if (oc%atm2obm) &
             call coupling_atm2obm(obm, oc%forcing_gain*coefs_value(coefs, oc%forcing_coef))
 
-        if (oc%ism2obm) then
-            if (oc%couple_fwf_north .and. active_north) &
-                call coupling_ism2obm(dom_north, obm, oc%hydro_mask_north, "north", oc%fwf_definition)
-            if (oc%couple_fwf_south .and. active_south) &
-                call coupling_ism2obm(dom_south, obm, oc%hydro_mask_south, "south", oc%fwf_definition)
-        end if
+        if (oc%couple_fwf_north) &
+            call coupling_ism2obm(dom_north, obm, oc%hydro_mask_north, "north", oc%fwf_definition)
+        if (oc%couple_fwf_south) &
+            call coupling_ism2obm(dom_south, obm, oc%hydro_mask_south, "south", oc%fwf_definition)
 
         if (trim(oc%obm_name) == "nautilus" .and. oc%hyster_on) &
             call update_bipolar_hyster_forcing(time, time_init, obm, dtt, &

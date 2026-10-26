@@ -85,7 +85,7 @@ run_test "Test 2: OBM on (atm2obm + obm2ism, no fwf)" "tmp/mgbi_test2_obm" \
 if [ "$RUN_FWF" = "1" ]; then
     run_test "Test 3: FULL coupling (+ ism2obm/fwf)" "tmp/mgbi_test3_fullcouple" \
         -p $OBM_ON \
-           ctrl.ism2obm=True ctrl.couple_fwf_north=True ctrl.couple_fwf_south=True
+           ctrl.couple_fwf_north=True ctrl.couple_fwf_south=True
 else
     echo
     echo "=== Test 3 (full fwf coupling) skipped; set RUN_FWF=1 to enable (needs hydro masks) ==="

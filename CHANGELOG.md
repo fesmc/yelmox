@@ -3,6 +3,13 @@
 All notable changes to YelmoX are recorded here. Each version corresponds to an
 annotated git tag. Dates are release (tag) dates.
 
+## [Unreleased]
+
+### Changed
+- yelmox_bipolar: `[ctrl] ism2obm` removed; the freshwater flux of each hemisphere is
+  switched by `couple_fwf_north`/`couple_fwf_south` alone (an error without the box
+  model or without the domain of that hemisphere).
+
 ## [v2.4] - 2026-10-23
 
 ### Added

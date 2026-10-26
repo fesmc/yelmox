@@ -27,18 +27,24 @@
     write_lossless  = False             ! write all output lossless (ignore per-field precision), e.g. for bit-for-bit comparisons
 
     ! --- Ocean box model (OBM) + inter-domain coupling ---
+    ! The coupling setups (uncoupled, box model alone, one-way, two-way, per
+    ! hemisphere) as runme -p arrays: yelmox_bipolar/params.sh.
     active_obm       = False            ! Run the shared ocean box model?
     obm_name         = "nautilus"       ! OBM parameter block name ("nautilus")
 
-    ism2obm          = False            ! Ice sheet -> OBM freshwater flux coupling?
-    couple_fwf_north = False            ! North freshwater flux -> obm%fn?
-    couple_fwf_south = False            ! South freshwater flux -> obm%fs?
+    ! Atmosphere -> OBM
+    atm2obm          = False            ! gmt ([obm_forcing] coef) -> OBM box air temperatures and vapour fluxes?
+
+    ! Ice sheet -> OBM (freshwater flux)
+    couple_fwf_north = False            ! North domain freshwater flux -> northern box (obm%fn)?
+    couple_fwf_south = False            ! South domain freshwater flux -> southern box (obm%fs)?
     fwf_definition   = "dVdt"           ! "dVdt", "mb", "ablation"
     hydro_mask_north = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"   ! {domain}, {grid_name}: the domain's name and grid_ice
     hydro_mask_south = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"
 
-    atm2obm          = False            ! Global air temperature anomaly ([obm_forcing]) -> OBM box air temperatures?
-                                        ! OBM ocean temperature -> ice sheet: a coefficient derived from a box (from = obm_north/obm_south)
+    ! OBM -> ice sheet (ocean temperature): no switch here; the term obm_north
+    ! ([forcing_north] terms) or obm_south ([forcing_south] terms), with its
+    ! coefficient in [forcing] coefs.
 /
 
 ! ===== Output timing =====
