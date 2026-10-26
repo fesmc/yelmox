@@ -261,7 +261,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="output" class="level2">
 <h2 class="anchored" data-anchor-id="output">Output</h2>
-<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>chion.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>esm.nc</code> (the ESM fields on the climate grid) and <code>esm_ts.nc</code> (the forcing averaged over the ice and the floating ice), and, with <code>[output] write_cmip</code> (every <code>dt_cmip</code>), the CMIP-formatted <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code>.</p>
+<p>The shared per-module files (<code>yelmo.nc</code>, <code>isos.nc</code>, <code>mshlf.nc</code>, <code>chion.nc</code>, …), plus, with <code>[output] write_clim</code>, <code>esm.nc</code> (the ESM fields on the climate grid) and <code>esm_ts.nc</code> (the forcing averaged over the ice and the floating ice: <code>t2m_1d</code> and <code>pr_1d</code> as applied, with the variability, terms and transforms; <code>pr_1d</code> only without the esm smb; the anomalies of the esm), and, with <code>[output] write_cmip</code> (every <code>dt_cmip</code>), the CMIP-formatted <code>yelmo_cmip.nc</code> and <code>yelmo_ts_cmip.nc</code>.</p>
 
 
 </section>

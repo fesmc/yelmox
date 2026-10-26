@@ -506,8 +506,8 @@ const atT = (tl, f, t) => f ? interp({ time: tl.t, f }, t) : NaN;
 
 // ----------------------------------------------------------------- tsgen (JS)
 
-const KINDS = { record: ["series"], constant: ["const"], ramp: ["ramp-slope", "ramp-time", "ramp-time-step", "sin"], controller: ["exp", "PI42", "H312b", "H312PID", "H321PID", "PID1"], derived: ["derived"] };
-const KIND_LABEL = { record: "series (a time series from a file)", constant: "constant", ramp: "ramp or wave", controller: "controller (feedback)", derived: "derived (set by the model)" };
+const KINDS = { record: ["series"], constant: ["const"], ramp: ["ramp-slope", "ramp-time", "ramp-time-step", "sin"], controller: ["exp", "PI42", "H312b", "H312PID", "H321PID", "PID1"], scaled: ["scaled"], derived: ["derived"] };
+const KIND_LABEL = { record: "series (a time series from a file)", constant: "constant", ramp: "ramp or wave", controller: "controller (feedback)", scaled: "scaled (factor × another coefficient)", derived: "derived (set by the model)" };
 // the kind of a coefficient: tsgen "const" with a rate is a ramp
 function kindOf(p) {
   const m = String(p.method);
@@ -582,12 +582,30 @@ function applyWindow(p, t, f) {
   const w = taper > 0 ? Math.min(1, (t - t0) / taper, (t1 - t) / taper) : 1;
   return f + w * (num(p.win_fac) - 1) * (f - ref);
 }
-// The coefficient on the run's timeline: {p, ser, f, kind}; derived: f = null.
+// The source of a scaled coefficient, or why it has none: a tsgen
+// coefficient of the run, as in the model.
+function scaledSource(name, p) {
+  const src = String(p.coef || "");
+  if (!src) return { src, bad: "no coef: name the coefficient it scales" };
+  if (!coefNames().includes(src)) return { src, bad: `coef "${src}" is not a coefficient of the run` };
+  const q = coefPar(src);
+  if (!q) return { src, bad: `[coef_${src}]: no such group` };
+  const k = kindOf(q);
+  if (k === "scaled" || k === "derived") return { src, bad: `coef "${src}" is ${k}: a scaled coefficient scales a tsgen one` };
+  return { src, bad: null };
+}
+// The coefficient on the run's timeline: {p, ser, f, kind}; derived: f = null;
+// scaled: factor × its source (null without a valid one).
 function coefOnRun(name, tl) {
   const p = coefPar(name);
   if (!p) return { p: null, ser: null, f: null, kind: null, missing: true };
   const kind = kindOf(p);
   if (kind === "derived") return { p, ser: null, f: null, kind, missing: false };
+  if (kind === "scaled") {
+    const { src, bad } = scaledSource(name, p);
+    const s = bad ? null : coefOnRun(src, tl);
+    return { p, ser: null, f: s && s.f ? s.f.map(v => num(p.factor) * v) : null, kind, missing: false };
+  }
   const ser = seriesFile(p);
   const f = tl.tf.map(tf => applyWindow(p, tf, p.method === "series" ? (ser ? interp(ser, tf) : NaN) : evalOpen(p, tf - tl.tf0)));
   return { p, ser, f, kind, missing: false };
@@ -723,6 +741,7 @@ const recordSym = (p) => p.series_file ? `\\texttt{${String(p.series_file).repla
 function coefEq(name, p) {
   const a = sym(name) + "(\\tau)", method = String(p.method), kind = kindOf(p);
   if (kind === "derived") return derivedEq(name, p) + `\\qquad\\text{(derived: set by the model each step)}`;
+  if (kind === "scaled") return `${a} = ${fmtNum(num(p.factor))}\\,${csym(String(p.coef || "?"))}(\\tau)`;
   if (kind === "constant") return `${a} = ${fmtNum(num(num(p.df_sign) >= 0 ? p.f_min : p.f_max))}`;
   if (kind === "record") return (p.norm ? `${a} = \\frac{F(\\tau) - \\bar F[t_0]}{\\bar F[t_1] - \\bar F[t_0]}` : `${a} = F(\\tau)`) + `,\\quad F = ${recordSym(p)}`;
   if (kind === "controller") return `\\dot ${sym(name)} = \\text{${method}}(\\dot V_{\\mathrm{ice}}),\\quad |\\dot ${sym(name)}| \\le ${fmtNum(p.df_dt_max)},\\quad ${sym(name)} \\in [${fmtNum(p.f_min)},\\,${fmtNum(p.f_max)}]`;
@@ -730,9 +749,10 @@ function coefEq(name, p) {
 }
 // change the kind of a coefficient: the first method of the kind, a constant with f_min = f_max
 function setKind(g, kind) {
-  const p = coefPar(g.slice(COEF_PREFIX.length));
+  const name = g.slice(COEF_PREFIX.length), p = coefPar(name);
   const kv = { method: KINDS[kind][0] };
   if (kind === "constant") { kv.f_max = p.f_min; kv.df_dt_max = 0; }
+  if (kind === "scaled" && !p.coef) { const o = coefNames().find(n => n !== name && !["scaled", "derived"].includes(kindOf(coefPar(n) || {}))); if (o) kv.coef = o; }
   if (kind === "ramp" && num(p.df_dt_max) <= 0 && num(p.f_max) <= num(p.f_min)) { kv.f_max = num(p.f_min) + 1; kv.df_dt_max = 1e-3; }
   setMany(g, kv);
 }
@@ -749,7 +769,12 @@ function coefCard(name, tl) {
   const head = h("div", { class: "fb-cardhead" }, texi(sym(name) + "(\\tau)"), h("code", {}, `[${g}]`), srcBadge(g), kindSel, removeBtn(COEF_LIST_KEY, name));
   const content = [head, newHint(g)];
   let shown = ["method", "units"];
-  if (kind === "derived") {
+  if (kind === "scaled") {
+    const { src, bad } = scaledSource(name, p);
+    content.push(fields(g, ["coef", "factor", "units"], { coef: { options: coefNames().filter(n => n !== name) } }));
+    shown.push("coef", "factor");
+    content.push(bad ? warn(`[${g}]: ${bad}`) : note(`${fmtNum(num(p.factor))} × ${src}, set each step right after ${src}: terms on the atmosphere may use it. Not restarted: it follows its source.`));
+  } else if (kind === "derived") {
     const from = String(p.from || "");
     const dk = DERIVED_KEYS[from] || ["factor", "region", "anomaly"];
     content.push(fields(g, ["from", ...dk, "units"]));

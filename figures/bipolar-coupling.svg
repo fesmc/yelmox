@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" width="760" height="330" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a-air" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#777777"/></marker>
+    <marker id="a-fwf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f6fb4"/></marker>
+    <marker id="a-ocn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c8372d"/></marker>
+  </defs>
+  <rect x="0" y="0" width="760" height="330" fill="#ffffff"/>
+
+  <!-- legend -->
+  <g font-size="12" fill="#333333">
+    <line x1="16" y1="20" x2="46" y2="20" stroke="#777777" stroke-width="2"/><text x="54" y="24">air temperature</text>
+    <line x1="16" y1="40" x2="46" y2="40" stroke="#1f6fb4" stroke-width="2"/><text x="54" y="44">freshwater flux</text>
+    <line x1="16" y1="60" x2="46" y2="60" stroke="#c8372d" stroke-width="2"/><text x="54" y="64">ocean temperature</text>
+  </g>
+
+  <!-- arrows: air temperature (gmt) -->
+  <g stroke="#777777" stroke-width="2" fill="none">
+    <line x1="322" y1="52" x2="182" y2="136" marker-end="url(#a-air)"/>
+    <line x1="438" y1="52" x2="578" y2="136" marker-end="url(#a-air)"/>
+    <line x1="380" y1="66" x2="380" y2="254" marker-end="url(#a-air)"/>
+  </g>
+  <g font-family="Menlo, Consolas, monospace" font-size="13" fill="#444444">
+    <text x="236" y="80" text-anchor="end">dTa_north</text>
+    <text x="236" y="96" text-anchor="end" font-size="11" fill="#777777">regional_north</text>
+    <text x="524" y="80">dTa_south</text>
+    <text x="524" y="96" font-size="11" fill="#777777">regional_south</text>
+    <text x="388" y="162">atm2obm</text>
+    <text x="388" y="178" font-size="11" fill="#777777">dTa_*, gmt</text>
+  </g>
+
+  <!-- arrows: freshwater flux (ice sheet -> box model) -->
+  <g stroke="#1f6fb4" stroke-width="2" fill="none">
+    <path d="M 100 192 Q 120 292 274 292" marker-end="url(#a-fwf)"/>
+    <path d="M 660 192 Q 640 292 486 292" marker-end="url(#a-fwf)"/>
+  </g>
+  <g font-family="Menlo, Consolas, monospace" font-size="13" fill="#1f6fb4">
+    <text x="96" y="318">couple_fwf_north</text>
+    <text x="664" y="318" text-anchor="end">couple_fwf_south</text>
+  </g>
+
+  <!-- arrows: ocean temperature (box model -> ice sheet) -->
+  <g stroke="#c8372d" stroke-width="2" fill="none">
+    <path d="M 278 268 Q 196 256 168 196" marker-end="url(#a-ocn)"/>
+    <path d="M 482 268 Q 564 256 592 196" marker-end="url(#a-ocn)"/>
+  </g>
+  <g font-family="Menlo, Consolas, monospace" font-size="13" fill="#c8372d">
+    <text x="198" y="226">obm_north</text>
+    <text x="562" y="226" text-anchor="end">obm_south</text>
+  </g>
+
+  <!-- nodes -->
+  <g stroke="#333333" stroke-width="1.5">
+    <rect x="320" y="18" width="120" height="48" rx="24" fill="#f2f2f2"/>
+    <rect x="40" y="140" width="170" height="52" rx="8" fill="#e8f1fa"/>
+    <rect x="550" y="140" width="170" height="52" rx="8" fill="#e8f1fa"/>
+    <rect x="276" y="256" width="208" height="52" rx="8" fill="#fbeceb"/>
+  </g>
+  <g text-anchor="middle" fill="#222222">
+    <text x="380" y="40" font-family="Menlo, Consolas, monospace" font-weight="bold">gmt</text>
+    <text x="380" y="57" font-size="11" fill="#555555">global mean ΔT [K]</text>
+    <text x="125" y="163" font-weight="bold">Greenland</text>
+    <text x="125" y="181" font-size="11" fill="#555555">north domain</text>
+    <text x="635" y="163" font-weight="bold">Antarctica</text>
+    <text x="635" y="181" font-size="11" fill="#555555">south domain</text>
+    <text x="380" y="279" font-weight="bold">Ocean box model</text>
+    <text x="380" y="297" font-size="11" fill="#555555">nautilus</text>
+  </g>
+</svg>

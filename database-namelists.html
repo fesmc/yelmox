@@ -273,7 +273,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>Most forcing in YelmoX is now loaded through the shared <a href="https://github.com/fesmc/fesm-utils"><code>varslice</code></a> reader. A <strong>database namelist</strong> is a small, static description of a dataset on disk: where the file lives, which variable to read, how to convert its units, and how its records map onto a time axis. The consuming modules — <code>varslice</code> itself, <code>esm_forcing</code>, <code>snapshots</code>, <code>ismip6</code> — all read the <em>same</em> group layout, so once you understand one group you understand them all.</p>
+<p>Most forcing in YelmoX is now loaded through the shared <a href="https://github.com/fesmc/fesm-utils"><code>varslice</code></a> reader. A <strong>database namelist</strong> is a small, static description of a dataset on disk: where the file lives, which variable to read, how to convert its units, and how its records map onto a time axis. The consuming modules — <code>varslice</code> itself, <code>esm_forcing</code>, <code>snapshots</code>, the climate transforms <code>[taper]</code>/<code>[bias]</code> and <code>[ice_bnd]</code> — all read the <em>same</em> group layout, so once you understand one group you understand them all.</p>
 <p>The point of these files is to keep the <em>provenance</em> of every forcing field visible and in one place. Nothing in the namelist runs code; each group is a declarative record that says “this NetCDF file, this variable, these units, this period” — everything the reader needs to ingest the dataset and hand back a time-indexed field.</p>
 <p>See <code>input/esm/esm_ant_ismip7.nml</code> for a full, real-world example.</p>
 <section id="anatomy-of-a-group" class="level2">
@@ -452,7 +452,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong><code>esm_forcing</code></strong> groups the atmosphere/ocean database groups into reference, variability, ESM-reference, historical, and projection periods (<code>&amp;gcm_ts_ref</code>, <code>&amp;gcm_to_proj</code>, …) and supplies <code>{gcm}</code>/<code>{experiment}</code>. See <a href="./climate-esm.html">ESM forcing</a>.</li>
 <li><strong><code>snapshots</code></strong> uses the same reader for its snapshot climate database.</li>
-<li><strong><code>ismip6</code></strong> uses it for the ISMIP6 atmosphere/ocean forcing files.</li>
+<li><strong><code>[taper]</code>, <code>[bias]</code></strong> and <strong><code>[ice_bnd]</code></strong> read their fields (weights, bias fields, ice thickness) as groups of the same databases.</li>
 </ul>
 <p>Because they share the reader, the layout documented here is identical across all of them — a group is a group regardless of which module owns it.</p>
 </section>
