@@ -34,9 +34,12 @@ yelmox therefore gets two layers:
 The defaults are the most complete physics: VILMA2 for the global sea level
 and far field, FastIsostasy in the domains. Today's yelmox (one domain,
 FastIsostasy, `fastiso` sea level) is the special case `barystatic` +
-`fastisostasy`: reproduced bit for bit by phase 1a, closely but not bit for
-bit from phase 1b on (see Phases). Every par file sets `[sealevel] method`
+`fastisostasy`: reproduced bit for bit by phase 1, closely but not bit for
+bit from phase 3 on (see Phases). Every par file sets `[sealevel] method`
 explicitly, so a default never changes a configured experiment.
+
+The first priority is the VILMA2-Yelmo coupling itself: `vilma2` with
+`[isostasy] method = "global"` (bed and sea level from VILMA2), phase 2.
 
 VILMA2 is a default build dependency (`vilma=1`); `vilma=0` builds a stub
 for machines without it.
@@ -66,10 +69,10 @@ for machines without it.
 - Sea level comes only from the global ice distribution and the Earth's
   response to it. Where a cell's ice came from (Yelmo or external data)
   does not enter.
-- A domain's footprint (the cells whose ice is Yelmo's) is where Yelmo's
-  ice is dynamic (`mask_ice == MASK_ICE_DYNAMIC`); every other cell, also
-  inside the Yelmo domain, takes the external ice. (See open question 1 on
-  `MASK_ICE_FIXED`.)
+- A domain's footprint (the cells whose ice is Yelmo's) is every cell where
+  Yelmo holds ice, dynamic or prescribed (`mask_ice /= MASK_ICE_NONE`):
+  what Yelmo holds is what loads the Earth. Every other cell, also inside
+  the Yelmo domain, takes the external ice.
 - Grounded/floating and the coastline inside a Yelmo domain are decided at
   Yelmo's resolution (`f_grnd`), not by the global model on its coarse
   grid. VILMA2 is extended to take them from the host.
@@ -78,10 +81,19 @@ for machines without it.
 - `fastiso` and `mixed` are replaced by `barystatic`. Ice outside the
   domains is always a field (reference or history), never a sea-level
   series.
-- Global grid `[sealevel] grid`, default `GLOBAL-1DEG` (FesmData lon-lat),
-  for every method. VILMA2 maps it to its own Gauss grid internally.
+- Global grid: under `vilma2`, VILMA2's own Gauss grid (no second remap);
+  under `const`, `file` and `barystatic`, `[sealevel] grid`, default
+  `GLOBAL-1DEG` (FesmData lon-lat).
 - Defaults are the most complete physics: `[sealevel] method = "vilma2"`,
-  `[isostasy] method = "fastisostasy"`, `ice_ext = "file"`.
+  `[isostasy] method = "fastisostasy"`, `ice_ext = "file"` with PaleoMIST
+  1.0 (global, 80-0 ka).
+- First priority: the VILMA2-Yelmo coupling (`vilma2` + `global`), phase 2.
+  Par files switch to `vilma2` + `global` with phase 2, and to `vilma2` +
+  `fastisostasy` with phase 4.
+- VILMA2's reference equilibrium (`z_bed_eq`, `h_ice_eq`) is the present
+  day, treated as relaxed: CLIMBER-X's default for VILMA
+  (`i_equilibrium = 1`) and FastIsostasy's convention. Ongoing adjustment
+  at present day comes only from the spin-up memory.
 - VILMA2 runs as in CLIMBER-X (`nml/geo_par.nml`, `&vilma`): `lmax = 170`,
   PREM incompressible (80 km elastic lithosphere, 9 Maxwell mantle layers,
   "Clemens" 1-D reference viscosity), 3D viscosity on, Bagge et al. (2021)
@@ -155,8 +167,10 @@ seawater at the host's `rho_sw`.
   the global grid is the conservative remap of ones. Host regions must not
   overlap (checked at init); this also keeps FastIsostasy regions apart.
 - **Footprint** `m_d` (on the Yelmo grid): the cells whose ice is Yelmo's,
-  `mask_ice == MASK_ICE_DYNAMIC` at the end of init. It is fixed for the
-  run; a later change of `mask_ice` there stops the run.
+  `mask_ice /= MASK_ICE_NONE` (dynamic and prescribed) at the end of init.
+  Prescribed ice (`ice_bnd`) therefore loads the Earth as Yelmo holds it,
+  whatever history `ice_ext` uses. The footprint is fixed for the run; a
+  later change of `mask_ice` there stops the run.
 - **Inside the host region**, the ice is assembled on the Yelmo grid:
   `H = m·H_yelmo + (1 - m)·H_ext`, with the external ice interpolated to
   the Yelmo grid. The host-resolved terms (below) are computed there for
@@ -192,6 +206,16 @@ flotation rule applied to `H_ext`, `z_bed`, `z_sl` elsewhere:
 | grounded-ice column `I_g` | `H · f_g` |
 | ocean fraction `C` (open ocean and floating ice) | `1 - f_g` (ice-free land has `f_g = 1`) |
 | flooded-area fill `F = ζ⁽⁰⁾(C - C⁽⁰⁾)` | `(z_bed_ref - z_sl_ref)·(C - C_ref)` |
+
+**Global grid.** Under `vilma2` the layer works on VILMA2's own Gauss grid
+(`nlat = 2 lmax + 2`, `nphi = 4 lmax`: 342 × 680, about 0.53°, at
+`lmax = 170`), so the coupler remaps once and VILMA2 passes the fields
+straight through (`grid_is_gauss`, checked at init). yelmox writes its
+cdo `gaussian` description (`maps/grid_GLOBAL-T<lmax>.txt`) from
+`[vilma] lmax`; the coupler's `grid_cdo` reads it. External data are
+remapped onto it from the FesmData lon-lat grids. Under `const`, `file`
+and `barystatic` the layer uses `[sealevel] grid` (default
+`GLOBAL-1DEG`).
 
 `I_g` and `F` are mass fields and are remapped conservatively. `C` and
 `w_d` are fractions: conservative too, but kept in [0, 1] and never
@@ -309,10 +333,9 @@ call couple_to_yelmo(dom)
 ```
 
 The sea level is settled from all domains before any regional solve.
-Cadences: `[sealevel] dt` for the global layer (from phase 1b; in phase 1a
-the provisional barystatic follows each domain's `dt_isos`); FastIsostasy
-keeps its per-domain `dt_isos`. Global fields are held between global
-steps.
+Cadences: `[sealevel] dt` for the global layer (the provisional barystatic
+of phases 1-2 follows each domain's `dt_isos` instead); FastIsostasy keeps
+its per-domain `dt_isos`. Global fields are held between global steps.
 
 ### Init and restart
 
@@ -432,20 +455,21 @@ Gaps:
 [sealevel]
     method         = "vilma2"         ! "const" | "file" | "barystatic" | "vilma2"
     dt             = 10.0             ! [yr] global-layer cadence (as dt_isos)
-    grid           = "GLOBAL-1DEG"    ! global grid (FesmData lon-lat)
+    grid           = "GLOBAL-1DEG"    ! global grid without vilma2 (with vilma2: VILMA2's Gauss grid)
     bsl_init       = 0.0              ! const
     sl_path        = "none"           ! file
     sl_name        = "none"
     z_bed_ref_file = "fesmdata/Global/{grid}/{grid}_TOPO-<global product>.nc"
     ice_ext        = "file"           ! "ref" | "file": ice outside the footprints
-    ice_ext_file   = "fesmdata/Global/{grid}/{grid}_IceHistory-ICE6G_C.nc"
+    ice_ext_file   = "fesmdata/Global/{grid}/{grid}_IceHistory-PaleoMIST.nc"   ! 80-0 ka, 2.5 kyr
     ice_ext_name   = "H_ice"
     ice_ext_tref   = 0.0              ! [yr] time of the history's present day
     dt_ice_ext     = 100.0            ! [yr] read and interpolation interval
 ```
 
-`A_ocean_pd` and `A_ocean_path` go away in phase 1b (the ocean area comes
-from the global field); phase 1a still needs them.
+`A_ocean_pd` and `A_ocean_path` go away in phase 3 (the ocean area comes
+from the global field); the provisional barystatic of phases 1-2 still
+needs them.
 
 - `[isostasy<sfx>] method` per domain replaces `[comps] with_isostasy`. The
   FastIsostasy group `[isos<sfx>]` is unchanged.
@@ -456,19 +480,18 @@ from the global field); phase 1a still needs them.
   `visc_3d_file` / `visc_3d_structure` point to FesmData's
   `Bagge2021_visc.nc`, structure 6. The densities are set by yelmox, not
   in `[vilma]`.
-- `[sealevel] grid` sets the coastline resolution outside host regions;
-  VILMA2's pointwise products are on its Gauss grid (about 0.53° at
-  `lmax = 170`). See open question 3.
+- With PaleoMIST, runs that start before 80 ka stop at init; they set
+  another history (e.g. GLAC-1D nn9927, 120-0 ka, no Eurasia).
 
 ## Restart and output
 
 - Run bundle: `sealevel_restart.nc` (`barystatic`: `Δφ`, bsl, `C`) or
   `vilma_restart.nc` (`vilma2`: VILMA2's state, the channel memories and
   the last host terms). `const` and `file` have no state. `bsl_restart.nc`
-  is retired in phase 1b.
+  is retired in phase 3.
 - Domain bundle: `isos_restart.nc` under `fastisostasy`. Restart files from
-  before phase 1b carry the unassembled reference ice and fail the
-  reference check, so phase 1b needs cold starts.
+  before phase 3 carry the unassembled reference ice and fail the
+  reference check, so `fastisostasy` runs need cold starts after phase 3.
 - Run level: `sealevel.nc` (global grid: ice, `I_g`, `C`, host weights;
   under `vilma2` also `dz_bed`, `dz_ss`, `rsl`) and `sealevel_ts.nc`
   (`bsl`, `bsl_ive`, `Δφ`, ocean area, contribution per domain and
@@ -521,7 +544,8 @@ FastIsostasy:
    as a scalar and no longer write bsl back. The restart gate stays inside
    FastIsostasy: at the redo the passed shift is ignored and the restored
    `z_ss` kept (`fastisostasy.f90:829-834, 849`).
-2. Phase 1a only: the sea-level contribution (`calc_sl_contributions`) as
+2. Phases 1-2 only (the provisional barystatic): the sea-level
+   contribution (`calc_sl_contributions`) as
    a separate call before `isos_update`, also at init, with the same gate
    (`use_restart` and `time <= time_prognostics`, `fastisostasy.f90:801`).
 3. Optional external fields: a sea-surface anomaly (replaces its regional
@@ -533,21 +557,22 @@ FesmData:
 1. A global present-day topography product (`z_bed`, `H_ice`, `z_srf`) on
    the Global lon-lat grids: the domain merges (BedMachine Antarctica v4
    and Greenland v6, IceBoost v2.0, GEBCO 2026) applied globally.
-2. `IceHistory-ICE6G_C` on the Global grids (exists).
+2. `IceHistory-PaleoMIST` on the Global grids (exists).
 
 Yelmo: none. kryos calls Yelmo's flotation routines for `f_grnd_ref` and
 for the external ice in host regions.
 
 ## Phases
 
-- **0 (VILMA2, FesmData):** VILMA2 changes 1-8 and the FesmData product.
-  Tests: benchmarks still pass; `rsl = dz_ss - dz_bed` to round-off;
-  `w ≡ 0` bit-identical; host terms from a fine grid converge to VILMA2's
-  own flotation on the same geometry (same densities) as the Gauss grid is
-  refined; under `fe`, channels plus remainder equal the total response to
-  round-off; the FesmData 3D file matches the isostasy_data file for
-  structure 6.
-- **1a (yelmox, FastIsostasy):** `kryos_sealevel` and `kryos_isostasy` with
+The VILMA2-Yelmo coupling (`vilma2` + `global`) comes first, in phase 2.
+
+- **0 (VILMA2, FesmData):** what the coupling needs: VILMA2 changes 1-4 and
+  6-8, and the FesmData product. Tests: benchmarks still pass;
+  `rsl = dz_ss - dz_bed` to round-off; `w ≡ 0` bit-identical; host terms
+  from a fine grid converge to VILMA2's own flotation on the same geometry
+  (same densities) as the Gauss grid is refined; the FesmData 3D file
+  matches the isostasy_data file for structure 6.
+- **1 (yelmox, FastIsostasy):** `kryos_sealevel` and `kryos_isostasy` with
   `const`, `file`, and `barystatic` provisionally computed as today:
   FastIsostasy's volume contributions (init included) summed by the run on
   each domain's `dt_isos`, `A_ocean_now` from the bsl before the
@@ -555,38 +580,30 @@ for the external ice in host regions.
   explicit `[sealevel]` group with their current behaviour (`fastiso` →
   `barystatic`). Bit-identical on the single-domain Levante cases; bipolar
   changes only by the order fix.
-- **1b (yelmox):** the global ice field (assembly, footprints, host-resolved
-  terms, reference from `dta%pd`), the `barystatic` budget replaces the
-  provisional one, FastIsostasy's load comes from the assembly,
-  `sealevel.nc`, `sealevel_restart.nc`. Validated against 1a: bsl and ice
-  volume on the ANT, GRL and bipolar cases. Expected differences: the
-  budget formula against the volume accounting, densities, `∫C` against
-  the `A_ocean(bsl)` table, spherical against projected areas, the `Δφ`
-  correction, the masked-reference fix, the one-step lag of `u_R`.
-- **2 (yelmox):** VILMA2 adapter and stub, `vilma=1`,
-  `input/vilma_defaults.nml`, `[vilma]`, `[isostasy] method = "global"`,
-  restart, output.
-- **3 (yelmox, FastIsostasy):** FastIsostasy with VILMA2: FastIsostasy
-  change 3, response channels, `u_far`.
-- **4 (tests):** VILMA2 standalone vs yelmox with prescribed ice (same
-  load); ANT deglaciation under `fastisostasy`, `global` and both;
+- **2 (yelmox): the VILMA2-Yelmo coupling.** The global ice field
+  (assembly, footprints, host-resolved terms, reference from `dta%pd`) for
+  the global layer; VILMA2 adapter and stub, `vilma=1`,
+  `input/vilma_defaults.nml`, `[vilma]`, Gauss grid file,
+  `[isostasy] method = "global"`, the init and restart sequence,
+  `vilma_restart.nc`, `sealevel.nc`. `fastisostasy` runs are unchanged
+  (provisional barystatic, their own load). Par files switch to `vilma2` +
+  `global`. Tests: VILMA2 standalone vs yelmox with prescribed ice (same
+  load); an ANT deglaciation; exact restart.
+- **3 (yelmox):** the `barystatic` budget replaces the provisional one,
+  FastIsostasy's load comes from the assembly, `sealevel_restart.nc`.
+  Validated against phase 1: bsl and ice volume on the ANT, GRL and
+  bipolar cases. Expected differences: the budget formula against the
+  volume accounting, densities, `∫C` against the `A_ocean(bsl)` table,
+  spherical against projected areas, the `Δφ` correction, the
+  masked-reference fix, the one-step lag of `u_R`.
+- **4 (yelmox, FastIsostasy, VILMA2):** FastIsostasy with VILMA2: VILMA2
+  change 5 (response channels; test: under `fe`, channels plus remainder
+  equal the total response to round-off), FastIsostasy change 3, `u_far`.
+  Par files switch to `vilma2` + `fastisostasy`.
+- **5 (tests):** ANT deglaciation under `fastisostasy`, `global` and both;
   bipolar (two domains, one Earth, two channels); exact restart for every
   method; cost of the default (T170, 3D viscosity, channels).
 
 ## Open questions
 
-1. Footprint: `MASK_ICE_DYNAMIC` only, or every cell with
-   `mask_ice /= MASK_ICE_NONE` (also `FIXED`)? With dynamic only, fixed
-   cells take the external ice rather than the ice Yelmo prescribes there
-   (`ice_bnd`), so Yelmo's geometry and the load differ wherever `ice_bnd`
-   and `ice_ext` use different histories.
-2. Default ice history: ICE-6G_C covers 26-0 ka only, so runs that start
-   earlier stop at init. Longer ones in FesmData: PaleoMIST 1.0 (global,
-   80-0 ka), GLAC-1D nn9927 (120-0 ka, no Eurasia). Or default to `"ref"`.
-3. Default `[sealevel] grid`: `GLOBAL-1DEG`, or `GLOBAL-0.5DEG` to match
-   VILMA2's Gauss grid at `lmax = 170`?
-4. When do the existing par files switch from `barystatic` to `vilma2`:
-   with phase 2, or after the phase-4 validation?
-5. Reference equilibrium: the present-day bed treated as relaxed (as
-   FastIsostasy does; ongoing adjustment only from the spin-up memory), or
-   a relaxed ice-free bed as in CLIMBER-X (`z_bed_rel_file`)?
+None at the moment.
