@@ -31,3 +31,5 @@ __pycache__
 coordinates
 data_fixes/
 yelmox_esm/*_javi.nml
+libs/obm/obm_old
+libs/obm/obm_released
