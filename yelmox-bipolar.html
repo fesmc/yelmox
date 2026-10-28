@@ -278,7 +278,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <section id="coupling-setups" class="level2">
 <h2 class="anchored" data-anchor-id="coupling-setups">Coupling setups</h2>
-<p>One global coefficient, <code>gmt</code> (global mean air temperature anomaly [K], <code>const</code> 0 in the par file), drives both ice sheets and the box model, through its regional amplifications: the scaled coefficients <code>dTa_north</code> = 1.07 × <code>gmt</code>, <code>dTa_tropics</code> = 0.79 × <code>gmt</code> and <code>dTa_south</code> = 0.86 × <code>gmt</code> of the library (Zickfeld et al., 2004). A region’s ice sheet and its box read the same coefficient, so the amplification is set once, in its <code>factor</code>. Three exchanges with the box model can be switched on, each on its own:</p>
+<p>One global coefficient, <code>gmt</code> (global mean air temperature anomaly [K], <code>const</code> 0 in the par file), drives both ice sheets and the box model, through its regional amplifications, scaled coefficients of the library: for the ice sheets <code>dTa_greenland</code> = <code>dTa_antarctica</code> = 1.5 × <code>gmt</code>, for the boxes <code>dTa_north</code> = 1.07 × <code>gmt</code>, <code>dTa_tropics</code> = 0.79 × <code>gmt</code> and <code>dTa_south</code> = 0.86 × <code>gmt</code> (Zickfeld et al., 2004). Each amplification is set once, in the <code>factor</code> of its coefficient. Three exchanges with the box model can be switched on, each on its own:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/bipolar-coupling.svg" class="img-fluid figure-img" style="width:100.0%"></p>
@@ -302,7 +302,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td><code>gmt</code> → ice sheets</td>
 <td>the terms <code>regional_north</code>, <code>regional_south</code> (in every setup)</td>
-<td>the uniform anomaly <code>dTa_north</code> (<code>dTa_south</code>) on <code>tas</code> and <code>pr</code></td>
+<td>the uniform anomaly <code>dTa_greenland</code> (<code>dTa_antarctica</code>) on <code>tas</code> and <code>pr</code></td>
 </tr>
 <tr class="even">
 <td><code>gmt</code> → box model</td>
@@ -350,7 +350,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Uncoupled (the par file)</td>
 <td><code>bip_uncoupled</code></td>
 <td>–</td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_south</code>, <code>dTo</code></td>
+<td><code>gmt</code>, <code>dTa_greenland</code>, <code>dTa_antarctica</code>, <code>dTo</code></td>
 <td><code>regional_north</code>, <code>ocean</code></td>
 <td><code>regional_south</code></td>
 </tr>
@@ -368,7 +368,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Box model → both ice sheets</td>
 <td><code>bip_obm_to_ice</code></td>
 <td><code>active_obm</code>, <code>atm2obm</code></td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_north</code>, <code>obm_south</code></td>
+<td><code>gmt</code>, <code>dTa_greenland</code>, <code>dTa_antarctica</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_north</code>, <code>obm_south</code></td>
 <td><code>regional_north</code>, <code>obm_north</code></td>
 <td><code>regional_south</code>, <code>obm_south</code></td>
 </tr>
@@ -377,7 +377,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Greenland → box model</td>
 <td><code>bip_gis_to_obm</code></td>
 <td><code>active_south</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_north</code></td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>dTo</code></td>
+<td><code>gmt</code>, <code>dTa_greenland</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>dTo</code></td>
 <td><code>regional_north</code>, <code>ocean</code></td>
 <td>–</td>
 </tr>
@@ -386,7 +386,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Antarctica → box model</td>
 <td><code>bip_ais_to_obm</code></td>
 <td><code>active_north</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_south</code></td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>dTo</code></td>
+<td><code>gmt</code>, <code>dTa_antarctica</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>dTo</code></td>
 <td>–</td>
 <td><code>regional_south</code>, <code>ocean</code></td>
 </tr>
@@ -395,7 +395,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Greenland ↔︎ box model</td>
 <td><code>bip_gis_obm</code></td>
 <td><code>active_south</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_north</code></td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_north</code></td>
+<td><code>gmt</code>, <code>dTa_greenland</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_north</code></td>
 <td><code>regional_north</code>, <code>obm_north</code></td>
 <td>–</td>
 </tr>
@@ -404,7 +404,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Antarctica ↔︎ box model</td>
 <td><code>bip_ais_obm</code></td>
 <td><code>active_north</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_south</code></td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_south</code></td>
+<td><code>gmt</code>, <code>dTa_antarctica</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_south</code></td>
 <td>–</td>
 <td><code>regional_south</code>, <code>obm_south</code></td>
 </tr>
@@ -413,7 +413,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Greenland ↔︎ box model ↔︎ Antarctica</td>
 <td><code>bip_full</code></td>
 <td><code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_north</code>, <code>couple_fwf_south</code></td>
-<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_north</code>, <code>obm_south</code></td>
+<td><code>gmt</code>, <code>dTa_greenland</code>, <code>dTa_antarctica</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>obm_north</code>, <code>obm_south</code></td>
 <td><code>regional_north</code>, <code>obm_north</code></td>
 <td><code>regional_south</code>, <code>obm_south</code></td>
 </tr>
@@ -424,18 +424,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">runme</span> <span class="at">-rs</span> <span class="at">-e</span> bipolar <span class="at">-n</span> yelmox_bipolar/yelmox_bipolar_Bipolar.nml <span class="at">-o</span> output/bip-full <span class="at">-p</span> <span class="st">"</span><span class="va">${bip_full</span><span class="op">[@]</span><span class="va">}</span><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Further <code>-p</code> arguments go after the array (a later value wins). The rules behind the table, checked at init (before the startup of the domains) where noted:</p>
 <ul>
-<li>Every coefficient a term or <code>[obm_forcing]</code> uses is listed in <code>[forcing] coefs</code>, and only those (errors at init): with <code>atm2obm</code> all three <code>dTa_*</code>; without it no <code>dTa_tropics</code>, and no <code>dTa_*</code> of an inactive domain; no <code>dTo</code> once <code>obm_north</code> replaces <code>ocean</code>. <code>dTa_*</code> (scaled from <code>gmt</code>) and <code>obm_north</code>/<code>obm_south</code> (set by the box model each step) are library coefficients (<code>input/forcing_db.nml</code>).</li>
+<li>Every coefficient a term or <code>[obm_forcing]</code> uses is listed in <code>[forcing] coefs</code>, and only those (errors at init): <code>dTa_greenland</code>/<code>dTa_antarctica</code> of the active domains; with <code>atm2obm</code> the three box coefficients <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, without it none; no <code>dTo</code> once <code>obm_north</code> replaces <code>ocean</code>. <code>dTa_*</code> (scaled from <code>gmt</code>) and <code>obm_north</code>/<code>obm_south</code> (set by the box model each step) are library coefficients (<code>input/forcing_db.nml</code>).</li>
 <li><code>obm_north</code> takes the place of <code>ocean</code>, never both: <code>obm_north</code> sets the ocean anomaly from the box and <code>ocean</code> would add 0.25 × the air anomaly on top (an error at init: a domain with an ocean term on a box coefficient and one on an air-anomaly coefficient). Likewise <code>obm_south</code> in the south.</li>
 <li>A domain takes its ocean from the box of its own hemisphere: the north from <code>obm_north</code>, the south from <code>obm_south</code> (an error at init otherwise).</li>
 <li>With the box model on and an atmosphere that changes in time (a varying <code>gmt</code>), <code>atm2obm</code> is on too: the boxes would keep their initial air temperatures otherwise (an error at init).</li>
 <li><code>couple_fwf_north</code>/<code>couple_fwf_south</code> need the box model and the domain of their hemisphere (errors at init), and the hydrographic masks <code>[ctrl] hydro_mask_north</code>/<code>hydro_mask_south</code> on the Yelmo grid of the domain (<code>{grid_name}_HYDRO-BASINS_zickfeld2004.nc</code>).</li>
-<li>A different amplification: a <code>[coef_dTa_north]</code> group in the par file with its own <code>factor</code> (both the domain and the box follow); a domain of its own amplification, unlike its box: an <code>f_ta</code> in its regional term on top.</li>
+<li>A different amplification: a <code>[coef_dTa_greenland]</code> (domain) or <code>[coef_dTa_north]</code> (box) group in the par file with its own <code>factor</code>.</li>
 <li><code>dTo</code> (term <code>ocean</code>) is the mean air anomaly of the domain whose climate sets it, the north. The coefficients are shared, so a second domain with an ocean anomaly from its own air needs a coefficient of its own (a group <code>[coef_dTo_south]</code> as <code>[coef_dTo]</code>, and a term on it), not <code>dTo</code> (an error at init: an air-anomaly coefficient used by the terms of both domains).</li>
 </ul>
 <p>Variations on a setup:</p>
 <ul>
 <li><strong>The box temperature instead of the box anomaly</strong>: the box temperature at every depth in place of the reference ocean (<code>coef_obm_*.anomaly = False</code>, <code>term_obm_*.pattern = "replace"</code>), with the modifier <code>bip_ocean_replace</code> after the setup: <code>-p "${bip_full[@]}" "${bip_ocean_replace[@]}"</code>.</li>
-<li><strong>A domain amplification other than its box’s</strong>: the library coefficients <code>dTa_greenland</code>, <code>dTa_antarctica</code> (1.5 × <code>gmt</code>) on the regional term of the domain (<code>term_regional_north.coef</code>), listed in <code>[forcing] coefs</code>.</li>
+<li><strong>A domain with its box’s amplification</strong>: <code>term_regional_north.coef = dTa_north</code> (<code>term_regional_south.coef = dTa_south</code>), with <code>[forcing] coefs</code> to match.</li>
 <li><strong>A transient</strong>: <code>gmt</code> from a time series, in <code>[coef_gmt]</code> of the par file (<code>method = "series"</code>, <code>series_file = ...</code>); see <a href="./yelmox.html#forcing">Forcing</a> for the coefficient methods.</li>
 <li><strong>A glacial pattern</strong> (paleo): the library term <code>lgm</code> (PMIP3 LGM − piControl on the coefficient <code>alpha</code>) added to <code>[forcing_north] terms</code>, with <code>alpha</code> in <code>[forcing] coefs</code> (a <code>[coef_alpha]</code> group in the par file sets its record; the library default is <code>alpha_combined_125kyr_interp</code>). The box model does not see <code>alpha</code>: <code>gmt</code> stays its only forcing.</li>
 <li><strong>Hysteresis of the box model</strong>: <code>[nautilus] hyster_on</code> (below).</li>
@@ -446,7 +446,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Two <code>kryos_domain</code>s</strong> (<code>dom_north</code>, <code>dom_south</code>), each set up via <code>setup_domain</code>, then, after the consistency checks of the run (<code>obm_coupling_init</code>, <code>coefs_check_used</code>), started (<code>start_domain</code> → <code>domain_startup</code>). Either can be individually deactivated (<code>active_north</code> / <code>active_south</code>); with neither, the ocean box model runs alone (<code>active_obm</code>, forced by <code>atm2obm</code> or not; no freshwater flux, no terms on the box coefficients).</li>
 <li><strong>Shared <code>bsl</code></strong> — one barystatic sea level for the run, restored once at startup (<code>bsl_startup</code>) and written to the run restart bundle.</li>
-<li><strong>Shared forcing output</strong> — <code>forcing_ts.nc</code> in the run folder, on the <code>[tm_1D]</code> cadence: every coefficient of <code>[forcing] coefs</code> under its name (<code>gmt</code>, <code>dTa_north</code>, …) and <code>bsl</code>. What each domain’s climate used is in its own climate file (<code>term_&lt;name&gt;</code> in <code>snap.nc</code>).</li>
+<li><strong>Shared forcing output</strong> — <code>forcing_ts.nc</code> in the run folder, on the <code>[tm_1D]</code> cadence: every coefficient of <code>[forcing] coefs</code> under its name (<code>gmt</code>, <code>dTa_greenland</code>, …) and <code>bsl</code>. What each domain’s climate used is in its own climate file (<code>term_&lt;name&gt;</code> in <code>snap.nc</code>).</li>
 <li><strong>Shared OBM</strong> (<code>obm</code>) — an ocean box model stepped once per timestep, configured via <code>obm_ctl_load</code> and coupled to the domains through <code>obm_coupling.f90</code> (<code>coupling_obm2ism</code>, <code>obm_coupling_init</code>, <code>obm_exchange</code>). The OBM writes its own 1D output, <code>&lt;obm_name&gt;.nc</code> (<code>[ctrl] obm_name = "nautilus"</code>), on the <code>[tm_1D]</code> cadence; its restart (<code>obm_restart.nc</code>) goes into the run restart bundle next to <code>bsl_restart.nc</code>.</li>
 <li><strong>One restart bundle per run</strong> — <code>restart-&lt;kyr&gt;-kyr/</code> holds the shared <code>bsl_restart.nc</code>, <code>obm_restart.nc</code> and the coefficients (<code>coef_&lt;name&gt;_restart.nc</code>), and each domain in a subfolder named after it (<code>Greenland/</code>, <code>Antarctica/</code>). <code>[ctrl] restart</code> is the bundle to start from. The output of each domain goes to the same subfolder of the run folder.</li>
 </ul>
