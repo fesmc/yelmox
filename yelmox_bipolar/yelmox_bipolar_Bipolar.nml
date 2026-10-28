@@ -15,7 +15,7 @@
 ! ===== Run setup =====
 
 &ctrl
-    tstep_method    = "const"
+    tstep_method    = "rel"             ! "rel": the forcing time follows the model time (the coefficients move); "const": held at tstep_const
     tstep_const     = 0.0
     time_init       = 0.0
     time_end        = 40.0

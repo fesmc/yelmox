@@ -32,6 +32,9 @@ annotated git tag. Dates are release (tag) dates.
   `coef_gmt`), with `kind` and the source (`method`, `coef` + `factor`, `from`) as
   attributes. `yelmo_ts.nc` no longer holds them. `time` and `bsl` are not coefficient
   names (checked at init).
+- yelmox_bipolar: `[ctrl] tstep_method = "rel"` by default (was `"const"`, which held the
+  forcing time at `tstep_const`, so a time-dependent coefficient such as a `gmt` ramp or
+  series never moved). No change in answers with the constant `gmt` of the par file.
 - yelmox_bipolar: the regional amplification of `gmt` is set once, in the scaled library
   coefficients `dTa_north` (1.07), `dTa_tropics` (0.79) and `dTa_south` (0.86 x `gmt`;
   Zickfeld et al., 2004), read by the domains (`term_regional_north`/`_south` on them,
