@@ -157,7 +157,7 @@ function check_domain(P, run, sfx, ts)
         ratio = pr ./ pr[:, :, 1:1]
         ok = (pr[:, :, 1:1] .> 1e-3) .& isfinite.(ratio)
         expect = reshape(exp.(f_p .* (s .- s[1])), 1, 1, :)
-        d = maxabs((ratio .- expect)[repeat(ok, 1, 1, length(t))])
+        d = maxabs((ratio .- expect)[ok])
         check(d < 2e-3, @sprintf("pr_ann scales by exp(f_p = %.3f x the uniform pr terms) (max |rel diff| %.1e)", f_p, d))
     end
 
