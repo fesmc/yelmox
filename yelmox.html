@@ -472,7 +472,7 @@ S(x,z,τ)    = S_0 (or ...)                          + Σ_k α_k [S_k1 − S_k0]
 </tr>
 </tbody>
 </table>
-<p>A term on a derived coefficient may touch <code>to</code> and <code>so</code> only (an error at init otherwise); <code>air_anomaly</code> needs a backend with a sea-level air temperature (snapshots). <code>region</code> is <code>"all"</code> or a selection expression of the domain’s regions on the climate grid (<code>[regions]</code>, e.g.&nbsp;<code>"zone:open_ocean"</code>, <code>"~zone:land"</code>; see the fesm-utils regions docs); its cell count is printed at init. The run stops when a coefficient trips its kill switch (<code>with_kill</code>), and writes a restart bundle <code>restart-&lt;n&gt;</code> each time a coefficient moves by more than its <code>restart_every_df</code>. Each tsgen coefficient restarts from <code>coef_&lt;name&gt;_restart.nc</code> in the bundle (a scaled or derived one is recomputed; an older bundle’s <code>series_&lt;name&gt;_restart.nc</code> is still read, with a note); every coefficient is written to the 1D output <code>yelmo_ts.nc</code> (with <code>[output] write_yelmo</code>) as <code>coef_&lt;name&gt;</code> (tsgen ones also <code>coef_&lt;name&gt;_df_dt</code>), labelled with <code>units</code>.</p>
+<p>A term on a derived coefficient may touch <code>to</code> and <code>so</code> only (an error at init otherwise); <code>air_anomaly</code> needs a backend with a sea-level air temperature (snapshots). <code>region</code> is <code>"all"</code> or a selection expression of the domain’s regions on the climate grid (<code>[regions]</code>, e.g.&nbsp;<code>"zone:open_ocean"</code>, <code>"~zone:land"</code>; see the fesm-utils regions docs); its cell count is printed at init. The run stops when a coefficient trips its kill switch (<code>with_kill</code>), and writes a restart bundle <code>restart-&lt;n&gt;</code> each time a coefficient moves by more than its <code>restart_every_df</code>. Each tsgen coefficient restarts from <code>coef_&lt;name&gt;_restart.nc</code> in the bundle (a scaled or derived one is recomputed; an older bundle’s <code>series_&lt;name&gt;_restart.nc</code> is still read, with a note); every coefficient is written to the run’s 1D file <code>forcing_ts.nc</code> (<code>[tm_1D]</code>) under its name (tsgen ones also <code>&lt;name&gt;_df_dt</code>), labelled with <code>units</code>, its <code>kind</code> and source as attributes, next to the barystatic sea level <code>bsl</code>. The names <code>time</code> and <code>bsl</code> are therefore not coefficient names.</p>
 <p><strong>Terms</strong> are one coefficient times one pattern on an explicit list of <code>fields</code>:</p>
 <table class="caption-top table">
 <colgroup>
@@ -912,7 +912,7 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f a coefficient, e.g. before the fi
 </section>
 <section id="output" class="level3">
 <h3 class="anchored" data-anchor-id="output"><code>[output]</code></h3>
-<p>Each module writes its own files, on its own grid, at the <code>[tm_2D]</code> (2D), <code>[tm_2Dsm]</code> (small 2D) and <code>[tm_1D]</code> (time series) intervals. Every key is required. A component switched off in <code>[comps]</code> writes no files whatever its switch (<code>write_isos</code>, <code>write_shelf</code>, <code>write_surface</code>, <code>write_clim</code> need <code>with_isostasy</code>, <code>with_shelf</code>, <code>with_surface</code>, <code>with_climate</code>):</p>
+<p>Each module writes its own files, on its own grid, at the <code>[tm_2D]</code> (2D), <code>[tm_2Dsm]</code> (small 2D) and <code>[tm_1D]</code> (time series) intervals. Every key is required. The driver’s forcing, shared by its domains (the coefficients and the barystatic sea level), goes to <code>forcing_ts.nc</code> in the run folder on the <code>[tm_1D]</code> cadence, whatever the switches. A component switched off in <code>[comps]</code> writes no files whatever its switch (<code>write_isos</code>, <code>write_shelf</code>, <code>write_surface</code>, <code>write_clim</code> need <code>with_isostasy</code>, <code>with_shelf</code>, <code>with_surface</code>, <code>with_climate</code>):</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -927,7 +927,7 @@ scaled:  H_ice_ref = f * H_ice(slice_time)  (f a coefficient, e.g. before the fi
 <tbody>
 <tr class="odd">
 <td><code>write_yelmo</code></td>
-<td><code>yelmo.nc</code>, <code>yelmo_sm.nc</code>, <code>yelmo_ts.nc</code> with the coefficients (and <code>yelmo_ts_&lt;name&gt;.nc</code> for the named masks of <code>[regions]</code>)</td>
+<td><code>yelmo.nc</code>, <code>yelmo_sm.nc</code>, <code>yelmo_ts.nc</code> (and <code>yelmo_ts_&lt;name&gt;.nc</code> for the named masks of <code>[regions]</code>)</td>
 </tr>
 <tr class="even">
 <td><code>write_isos</code></td>
