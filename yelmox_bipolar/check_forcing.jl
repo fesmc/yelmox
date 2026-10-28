@@ -65,8 +65,8 @@ aslist(v) = v isa AbstractVector ? string.(v) : (v == "" ? String[] : [string(v)
 
 # ----- output ------------------------------------------------------------
 
-"A variable as Float64, fill values as NaN."
-readvar(ds, v) = Float64.(coalesce.(ds[v][:], NaN))
+"A variable as a Float64 array of its dimensions, fill values as NaN."
+readvar(ds, v) = Float64.(coalesce.(Array(ds[v]), NaN))
 
 "The record indices of the times `t` in `tf` (all must be there)."
 records(tf, t) = [findfirst(==(x), tf) for x in t]

@@ -110,9 +110,12 @@ bip_setups=(
 # Modifier for the forcing tests (run_tests.sh forcing, checked by
 # yelmox_bipolar/check_forcing.jl): the ice sheets and the solid earth frozen
 # (no ice dynamics, isostasy, relaxation or optimization), gmt a ramp from 0 to
-# -6 K over 60 years then held, 100 years with every step written (1D and 2D)
-# and a restart bundle at 50 years. The box model, when on, runs.
+# -6 K over 60 years then held, on a forcing time that follows the model time
+# (tstep_method rel; the par file's const holds it at tstep_const), 100 years
+# with every step written (1D and 2D) and a restart bundle at 50 years. The
+# box model, when on, runs.
 bip_forcing=(
+    "ctrl.tstep_method=rel"
     "ctrl.time_end=100"
     "tm_1D.dt=10"
     "tm_2D.dt=10"
