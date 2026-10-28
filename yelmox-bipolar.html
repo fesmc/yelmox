@@ -272,7 +272,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Program:</strong> <code>yelmox_bipolar/yelmox_bipolar.f90</code> + <code>yelmox_bipolar/obm_coupling.f90</code> + <code>libs/kryos*.f90</code>.</li>
 <li><strong>Build:</strong> <code>make yelmox_bipolar</code> (links the OBM stack, <code>$(obm_libs)</code>).</li>
-<li><strong>Config:</strong> <code>yelmox_bipolar/yelmox_bipolar_Bipolar.nml</code>: north = Greenland (hub and ice <code>GRL-16KM</code>, the other components <code>GRL-32KM</code>), south = Antarctica (hub and shelf <code>ANT-16KM</code>, the other components <code>ANT-32KM</code>, with <code>relax</code> and <code>opt</code>); <code>[ctrl]</code> 0 to 40 yr, <code>dtt = 10</code> yr; uncoupled (the box model off). <code>[ctrl]</code>, <code>[barysealevel]</code> and the Yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared (no suffix).</li>
+<li><strong>Config:</strong> <code>yelmox_bipolar/yelmox_bipolar_Bipolar.nml</code>: north = Greenland (every component on <code>GRL-16KM</code>), south = Antarctica (every component on <code>ANT-32KM</code>, with <code>relax</code> and <code>opt</code>); <code>[ctrl]</code> 0 to 40 yr, <code>dtt = 10</code> yr; uncoupled (the box model off). <code>[ctrl]</code>, <code>[barysealevel]</code> and the Yelmo physics groups (<code>ydyn</code>, <code>ytopo</code>, …) are shared (no suffix).</li>
 <li><strong>Coupling setups:</strong> <code>yelmox_bipolar/params.sh</code>, one runme <code>-p</code> array per setup (<a href="#coupling-setups">below</a>).</li>
 <li><strong>Tests:</strong> <code>yelmox_bipolar/run_tests.sh</code> runs every setup of <code>params.sh</code> (local runs under <code>tmp/bipolar-tests/</code>), or those named. <code>run_tests.sh forcing</code> runs the forcing tests: the setups of <code>bip_forcing_setups</code> with the ice sheets frozen and <code>gmt</code> a ramp (<code>bip_forcing</code>), each checked by <code>check_forcing.jl</code> (Julia, environment <code>yelmox_bipolar/</code>): <code>gmt</code> and its scaled coefficients in <code>forcing_ts.nc</code>, each domain’s terms, air temperature, precipitation and ocean in <code>snap.nc</code>, the box air temperatures, vapour fluxes and <code>obm_north/south</code>; the last setup also restarted at 50 years and compared with its continuous run.</li>
 </ul>
@@ -307,17 +307,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="even">
 <td><code>gmt</code> → box model</td>
 <td><code>[ctrl] atm2obm</code></td>
-<td>the box air temperatures θ_i = θ_i,init + <code>dTa_i</code> (north, tropics, south) and the vapour fluxes from <code>gmt</code> (<code>[obm_forcing]</code>)</td>
+<td>the box air temperatures <code>tstar_i</code> = <code>tstar_i_init</code> + <code>dTa_i</code> (north, tropics, south) and the vapour fluxes from <code>gmt</code> (<code>[obm_forcing]</code>)</td>
 </tr>
 <tr class="odd">
 <td>ice sheet → box model</td>
 <td><code>[ctrl] couple_fwf_north</code>, <code>couple_fwf_south</code></td>
-<td>the freshwater flux of the domain, within its hydrographic mask, into its box (<code>fn</code>, <code>fs</code>)</td>
+<td>the freshwater flux of the domain (<code>dVdt</code>: the whole domain; <code>mb</code>, <code>ablation</code>: within its hydrographic mask) into its box (<code>fn</code>, <code>fs</code>)</td>
 </tr>
 <tr class="even">
 <td>box model → ice sheet</td>
 <td>the term <code>obm_north</code> / <code>obm_south</code> of the domain, its coefficient in <code>[forcing] coefs</code></td>
-<td>the ocean temperature <code>to</code> of the domain = its box temperature at every depth, read by the marine shelf</td>
+<td>the ocean temperature <code>to</code> of the domain = its reference plus the box anomaly (<code>tn − tn_init</code>) at every depth, read by the marine shelf</td>
 </tr>
 </tbody>
 </table>
@@ -383,6 +383,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>5</td>
+<td>Antarctica → box model</td>
+<td><code>bip_ais_to_obm</code></td>
+<td><code>active_north</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_south</code></td>
+<td><code>gmt</code>, <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>dTo</code></td>
+<td>–</td>
+<td><code>regional_south</code>, <code>ocean</code></td>
+</tr>
+<tr class="even">
+<td>6</td>
 <td>Greenland ↔︎ box model</td>
 <td><code>bip_gis_obm</code></td>
 <td><code>active_south</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_north</code></td>
@@ -390,8 +399,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td><code>regional_north</code>, <code>obm_north</code></td>
 <td>–</td>
 </tr>
-<tr class="even">
-<td>6</td>
+<tr class="odd">
+<td>7</td>
 <td>Antarctica ↔︎ box model</td>
 <td><code>bip_ais_obm</code></td>
 <td><code>active_north</code> = False, <code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_south</code></td>
@@ -399,8 +408,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>–</td>
 <td><code>regional_south</code>, <code>obm_south</code></td>
 </tr>
-<tr class="odd">
-<td>7</td>
+<tr class="even">
+<td>8</td>
 <td>Greenland ↔︎ box model ↔︎ Antarctica</td>
 <td><code>bip_full</code></td>
 <td><code>active_obm</code>, <code>atm2obm</code>, <code>couple_fwf_north</code>, <code>couple_fwf_south</code></td>
@@ -416,7 +425,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Further <code>-p</code> arguments go after the array (a later value wins). The rules behind the table, checked at init (before the startup of the domains) where noted:</p>
 <ul>
 <li>Every coefficient a term or <code>[obm_forcing]</code> uses is listed in <code>[forcing] coefs</code>, and only those (errors at init): with <code>atm2obm</code> all three <code>dTa_*</code>; without it no <code>dTa_tropics</code>, and no <code>dTa_*</code> of an inactive domain; no <code>dTo</code> once <code>obm_north</code> replaces <code>ocean</code>. <code>dTa_*</code> (scaled from <code>gmt</code>) and <code>obm_north</code>/<code>obm_south</code> (set by the box model each step) are library coefficients (<code>input/forcing_db.nml</code>).</li>
-<li><code>obm_north</code> takes the place of <code>ocean</code>, never both: <code>obm_north</code> replaces <code>to</code> (<code>pattern = "replace"</code>) and <code>ocean</code> would add 0.25 × the air anomaly on top (an error at init: a domain with an ocean term on a box coefficient and one on an air-anomaly coefficient). Likewise <code>obm_south</code> in the south.</li>
+<li><code>obm_north</code> takes the place of <code>ocean</code>, never both: <code>obm_north</code> sets the ocean anomaly from the box and <code>ocean</code> would add 0.25 × the air anomaly on top (an error at init: a domain with an ocean term on a box coefficient and one on an air-anomaly coefficient). Likewise <code>obm_south</code> in the south.</li>
 <li>A domain takes its ocean from the box of its own hemisphere: the north from <code>obm_north</code>, the south from <code>obm_south</code> (an error at init otherwise).</li>
 <li>With the box model on and an atmosphere that changes in time (a varying <code>gmt</code>), <code>atm2obm</code> is on too: the boxes would keep their initial air temperatures otherwise (an error at init).</li>
 <li><code>couple_fwf_north</code>/<code>couple_fwf_south</code> need the box model and the domain of their hemisphere (errors at init), and the hydrographic masks <code>[ctrl] hydro_mask_north</code>/<code>hydro_mask_south</code> on the Yelmo grid of the domain (<code>{grid_name}_HYDRO-BASINS_zickfeld2004.nc</code>).</li>
@@ -425,7 +434,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <p>Variations on a setup:</p>
 <ul>
-<li><strong>The box anomaly instead of the box temperature</strong>: the reference ocean plus θ − θ_init of the box (<code>coef_obm_*.anomaly = True</code>, <code>term_obm_*.pattern = "uniform"</code>), with the modifier <code>bip_ocean_anomaly</code> after the setup: <code>-p "${bip_full[@]}" "${bip_ocean_anomaly[@]}"</code>.</li>
+<li><strong>The box temperature instead of the box anomaly</strong>: the box temperature at every depth in place of the reference ocean (<code>coef_obm_*.anomaly = False</code>, <code>term_obm_*.pattern = "replace"</code>), with the modifier <code>bip_ocean_replace</code> after the setup: <code>-p "${bip_full[@]}" "${bip_ocean_replace[@]}"</code>.</li>
+<li><strong>A domain amplification other than its box’s</strong>: the library coefficients <code>dTa_greenland</code>, <code>dTa_antarctica</code> (1.5 × <code>gmt</code>) on the regional term of the domain (<code>term_regional_north.coef</code>), listed in <code>[forcing] coefs</code>.</li>
 <li><strong>A transient</strong>: <code>gmt</code> from a time series, in <code>[coef_gmt]</code> of the par file (<code>method = "series"</code>, <code>series_file = ...</code>); see <a href="./yelmox.html#forcing">Forcing</a> for the coefficient methods.</li>
 <li><strong>A glacial pattern</strong> (paleo): the library term <code>lgm</code> (PMIP3 LGM − piControl on the coefficient <code>alpha</code>) added to <code>[forcing_north] terms</code>, with <code>alpha</code> in <code>[forcing] coefs</code> (a <code>[coef_alpha]</code> group in the par file sets its record; the library default is <code>alpha_combined_125kyr_interp</code>). The box model does not see <code>alpha</code>: <code>gmt</code> stays its only forcing.</li>
 <li><strong>Hysteresis of the box model</strong>: <code>[nautilus] hyster_on</code> (below).</li>
@@ -440,7 +450,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Shared OBM</strong> (<code>obm</code>) — an ocean box model stepped once per timestep, configured via <code>obm_ctl_load</code> and coupled to the domains through <code>obm_coupling.f90</code> (<code>coupling_obm2ism</code>, <code>obm_coupling_init</code>, <code>obm_exchange</code>). The OBM writes its own 1D output, <code>&lt;obm_name&gt;.nc</code> (<code>[ctrl] obm_name = "nautilus"</code>), on the <code>[tm_1D]</code> cadence; its restart (<code>obm_restart.nc</code>) goes into the run restart bundle next to <code>bsl_restart.nc</code>.</li>
 <li><strong>One restart bundle per run</strong> — <code>restart-&lt;kyr&gt;-kyr/</code> holds the shared <code>bsl_restart.nc</code>, <code>obm_restart.nc</code> and the coefficients (<code>coef_&lt;name&gt;_restart.nc</code>), and each domain in a subfolder named after it (<code>Greenland/</code>, <code>Antarctica/</code>). <code>[ctrl] restart</code> is the bundle to start from. The output of each domain goes to the same subfolder of the run folder.</li>
 </ul>
-<p>Climate/SMB per domain is <strong>snapshots + chion</strong> (<code>[chion_north] model = "itm"</code>, <code>[chion_south] model = "pdd"</code>), as in the single-domain driver; the OBM’s contribution is folded into the ocean forcing — <code>obm_exchange</code> sets the derived coefficients <code>obm_north</code>/<code>obm_south</code> (the box temperatures) and re-applies each domain’s ocean terms (e.g.&nbsp;the <code>replace</code> terms <code>term_obm_north</code>/<code>_south</code>: the box temperature into <code>to_ann</code>) before the marine-shelf step reads it.</p>
+<p>Climate/SMB per domain is <strong>snapshots + chion</strong> (<code>[chion_north] model = "itm"</code>, <code>[chion_south] model = "pdd"</code>), as in the single-domain driver; the OBM’s contribution is folded into the ocean forcing — <code>obm_exchange</code> sets the derived coefficients <code>obm_north</code>/<code>obm_south</code> (the box temperature anomalies) and re-applies each domain’s ocean terms (e.g.&nbsp;the <code>uniform</code> terms <code>term_obm_north</code>/<code>_south</code>: the reference plus the box anomaly into <code>to_ann</code>) before the marine-shelf step reads it.</p>
 </section>
 <section id="stepping-order" class="level2">
 <h2 class="anchored" data-anchor-id="stepping-order">Stepping order</h2>
@@ -484,9 +494,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>The forcing of each domain is that of <code>yelmox</code> (<a href="./yelmox.html#forcing">Forcing</a>): a reference snapshot plus terms, <code>[forcing_north]</code> and <code>[forcing_south]</code>. What the bipolar driver adds:</p>
 <ul>
 <li><strong>Shared coefficients</strong> (<code>[forcing] coefs</code>, <code>[coef_&lt;name&gt;]</code>): one registry for both domains and the OBM, advanced once per step, written to the run’s <code>forcing_ts.nc</code>, restarted from the run bundle (<code>coef_&lt;name&gt;_restart.nc</code>), with the kill switch and <code>restart_every_df</code> bundles as in <code>yelmox</code>.</li>
-<li><strong><code>atm2obm</code></strong> (<code>[ctrl]</code>): the box air temperatures from <code>[obm_forcing]</code>, <code>theta_i = theta_i_init + dT_i</code> for north, tropics and south (the coefficients <code>coef_north</code>, <code>coef_tropics</code>, <code>coef_south</code>: <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>gmt</code> amplified, Zickfeld et al., 2004) and the vapour fluxes <code>phin</code>, <code>phit</code> linear in the global anomaly (<code>coef</code>: <code>gmt</code>). It needs no ice-sheet domain; the coefficients must be in the registry (checked at init).</li>
-<li><strong>Box model → ice sheet</strong> (obm2ism): per domain, a coefficient derived from the box (<code>[coef_obm_north]</code>, <code>[coef_obm_south]</code> of the library: <code>method = "derived"</code>, <code>from = "obm_north"</code>/<code>"obm_south"</code>, the box temperature, or its anomaly to the initial value with <code>anomaly = True</code>) with a term on <code>to</code> (<code>[term_obm_north]</code>/<code>[term_obm_south]</code>: <code>replace</code>, <code>to_ann</code> = the box temperature; <code>uniform</code> with the anomaly coefficient for the reference + the box anomaly). On when a term uses such a coefficient. <code>obm_exchange</code> sets the coefficients and re-applies the ocean terms after both climate steps. At the start the box model is initialized (cold start or restart) and the coefficients set before the domains, so their startup climate, shelf and ice state already see the box.</li>
-<li><strong>Freshwater flux</strong> (<code>[ctrl] couple_fwf_north</code>/<code>couple_fwf_south</code>): the flux of each domain into its box (<code>fn</code>, <code>fs</code>), from the Yelmo mass balance (<code>fwf_definition</code>: <code>dVdt</code>, <code>mb</code>, <code>ablation</code>) within the hydrographic mask (<code>hydro_mask_north</code>/<code>hydro_mask_south</code>, on the Yelmo grid).</li>
+<li><strong><code>atm2obm</code></strong> (<code>[ctrl]</code>): the box air temperatures from <code>[obm_forcing]</code>, <code>tstar_i = tstar_i_init + dT_i</code> for north, tropics and south (the coefficients <code>coef_north</code>, <code>coef_tropics</code>, <code>coef_south</code>: <code>dTa_north</code>, <code>dTa_tropics</code>, <code>dTa_south</code>, <code>gmt</code> amplified, Zickfeld et al., 2004) and the vapour fluxes <code>phin</code>, <code>phit</code> linear in the global anomaly (<code>coef</code>: <code>gmt</code>). It needs no ice-sheet domain; the coefficients must be in the registry (checked at init).</li>
+<li><strong>Box model → ice sheet</strong> (obm2ism): per domain, a coefficient derived from the box (<code>[coef_obm_north]</code>, <code>[coef_obm_south]</code> of the library: <code>method = "derived"</code>, <code>from = "obm_north"</code>/<code>"obm_south"</code>, the box temperature anomaly to its initial value, or the temperature with <code>anomaly = False</code>) with a term on <code>to</code> (<code>[term_obm_north]</code>/<code>[term_obm_south]</code>: <code>uniform</code>, the reference + the box anomaly; <code>replace</code> with the temperature coefficient, <code>to_ann</code> = the box temperature). On when a term uses such a coefficient. <code>obm_exchange</code> sets the coefficients and re-applies the ocean terms after both climate steps. At the start the box model is initialized (cold start or restart) and the coefficients set before the domains, so their startup climate, shelf and ice state already see the box.</li>
+<li><strong>Freshwater flux</strong> (<code>[ctrl] couple_fwf_north</code>/<code>couple_fwf_south</code>): the flux of each domain into its box (<code>fn</code>, <code>fs</code>), from the Yelmo mass balance (<code>fwf_definition</code>: <code>dVdt</code> over the whole domain; <code>mb</code>, <code>ablation</code> within the hydrographic mask <code>hydro_mask_north</code>/<code>hydro_mask_south</code>, on the Yelmo grid).</li>
 <li><strong>Hysteresis</strong> (<code>nautilus</code> only): <code>[nautilus] hyster_on</code> nudges one box-model control (<code>hyster_forcing</code>: <code>phit</code>, <code>phin</code>, <code>fn</code>, <code>fs</code>, <code>global_melt</code>) along <code>hyster_forcing_method</code> (<code>triangular</code>, <code>sin</code>, <code>noise</code>, <code>linear</code>) in <code>obm_exchange</code>.</li>
 </ul>
 <p><code>obm_restart.nc</code> (run bundle) holds the box state, the fluxes and the box air temperatures; the <code>*_init</code> values stay those of the par file, the reference of <code>atm2obm</code> and of the box anomaly (<code>anomaly = True</code>).</p>
