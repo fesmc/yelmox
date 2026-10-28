@@ -30,7 +30,7 @@ module kryos_forcing
 
     use nml,          only : nml_read, nml_validate
     use yelmox_nml,   only : VAR_DEFS_MAX, var_defs_find, def_file => yelmox_defaults_file
-    use ncio,         only : nc_open, nc_close, nc_write, nc_time_index
+    use ncio,         only : nc_write, nc_write_attr
     use precision,    only : wp, dp
     use tsgen,        only : tsgen_class, tsgen_init, tsgen_update, &
                              tsgen_restart_write, tsgen_restart_read
@@ -52,7 +52,7 @@ module kryos_forcing
     type coef_class
         character(len=64)  :: name
         character(len=8)   :: kind             = "tsgen"  ! tsgen | scaled | derived
-        character(len=32)  :: units            = "1"      ! label of coef_<name> in the 1D output
+        character(len=32)  :: units            = "1"      ! label of <name> in forcing_ts.nc
         real(wp)           :: restart_every_df = 0.0_wp   ! [f] |Δf| between restarts; 0 = off
         real(wp)           :: f_last_restart   = 0.0_wp   ! f at the last restart mark
         real(wp)           :: f                = 0.0_wp   ! the current value (every kind)
@@ -74,7 +74,7 @@ module kryos_forcing
     public :: coefs_set, coefs_is_derived, coefs_derived, coefs_varies, coefs_check_used
     public :: coefs_uses_derived, coefs_set_obm
     public :: coefs_kill, coefs_restart_due, coefs_restart_fldr
-    public :: coefs_restart_write, coefs_restart_read, coefs_write_step
+    public :: coefs_restart_write, coefs_restart_read, coefs_write_step, coefs_write_attrs
 
 contains
 
@@ -118,6 +118,11 @@ contains
             c%name = trim(names(k))
             if (any(names(1:k-1) == names(k))) then
                 write(*,*) "coefs_init:: error: coefficient '"//trim(c%name)//"' is listed twice in [forcing] coefs."
+                error stop 1
+            end if
+            if (trim(c%name) == "time" .or. trim(c%name) == "bsl") then
+                write(*,*) "coefs_init:: error: '"//trim(c%name)//"' is not a coefficient name: "// &
+                           "forcing_ts.nc holds it beside the coefficients."
                 error stop 1
             end if
             group = "coef_"//trim(c%name)
@@ -503,43 +508,57 @@ contains
         fnm = trim(fldr)//"/coef_"//trim(name)//"_restart.nc"
     end function coef_restart_file
 
-    subroutine coefs_write_step(coefs, filename, time)
-        ! Append every coefficient to an existing 1D timeseries file at
-        ! `time`: its value coef_<name> (in its units) and, for tsgen
-        ! coefficients, the rate coef_<name>_df_dt and, with a response
+    subroutine coefs_write_step(coefs, filename, ncid, n)
+        ! Write every coefficient to record n of an open 1D timeseries file
+        ! (the run's forcing_ts.nc): its value <name> (in its units) and, for
+        ! tsgen coefficients, the rate <name>_df_dt and, with a response
         ! history (feedback methods, kill switch), the windowed response rate
-        ! coef_<name>_dv_dt. Call after the file's own 1D write.
+        ! <name>_dv_dt. Their attributes: coefs_write_attrs.
         type(coefs_class), intent(in) :: coefs
         character(len=*),  intent(in) :: filename
-        real(dp),          intent(in) :: time
-        integer :: k, ncid, n
-        character(len=72) :: vnm
-
-        if (size(coefs%coef) == 0) return
-
-        call nc_open(filename, ncid, writable=.true.)
-        n = nc_time_index(filename, "time", time, ncid)
-        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        integer,           intent(in) :: ncid, n
+        integer :: k
 
         do k = 1, size(coefs%coef)
             associate(c => coefs%coef(k))
-            vnm = "coef_"//trim(c%name)
-            call nc_write(filename, trim(vnm), c%f, dim1="time", &
+            call nc_write(filename, trim(c%name), c%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(c%units), &
                           long_name="Coefficient "//trim(c%name))
             if (c%kind /= "tsgen") cycle
-            call nc_write(filename, trim(vnm)//"_df_dt", c%tsg%df_dt, dim1="time", &
+            call nc_write(filename, trim(c%name)//"_df_dt", c%tsg%df_dt, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(c%units)//"/yr", &
                           long_name="Rate of change of coefficient "//trim(c%name))
             if (allocated(c%tsg%dv_dt)) &
-                call nc_write(filename, trim(vnm)//"_dv_dt", c%tsg%dv_dt_ave, dim1="time", &
+                call nc_write(filename, trim(c%name)//"_dv_dt", c%tsg%dv_dt_ave, dim1="time", &
                               start=[n], count=[1], ncid=ncid, units="Gt/yr", &
                               long_name="Windowed rate of the response (ice volume) of coefficient "// &
                                         trim(c%name))
             end associate
         end do
-
-        call nc_close(ncid)
     end subroutine coefs_write_step
+
+    subroutine coefs_write_attrs(coefs, filename)
+        ! The attributes of each coefficient's value in a closed 1D file
+        ! written by coefs_write_step: kind, and method (tsgen), coef + factor
+        ! (scaled) or from (derived).
+        type(coefs_class), intent(in) :: coefs
+        character(len=*),  intent(in) :: filename
+        integer :: k
+
+        do k = 1, size(coefs%coef)
+            associate(c => coefs%coef(k))
+            call nc_write_attr(filename, trim(c%name), "kind", trim(c%kind))
+            select case(trim(c%kind))
+                case("tsgen")
+                    call nc_write_attr(filename, trim(c%name), "method", trim(c%tsg%par%method))
+                case("scaled")
+                    call nc_write_attr(filename, trim(c%name), "coef", trim(c%source))
+                    call nc_write_attr(filename, trim(c%name), "factor", c%factor)
+                case("derived")
+                    call nc_write_attr(filename, trim(c%name), "from", trim(c%drv%from))
+            end select
+            end associate
+        end do
+    end subroutine coefs_write_attrs
 
 end module kryos_forcing

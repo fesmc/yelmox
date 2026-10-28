@@ -23,7 +23,14 @@ across both domains plus the OBM.
 - **Coupling setups:** `yelmox_bipolar/params.sh`, one runme `-p` array per
   setup ([below](#coupling-setups)).
 - **Tests:** `yelmox_bipolar/run_tests.sh` runs every setup of `params.sh`
-  (local runs under `tmp/bipolar-tests/`), or those named.
+  (local runs under `tmp/bipolar-tests/`), or those named. `run_tests.sh
+  forcing` runs the forcing tests: the setups of `bip_forcing_setups` with the
+  ice sheets frozen and `gmt` a ramp (`bip_forcing`), each checked by
+  `check_forcing.jl` (Julia, environment `yelmox_bipolar/`): `gmt` and its
+  scaled coefficients in `forcing_ts.nc`, each domain's terms, air
+  temperature, precipitation and ocean in `snap.nc`, the box air temperatures,
+  vapour fluxes and `obm_north/south`; the last setup also restarted at 50
+  years and compared with its continuous run.
 
 ## Coupling setups {#coupling-setups}
 
@@ -128,6 +135,10 @@ Variations on a setup:
   forced by `atm2obm` or not; no freshwater flux, no terms on the box coefficients).
 - **Shared `bsl`** — one barystatic sea level for the run, restored once at startup
   (`bsl_startup`) and written to the run restart bundle.
+- **Shared forcing output** — `forcing_ts.nc` in the run folder, on the
+  `[tm_1D]` cadence: every coefficient of `[forcing] coefs` under its name
+  (`gmt`, `dTa_north`, ...) and `bsl`. What each domain's climate used is in
+  its own climate file (`term_<name>` in `snap.nc`).
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`
   (`coupling_obm2ism`, `obm_coupling_init`, `obm_exchange`). The OBM writes its own
@@ -198,8 +209,8 @@ a reference snapshot plus terms, `[forcing_north]` and `[forcing_south]`. What
 the bipolar driver adds:
 
 - **Shared coefficients** (`[forcing] coefs`, `[coef_<name>]`): one registry
-  for both domains and the OBM, advanced once per step, written to each
-  domain's 1D file, restarted from the run bundle (`coef_<name>_restart.nc`),
+  for both domains and the OBM, advanced once per step, written to the run's
+  `forcing_ts.nc`, restarted from the run bundle (`coef_<name>_restart.nc`),
   with the kill switch and `restart_every_df` bundles as in `yelmox`.
 - **`atm2obm`** (`[ctrl]`): the box air temperatures from `[obm_forcing]`,
   `theta_i = theta_i_init + dT_i` for north, tropics and south (the

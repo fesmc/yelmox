@@ -15,7 +15,7 @@
 ! ===== Run setup =====
 
 &ctrl
-    tstep_method    = "const"
+    tstep_method    = "rel"             ! "rel": the forcing time follows the model time (the coefficients move); "const": held at tstep_const
     tstep_const     = 0.0
     time_init       = 0.0
     time_end        = 40.0
@@ -113,10 +113,14 @@
     ! dTa_south the OBM box air temperatures ([obm_forcing]) and the uniform
     ! anomaly of each domain ([term_regional_north], [term_regional_south]);
     ! the OBM vapour fluxes. Zero here (present day).
-    ! A time series instead, e.g.:
+    ! A ramp from f_max to f_min over dt_ramp (method = "ramp-time",
+    ! df_sign = -1; the forcing tests of run_tests.sh), or a time series, e.g.:
     !   method = "series", series_file = "input/<gmt series>.dat"
     method      = "const"
     f_min       = 0.0
+    f_max       = 0.0
+    df_sign     = 1
+    dt_ramp     = 1000.0
     units       = "K"
 /
 

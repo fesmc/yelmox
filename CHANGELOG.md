@@ -17,10 +17,24 @@ annotated git tag. Dates are release (tag) dates.
   `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
   every setup and the consistency checks (each must stop with its error), or the setups
   named (`setup+modifier`).
+- yelmox_bipolar forcing tests (`run_tests.sh forcing`): the setups with the ice sheets
+  frozen and `gmt` a ramp (`params.sh` `bip_forcing`, `bip_forcing_setups`), checked by
+  `check_forcing.jl` (the coefficients, each domain's climate, the box model, a restart
+  against its continuous run). `[coef_gmt]` of the par file lists the ramp keys
+  (`f_max`, `df_sign`, `dt_ramp`; constant 0 as before).
 - Docs `yelmox-bipolar.md`: "Coupling setups", the exchanges (diagram), their switches,
   the setups table and the rules behind it.
 
 ### Changed
+- Coefficient output: the driver writes the coefficients and the barystatic sea level to
+  the run's own 1D file `forcing_ts.nc` (`[tm_1D]` cadence, both drivers; in
+  yelmox_bipolar the run folder, not each domain's), under their names (`gmt`, not
+  `coef_gmt`), with `kind` and the source (`method`, `coef` + `factor`, `from`) as
+  attributes. `yelmo_ts.nc` no longer holds them. `time` and `bsl` are not coefficient
+  names (checked at init).
+- yelmox_bipolar: `[ctrl] tstep_method = "rel"` by default (was `"const"`, which held the
+  forcing time at `tstep_const`, so a time-dependent coefficient such as a `gmt` ramp or
+  series never moved). No change in answers with the constant `gmt` of the par file.
 - yelmox_bipolar: the regional amplification of `gmt` is set once, in the scaled library
   coefficients `dTa_north` (1.07), `dTa_tropics` (0.79) and `dTa_south` (0.86 x `gmt`;
   Zickfeld et al., 2004), read by the domains (`term_regional_north`/`_south` on them,

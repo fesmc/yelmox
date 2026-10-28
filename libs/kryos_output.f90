@@ -8,7 +8,7 @@ module kryos_output
     use precision,    only : dp
     use yelmo,        only : wp, yelmo_write_init, yelmo_write_step, yelmo_regions_write
     use marine_shelf, only : marshelf_class
-    use fastisostasy, only : isos_class
+    use fastisostasy, only : isos_class, bsl_class
     use smbpal,       only : smbpal_class
     use smb_simple_m, only : smb_simple_class
     use surface_chion, only : surface_chion_class
@@ -17,7 +17,7 @@ module kryos_output
     use yelmox_climate, only : climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     use cmip_output,  only : cmip_write_init, write_step_2D_cmip, write_step_1D_cmip
     use kryos,        only : kryos_domain, MAP_FLDR, remap, cadence_due
-    use kryos_forcing, only : coefs_class, coefs_write_step
+    use kryos_forcing, only : coefs_class, coefs_write_step, coefs_write_attrs
 
     implicit none
     private
@@ -43,6 +43,7 @@ module kryos_output
     public :: domain_write_init, domain_write_step, domain_write_1D
     public :: domain_write_init_sm, domain_write_step_sm
     public :: domain_write_cmip
+    public :: run_write_1D
 
 contains
 
@@ -157,14 +158,12 @@ contains
                                   time, nms=yvars, compare_pd=.FALSE.)
     end subroutine domain_write_step_sm
 
-    subroutine domain_write_1D(dom, outfldr, time, coefs, init)
-        ! Write 1D timeseries: Yelmo regional aggregates with the driver's
-        ! coefficients (coef_<name> in yelmo_ts.nc), isostasy diagnostics and
-        ! the climate's own.
+    subroutine domain_write_1D(dom, outfldr, time, init)
+        ! Write 1D timeseries: Yelmo regional aggregates, isostasy diagnostics
+        ! and the climate's own. The driver's forcing: run_write_1D.
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
         real(dp),         intent(in)    :: time
-        type(coefs_class), intent(in)   :: coefs
         logical, intent(in), optional   :: init
 
         logical :: is_init
@@ -179,7 +178,6 @@ contains
                 call yelmo_regions_write(dom%yelmo, time, init=.TRUE., units="years")
             else
                 call yelmo_regions_write(dom%yelmo, time)
-                call coefs_write_step(coefs, dom%yelmo%reg%fnm, time)
             end if
         end if
 
@@ -198,6 +196,39 @@ contains
                     H_ice_c, f_grnd_c, dom%ctl%dx_clim, is_init)
         end if
     end subroutine domain_write_1D
+
+    subroutine run_write_1D(filename, time, coefs, bsl, init)
+        ! The run's 1D timeseries (forcing_ts.nc in the run folder): the
+        ! forcing owned by the driver and shared by its domains, the
+        ! coefficients ([forcing] coefs, coefs_write_step; their attributes
+        ! with the first record) and the barystatic sea level. init creates
+        ! the file.
+        character(len=*),  intent(in) :: filename
+        real(dp),          intent(in) :: time
+        type(coefs_class), intent(in) :: coefs
+        type(bsl_class),   intent(in) :: bsl
+        logical, intent(in), optional :: init
+
+        integer :: ncid, n
+        logical :: is_init
+
+        is_init = .false.
+        if (present(init)) is_init = init
+
+        if (is_init) then
+            call nc_create(filename)
+            call nc_write_dim(filename, "time", x=time, dx=1.0_dp, nx=1, units="year", unlimited=.TRUE.)
+            return
+        end if
+
+        call nc_open(filename, ncid, writable=.TRUE.)
+        n = nc_time_index(filename, "time", time, ncid)
+        call nc_write(filename, "time", time, dim1="time", start=[n], count=[1], ncid=ncid)
+        call io_ts(filename, "bsl", bsl%bsl_now, n, ncid, "m", "Barystatic sea level")
+        call coefs_write_step(coefs, filename, ncid, n)
+        call nc_close(ncid)
+        if (n == 1) call coefs_write_attrs(coefs, filename)
+    end subroutine run_write_1D
 
     subroutine domain_write_cmip(dom, outfldr, ts, init)
         ! CMIP/ISMIP-formatted output ([output] write_cmip): init creates the
