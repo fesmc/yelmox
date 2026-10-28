@@ -162,7 +162,7 @@ window t0 t1 whose mean is taken, `exp`, the PI/PID feedback controllers on the
 response, the ice volume in Gt; see the fesm-utils tsgen docs), **scaled**
 (`method = "scaled"`: `factor` × the tsgen coefficient `coef`, set right
 after it each step, so a term on the atmosphere may use it; e.g. a regional
-amplification of a global anomaly, `[coef_dTa_north]` of the library), or
+amplification of a global anomaly, `[coef_dTa_greenland]` of the library), or
 **derived** (`method = "derived"`), computed by the model after the atmosphere
 of the update is composed:
 

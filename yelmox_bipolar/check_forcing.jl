@@ -253,10 +253,10 @@ end
 
 function print_table(ts, names)
     names = [n for n in names if haskey(ts, n)]
-    println("  ", rpad("time", 8), join(lpad.(names, 11)))
+    println("  ", rpad("time", 8), join(lpad.(names, 15)))
     cols = [readvar(ts, n) for n in names]
     for (k, t) in enumerate(readvar(ts, "time"))
-        println("  ", rpad(@sprintf("%.0f", t), 8), join(@sprintf("%11.4f", c[k]) for c in cols))
+        println("  ", rpad(@sprintf("%.0f", t), 8), join(@sprintf("%15.4f", c[k]) for c in cols))
     end
 end
 
@@ -270,7 +270,7 @@ function main(args)
 
     println("== $run", ref === nothing ? "" : "  (reference $ref)")
     ts = NCDataset(joinpath(run, "forcing_ts.nc"))
-    print_table(ts, ["gmt", "dTa_north", "dTa_south", "dTo", "obm_north", "obm_south", "bsl"])
+    print_table(ts, ["gmt", "dTa_greenland", "dTa_antarctica", "dTa_north", "dTa_south", "dTo", "obm_north", "obm_south", "bsl"])
 
     println("forcing_ts.nc")
     # The ramp starts at the start of the run, or of its reference (a restart

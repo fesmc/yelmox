@@ -43,9 +43,11 @@ annotated git tag. Dates are release (tag) dates.
   "uniform"`; was the box temperature at every depth, now the modifier
   `bip_ocean_replace`); the freshwater flux `fwf_definition = "dVdt"` sums the whole
   domain (`mb`, `ablation` the hydrographic mask). Par file grids: Greenland every
-  component on `GRL-16KM`, Antarctica on `ANT-32KM`. Library coefficients
-  `dTa_greenland`, `dTa_antarctica` (1.5 x `gmt`), for a domain amplification other than
-  its box's.
+  component on `GRL-16KM`, Antarctica on `ANT-32KM`.
+- yelmox_bipolar: the ice sheets take their own amplification of `gmt`, the library
+  coefficients `dTa_greenland`, `dTa_antarctica` (1.5 x `gmt`) in `term_regional_north`/
+  `_south`; the boxes keep `dTa_north`, `dTa_tropics`, `dTa_south` (Zickfeld et al., 2004).
+  `[forcing] coefs` of the par file and the setups of `params.sh` list them.
 - yelmox_bipolar: `[ctrl] tstep_method = "rel"` by default (was `"const"`, which held the
   forcing time at `tstep_const`, so a time-dependent coefficient such as a `gmt` ramp or
   series never moved). No change in answers with the constant `gmt` of the par file.

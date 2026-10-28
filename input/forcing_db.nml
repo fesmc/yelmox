@@ -138,8 +138,7 @@
 
 &coef_dTa_greenland
     ! yelmox_bipolar: the air temperature anomaly of the Greenland domain [K],
-    ! the global mean gmt amplified, for a domain amplification other than
-    ! its box's (dTa_north): its regional term on this coefficient.
+    ! the global mean gmt amplified (term_regional_north; its box: dTa_north).
     method = "scaled"
     coef   = "gmt"
     factor = 1.5
@@ -148,7 +147,7 @@
 
 &coef_dTa_antarctica
     ! yelmox_bipolar: the air temperature anomaly of the Antarctica domain [K],
-    ! as coef_dTa_greenland (its box's: dTa_south).
+    ! the global mean gmt amplified (term_regional_south; its box: dTa_south).
     method = "scaled"
     coef   = "gmt"
     factor = 1.5
@@ -158,8 +157,7 @@
 &coef_dTa_north
     ! yelmox_bipolar: the air temperature anomaly of the north [K], the global
     ! mean gmt amplified (Zickfeld et al., 2004): the northern box of the ocean
-    ! box model ([obm_forcing] coef_north) and the north domain
-    ! (term_regional_north).
+    ! box model ([obm_forcing] coef_north).
     method = "scaled"
     coef   = "gmt"
     factor = 1.07
@@ -177,8 +175,7 @@
 
 &coef_dTa_south
     ! yelmox_bipolar: the air temperature anomaly of the south [K]: the
-    ! southern box ([obm_forcing] coef_south) and the south domain
-    ! (term_regional_south).
+    ! southern box ([obm_forcing] coef_south).
     method = "scaled"
     coef   = "gmt"
     factor = 0.86

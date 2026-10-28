@@ -35,17 +35,18 @@ across both domains plus the OBM.
 
 One global coefficient, `gmt` (global mean air temperature anomaly [K], `const`
 0 in the par file), drives both ice sheets and the box model, through its
-regional amplifications: the scaled coefficients `dTa_north` = 1.07 × `gmt`,
-`dTa_tropics` = 0.79 × `gmt` and `dTa_south` = 0.86 × `gmt` of the library
-(Zickfeld et al., 2004). A region's ice sheet and its box read the same
-coefficient, so the amplification is set once, in its `factor`. Three
+regional amplifications, scaled coefficients of the library: for the ice
+sheets `dTa_greenland` = `dTa_antarctica` = 1.5 × `gmt`, for the boxes
+`dTa_north` = 1.07 × `gmt`, `dTa_tropics` = 0.79 × `gmt` and `dTa_south` =
+0.86 × `gmt` (Zickfeld et al., 2004). Each amplification is set once, in the
+`factor` of its coefficient. Three
 exchanges with the box model can be switched on, each on its own:
 
 ![The exchanges of yelmox_bipolar and the switch or term of each.](figures/bipolar-coupling.svg){width=100%}
 
 | Exchange | Switched by | What it does |
 |---|---|---|
-| `gmt` → ice sheets | the terms `regional_north`, `regional_south` (in every setup) | the uniform anomaly `dTa_north` (`dTa_south`) on `tas` and `pr` |
+| `gmt` → ice sheets | the terms `regional_north`, `regional_south` (in every setup) | the uniform anomaly `dTa_greenland` (`dTa_antarctica`) on `tas` and `pr` |
 | `gmt` → box model | `[ctrl] atm2obm` | the box air temperatures `tstar_i` = `tstar_i_init` + `dTa_i` (north, tropics, south) and the vapour fluxes from `gmt` (`[obm_forcing]`) |
 | ice sheet → box model | `[ctrl] couple_fwf_north`, `couple_fwf_south` | the freshwater flux of the domain (`dVdt`: the whole domain; `mb`, `ablation`: within its hydrographic mask) into its box (`fn`, `fs`) |
 | box model → ice sheet | the term `obm_north` / `obm_south` of the domain, its coefficient in `[forcing] coefs` | the ocean temperature `to` of the domain = its reference plus the box anomaly (`tn − tn_init`) at every depth, read by the marine shelf |
@@ -59,14 +60,14 @@ The setups, each a `-p` array of `yelmox_bipolar/params.sh` on the par file
 
 | # | Setup | Array | `[ctrl]` | `forcing.coefs` | `forcing_north.terms` | `forcing_south.terms` |
 |---|---|---|---|---|---|---|
-| 1 | Uncoupled (the par file) | `bip_uncoupled` | – | `gmt`, `dTa_north`, `dTa_south`, `dTo` | `regional_north`, `ocean` | `regional_south` |
+| 1 | Uncoupled (the par file) | `bip_uncoupled` | – | `gmt`, `dTa_greenland`, `dTa_antarctica`, `dTo` | `regional_north`, `ocean` | `regional_south` |
 | 2 | Box model alone | `bip_obm_only` | `active_north` = `active_south` = False, `active_obm`, `atm2obm` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south` | – | – |
-| 3 | Box model → both ice sheets | `bip_obm_to_ice` | `active_obm`, `atm2obm` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
-| 4 | Greenland → box model | `bip_gis_to_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `dTo` | `regional_north`, `ocean` | – |
-| 5 | Antarctica → box model | `bip_ais_to_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `dTo` | – | `regional_south`, `ocean` |
-| 6 | Greenland ↔ box model | `bip_gis_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north` | `regional_north`, `obm_north` | – |
-| 7 | Antarctica ↔ box model | `bip_ais_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_south` | – | `regional_south`, `obm_south` |
-| 8 | Greenland ↔ box model ↔ Antarctica | `bip_full` | `active_obm`, `atm2obm`, `couple_fwf_north`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
+| 3 | Box model → both ice sheets | `bip_obm_to_ice` | `active_obm`, `atm2obm` | `gmt`, `dTa_greenland`, `dTa_antarctica`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
+| 4 | Greenland → box model | `bip_gis_to_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_greenland`, `dTa_north`, `dTa_tropics`, `dTa_south`, `dTo` | `regional_north`, `ocean` | – |
+| 5 | Antarctica → box model | `bip_ais_to_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_antarctica`, `dTa_north`, `dTa_tropics`, `dTa_south`, `dTo` | – | `regional_south`, `ocean` |
+| 6 | Greenland ↔ box model | `bip_gis_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_greenland`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north` | `regional_north`, `obm_north` | – |
+| 7 | Antarctica ↔ box model | `bip_ais_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_antarctica`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_south` | – | `regional_south`, `obm_south` |
+| 8 | Greenland ↔ box model ↔ Antarctica | `bip_full` | `active_obm`, `atm2obm`, `couple_fwf_north`, `couple_fwf_south` | `gmt`, `dTa_greenland`, `dTa_antarctica`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
 
 Other combinations follow from these: e.g. `bip_full` without
 `ctrl.couple_fwf_south=True` is Greenland ↔ box model → Antarctica. Run a
@@ -82,9 +83,10 @@ behind the table, checked at init (before the startup of the domains) where
 noted:
 
 - Every coefficient a term or `[obm_forcing]` uses is listed in `[forcing]
-  coefs`, and only those (errors at init): with `atm2obm` all three `dTa_*`;
-  without it no `dTa_tropics`, and no `dTa_*` of an inactive domain; no `dTo`
-  once `obm_north` replaces `ocean`.
+  coefs`, and only those (errors at init): `dTa_greenland`/`dTa_antarctica`
+  of the active domains; with `atm2obm` the three box coefficients `dTa_north`,
+  `dTa_tropics`, `dTa_south`, without it none; no `dTo` once `obm_north`
+  replaces `ocean`.
   `dTa_*` (scaled from `gmt`) and `obm_north`/`obm_south` (set by the box
   model each step) are library coefficients (`input/forcing_db.nml`).
 - `obm_north` takes the place of `ocean`, never both: `obm_north` sets the
@@ -100,9 +102,8 @@ noted:
   their hemisphere (errors at init), and the hydrographic masks `[ctrl]
   hydro_mask_north`/`hydro_mask_south` on the Yelmo grid of the domain
   (`{grid_name}_HYDRO-BASINS_zickfeld2004.nc`).
-- A different amplification: a `[coef_dTa_north]` group in the par file with
-  its own `factor` (both the domain and the box follow); a domain of its own
-  amplification, unlike its box: an `f_ta` in its regional term on top.
+- A different amplification: a `[coef_dTa_greenland]` (domain) or
+  `[coef_dTa_north]` (box) group in the par file with its own `factor`.
 - `dTo` (term `ocean`) is the mean air anomaly of the domain whose climate
   sets it, the north. The coefficients are shared, so a second domain with an
   ocean anomaly from its own air needs a coefficient of its own (a group
@@ -115,9 +116,9 @@ Variations on a setup:
   every depth in place of the reference ocean (`coef_obm_*.anomaly = False`,
   `term_obm_*.pattern = "replace"`), with the modifier `bip_ocean_replace`
   after the setup: `-p "${bip_full[@]}" "${bip_ocean_replace[@]}"`.
-- **A domain amplification other than its box's**: the library coefficients
-  `dTa_greenland`, `dTa_antarctica` (1.5 × `gmt`) on the regional term of the
-  domain (`term_regional_north.coef`), listed in `[forcing] coefs`.
+- **A domain with its box's amplification**: `term_regional_north.coef =
+  dTa_north` (`term_regional_south.coef = dTa_south`), with `[forcing] coefs`
+  to match.
 - **A transient**: `gmt` from a time series, in `[coef_gmt]` of the par file
   (`method = "series"`, `series_file = ...`); see
   [Forcing](yelmox.md#forcing) for the coefficient methods.
@@ -140,7 +141,7 @@ Variations on a setup:
   (`bsl_startup`) and written to the run restart bundle.
 - **Shared forcing output** — `forcing_ts.nc` in the run folder, on the
   `[tm_1D]` cadence: every coefficient of `[forcing] coefs` under its name
-  (`gmt`, `dTa_north`, ...) and `bsl`. What each domain's climate used is in
+  (`gmt`, `dTa_greenland`, ...) and `bsl`. What each domain's climate used is in
   its own climate file (`term_<name>` in `snap.nc`).
 - **Shared OBM** (`obm`) — an ocean box model stepped once per timestep, configured
   via `obm_ctl_load` and coupled to the domains through `obm_coupling.f90`

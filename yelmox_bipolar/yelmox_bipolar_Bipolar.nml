@@ -99,20 +99,21 @@
     ! time_rel; each a group [coef_<name>] (this file, then the var_defs files:
     ! input/forcing_db.nml). Every coefficient a term or [obm_forcing] uses
     ! must be listed, and only those. One coefficient, gmt, drives the box
-    ! model and both domains, through its regional amplifications dTa_north,
-    ! dTa_south (and dTa_tropics with atm2obm): scaled coefficients of the
-    ! library, factor x gmt (Zickfeld et al., 2004). dTo is derived (the ocean
-    ! of the north, term ocean). The reference snapshot and the terms of each
-    ! domain: [forcing_north], [forcing_south]. Docs: yelmox-bipolar.md.
-    coefs = "gmt" "dTa_north" "dTa_south" "dTo"
+    ! model and both domains, through its regional amplifications: scaled
+    ! coefficients of the library, factor x gmt; dTa_greenland, dTa_antarctica
+    ! for the domains, dTa_north, dTa_tropics, dTa_south for the boxes (with
+    ! atm2obm; Zickfeld et al., 2004). dTo is derived (the ocean of the north,
+    ! term ocean). The reference snapshot and the terms of each domain:
+    ! [forcing_north], [forcing_south]. Docs: yelmox-bipolar.md.
+    coefs = "gmt" "dTa_greenland" "dTa_antarctica" "dTo"
 /
 
 
 &coef_gmt
-    ! Global mean air temperature anomaly [K]: through dTa_north, dTa_tropics,
-    ! dTa_south the OBM box air temperatures ([obm_forcing]) and the uniform
-    ! anomaly of each domain ([term_regional_north], [term_regional_south]);
-    ! the OBM vapour fluxes. Zero here (present day).
+    ! Global mean air temperature anomaly [K]: through dTa_greenland,
+    ! dTa_antarctica the uniform anomaly of each domain ([term_regional_north],
+    ! [term_regional_south]); through dTa_north, dTa_tropics, dTa_south the OBM
+    ! box air temperatures ([obm_forcing]); the OBM vapour fluxes. Zero here (present day).
     ! A ramp from f_max to f_min over dt_ramp (method = "ramp-time",
     ! df_sign = -1; the forcing tests of run_tests.sh), or a time series, e.g.:
     !   method = "series", series_file = "input/<gmt series>.dat"
@@ -688,7 +689,7 @@
 &forcing_south
     ! The forcing of the southern domain: the reference snapshot and the terms
     ! ([term_<name>]: this file, then input/forcing_db.nml).
-    !   regional_south  dTa_south (0.86 x gmt) on tas and pr; the ocean stays at the reference
+    !   regional_south  dTa_antarctica (1.5 x gmt) on tas and pr; the ocean stays at the reference
     ! Coupled to the box model: add obm_south (the ocean from the southern box)
     ! and list obm_south in [forcing] coefs (yelmox_bipolar/params.sh).
     reference = "pd_ant"
@@ -696,8 +697,8 @@
 /
 
 &term_regional_south
-    ! The regional anomaly dTa_south, the southern box's (atm2obm), uniform.
-    coef    = "dTa_south"
+    ! The regional anomaly dTa_antarctica, uniform (the southern box: dTa_south).
+    coef    = "dTa_antarctica"
     pattern = "uniform"
     fields  = "tas" "pr"
 /
@@ -1196,18 +1197,18 @@
 &forcing_north
     ! The forcing of the northern domain: the reference snapshot and the terms
     ! ([term_<name>]: this file, then input/forcing_db.nml).
-    !   regional_north  dTa_north (1.07 x gmt) on tas and pr
+    !   regional_north  dTa_greenland (1.5 x gmt) on tas and pr
     !   ocean           to + dTo, dTo = 0.25 x the mean sea-level air anomaly (library)
     ! Coupled to the box model: obm_north (the ocean from the northern box) in
-    ! place of ocean, never both (obm_north replaces to, ocean would add to it),
+    ! place of ocean, never both (each adds an anomaly to to),
     ! and obm_north in [forcing] coefs (yelmox_bipolar/params.sh).
     reference = "pd_grl"
     terms     = "regional_north" "ocean"
 /
 
 &term_regional_north
-    ! The regional anomaly dTa_north, the northern box's (atm2obm), uniform.
-    coef    = "dTa_north"
+    ! The regional anomaly dTa_greenland, uniform (the northern box: dTa_north).
+    coef    = "dTa_greenland"
     pattern = "uniform"
     fields  = "tas" "pr"
 /
