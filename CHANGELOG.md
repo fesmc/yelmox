@@ -17,6 +17,11 @@ annotated git tag. Dates are release (tag) dates.
   `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
   every setup and the consistency checks (each must stop with its error), or the setups
   named (`setup+modifier`).
+- yelmox_bipolar forcing tests (`run_tests.sh forcing`): the setups with the ice sheets
+  frozen and `gmt` a ramp (`params.sh` `bip_forcing`, `bip_forcing_setups`), checked by
+  `check_forcing.jl` (the coefficients, each domain's climate, the box model, a restart
+  against its continuous run). `[coef_gmt]` of the par file lists the ramp keys
+  (`f_max`, `df_sign`, `dt_ramp`; constant 0 as before).
 - Docs `yelmox-bipolar.md`: "Coupling setups", the exchanges (diagram), their switches,
   the setups table and the rules behind it.
 

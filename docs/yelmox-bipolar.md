@@ -23,7 +23,14 @@ across both domains plus the OBM.
 - **Coupling setups:** `yelmox_bipolar/params.sh`, one runme `-p` array per
   setup ([below](#coupling-setups)).
 - **Tests:** `yelmox_bipolar/run_tests.sh` runs every setup of `params.sh`
-  (local runs under `tmp/bipolar-tests/`), or those named.
+  (local runs under `tmp/bipolar-tests/`), or those named. `run_tests.sh
+  forcing` runs the forcing tests: the setups of `bip_forcing_setups` with the
+  ice sheets frozen and `gmt` a ramp (`bip_forcing`), each checked by
+  `check_forcing.jl` (Julia, environment `yelmox_bipolar/`): `gmt` and its
+  scaled coefficients in `forcing_ts.nc`, each domain's terms, air
+  temperature, precipitation and ocean in `snap.nc`, the box air temperatures,
+  vapour fluxes and `obm_north/south`; the last setup also restarted at 50
+  years and compared with its continuous run.
 
 ## Coupling setups {#coupling-setups}
 
