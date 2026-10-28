@@ -17,7 +17,7 @@ module kryos_output
     use yelmox_climate, only : climate_file_base, climate_write_init, climate_write_2D, climate_write_1D
     use cmip_output,  only : cmip_write_init, write_step_2D_cmip, write_step_1D_cmip
     use kryos,        only : kryos_domain, MAP_FLDR, remap, cadence_due
-    use kryos_forcing, only : coefs_class, coefs_write_step
+    use kryos_forcing, only : coefs_class, coefs_write_step, coefs_write_attrs
 
     implicit none
     private
@@ -200,8 +200,9 @@ contains
     subroutine run_write_1D(filename, time, coefs, bsl, init)
         ! The run's 1D timeseries (forcing_ts.nc in the run folder): the
         ! forcing owned by the driver and shared by its domains, the
-        ! coefficients ([forcing] coefs, coefs_write_step) and the barystatic
-        ! sea level. init creates the file.
+        ! coefficients ([forcing] coefs, coefs_write_step; their attributes
+        ! with the first record) and the barystatic sea level. init creates
+        ! the file.
         character(len=*),  intent(in) :: filename
         real(dp),          intent(in) :: time
         type(coefs_class), intent(in) :: coefs
@@ -226,6 +227,7 @@ contains
         call io_ts(filename, "bsl", bsl%bsl_now, n, ncid, "m", "Barystatic sea level")
         call coefs_write_step(coefs, filename, ncid, n)
         call nc_close(ncid)
+        if (n == 1) call coefs_write_attrs(coefs, filename)
     end subroutine run_write_1D
 
     subroutine domain_write_cmip(dom, outfldr, ts, init)

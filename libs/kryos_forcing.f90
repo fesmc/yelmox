@@ -74,7 +74,7 @@ module kryos_forcing
     public :: coefs_set, coefs_is_derived, coefs_derived, coefs_varies, coefs_check_used
     public :: coefs_uses_derived, coefs_set_obm
     public :: coefs_kill, coefs_restart_due, coefs_restart_fldr
-    public :: coefs_restart_write, coefs_restart_read, coefs_write_step
+    public :: coefs_restart_write, coefs_restart_read, coefs_write_step, coefs_write_attrs
 
 contains
 
@@ -513,8 +513,7 @@ contains
         ! (the run's forcing_ts.nc): its value <name> (in its units) and, for
         ! tsgen coefficients, the rate <name>_df_dt and, with a response
         ! history (feedback methods, kill switch), the windowed response rate
-        ! <name>_dv_dt. On the first record, the attributes of each value:
-        ! kind, and method (tsgen), coef + factor (scaled) or from (derived).
+        ! <name>_dv_dt. Their attributes: coefs_write_attrs.
         type(coefs_class), intent(in) :: coefs
         character(len=*),  intent(in) :: filename
         integer,           intent(in) :: ncid, n
@@ -525,18 +524,6 @@ contains
             call nc_write(filename, trim(c%name), c%f, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(c%units), &
                           long_name="Coefficient "//trim(c%name))
-            if (n == 1) then
-                call nc_write_attr(filename, ncid, trim(c%name), "kind", trim(c%kind))
-                select case(trim(c%kind))
-                    case("tsgen")
-                        call nc_write_attr(filename, ncid, trim(c%name), "method", trim(c%tsg%par%method))
-                    case("scaled")
-                        call nc_write_attr(filename, ncid, trim(c%name), "coef", trim(c%source))
-                        call nc_write_attr(filename, ncid, trim(c%name), "factor", c%factor)
-                    case("derived")
-                        call nc_write_attr(filename, ncid, trim(c%name), "from", trim(c%drv%from))
-                end select
-            end if
             if (c%kind /= "tsgen") cycle
             call nc_write(filename, trim(c%name)//"_df_dt", c%tsg%df_dt, dim1="time", &
                           start=[n], count=[1], ncid=ncid, units=trim(c%units)//"/yr", &
@@ -549,5 +536,29 @@ contains
             end associate
         end do
     end subroutine coefs_write_step
+
+    subroutine coefs_write_attrs(coefs, filename)
+        ! The attributes of each coefficient's value in a closed 1D file
+        ! written by coefs_write_step: kind, and method (tsgen), coef + factor
+        ! (scaled) or from (derived).
+        type(coefs_class), intent(in) :: coefs
+        character(len=*),  intent(in) :: filename
+        integer :: k
+
+        do k = 1, size(coefs%coef)
+            associate(c => coefs%coef(k))
+            call nc_write_attr(filename, trim(c%name), "kind", trim(c%kind))
+            select case(trim(c%kind))
+                case("tsgen")
+                    call nc_write_attr(filename, trim(c%name), "method", trim(c%tsg%par%method))
+                case("scaled")
+                    call nc_write_attr(filename, trim(c%name), "coef", trim(c%source))
+                    call nc_write_attr(filename, trim(c%name), "factor", c%factor)
+                case("derived")
+                    call nc_write_attr(filename, trim(c%name), "from", trim(c%drv%from))
+            end select
+            end associate
+        end do
+    end subroutine coefs_write_attrs
 
 end module kryos_forcing

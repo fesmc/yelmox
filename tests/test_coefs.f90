@@ -23,7 +23,7 @@ program test_coefs
                               coefs_value, coefs_has, coefs_set, coefs_is_derived, &
                               coefs_derived, coefs_kill, coefs_restart_due, &
                               coefs_restart_write, coefs_restart_read, coefs_write_step, &
-                              coefs_varies, coefs_check_used
+                              coefs_varies, coefs_check_used, coefs_write_attrs
 
     implicit none
 
@@ -133,6 +133,7 @@ program test_coefs
     n = nc_time_index(tmp//"/ts.nc", "time", 150.0_dp, ncid)
     call coefs_write_step(coefs, tmp//"/ts.nc", ncid, n)
     call nc_close(ncid)
+    call coefs_write_attrs(coefs, tmp//"/ts.nc")
     call check(nc_has(tmp//"/ts.nc", "c") .and. nc_has(tmp//"/ts.nc", "dto") .and. &
                nc_has(tmp//"/ts.nc", "s") .and. .not. nc_has(tmp//"/ts.nc", "s_df_dt") .and. &
                nc_has(tmp//"/ts.nc", "c_df_dt") .and. .not. nc_has(tmp//"/ts.nc", "dto_df_dt"), &
