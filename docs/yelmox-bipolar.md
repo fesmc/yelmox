@@ -15,9 +15,8 @@ across both domains plus the OBM.
 - **Program:** `yelmox_bipolar/yelmox_bipolar.f90` + `yelmox_bipolar/obm_coupling.f90` + `libs/kryos*.f90`.
 - **Build:** `make yelmox_bipolar` (links the OBM stack, `$(obm_libs)`).
 - **Config:** `yelmox_bipolar/yelmox_bipolar_Bipolar.nml`: north = Greenland
-  (hub and ice `GRL-16KM`, the other components `GRL-32KM`), south = Antarctica
-  (hub and shelf `ANT-16KM`, the other components `ANT-32KM`, with `relax` and
-  `opt`); `[ctrl]` 0 to 40 yr, `dtt = 10` yr; uncoupled (the box model off).
+  (every component on `GRL-16KM`), south = Antarctica (every component on
+  `ANT-32KM`, with `relax` and `opt`); `[ctrl]` 0 to 40 yr, `dtt = 10` yr; uncoupled (the box model off).
   `[ctrl]`, `[barysealevel]` and the Yelmo physics groups (`ydyn`, `ytopo`, ...)
   are shared (no suffix).
 - **Coupling setups:** `yelmox_bipolar/params.sh`, one runme `-p` array per
@@ -47,9 +46,9 @@ exchanges with the box model can be switched on, each on its own:
 | Exchange | Switched by | What it does |
 |---|---|---|
 | `gmt` → ice sheets | the terms `regional_north`, `regional_south` (in every setup) | the uniform anomaly `dTa_north` (`dTa_south`) on `tas` and `pr` |
-| `gmt` → box model | `[ctrl] atm2obm` | the box air temperatures θ_i = θ_i,init + `dTa_i` (north, tropics, south) and the vapour fluxes from `gmt` (`[obm_forcing]`) |
-| ice sheet → box model | `[ctrl] couple_fwf_north`, `couple_fwf_south` | the freshwater flux of the domain, within its hydrographic mask, into its box (`fn`, `fs`) |
-| box model → ice sheet | the term `obm_north` / `obm_south` of the domain, its coefficient in `[forcing] coefs` | the ocean temperature `to` of the domain = its box temperature at every depth, read by the marine shelf |
+| `gmt` → box model | `[ctrl] atm2obm` | the box air temperatures `tstar_i` = `tstar_i_init` + `dTa_i` (north, tropics, south) and the vapour fluxes from `gmt` (`[obm_forcing]`) |
+| ice sheet → box model | `[ctrl] couple_fwf_north`, `couple_fwf_south` | the freshwater flux of the domain (`dVdt`: the whole domain; `mb`, `ablation`: within its hydrographic mask) into its box (`fn`, `fs`) |
+| box model → ice sheet | the term `obm_north` / `obm_south` of the domain, its coefficient in `[forcing] coefs` | the ocean temperature `to` of the domain = its reference plus the box anomaly (`tn − tn_init`) at every depth, read by the marine shelf |
 
 Every exchange with the box model needs `[ctrl] active_obm = True`. The box
 model does not act on the atmosphere: the surface mass balance of both ice
@@ -64,9 +63,10 @@ The setups, each a `-p` array of `yelmox_bipolar/params.sh` on the par file
 | 2 | Box model alone | `bip_obm_only` | `active_north` = `active_south` = False, `active_obm`, `atm2obm` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south` | – | – |
 | 3 | Box model → both ice sheets | `bip_obm_to_ice` | `active_obm`, `atm2obm` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
 | 4 | Greenland → box model | `bip_gis_to_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `dTo` | `regional_north`, `ocean` | – |
-| 5 | Greenland ↔ box model | `bip_gis_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north` | `regional_north`, `obm_north` | – |
-| 6 | Antarctica ↔ box model | `bip_ais_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_south` | – | `regional_south`, `obm_south` |
-| 7 | Greenland ↔ box model ↔ Antarctica | `bip_full` | `active_obm`, `atm2obm`, `couple_fwf_north`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
+| 5 | Antarctica → box model | `bip_ais_to_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `dTo` | – | `regional_south`, `ocean` |
+| 6 | Greenland ↔ box model | `bip_gis_obm` | `active_south` = False, `active_obm`, `atm2obm`, `couple_fwf_north` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north` | `regional_north`, `obm_north` | – |
+| 7 | Antarctica ↔ box model | `bip_ais_obm` | `active_north` = False, `active_obm`, `atm2obm`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_south` | – | `regional_south`, `obm_south` |
+| 8 | Greenland ↔ box model ↔ Antarctica | `bip_full` | `active_obm`, `atm2obm`, `couple_fwf_north`, `couple_fwf_south` | `gmt`, `dTa_north`, `dTa_tropics`, `dTa_south`, `obm_north`, `obm_south` | `regional_north`, `obm_north` | `regional_south`, `obm_south` |
 
 Other combinations follow from these: e.g. `bip_full` without
 `ctrl.couple_fwf_south=True` is Greenland ↔ box model → Antarctica. Run a
@@ -87,8 +87,8 @@ noted:
   once `obm_north` replaces `ocean`.
   `dTa_*` (scaled from `gmt`) and `obm_north`/`obm_south` (set by the box
   model each step) are library coefficients (`input/forcing_db.nml`).
-- `obm_north` takes the place of `ocean`, never both: `obm_north` replaces `to`
-  (`pattern = "replace"`) and `ocean` would add 0.25 × the air anomaly on top
+- `obm_north` takes the place of `ocean`, never both: `obm_north` sets the
+  ocean anomaly from the box and `ocean` would add 0.25 × the air anomaly on top
   (an error at init: a domain with an ocean term on a box coefficient and one on
   an air-anomaly coefficient). Likewise `obm_south` in the south.
 - A domain takes its ocean from the box of its own hemisphere: the north from
@@ -111,10 +111,13 @@ noted:
 
 Variations on a setup:
 
-- **The box anomaly instead of the box temperature**: the reference ocean plus
-  θ − θ_init of the box (`coef_obm_*.anomaly = True`, `term_obm_*.pattern =
-  "uniform"`), with the modifier `bip_ocean_anomaly` after the setup: `-p
-  "${bip_full[@]}" "${bip_ocean_anomaly[@]}"`.
+- **The box temperature instead of the box anomaly**: the box temperature at
+  every depth in place of the reference ocean (`coef_obm_*.anomaly = False`,
+  `term_obm_*.pattern = "replace"`), with the modifier `bip_ocean_replace`
+  after the setup: `-p "${bip_full[@]}" "${bip_ocean_replace[@]}"`.
+- **A domain amplification other than its box's**: the library coefficients
+  `dTa_greenland`, `dTa_antarctica` (1.5 × `gmt`) on the regional term of the
+  domain (`term_regional_north.coef`), listed in `[forcing] coefs`.
 - **A transient**: `gmt` from a time series, in `[coef_gmt]` of the par file
   (`method = "series"`, `series_file = ...`); see
   [Forcing](yelmox.md#forcing) for the coefficient methods.
@@ -154,9 +157,9 @@ Variations on a setup:
 Climate/SMB per domain is **snapshots + chion** (`[chion_north] model = "itm"`,
 `[chion_south] model = "pdd"`), as in the single-domain driver;
 the OBM's contribution is folded into the ocean forcing — `obm_exchange` sets
-the derived coefficients `obm_north`/`obm_south` (the box temperatures) and re-applies
-each domain's ocean terms (e.g. the `replace` terms `term_obm_north`/`_south`:
-the box temperature into `to_ann`) before the marine-shelf step reads it.
+the derived coefficients `obm_north`/`obm_south` (the box temperature anomalies) and re-applies
+each domain's ocean terms (e.g. the `uniform` terms `term_obm_north`/`_south`:
+the reference plus the box anomaly into `to_ann`) before the marine-shelf step reads it.
 
 ## Stepping order
 
@@ -213,7 +216,7 @@ the bipolar driver adds:
   `forcing_ts.nc`, restarted from the run bundle (`coef_<name>_restart.nc`),
   with the kill switch and `restart_every_df` bundles as in `yelmox`.
 - **`atm2obm`** (`[ctrl]`): the box air temperatures from `[obm_forcing]`,
-  `theta_i = theta_i_init + dT_i` for north, tropics and south (the
+  `tstar_i = tstar_i_init + dT_i` for north, tropics and south (the
   coefficients `coef_north`, `coef_tropics`, `coef_south`: `dTa_north`,
   `dTa_tropics`, `dTa_south`, `gmt` amplified, Zickfeld et al., 2004) and the
   vapour fluxes `phin`, `phit` linear in the global anomaly (`coef`: `gmt`). It
@@ -221,19 +224,20 @@ the bipolar driver adds:
   (checked at init).
 - **Box model → ice sheet** (obm2ism): per domain, a coefficient derived from
   the box (`[coef_obm_north]`, `[coef_obm_south]` of the library: `method =
-  "derived"`, `from = "obm_north"`/`"obm_south"`, the box temperature, or its
-  anomaly to the initial value with `anomaly = True`) with a term on `to`
-  (`[term_obm_north]`/`[term_obm_south]`: `replace`, `to_ann` = the box
-  temperature; `uniform` with the anomaly coefficient for the reference + the
-  box anomaly). On when a term uses such a coefficient. `obm_exchange` sets the
+  "derived"`, `from = "obm_north"`/`"obm_south"`, the box temperature anomaly
+  to its initial value, or the temperature with `anomaly = False`) with a term
+  on `to` (`[term_obm_north]`/`[term_obm_south]`: `uniform`, the reference +
+  the box anomaly; `replace` with the temperature coefficient, `to_ann` = the
+  box temperature). On when a term uses such a coefficient. `obm_exchange` sets the
   coefficients and re-applies the ocean terms after both climate steps. At the
   start the box model is initialized (cold start or restart) and the
   coefficients set before the domains, so their startup climate, shelf and ice
   state already see the box.
 - **Freshwater flux** (`[ctrl] couple_fwf_north`/`couple_fwf_south`): the flux
   of each domain into its box (`fn`, `fs`), from the Yelmo mass balance
-  (`fwf_definition`: `dVdt`, `mb`, `ablation`) within the hydrographic mask
-  (`hydro_mask_north`/`hydro_mask_south`, on the Yelmo grid).
+  (`fwf_definition`: `dVdt` over the whole domain; `mb`, `ablation` within
+  the hydrographic mask `hydro_mask_north`/`hydro_mask_south`, on the Yelmo
+  grid).
 - **Hysteresis** (`nautilus` only): `[nautilus] hyster_on` nudges one box-model
   control (`hyster_forcing`: `phit`, `phin`, `fn`, `fs`, `global_melt`) along
   `hyster_forcing_method` (`triangular`, `sin`, `noise`, `linear`) in

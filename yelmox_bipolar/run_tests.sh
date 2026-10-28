@@ -16,7 +16,7 @@
 #
 #     bash yelmox_bipolar/run_tests.sh                     # every setup and check
 #     bash yelmox_bipolar/run_tests.sh bip_full bip_gis_obm
-#     bash yelmox_bipolar/run_tests.sh bip_full+bip_ocean_anomaly   # a setup + a modifier
+#     bash yelmox_bipolar/run_tests.sh bip_full+bip_ocean_replace   # a setup + a modifier
 #     bash yelmox_bipolar/run_tests.sh forcing             # the forcing tests
 #
 # Prerequisites:
@@ -54,7 +54,7 @@ setups=("$@")
 run_checks=0
 run_forcing=0
 if [ ${#setups[@]} -eq 0 ]; then
-    setups=("${bip_setups[@]}" "bip_full+bip_ocean_anomaly")
+    setups=("${bip_setups[@]}" "bip_full+bip_ocean_replace")
     run_checks=1
 elif [ "${setups[0]}" = "forcing" ]; then
     setups=("${bip_forcing_setups[@]}")

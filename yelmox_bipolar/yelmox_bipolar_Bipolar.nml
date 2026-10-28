@@ -38,7 +38,7 @@
     ! Ice sheet -> OBM (freshwater flux)
     couple_fwf_north = False            ! North domain freshwater flux -> northern box (obm%fn)?
     couple_fwf_south = False            ! South domain freshwater flux -> southern box (obm%fs)?
-    fwf_definition   = "dVdt"           ! "dVdt", "mb", "ablation"
+    fwf_definition   = "dVdt"           ! "dVdt" (whole domain), "mb", "ablation" (hydrographic mask)
     hydro_mask_north = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"   ! {domain}, {grid_name}: the domain's name and grid_ice
     hydro_mask_south = "ice_data/{domain}/{grid_name}/{grid_name}_HYDRO-BASINS_zickfeld2004.nc"
 

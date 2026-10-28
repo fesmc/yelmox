@@ -13,8 +13,9 @@ annotated git tag. Dates are release (tag) dates.
   `tsgen | scaled | derived`). `tests/test_coefs.f90` covers them.
 - `yelmox_bipolar/params.sh`: the coupling setups of yelmox_bipolar as runme `-p` arrays
   (uncoupled, box model alone, box model -> both ice sheets, Greenland -> box model,
-  Greenland <-> box model, Antarctica <-> box model, fully coupled) and the modifier
-  `bip_ocean_anomaly` (the reference ocean plus the box anomaly). `run_tests.sh` runs
+  Antarctica -> box model, Greenland <-> box model, Antarctica <-> box model, fully
+  coupled) and the modifier `bip_ocean_replace` (the box temperature in place of the
+  reference ocean). `run_tests.sh` runs
   every setup and the consistency checks (each must stop with its error), or the setups
   named (`setup+modifier`).
 - yelmox_bipolar forcing tests (`run_tests.sh forcing`): the setups with the ice sheets
@@ -32,6 +33,19 @@ annotated git tag. Dates are release (tag) dates.
   `coef_gmt`), with `kind` and the source (`method`, `coef` + `factor`, `from`) as
   attributes. `yelmo_ts.nc` no longer holds them. `time` and `bsl` are not coefficient
   names (checked at init).
+- yelmox_bipolar box model (nautilus): the box air temperatures `theta*` renamed
+  `tstar*` (`[nautilus] tstar{n,t,s}_init`, the output and restart variables); the
+  salinity equations with the mean salinity of the boxes as reference and the external
+  freshwater fluxes on the box salinity, unbounded; the thermal coupling constants held
+  at their `*_init` values (`calc_all_lambda` off). Restarts of earlier runs do not load.
+- yelmox_bipolar: the ocean from the box model is the reference plus the box anomaly by
+  default (`coef_obm_north/_south anomaly = True`, `term_obm_north/_south pattern =
+  "uniform"`; was the box temperature at every depth, now the modifier
+  `bip_ocean_replace`); the freshwater flux `fwf_definition = "dVdt"` sums the whole
+  domain (`mb`, `ablation` the hydrographic mask). Par file grids: Greenland every
+  component on `GRL-16KM`, Antarctica on `ANT-32KM`. Library coefficients
+  `dTa_greenland`, `dTa_antarctica` (1.5 x `gmt`), for a domain amplification other than
+  its box's.
 - yelmox_bipolar: `[ctrl] tstep_method = "rel"` by default (was `"const"`, which held the
   forcing time at `tstep_const`, so a time-dependent coefficient such as a `gmt` ramp or
   series never moved). No change in answers with the constant `gmt` of the par file.

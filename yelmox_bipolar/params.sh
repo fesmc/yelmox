@@ -15,7 +15,7 @@
 #                      domain into its box (needs the hydrographic masks
 #                      [ctrl] hydro_mask_north/south)
 #   OBM -> ice sheet   the term obm_north/obm_south of a domain: its ocean
-#                      temperature from its box, in place of the term ocean;
+#                      anomaly from its box, in place of the term ocean;
 #                      the coefficient of the same name in [forcing] coefs
 # The OBM does not act on the atmosphere of the domains: gmt alone drives it.
 # [forcing] coefs lists exactly the coefficients the run reads (checked at
@@ -52,19 +52,21 @@ bip_gis_to_obm=(
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_north=True"
     "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo"
-    "forcing_north.terms==regional_north,ocean" # spm
+    "forcing_north.terms==regional_north,ocean"
 )
 
+# 5. Antarctica -> OBM (one-way): the freshwater flux of Antarctica into the
+# southern box; the ocean of Antarctica from its air (term ocean).
 bip_ais_to_obm=(
     "ctrl.active_north=False"
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_south=True"
     "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo"
-    "forcing_south.terms==regional_south,ocean" # spm
+    "forcing_south.terms==regional_south,ocean"
 )
 
-# 5. Greenland <-> OBM.
+# 6. Greenland <-> OBM.
 bip_gis_obm=(
     "ctrl.active_south=False"
     "ctrl.active_obm=True"
@@ -74,7 +76,7 @@ bip_gis_obm=(
     "forcing_north.terms==regional_north,obm_north"
 )
 
-# 6. Antarctica <-> OBM.
+# 7. Antarctica <-> OBM.
 bip_ais_obm=(
     "ctrl.active_north=False"
     "ctrl.active_obm=True"
@@ -84,7 +86,7 @@ bip_ais_obm=(
     "forcing_south.terms==regional_south,obm_south"
 )
 
-# 7. Greenland <-> OBM <-> Antarctica (fully coupled).
+# 8. Greenland <-> OBM <-> Antarctica (fully coupled).
 bip_full=(
     "ctrl.active_obm=True"
     "ctrl.atm2obm=True"
@@ -95,14 +97,14 @@ bip_full=(
     "forcing_south.terms==regional_south,obm_south"
 )
 
-# Modifier, after a setup with obm_north/obm_south: the ocean as the reference
-# plus the box anomaly (tstar - tstar_init), instead of the box temperature at
-# every depth. E.g. -p "${bip_full[@]}" "${bip_ocean_anomaly[@]}".
-bip_ocean_anomaly=(
-    "coef_obm_north.anomaly=True"
-    "term_obm_north.pattern=uniform"
-    "coef_obm_south.anomaly=True"
-    "term_obm_south.pattern=uniform"
+# Modifier, after a setup with obm_north/obm_south: the ocean the box
+# temperature at every depth, instead of the reference plus the box anomaly
+# (tn - tn_init). E.g. -p "${bip_full[@]}" "${bip_ocean_replace[@]}".
+bip_ocean_replace=(
+    "coef_obm_north.anomaly=False"
+    "term_obm_north.pattern=replace"
+    "coef_obm_south.anomaly=False"
+    "term_obm_south.pattern=replace"
 )
 
 # The setups run by run_tests.sh, in order.
@@ -111,6 +113,7 @@ bip_setups=(
     bip_obm_only
     bip_obm_to_ice
     bip_gis_to_obm
+    bip_ais_to_obm
     bip_gis_obm
     bip_ais_obm
     bip_full
@@ -150,7 +153,7 @@ bip_forcing_setups=(
     bip_obm_only+bip_forcing
     bip_gis_obm+bip_forcing
     bip_ais_obm+bip_forcing
-    bip_obm_to_ice+bip_ocean_anomaly+bip_forcing
+    bip_obm_to_ice+bip_ocean_replace+bip_forcing
     bip_full+bip_forcing
     bip_obm_to_ice+bip_forcing
 )

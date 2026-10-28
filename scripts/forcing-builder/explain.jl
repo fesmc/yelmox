@@ -93,7 +93,7 @@ end
 function derived_text(name, p)
     from = string(get(p, "from", ""))
     from == "air_anomaly" && return @sprintf("%s = %s x mean over \"%s\" of (T^sl_ann - T^sl_ann,ref) of the climate update", name, fnum(p["factor"]), string(p["region"]))
-    from in ("obm_north", "obm_south") && return "$name = " * (get(p, "anomaly", true) == true ? "theta - theta_init" : "theta") * " of the $(from[5:end]) box of the ocean box model (yelmox_bipolar)"
+    from in ("obm_north", "obm_south") && return "$name = " * (get(p, "anomaly", true) == true ? "tstar - tstar_init" : "tstar") * " of the $(from[5:end]) box of the ocean box model (yelmox_bipolar)"
     return "$name: from = \"$from\" (unknown)"
 end
 

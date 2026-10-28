@@ -13,9 +13,9 @@ contains
 function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx,dy,mask,hemisphere, fwf_def) result(fwf)
     ! Freshwater flux [Sv] from an ice sheet into the ocean box model, from
     ! the Yelmo mass balance (applied fields, m ice/yr) summed over the
-    ! hydrographic mask (mask == 1: cells draining into the box). Positive
-    ! for a mass loss of the ice sheet. Definitions (fwf_def):
-    !   "dVdt"     : -dV/dt, the change in ice volume (dHidt)
+    ! hydrographic mask (mask == 1: cells draining into the box), except dVdt.
+    ! Positive for a mass loss of the ice sheet. Definitions (fwf_def):
+    !   "dVdt"     : -dV/dt, the change in ice volume of the whole domain (dHidt)
     !   "mb"       : -net mass balance applied (mb_net)
     !   "ablation" : -the negative parts of smb, bmb and cmb (ablation only)
     ! Every definition converts ice volume to water volume (rho_ice/rho_water).
@@ -48,7 +48,7 @@ function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx
 
     mask_basin = (mask .eq. 1.0_wp)
 
-    ! Ice volume change rate within the basin [m3 ice/yr] (negative: loss)
+    ! Ice volume change rate [m3 ice/yr] (negative: loss)
     select case(trim(fwf_def))
         case("dVdt")
             dV_ice = sum(dHidt)*dx*dy

@@ -137,8 +137,9 @@
 /
 
 &coef_dTa_greenland
-    ! yelmox_bipolar: the air temperature anomaly of the Greenland domain [K], the global
-    ! mean gmt amplified (Zickfeld et al., 2004): 
+    ! yelmox_bipolar: the air temperature anomaly of the Greenland domain [K],
+    ! the global mean gmt amplified, for a domain amplification other than
+    ! its box's (dTa_north): its regional term on this coefficient.
     method = "scaled"
     coef   = "gmt"
     factor = 1.5
@@ -146,8 +147,8 @@
 /
 
 &coef_dTa_antarctica
-    ! yelmox_bipolar: the air temperature anomaly of the Antarctica domain [K], the global
-    ! mean gmt amplified (Zickfeld et al., 2004): 
+    ! yelmox_bipolar: the air temperature anomaly of the Antarctica domain [K],
+    ! as coef_dTa_greenland (its box's: dTa_south).
     method = "scaled"
     coef   = "gmt"
     factor = 1.5
@@ -185,17 +186,17 @@
 /
 
 &coef_obm_north
-    ! yelmox_bipolar: the northern box temperature of the ocean box model [K]
-    ! (derived, set by the bridge after the box model), the ocean of the
-    ! northern domain with term_obm_north.
+    ! yelmox_bipolar: the northern box temperature anomaly of the ocean box
+    ! model to its initial value [K] (derived, set by the bridge after the box
+    ! model), the ocean of the northern domain with term_obm_north.
     method  = "derived"
     from    = "obm_north"
-    anomaly = True     ! the temperature itself (True: minus its initial value)
+    anomaly = True     ! minus its initial value (False: the temperature itself)
     units   = "K"
 /
 
 &coef_obm_south
-    ! yelmox_bipolar: the southern box temperature [K] (term_obm_south).
+    ! yelmox_bipolar: the southern box temperature anomaly [K] (term_obm_south).
     method  = "derived"
     from    = "obm_south"
     anomaly = True
@@ -258,10 +259,10 @@
 /
 
 &term_obm_north
-    ! yelmox_bipolar: the ocean temperature profiles replaced by the northern
-    ! box temperature at every depth (coef_obm_north); with anomaly = True
-    ! in the coefficient and pattern = "uniform" here, the reference plus the
-    ! box anomaly instead.
+    ! yelmox_bipolar: the reference ocean temperature profiles plus the
+    ! northern box anomaly at every depth (coef_obm_north); with anomaly =
+    ! False in the coefficient and pattern = "replace" here, the box
+    ! temperature at every depth instead.
     coef    = "obm_north"
     pattern = "uniform"
     fields  = "to"

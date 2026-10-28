@@ -184,7 +184,7 @@
 ! ===== Ocean box model forcing (yelmox_bipolar) =====
 
 &obm_forcing
-    ! [ctrl] atm2obm: the box air temperatures theta_i = theta_i_init + dT_i
+    ! [ctrl] atm2obm: the box air temperatures tstar_i = tstar_i_init + dT_i
     ! (north, tropics, south) and the vapour fluxes, from coefficients
     ! ([forcing] coefs) [K].
     coef_north   = ""   ! dT_north, the northern box (e.g. dTa_north, scaled from gmt)

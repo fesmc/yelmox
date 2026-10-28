@@ -13,7 +13,7 @@
 #    terms), to_ann by the uniform to terms, or is the replace term's value;
 #    a derived air_anomaly coefficient moves by factor x the mean tsl_ann
 #    anomaly;
-# 4. the box model (<obm_name>.nc, atm2obm): theta_i = theta_i_init + its
+# 4. the box model (<obm_name>.nc, atm2obm): tstar_i = tstar_i_init + its
 #    coefficient, phin/phit linear in the global coefficient; obm_north/
 #    obm_south are the box temperature in K (minus its initial value with
 #    anomaly = True);
@@ -209,8 +209,8 @@ function check_obm(P, run, ts)
     if par(P, "ctrl", "atm2obm", false) == true
         for (box, key) in (("n", "coef_north"), ("t", "coef_tropics"), ("s", "coef_south"))
             c = par(P, "obm_forcing", key)
-            d = maxabs(readvar(ob, "theta$box") .- (np("theta$(box)_init") .+ coef(c)))
-            check(d < 1e-5, @sprintf("theta%s = theta%s_init + %s (max |diff| %.1e K)", box, box, c, d))
+            d = maxabs(readvar(ob, "tstar$box") .- (np("tstar$(box)_init") .+ coef(c)))
+            check(d < 1e-5, @sprintf("tstar%s = tstar%s_init + %s (max |diff| %.1e K)", box, box, c, d))
         end
         g = coef(par(P, "obm_forcing", "coef"))
         d = maxabs(readvar(ob, "phin") .- (np("phin_init") .+ np("nh_hydro_sensitivity") * np("nh_temp_constant") .* g))

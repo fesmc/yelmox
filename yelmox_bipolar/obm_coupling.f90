@@ -355,7 +355,8 @@ contains
 
     subroutine coupling_ism2obm(dom, obm, mask, hemisphere, fwf_def)
         ! Ice sheet -> OBM: freshwater flux from the domain's ice mass balance
-        ! (calc_fwf, on the Yelmo grid, restricted by the hydrographic mask) into
+        ! (calc_fwf, on the Yelmo grid, restricted by the hydrographic mask but
+        ! for dVdt) into
         ! the box model's northern (fn) or southern (fs) input flux.
         type(kryos_domain),    intent(in)    :: dom
         type(obm_class),       intent(inout) :: obm
