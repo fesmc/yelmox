@@ -34,6 +34,7 @@
 
     ! Atmosphere -> OBM
     atm2obm          = False            ! dTa_north/tropics/south, gmt ([obm_forcing]) -> OBM box air temperatures and vapour fluxes?
+    tau_star_south   = 0.0              ! [yr] atm2obm: relaxation time of the southern box air temperature tstars to its forcing (0: none)
 
     ! Ice sheet -> OBM (freshwater flux)
     couple_fwf_north = False            ! North domain freshwater flux -> northern box (obm%fn)?
@@ -945,6 +946,7 @@
     ! Conditions of this simulation: cold-start ice state (init_*),
     ! relaxation, optimization, regional modifications.
     init_method             = "none"    ! cold start: none, equil, recon (from recon_path), recon_ref (recon_path as reference ice only)
+    init_equil_time         = 10.0      ! [yr] equil: equilibration time
     init_marine_H           = False     ! LGM-like marine ice at cold start (before init_method)
     init_kill_shelves       = False     ! cold start: no ice where the present-day bed is ocean
     init_time_thrm          = 0.0       ! [yr] cold start: then equilibrate with topography fixed

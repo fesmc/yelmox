@@ -109,6 +109,12 @@ bip_ocean_replace=(
     "term_obm_south.pattern=replace"
 )
 
+# Modifier, after a setup with atm2obm: the southern box air temperature lags
+# its forcing, relaxing to it over tau_star_south [yr].
+bip_lag_south=(
+    "ctrl.tau_star_south=50"
+)
+
 # The setups run by run_tests.sh, in order.
 bip_setups=(
     bip_uncoupled
@@ -158,4 +164,5 @@ bip_forcing_setups=(
     bip_obm_to_ice+bip_ocean_replace+bip_forcing
     bip_full+bip_forcing
     bip_obm_to_ice+bip_forcing
+    bip_full+bip_lag_south+bip_forcing
 )

@@ -14,7 +14,7 @@
 #    a derived air_anomaly coefficient moves by factor x the mean tsl_ann
 #    anomaly;
 # 4. the box model (<obm_name>.nc, atm2obm): tstar_i = tstar_i_init + its
-#    coefficient, phin/phit linear in the global coefficient; obm_north/
+#    coefficient (tstars relaxing to it with tau_star_south > 0), phin/phit linear in the global coefficient; obm_north/
 #    obm_south are the box temperature in K (minus its initial value with
 #    anomaly = True);
 # 5. with a reference run (a restart of it): every value equal at the common
@@ -207,10 +207,23 @@ function check_obm(P, run, ts)
     np(key) = Float64(par(P, obm_name, key))
 
     if par(P, "ctrl", "atm2obm", false) == true
+        tau = Float64(par(P, "ctrl", "tau_star_south", 0.0))
         for (box, key) in (("n", "coef_north"), ("t", "coef_tropics"), ("s", "coef_south"))
             c = par(P, "obm_forcing", key)
-            d = maxabs(readvar(ob, "tstar$box") .- (np("tstar$(box)_init") .+ coef(c)))
-            check(d < 1e-5, @sprintf("tstar%s = tstar%s_init + %s (max |diff| %.1e K)", box, box, c, d))
+            target = np("tstar$(box)_init") .+ coef(c)
+            if box == "s" && tau > 0
+                # The lag: one explicit relaxation step of dtt per record, so
+                # checked between consecutive records one step apart.
+                dtt = Float64(par(P, "ctrl", "dtt"))
+                T = readvar(ob, "tstars")
+                ks = [k for k in 2:length(t) if isapprox(t[k] - t[k-1], dtt)]
+                isempty(ks) && return check(false, "consecutive box-model records one step (dtt) apart")
+                d = maximum(abs(T[k] - (T[k-1] + (target[k] - T[k-1]) * dtt / tau)) for k in ks)
+                check(d < 1e-5, @sprintf("tstars relaxes to tstars_init + %s over tau_star_south = %g yr (max |diff| %.1e K)", c, tau, d))
+            else
+                d = maxabs(readvar(ob, "tstar$box") .- target)
+                check(d < 1e-5, @sprintf("tstar%s = tstar%s_init + %s (max |diff| %.1e K)", box, box, c, d))
+            end
         end
         g = coef(par(P, "obm_forcing", "coef"))
         d = maxabs(readvar(ob, "phin") .- (np("phin_init") .+ np("nh_hydro_sensitivity") * np("nh_temp_constant") .* g))

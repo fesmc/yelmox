@@ -51,11 +51,13 @@ module obm_coupling
         ! obm2ism: a coefficient derived from a box).
         logical :: active_obm = .false.
         logical :: atm2obm    = .false.
-        real(wp):: tau_star_south = 0.0
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
         ! atm2obm: the coefficients of [obm_forcing], the air temperature
-        ! anomaly of each box and the global one (the vapour fluxes) [K].
+        ! anomaly of each box and the global one (the vapour fluxes) [K], and
+        ! the relaxation time of the southern box air temperature [yr] (0:
+        ! none, it follows its coefficient at once).
         character(len=64)  :: coef_north = "", coef_tropics = "", coef_south = "", coef_global = ""
+        real(wp)           :: tau_star_south = 0.0_wp
         ! ism2obm: the freshwater flux of each hemisphere into its box, its
         ! definition and the hydrographic masks.
         logical            :: couple_fwf_north = .false.
@@ -93,7 +95,6 @@ contains
 
         call nml_read(path_par, "ctrl", "active_obm",       oc%active_obm)
         call nml_read(path_par, "ctrl", "atm2obm",          oc%atm2obm)
-        call nml_read(path_par, "ctrl", "tau_star_south",   oc%tau_star_south)
         call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
         call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
         call nml_read(path_par, "ctrl", "obm_name",         oc%obm_name)
@@ -104,6 +105,11 @@ contains
             call nml_read(path_par, "obm_forcing", "coef_tropics", oc%coef_tropics, defaults_file=def_file)
             call nml_read(path_par, "obm_forcing", "coef_south",   oc%coef_south,   defaults_file=def_file)
             call nml_read(path_par, "obm_forcing", "coef",         oc%coef_global,  defaults_file=def_file)
+            call nml_read(path_par, "ctrl", "tau_star_south", oc%tau_star_south)
+            if (oc%tau_star_south < 0.0_wp) then
+                write(*,*) "obm_ctl_load:: error: [ctrl] tau_star_south must be >= 0; got ", oc%tau_star_south
+                error stop 1
+            end if
         end if
 
         if (oc%couple_fwf_north .or. oc%couple_fwf_south) then
@@ -345,22 +351,20 @@ contains
         ! dTa_south), tstar_i = tstar_i_init + dT_i, and the vapor fluxes, phin
         ! (tropics -> north) and phit (south -> tropics), linear in the global
         ! mean air temperature anomaly dT_glob by the hydrological sensitivities.
-        type(obm_class), intent(inout) :: obm
-        type(obm_coupling_ctl), intent(in) :: ctl
-        real(wp),        intent(in)    :: dT_north, dT_tropics, dT_south, dT_glob
-        real(dp),       intent(in) :: dt
-
-        ! local variables
-        real(wp) :: dtstarsdt
+        ! With [ctrl] tau_star_south > 0 the southern box lags: tstars relaxes
+        ! towards tstars_init + dT_south with that time scale (explicit step dt).
+        type(obm_class),        intent(inout) :: obm
+        type(obm_coupling_ctl), intent(in)    :: ctl
+        real(dp),               intent(in)    :: dt
+        real(wp),               intent(in)    :: dT_north, dT_tropics, dT_south, dT_glob
 
         obm%tstarn = obm%par%tstarn_init + dT_north
         obm%tstart = obm%par%tstart_init + dT_tropics
 
-        if (ctl%tau_star_south == 0.0) then
+        if (ctl%tau_star_south == 0.0_wp) then
             obm%tstars = obm%par%tstars_init + dT_south
-        else ! apply a lag in the southern atlantic ocean
-            dtstarsdt = (obm%par%tstars_init + dT_south - obm%tstars)/ctl%tau_star_south
-            obm%tstars = obm%tstars + dtstarsdt*dt
+        else
+            obm%tstars = obm%tstars + (obm%par%tstars_init + dT_south - obm%tstars)/ctl%tau_star_south*dt
         end if
 
         obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob

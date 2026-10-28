@@ -44,6 +44,10 @@ annotated git tag. Dates are release (tag) dates.
   `bip_ocean_replace`); the freshwater flux `fwf_definition = "dVdt"` sums the whole
   domain (`mb`, `ablation` the hydrographic mask). Par file grids: Greenland every
   component on `GRL-16KM`, Antarctica on `ANT-32KM`.
+- yelmox_bipolar: `[ctrl] tau_star_south` [yr] (`atm2obm`): the southern box air
+  temperature relaxes to its forcing on that time scale (0, the default: no lag); the
+  modifier `bip_lag_south` in `params.sh`, a forcing test with it (checked, and the
+  restart test). `[sim_north] init_equil_time` in the par file.
 - yelmox_bipolar: the ice sheets take their own amplification of `gmt`, the library
   coefficients `dTa_greenland`, `dTa_antarctica` (1.5 x `gmt`) in `term_regional_north`/
   `_south`; the boxes keep `dTa_north`, `dTa_tropics`, `dTa_south` (Zickfeld et al., 2004).

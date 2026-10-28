@@ -119,6 +119,9 @@ Variations on a setup:
 - **A domain with its box's amplification**: `term_regional_north.coef =
   dTa_north` (`term_regional_south.coef = dTa_south`), with `[forcing] coefs`
   to match.
+- **A lagged southern box**: `[ctrl] tau_star_south` > 0 (with `atm2obm`),
+  e.g. the modifier `bip_lag_south` (50 yr): `-p "${bip_full[@]}"
+  "${bip_lag_south[@]}"`.
 - **A transient**: `gmt` from a time series, in `[coef_gmt]` of the par file
   (`method = "series"`, `series_file = ...`); see
   [Forcing](yelmox.md#forcing) for the coefficient methods.
@@ -220,8 +223,11 @@ the bipolar driver adds:
   `tstar_i = tstar_i_init + dT_i` for north, tropics and south (the
   coefficients `coef_north`, `coef_tropics`, `coef_south`: `dTa_north`,
   `dTa_tropics`, `dTa_south`, `gmt` amplified, Zickfeld et al., 2004) and the
-  vapour fluxes `phin`, `phit` linear in the global anomaly (`coef`: `gmt`). It
-  needs no ice-sheet domain; the coefficients must be in the registry
+  vapour fluxes `phin`, `phit` linear in the global anomaly (`coef`: `gmt`).
+  With `[ctrl] tau_star_south` > 0 [yr] the southern box lags: `tstars`
+  relaxes towards `tstars_init + dT_south` on that time scale (an explicit
+  step of `dtt`, so `tau_star_south` well above `dtt`); 0 (the par file): no
+  lag. It needs no ice-sheet domain; the coefficients must be in the registry
   (checked at init).
 - **Box model → ice sheet** (obm2ism): per domain, a coefficient derived from
   the box (`[coef_obm_north]`, `[coef_obm_south]` of the library: `method =
