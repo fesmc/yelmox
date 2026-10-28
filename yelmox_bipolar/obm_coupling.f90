@@ -51,6 +51,7 @@ module obm_coupling
         ! obm2ism: a coefficient derived from a box).
         logical :: active_obm = .false.
         logical :: atm2obm    = .false.
+        real(wp):: tau_star_south = 0.0
         character(len=512) :: obm_name = "none"   ! OBM parameter block ("nautilus")
         ! atm2obm: the coefficients of [obm_forcing], the air temperature
         ! anomaly of each box and the global one (the vapour fluxes) [K].
@@ -92,6 +93,7 @@ contains
 
         call nml_read(path_par, "ctrl", "active_obm",       oc%active_obm)
         call nml_read(path_par, "ctrl", "atm2obm",          oc%atm2obm)
+        call nml_read(path_par, "ctrl", "tau_star_south",   oc%tau_star_south)
         call nml_read(path_par, "ctrl", "couple_fwf_north", oc%couple_fwf_north)
         call nml_read(path_par, "ctrl", "couple_fwf_south", oc%couple_fwf_south)
         call nml_read(path_par, "ctrl", "obm_name",         oc%obm_name)
@@ -316,7 +318,7 @@ contains
         real(dp),               intent(in)    :: time, time_init, dtt
 
         if (oc%atm2obm) &
-            call coupling_atm2obm(obm, coefs_value(coefs, oc%coef_north), coefs_value(coefs, oc%coef_tropics), &
+            call coupling_atm2obm(obm, oc, dtt, coefs_value(coefs, oc%coef_north), coefs_value(coefs, oc%coef_tropics), &
                                   coefs_value(coefs, oc%coef_south), coefs_value(coefs, oc%coef_global))
 
         if (oc%couple_fwf_north) &
@@ -336,7 +338,7 @@ contains
         if (active_south) call climate_apply_ocean(dom_south%cl, dom_south%clim, coefs)
     end subroutine obm_exchange
 
-    subroutine coupling_atm2obm(obm, dT_north, dT_tropics, dT_south, dT_glob)
+    subroutine coupling_atm2obm(obm, ctl, dt, dT_north, dT_tropics, dT_south, dT_glob)
         ! Atmosphere -> OBM: the box-model air temperatures of every box from
         ! its air temperature anomaly [K] (e.g. the global one amplified,
         ! Zickfeld et al., 2004: the scaled coefficients dTa_north, dTa_tropics,
@@ -344,11 +346,23 @@ contains
         ! (tropics -> north) and phit (south -> tropics), linear in the global
         ! mean air temperature anomaly dT_glob by the hydrological sensitivities.
         type(obm_class), intent(inout) :: obm
+        type(obm_coupling_ctl), intent(in) :: ctl
         real(wp),        intent(in)    :: dT_north, dT_tropics, dT_south, dT_glob
+        real(dp),       intent(in) :: dt
+
+        ! local variables
+        real(wp) :: dtstarsdt
 
         obm%tstarn = obm%par%tstarn_init + dT_north
         obm%tstart = obm%par%tstart_init + dT_tropics
-        obm%tstars = obm%par%tstars_init + dT_south
+
+        if (ctl%tau_star_south == 0.0) then
+            obm%tstars = obm%par%tstars_init + dT_south
+        else ! apply a lag in the southern atlantic ocean
+            dtstarsdt = (obm%par%tstars_init + dT_south - obm%tstars)/ctl%tau_star_south
+            obm%tstars = obm%tstars + dtstarsdt*dt
+        end if
+
         obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob
         obm%phit   = obm%par%phit_init   + obm%par%hs*obm%par%psh*dT_glob
     end subroutine coupling_atm2obm
