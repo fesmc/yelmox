@@ -3,8 +3,7 @@
 # run_tests.sh of this folder, which runs each of them. Use:
 #
 #     source yelmox_bipolar/params.sh
-#     runme -rs -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml \
-#         -o output/bip-full -p "${bip_full[@]}"
+#     runme -rs -e bipolar -n yelmox_bipolar/yelmox_bipolar_Bipolar.nml -o output/bip-full -p "${bip_full[@]}"
 #
 # The par file itself is the uncoupled setup. One coefficient, gmt, drives
 # everything through its regional amplifications, the scaled coefficients
@@ -53,6 +52,16 @@ bip_gis_to_obm=(
     "ctrl.atm2obm=True"
     "ctrl.couple_fwf_north=True"
     "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo"
+    "forcing_north.terms==regional_north,ocean" # spm
+)
+
+bip_ais_to_obm=(
+    "ctrl.active_north=False"
+    "ctrl.active_obm=True"
+    "ctrl.atm2obm=True"
+    "ctrl.couple_fwf_south=True"
+    "forcing.coefs==gmt,dTa_north,dTa_tropics,dTa_south,dTo"
+    "forcing_south.terms==regional_south,ocean" # spm
 )
 
 # 5. Greenland <-> OBM.
@@ -87,7 +96,7 @@ bip_full=(
 )
 
 # Modifier, after a setup with obm_north/obm_south: the ocean as the reference
-# plus the box anomaly (theta - theta_init), instead of the box temperature at
+# plus the box anomaly (tstar - tstar_init), instead of the box temperature at
 # every depth. E.g. -p "${bip_full[@]}" "${bip_ocean_anomaly[@]}".
 bip_ocean_anomaly=(
     "coef_obm_north.anomaly=True"

@@ -14,7 +14,7 @@ program yelmox_bipolar
     ! ocean box model alone, active_obm); a bipolar
     ! run is never more than these two domains, so they are held as two explicit
     ! kryos_domain variables (not an array) -- the inter-domain ocean coupling is
-    ! asymmetric (north <-> obm%fn/thetan/tn, south <-> obm%fs/thetas/ts).
+    ! asymmetric (north <-> obm%fn/tstarn/tn, south <-> obm%fs/tstars/ts).
     !
     ! Per-step coupling order: shared sea level and coefficients ([forcing] coefs,
     ! read by the climate of both domains and the OBM forcing), then per domain
@@ -215,6 +215,7 @@ program yelmox_bipolar
         fvar = 0.0_wp
         if (active_north) fvar = fvar + dom_north%yelmo%reg%V_ice * dom_north%yelmo%bnd%c%rho_ice * 1e-3_wp
         if (active_south) fvar = fvar + dom_south%yelmo%reg%V_ice * dom_south%yelmo%bnd%c%rho_ice * 1e-3_wp
+
         call coefs_update(coefs, ts%time_rel, var=fvar)
         call timer_step(tmr, tt_forcing)
 

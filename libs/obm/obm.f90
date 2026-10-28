@@ -140,11 +140,11 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"phit",obm_object%phit, units="Sv",long_name="Freshwater transport from southern to tropical box", &
                 dim1="time",start=[n],ncid=ncid) 
-        call nc_write(filename,"thetan",obm_object%thetan,units="degC",long_name="North Atlantic box air temperature", &
+        call nc_write(filename,"tstarn",obm_object%tstarn,units="degC",long_name="North Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"thetat",obm_object%thetat,units="degC",long_name="Tropical Atlantic box air temperature", &
+        call nc_write(filename,"tstart",obm_object%tstart,units="degC",long_name="Tropical Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid) 
-        call nc_write(filename,"thetas",obm_object%thetas,units="degC",long_name="South Atlantic box air temperature", &
+        call nc_write(filename,"tstars",obm_object%tstars,units="degC",long_name="South Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid) 
 
         ! Close the netcdf file
@@ -231,11 +231,11 @@ contains
                 dim1="time",start=[n],ncid=ncid)
         call nc_write(filename,"phit",obm_object%phit,units="Sv",long_name="Freshwater transport from southern to tropical box", &
                 dim1="time",start=[n],ncid=ncid) 
-        call nc_write(filename,"thetan",obm_object%thetan,units="degC",long_name="North Atlantic box air temperature", &
+        call nc_write(filename,"tstarn",obm_object%tstarn,units="degC",long_name="North Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"thetat",obm_object%thetat,units="degC",long_name="Tropical Atlantic box air temperature", &
+        call nc_write(filename,"tstart",obm_object%tstart,units="degC",long_name="Tropical Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
-        call nc_write(filename,"thetas",obm_object%thetas,units="degC",long_name="South Atlantic box air temperature", &
+        call nc_write(filename,"tstars",obm_object%tstars,units="degC",long_name="South Atlantic box air temperature", &
                 dim1="time",start=[n],ncid=ncid)
                 
         ! Close the netcdf file

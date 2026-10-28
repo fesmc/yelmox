@@ -340,15 +340,15 @@ contains
         ! Atmosphere -> OBM: the box-model air temperatures of every box from
         ! its air temperature anomaly [K] (e.g. the global one amplified,
         ! Zickfeld et al., 2004: the scaled coefficients dTa_north, dTa_tropics,
-        ! dTa_south), theta_i = theta_i_init + dT_i, and the vapor fluxes, phin
+        ! dTa_south), tstar_i = tstar_i_init + dT_i, and the vapor fluxes, phin
         ! (tropics -> north) and phit (south -> tropics), linear in the global
         ! mean air temperature anomaly dT_glob by the hydrological sensitivities.
         type(obm_class), intent(inout) :: obm
         real(wp),        intent(in)    :: dT_north, dT_tropics, dT_south, dT_glob
 
-        obm%thetan = obm%par%thetan_init + dT_north
-        obm%thetat = obm%par%thetat_init + dT_tropics
-        obm%thetas = obm%par%thetas_init + dT_south
+        obm%tstarn = obm%par%tstarn_init + dT_north
+        obm%tstart = obm%par%tstart_init + dT_tropics
+        obm%tstars = obm%par%tstars_init + dT_south
         obm%phin   = obm%par%phin_init   + obm%par%hn*obm%par%pnh*dT_glob
         obm%phit   = obm%par%phit_init   + obm%par%hs*obm%par%psh*dT_glob
     end subroutine coupling_atm2obm

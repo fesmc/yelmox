@@ -51,7 +51,7 @@ function calc_fwf(rho_water,rho_ice,sec_year,mb,smb,bmb,cmb,Hice,dHidt,f_grnd,dx
     ! Ice volume change rate within the basin [m3 ice/yr] (negative: loss)
     select case(trim(fwf_def))
         case("dVdt")
-            dV_ice = sum(dHidt, mask=mask_basin)*dx*dy
+            dV_ice = sum(dHidt)*dx*dy
         case("mb")
             dV_ice = sum(mb, mask=mask_basin)*dx*dy
         case("ablation")

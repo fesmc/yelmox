@@ -125,7 +125,7 @@
 /
 
 &obm_forcing
-    ! [ctrl] atm2obm: the OBM box air temperatures theta_i = theta_i_init +
+    ! [ctrl] atm2obm: the OBM box air temperatures tstar_i = tstar_i_init +
     ! dT_i and the vapour fluxes, from coefficients ([forcing] coefs) [K].
     coef_north   = "dTa_north"      ! the northern box
     coef_tropics = "dTa_tropics"    ! the tropical box
@@ -189,9 +189,9 @@
     phit_init = 0.014              ! [Sv] Freshwater transport from southern to tropical box
     phin_init = 0.065              ! [Sv] Freshwater transport from tropical to northern box
 
-    thetas_init = 6.6                   ! [C] Relaxation temperature of the southern box
-    thetan_init = 2.7                   ! [C] Relaxation temperature of the northern box
-    thetat_init = 11.7                  ! [C] Relaxation temperature of the tropical box
+    tstars_init = 6.6                   ! [C] Relaxation temperature of the southern box
+    tstarn_init = 2.7                   ! [C] Relaxation temperature of the northern box
+    tstart_init = 11.7                  ! [C] Relaxation temperature of the tropical box
 
     lambdan_init = 0.05934959349593496  ! Gamma / (c * rho * z)
     lambdas_init = 0.05934959349593496
@@ -458,12 +458,12 @@
     ! A blank component grid takes the default given in brackets.
     name         = "Antarctica"
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
-    grid_hub     = "ANT-16KM"         ! hi-res geometry hub
-    grid_ice     = "ANT-32KM"         ! Yelmo [grid_hub]
-    grid_isos    = "ANT-32KM"         ! isostasy [grid_ice]
-    grid_clim    = "ANT-32KM"         ! reference climate + transient forcing [grid_ice]
-    grid_surface = "ANT-32KM"         ! surface mass balance [grid_clim]
-    grid_shelf   = "ANT-16KM"         ! marine shelf [grid_hub]
+    grid_hub     = "ANT-32KM"         ! hi-res geometry hub
+    grid_ice     = ""         ! Yelmo [grid_hub]
+    grid_isos    = ""         ! isostasy [grid_ice]
+    grid_clim    = ""         ! reference climate + transient forcing [grid_ice]
+    grid_surface = ""         ! surface mass balance [grid_clim]
+    grid_shelf   = ""         ! marine shelf [grid_hub]
     basins       = "Zwally2012"  ! basin ids of the hub output: <set>, <set>.group, None or domain
 /
 
@@ -982,10 +982,10 @@
     phys_const   = "Earth"            ! physical constants: group of input/yelmo_phys_const.nml
     grid_hub     = "GRL-16KM"         ! hi-res geometry hub
     grid_ice     = ""                 ! Yelmo [grid_hub]
-    grid_isos    = "GRL-32KM"         ! isostasy [grid_ice]
-    grid_clim    = "GRL-32KM"         ! reference climate + transient forcing [grid_ice]
-    grid_surface = "GRL-32KM"         ! surface mass balance [grid_clim]
-    grid_shelf   = "GRL-32KM"         ! marine shelf [grid_hub]
+    grid_isos    = ""         ! isostasy [grid_ice]
+    grid_clim    = ""         ! reference climate + transient forcing [grid_ice]
+    grid_surface = ""         ! surface mass balance [grid_clim]
+    grid_shelf   = ""         ! marine shelf [grid_hub]
     basins       = "Zwally2012.group"  ! basin ids of the hub output: <set>, <set>.group, None or domain
 /
 

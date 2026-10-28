@@ -73,7 +73,7 @@ module nautilus
         
 
         ! Initial state: the *_init parameters, which stay the cold-start values
-        ! (the reference of the atmospheric forcing, theta_i_init + dT_i,
+        ! (the reference of the atmospheric forcing, tstar_i_init + dT_i,
         ! and of the box anomaly of the derived series obm_north/obm_south,
         ! tn - tn_init); on a restart the
         ! state is then taken from the restart file.
@@ -90,9 +90,9 @@ module nautilus
         call nml_read(filename, group, "fs_init", ntls%par%fs_init) 
         call nml_read(filename, group, "phin_init", ntls%par%phin_init)
         call nml_read(filename, group, "phit_init", ntls%par%phit_init) 
-        call nml_read(filename, group, "thetan_init", ntls%par%thetan_init)
-        call nml_read(filename, group, "thetat_init", ntls%par%thetat_init) 
-        call nml_read(filename, group, "thetas_init", ntls%par%thetas_init)
+        call nml_read(filename, group, "tstarn_init", ntls%par%tstarn_init)
+        call nml_read(filename, group, "tstart_init", ntls%par%tstart_init) 
+        call nml_read(filename, group, "tstars_init", ntls%par%tstars_init)
         call nml_read(filename, group, "lambdan_init", ntls%par%lambdan_init)
         call nml_read(filename, group, "lambdat_init", ntls%par%lambdat_init)
         call nml_read(filename, group, "lambdatd_init", ntls%par%lambdatd_init)  
@@ -111,9 +111,9 @@ module nautilus
         ntls%fs = ntls%par%fs_init  
         ntls%phin = ntls%par%phin_init
         ntls%phit = ntls%par%phit_init    
-        ntls%thetan = ntls%par%thetan_init
-        ntls%thetat = ntls%par%thetat_init
-        ntls%thetas = ntls%par%thetas_init    
+        ntls%tstarn = ntls%par%tstarn_init
+        ntls%tstart = ntls%par%tstart_init
+        ntls%tstars = ntls%par%tstars_init    
         ntls%lambdan = ntls%par%lambdan_init
         ntls%lambdat = ntls%par%lambdat_init
         ntls%lambdatd = ntls%par%lambdatd_init
@@ -138,9 +138,9 @@ module nautilus
             call nc_read(ocn_restart,"fs",ntls%fs,start=[n],count=[1]) 
             call nc_read(ocn_restart,"phin",ntls%phin,start=[n],count=[1]) 
             call nc_read(ocn_restart,"phit",ntls%phit,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetan",ntls%thetan,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetat",ntls%thetat,start=[n],count=[1]) 
-            call nc_read(ocn_restart,"thetas",ntls%thetas,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tstarn",ntls%tstarn,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tstart",ntls%tstart,start=[n],count=[1]) 
+            call nc_read(ocn_restart,"tstars",ntls%tstars,start=[n],count=[1]) 
         end if
 
         return
@@ -158,12 +158,17 @@ module nautilus
         ! Local variables
         real(prec) :: dTsdt, dTndt, dTtdt, dTtddt 
         real(prec) :: dSsdt, dSndt, dStdt, dStddt 
-        real(prec) :: fn, fs, phin, phit
-        real(prec), parameter :: maximum_overturning=100.0, maximum_salinity=50.0, minimum_salinity=0.0
+        real(prec) :: fn, ft, fs, phin, phit
+        real(prec), parameter :: maximum_overturning=40.0, maximum_salinity=50.0, minimum_salinity=0.0
+        real(prec) :: mean_salt
+
+        ! Compute mean salinity
+        mean_salt = (ntls%ss + ntls%st + ntls%sn + ntls%std) / 4
 
         ! Transform external fluxes (Sv) to m3a-1 (1 Sv = 1e6 m3s-1 = 1e6 * 365*24*60*60 m3yr-1).
         ! The tropical flux ft is not part of the nautilus budget.
         fn = ntls%fn * factor
+        ft = ntls%ft * factor
         fs = ntls%fs * factor
 
         phin = ntls%phin * factor
@@ -171,29 +176,29 @@ module nautilus
 
         ! Update diagnostic variables
         ntls%m = max(calc_overturning(ntls%par%emp_flow_k, ntls%par%haline_exp_coeff, ntls%par%therm_exp_coeff, ntls%ts, ntls%ss, ntls%tn, ntls%sn), ntls%par%overturning_threshold*factor)
-        call calc_all_lambda(ntls)
+        ! call calc_all_lambda(ntls)
 
         ! Compute time derivatives, box loop: [...-> South --> Tropics --> North --> Tropics Deep -...]
-        dTsdt = calc_temperature_derivative(ntls%par%vol_s, ntls%lambdas, ntls%m, -ntls%ts, ntls%ttd, ntls%thetas)               
-        dTtdt = calc_temperature_derivative(ntls%par%vol_t, ntls%lambdat, ntls%m, -ntls%tt, ntls%ts, ntls%thetat)
-        dTndt = calc_temperature_derivative(ntls%par%vol_n, ntls%lambdan, ntls%m, -ntls%tn, ntls%tt, ntls%thetan)                                          
+        dTsdt = calc_temperature_derivative(ntls%par%vol_s, ntls%lambdas, ntls%m, -ntls%ts, ntls%ttd, ntls%tstars)               
+        dTtdt = calc_temperature_derivative(ntls%par%vol_t, ntls%lambdat, ntls%m, -ntls%tt, ntls%ts, ntls%tstart)
+        dTndt = calc_temperature_derivative(ntls%par%vol_n, ntls%lambdan, ntls%m, -ntls%tn, ntls%tt, ntls%tstarn)                                          
         dTtddt = calc_temperature_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%ttd, ntls%tn, 0.0)   
         
-        dSsdt = calc_salinity_derivative(ntls%par%vol_s, ntls%par%reference_salinity, ntls%m, -ntls%ss, ntls%std, phit, -fs)
-        dStdt = calc_salinity_derivative(ntls%par%vol_t, ntls%par%reference_salinity, ntls%m, -ntls%st, ntls%ss, phin, -phit)
-        dSndt = calc_salinity_derivative(ntls%par%vol_n, ntls%par%reference_salinity, ntls%m, -ntls%sn, ntls%st, -fn, -phin)
-        dStddt = calc_salinity_derivative(ntls%par%vol_td, 0.0, ntls%m, -ntls%std, ntls%sn, 0.0, 0.0)
-
+        dSsdt = (ntls%m/ntls%par%vol_s)*(ntls%std - ntls%ss) + (mean_salt/ntls%par%vol_s)*phit - (ntls%ss/ntls%par%vol_s)*fs ! reference salinity is the mean, external fwf depends on actual box salinity
+        dStdt = (ntls%m/ntls%par%vol_t)*(ntls%ss - ntls%st) + (mean_salt/ntls%par%vol_t)*(phin - phit)
+        dSndt = (ntls%m/ntls%par%vol_n)*(ntls%st - ntls%sn) - (mean_salt/ntls%par%vol_n)*phin - (ntls%sn/ntls%par%vol_n)*fn
+        dStddt = (ntls%m/ntls%par%vol_td)*(ntls%sn - ntls%std)
+        
         ! Update prognostic variables
         ntls%ts = update_state(ntls%ts, dTsdt, dt)
         ntls%tt = update_state(ntls%tt, dTtdt, dt)
         ntls%tn = update_state(ntls%tn, dTndt, dt)
         ntls%ttd = update_state(ntls%ttd, dTtddt, dt)
 
-        ntls%ss = max(min(update_state(ntls%ss, dSsdt, dt), maximum_salinity), minimum_salinity)
-        ntls%st = max(min(update_state(ntls%st, dStdt, dt), maximum_salinity), minimum_salinity)
-        ntls%sn = max(min(update_state(ntls%sn, dSndt, dt), maximum_salinity), minimum_salinity)
-        ntls%std = max(min(update_state(ntls%std, dStddt, dt), maximum_salinity), minimum_salinity)
+        ntls%ss = update_state(ntls%ss, dSsdt, dt) ! max(min(update_state(ntls%ss, dSsdt, dt), maximum_salinity), minimum_salinity)
+        ntls%st = update_state(ntls%st, dStdt, dt) ! max(min(update_state(ntls%st, dStdt, dt), maximum_salinity), minimum_salinity)
+        ntls%sn = update_state(ntls%sn, dSndt, dt) ! max(min(update_state(ntls%sn, dSndt, dt), maximum_salinity), minimum_salinity)
+        ntls%std = update_state(ntls%std, dStddt, dt) ! max(min(update_state(ntls%std, dStddt, dt), maximum_salinity), minimum_salinity)
 
         return
 
@@ -230,10 +235,10 @@ module nautilus
         return
     end function calc_overturning
 
-    function calc_temperature_derivative(vol1, lambda1, m, t1, t2, theta1) result(dTdt)
+    function calc_temperature_derivative(vol1, lambda1, m, t1, t2, tstar1) result(dTdt)
         ! WARNING: make sure you provide the correct sign to the flux
-        real(prec) :: vol1, lambda1, m, t1, t2, theta1, dTdt
-        dTdt = m / vol1 * (t2 + t1) + lambda1 * (theta1 + t1)
+        real(prec) :: vol1, lambda1, m, t1, t2, tstar1, dTdt
+        dTdt = m / vol1 * (t2 + t1) + lambda1 * (tstar1 + t1)
         return
     end function calc_temperature_derivative
 

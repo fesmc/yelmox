@@ -275,19 +275,19 @@ contains
         end do
     end function coefs_uses_derived
 
-    subroutine coefs_set_obm(coefs, from, theta, theta_init)
+    subroutine coefs_set_obm(coefs, from, tstar, tstar_init)
         ! Set every coefficient derived `from` an OBM box (obm_north,
-        ! obm_south) to its box temperature theta [K], or theta - theta_init
+        ! obm_south) to its box temperature tstar [K], or tstar - tstar_init
         ! with `anomaly`.
         type(coefs_class), intent(inout) :: coefs
         character(len=*),  intent(in)    :: from
-        real(wp),          intent(in)    :: theta, theta_init
+        real(wp),          intent(in)    :: tstar, tstar_init
         integer :: k
         do k = 1, size(coefs%coef)
             associate(c => coefs%coef(k))
             if (.not. (c%kind == "derived" .and. trim(c%drv%from) == trim(from))) cycle
-            c%f = theta
-            if (c%drv%anomaly) c%f = theta - theta_init
+            c%f = tstar
+            if (c%drv%anomaly) c%f = tstar - tstar_init
             end associate
         end do
     end subroutine coefs_set_obm

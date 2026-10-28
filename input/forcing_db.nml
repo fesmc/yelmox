@@ -136,6 +136,24 @@
     units  = "K"
 /
 
+&coef_dTa_greenland
+    ! yelmox_bipolar: the air temperature anomaly of the Greenland domain [K], the global
+    ! mean gmt amplified (Zickfeld et al., 2004): 
+    method = "scaled"
+    coef   = "gmt"
+    factor = 1.5
+    units  = "K"
+/
+
+&coef_dTa_antarctica
+    ! yelmox_bipolar: the air temperature anomaly of the Antarctica domain [K], the global
+    ! mean gmt amplified (Zickfeld et al., 2004): 
+    method = "scaled"
+    coef   = "gmt"
+    factor = 1.5
+    units  = "K"
+/
+
 &coef_dTa_north
     ! yelmox_bipolar: the air temperature anomaly of the north [K], the global
     ! mean gmt amplified (Zickfeld et al., 2004): the northern box of the ocean
@@ -172,7 +190,7 @@
     ! northern domain with term_obm_north.
     method  = "derived"
     from    = "obm_north"
-    anomaly = False     ! the temperature itself (True: minus its initial value)
+    anomaly = True     ! the temperature itself (True: minus its initial value)
     units   = "K"
 /
 
@@ -180,7 +198,7 @@
     ! yelmox_bipolar: the southern box temperature [K] (term_obm_south).
     method  = "derived"
     from    = "obm_south"
-    anomaly = False
+    anomaly = True
     units   = "K"
 /
 
@@ -245,14 +263,14 @@
     ! in the coefficient and pattern = "uniform" here, the reference plus the
     ! box anomaly instead.
     coef    = "obm_north"
-    pattern = "replace"
+    pattern = "uniform"
     fields  = "to"
 /
 
 &term_obm_south
     ! yelmox_bipolar: the ocean of the southern domain from the southern box.
     coef    = "obm_south"
-    pattern = "replace"
+    pattern = "uniform"
     fields  = "to"
 /
 

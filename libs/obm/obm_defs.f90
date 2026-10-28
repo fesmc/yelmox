@@ -48,9 +48,9 @@ module obm_defs
         real(preci) :: fs_init
         real(preci) :: phit_init
         real(preci) :: phin_init
-        real(preci) :: thetas_init
-        real(preci) :: thetan_init
-        real(preci) :: thetat_init
+        real(preci) :: tstars_init
+        real(preci) :: tstarn_init
+        real(preci) :: tstart_init
         real(preci) :: lambdan_init
         real(preci) :: lambdas_init
         real(preci) :: lambdat_init
@@ -67,7 +67,7 @@ module obm_defs
         real(preci) :: m        ! thc [m3/yr]
         real(preci) :: fn,ft,fs ! external fluxes [Sv]
         real(preci) :: phin,phit  ! atmospheric humidity fluxes between boxes [Sv]
-        real(preci) :: thetan,thetat,thetas ! Atmospheric temperatures [degC]
+        real(preci) :: tstarn,tstart,tstars ! Atmospheric temperatures [degC]
         real(preci) :: lambdan,lambdat,lambdatd,lambdas   ! thermal coupling constants
 
     end type
