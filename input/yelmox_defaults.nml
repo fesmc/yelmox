@@ -76,7 +76,7 @@
     region           = "all"         ! air_anomaly: cells of the mean: "all" or a [regions] selection, e.g. "zone:open_ocean"
     anomaly          = True          ! obm_*: the box temperature minus its initial value (False: the temperature itself)
     ! yelmox
-    units            = "1"           ! units label of coef_<name> in the 1D output
+    units            = "1"           ! units label of <name> in forcing_ts.nc
     restart_every_df = 0.0           ! [f] write a restart each time f moves by this much; 0 = off
     ! window modifier (tsgen): inside win_t0 < t < win_t1, f = win_ref + win_fac*(f - win_ref)
     ! (only where f > win_ref if win_above), with linear ramps of win_taper at the edges;

@@ -181,9 +181,10 @@ writes a restart bundle `restart-<n>` each time a coefficient moves by more than
 its `restart_every_df`. Each tsgen coefficient restarts from
 `coef_<name>_restart.nc` in the bundle (a scaled or derived one is recomputed; an older
 bundle's `series_<name>_restart.nc` is still read, with a note); every
-coefficient is written to the 1D output `yelmo_ts.nc` (with `[output]
-write_yelmo`) as `coef_<name>` (tsgen ones also `coef_<name>_df_dt`), labelled
-with `units`.
+coefficient is written to the run's 1D file `forcing_ts.nc` (`[tm_1D]`) under
+its name (tsgen ones also `<name>_df_dt`), labelled with `units`, its `kind`
+and source as attributes, next to the barystatic sea level `bsl`. The names
+`time` and `bsl` are therefore not coefficient names.
 
 **Terms** are one coefficient times one pattern on an explicit list of `fields`:
 
@@ -582,13 +583,15 @@ The method and its other parameters are described in the Yelmo docs,
 
 Each module writes its own files, on its own grid, at the `[tm_2D]` (2D),
 `[tm_2Dsm]` (small 2D) and `[tm_1D]` (time series) intervals. Every key is
-required. A component switched off in `[comps]` writes no files whatever its
+required. The driver's forcing, shared by its domains (the coefficients and
+the barystatic sea level), goes to `forcing_ts.nc` in the run folder on the
+`[tm_1D]` cadence, whatever the switches. A component switched off in `[comps]` writes no files whatever its
 switch (`write_isos`, `write_shelf`, `write_surface`, `write_clim` need
 `with_isostasy`, `with_shelf`, `with_surface`, `with_climate`):
 
 | Key | Files |
 |---|---|
-| `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` with the coefficients (and `yelmo_ts_<name>.nc` for the named masks of `[regions]`) |
+| `write_yelmo` | `yelmo.nc`, `yelmo_sm.nc`, `yelmo_ts.nc` (and `yelmo_ts_<name>.nc` for the named masks of `[regions]`) |
 | `write_isos` | `isos.nc`, `isos_ts.nc` |
 | `write_shelf` | `mshlf.nc` |
 | `write_surface` | the surface model's file, `<surface_method>.nc`: `chion.nc`, `smbpal.nc`, `smb_simple.nc`; none with `climate` (the climate's file has the smb, `smb_ann`, `tsrf_ann`) |

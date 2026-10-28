@@ -21,6 +21,12 @@ annotated git tag. Dates are release (tag) dates.
   the setups table and the rules behind it.
 
 ### Changed
+- Coefficient output: the driver writes the coefficients and the barystatic sea level to
+  the run's own 1D file `forcing_ts.nc` (`[tm_1D]` cadence, both drivers; in
+  yelmox_bipolar the run folder, not each domain's), under their names (`gmt`, not
+  `coef_gmt`), with `kind` and the source (`method`, `coef` + `factor`, `from`) as
+  attributes. `yelmo_ts.nc` no longer holds them. `time` and `bsl` are not coefficient
+  names (checked at init).
 - yelmox_bipolar: the regional amplification of `gmt` is set once, in the scaled library
   coefficients `dTa_north` (1.07), `dTa_tropics` (0.79) and `dTa_south` (0.86 x `gmt`;
   Zickfeld et al., 2004), read by the domains (`term_regional_north`/`_south` on them,

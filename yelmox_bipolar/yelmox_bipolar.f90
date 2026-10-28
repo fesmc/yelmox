@@ -45,7 +45,7 @@ program yelmox_bipolar
                                restart_bundle_dir
     use kryos_output,   only : domain_write_init, domain_write_step, &
                                domain_write_init_sm, domain_write_step_sm, &
-                               domain_write_1D
+                               domain_write_1D, run_write_1D
     use kryos_forcing,  only : coefs_class, coefs_init, coefs_update, coefs_kill, &
                                coefs_restart_due, coefs_restart_fldr, &
                                coefs_restart_read, coefs_restart_write, coefs_check_used
@@ -169,6 +169,7 @@ program yelmox_bipolar
     call timeout_init(tm_rst,  path_par, "tm_rst",  "restart", ts%time_init, ts%time_end)
     if (active_north) call write_domain_init(dom_north, outfldr_north)
     if (active_south) call write_domain_init(dom_south, outfldr_south)
+    if (tm_1D%active) call run_write_1D("forcing_ts.nc", ts%time, coefs, bsl, init=.TRUE.)
 
     ! === Main time loop (shared timeline + dtt) ===
     ! Output and restarts are written at the top of the loop for the current
@@ -192,6 +193,7 @@ program yelmox_bipolar
         if (active_south) call write_domain_step(dom_south, outfldr_south)
         if (oc%active_obm .and. do_1D) call write_obm_update(obox, obm_file, oc%obm_name, ts%time)
         if (do_1D) then
+            call run_write_1D("forcing_ts.nc", ts%time, coefs, bsl)
             call timer_write_totals(tmr, ts%time, "s", "timing.txt", init=timing_init)
             timing_init = .FALSE.
         end if
@@ -370,19 +372,18 @@ contains
 
         if (tm_2D%active)   call domain_write_init(dom, trim(outfldr), ts%time)
         if (tm_2Dsm%active) call domain_write_init_sm(dom, trim(outfldr), ts%time)
-        if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, coefs, init=.TRUE.)
+        if (tm_1D%active)   call domain_write_1D(dom, trim(outfldr), ts%time, init=.TRUE.)
     end subroutine write_domain_init
 
     subroutine write_domain_step(dom, outfldr)
-        ! Append 2D/1D records (the shared coefficients in each domain's 1D file) on
-        ! the shared cadence (do_2D/do_2Dsm/do_1D, set by the driver at the top
-        ! of the loop).
+        ! Append 2D/1D records on the shared cadence (do_2D/do_2Dsm/do_1D, set
+        ! by the driver at the top of the loop).
         type(kryos_domain), intent(inout) :: dom
         character(len=*), intent(in)    :: outfldr
 
         if (do_2D)   call domain_write_step(dom, trim(outfldr), ts%time)
         if (do_2Dsm) call domain_write_step_sm(dom, trim(outfldr), ts%time)
-        if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time, coefs)
+        if (do_1D)   call domain_write_1D(dom, trim(outfldr), ts%time)
     end subroutine write_domain_step
 
     subroutine write_run_restart(bundle)

@@ -7,7 +7,7 @@ program test_coefs
     ! (listed before its source) follows its source, also after a restart,
     ! without a restart file; the derived coefficient starts at 0, is set by
     ! its producer (coefs_set), is not advanced by coefs_update, has no
-    ! restart file; all are written to a 1D file. coefs_varies tells the
+    ! restart file; all are written to a record of a 1D file. coefs_varies tells the
     ! constant from the others; coefs_check_used counts the source of a used
     ! scaled coefficient as used.
     !
@@ -17,7 +17,8 @@ program test_coefs
     ! (reads input/yelmox_defaults.nml; writes to a temporary folder it removes).
 
     use precision,     only : wp, dp
-    use ncio,          only : nc_create, nc_write_dim, nc_write
+    use ncio,          only : nc_create, nc_write_dim, nc_write, nc_open, nc_close, &
+                              nc_time_index, nc_read_attr
     use kryos_forcing, only : coefs_class, derived_spec, coefs_init, coefs_update, &
                               coefs_value, coefs_has, coefs_set, coefs_is_derived, &
                               coefs_derived, coefs_kill, coefs_restart_due, &
@@ -31,7 +32,8 @@ program test_coefs
     type(coefs_class)   :: coefs
     type(derived_spec)  :: drv
     logical :: found
-    integer :: nfail, u
+    integer :: nfail, u, ncid, n
+    character(len=32) :: attr
 
     nfail = 0
     call execute_command_line("mkdir -p "//tmp)
@@ -123,14 +125,22 @@ program test_coefs
     call coefs_restart_read(coefs, tmp)
     call check(abs(coefs_value(coefs, "c") - 1.5_wp) < 1e-9_wp, "c restored from series_c_restart.nc", nfail)
 
-    ! 1D output: every value, df_dt for the tsgen coefficients only.
+    ! 1D output (a record of forcing_ts.nc): every value under its name,
+    ! df_dt for the tsgen coefficients only; the kind and source as attributes.
     call nc_create(tmp//"/ts.nc")
-    call nc_write_dim(tmp//"/ts.nc", "time", x=0.0_dp, dx=1.0_dp, nx=1, unlimited=.true.)
-    call coefs_write_step(coefs, tmp//"/ts.nc", 150.0_dp)
-    call check(nc_has(tmp//"/ts.nc", "coef_c") .and. nc_has(tmp//"/ts.nc", "coef_dto") .and. &
-               nc_has(tmp//"/ts.nc", "coef_s") .and. .not. nc_has(tmp//"/ts.nc", "coef_s_df_dt") .and. &
-               nc_has(tmp//"/ts.nc", "coef_c_df_dt") .and. .not. nc_has(tmp//"/ts.nc", "coef_dto_df_dt"), &
+    call nc_write_dim(tmp//"/ts.nc", "time", x=150.0_dp, dx=1.0_dp, nx=1, unlimited=.true.)
+    call nc_open(tmp//"/ts.nc", ncid, writable=.true.)
+    n = nc_time_index(tmp//"/ts.nc", "time", 150.0_dp, ncid)
+    call coefs_write_step(coefs, tmp//"/ts.nc", ncid, n)
+    call nc_close(ncid)
+    call check(nc_has(tmp//"/ts.nc", "c") .and. nc_has(tmp//"/ts.nc", "dto") .and. &
+               nc_has(tmp//"/ts.nc", "s") .and. .not. nc_has(tmp//"/ts.nc", "s_df_dt") .and. &
+               nc_has(tmp//"/ts.nc", "c_df_dt") .and. .not. nc_has(tmp//"/ts.nc", "dto_df_dt"), &
                "1D output variables", nfail)
+    call nc_read_attr(tmp//"/ts.nc", "s", "kind", attr)
+    call check(trim(attr) == "scaled", "attribute kind of s", nfail)
+    call nc_read_attr(tmp//"/ts.nc", "s", "coef", attr)
+    call check(trim(attr) == "c", "attribute coef of s", nfail)
 
     call execute_command_line("rm -rf "//tmp)
 

@@ -59,7 +59,7 @@ The shared per-module files (`yelmo.nc`, `isos.nc`, `mshlf.nc`, ...), plus, with
 `[output] write_clim`, `rembo.nc` (annual and summer air temperature,
 precipitation, smb, surface temperature, ocean profiles) and `rembo_ts.nc` (the applied anomalies, the smb integrated
 over the ice sheet and the accumulation-area ratio). The coefficients go to
-the Yelmo 1D file (`coef_<name>`), as for the other climates. The library
+the run's `forcing_ts.nc`, as for the other climates. The library
 holds the hysteresis setup, `coef_hyst` (PI42 with kill switch) and the
 uniform `term_hyst` on `tas` and `pr`: `-p forcing.coefs=hyst
 forcing.terms=hyst` runs it with rembo (its `tas` part is REMBO's `dT_sum`,
