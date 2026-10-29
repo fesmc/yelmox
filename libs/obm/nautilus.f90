@@ -141,6 +141,14 @@ module nautilus
             call nc_read(ocn_restart,"tstarn",ntls%tstarn,start=[n],count=[1]) 
             call nc_read(ocn_restart,"tstart",ntls%tstart,start=[n],count=[1]) 
             call nc_read(ocn_restart,"tstars",ntls%tstars,start=[n],count=[1]) 
+
+            ntls%par%tstarn_init = ntls%tstarn
+            ntls%par%tstart_init = ntls%tstart
+            ntls%par%tstars_init = ntls%tstars 
+
+            ntls%par%phin_init = ntls%phin
+            ntls%par%phit_init = ntls%phit  
+
         end if
 
         return

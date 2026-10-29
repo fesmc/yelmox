@@ -240,16 +240,19 @@
 
 &ycalv
     ! === calving method & law ===
-    use_lsf             = True              ! use level-set method
-    lsf_method          = "snap"            ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
-    dt_lsf              = -1                ! [yr] lsf update timescale. If negative: no reset.
-    lsf_redist_n_iter   = 5                 ! Sussman/Osher LSF redistancing iterations. redist mode only.
-    calv_flt_method     = "equil"           ! "zero", "simple", "flux", "vm-l19", "kill", "threshold"
-    calv_grnd_method    = "equil"           ! "zero", "stress-b12"
+    use_lsf             = False            ! use level-set method
+    lsf_method          = "snap"           ! "snap" (legacy neighbour-snap) or "redist" (Sussman/Osher)
+    dt_lsf              = -1               ! [yr] lsf update timescale. If negative: no reset.
+    lsf_redist_n_iter   = 5                ! Sussman/Osher LSF redistancing iterations. redist mode only.
+    calv_flt_method     = "vm-l19"         ! "zero", "simple", "flux", "vm-l19", "kill", "threshold"
+    calv_grnd_method    = "zero"           ! "zero", "stress-b12"
     
+! vm'm16: lsf, vm-l19: use?lsf false
+! tau?ice, k2 w2
+
     ! === numeric noise === 
-    H_min_grnd          = 5.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
-    H_min_flt           = 5.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
+    H_min_grnd          = 30.0               ! [m] Minimum ice thickness at grounded margin (thinner ice is ablated) - helps with stability, smaller value will lead to more precise summit
+    H_min_flt           = 30.0               ! [m] Minimum ice thickness at floating margin (thinner ice is ablated) - helps with stability
     sd_min              = 100.0             ! [m] calv_grnd(z_bed_sd <= sd_min) = 0.0 
     sd_max              = 500.0             ! [m] calv_grnd(z_bed_sd >= sd_max) = calv_max  
     calv_grnd_max       = 0.0               ! [m/a] Maximum grounded calving rate from high stdev(z_bed)

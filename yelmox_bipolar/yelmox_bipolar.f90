@@ -139,8 +139,9 @@ program yelmox_bipolar
     !     and ice state built on it) sees the box ocean. ===
     if (oc%active_obm) then
         obm_file    = trim(oc%obm_name)//".nc"
-        obm_restart = "None"
-        if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
+        ! obm_restart = "None"
+        ! if (trim(restart) /= "None") obm_restart = trim(restart)//"/obm_restart.nc"
+        if (trim(restart) /= "None") obm_restart = obm_file
         call obm_init(obox, path_par, oc%obm_name, obm_restart)
         call write_obm_init(obm_file, ts%time, "years")
         call coupling_obm2ism(obox, oc%obm_name, coefs)
