@@ -6,7 +6,7 @@ module kryos_regions
     use precision,    only : dp
     use yelmo,        only : yelmo_class, wp
     use yelmo_defs,   only : MASK_ICE_NONE
-    use basal_dragging, only : calc_cb_ref
+    use yelmo_dynamics, only : calc_ydyn_cb_ref
     use kryos,        only : kryos_domain, negis_params, glacial_smb_params, remap
 
     implicit none
@@ -61,7 +61,7 @@ contains
     subroutine negis_update_cb_ref(ylmo, ngs, time)
         ! Northeast Greenland Ice Stream cb_ref modification ([sim] use_negis,
         ! Yelmo's till_method = -1): recompute cb_ref from bed properties
-        ! (calc_cb_ref), then scale the NEGIS parts (region_centre/south/north)
+        ! (calc_ydyn_cb_ref, with Yelmo's cf_ref field), then scale the NEGIS parts (region_centre/south/north)
         ! by their factors at the forcing time `time`: the centre by cf_centre,
         ! the north part (paleo ice stream) by cf_north before -4 ka, the south
         ! part by cf_south from -4 ka, and all parts by the ramp f_x, cf_0 before
@@ -90,10 +90,7 @@ contains
         end if
 
         ! Recompute cb_ref like the standard till function.
-        call calc_cb_ref(ylmo%dyn%now%cb_ref, ylmo%bnd%z_bed, ylmo%bnd%z_bed_sd, ylmo%bnd%z_sl, &
-                ylmo%bnd%H_sed, ylmo%dyn%par%till_f_sed, ylmo%dyn%par%till_sed_min, ylmo%dyn%par%till_sed_max, &
-                ylmo%dyn%par%till_cf_ref, ylmo%dyn%par%till_cf_min, ylmo%dyn%par%till_z0, ylmo%dyn%par%till_z1, &
-                ylmo%dyn%par%till_n_sd, ylmo%dyn%par%till_scale_zb, ylmo%dyn%par%till_scale_sed)
+        call calc_ydyn_cb_ref(ylmo%dyn%now%cb_ref, ylmo%dyn%par, ylmo%bnd, ylmo%dyn%now%cf_ref, ylmo%dyn%now%z_bed_reg)
 
         ! Apply the scaling of the NEGIS parts, then the ramp over all of them.
         where (ngs%mask_centre) ylmo%dyn%now%cb_ref = ylmo%dyn%now%cb_ref * ngs%cf_centre

@@ -11,7 +11,7 @@ module kryos_startup
                              yelmo_regions_update, mask_bed_ocean
     use yelmo_defs,   only : MASK_ICE_NONE
     use yelmo_tools,  only : smooth_gauss_2D
-    use basal_dragging,   only : calc_cb_ref
+    use yelmo_dynamics,   only : calc_ydyn_cb_ref
     use yelmo_topography, only : calc_ytopo_diagnostic
     use yelmo_io,         only : yelmo_restart_read_topo_bnd
     use marine_shelf, only : marshelf_restart_write, marshelf_restart_read
@@ -206,12 +206,8 @@ contains
         if (dom%opt%cf_init > 0.0_wp) then
             dom%yelmo%dyn%now%cb_ref = dom%opt%cf_init
         else
-            call calc_cb_ref(dom%yelmo%dyn%now%cb_ref, dom%yelmo%bnd%z_bed, dom%yelmo%bnd%z_bed_sd, &
-                    dom%yelmo%bnd%z_sl, dom%yelmo%bnd%H_sed, dom%yelmo%dyn%par%till_f_sed, &
-                    dom%yelmo%dyn%par%till_sed_min, dom%yelmo%dyn%par%till_sed_max, &
-                    dom%yelmo%dyn%par%till_cf_ref, dom%yelmo%dyn%par%till_cf_min, &
-                    dom%yelmo%dyn%par%till_z0, dom%yelmo%dyn%par%till_z1, dom%yelmo%dyn%par%till_n_sd, &
-                    dom%yelmo%dyn%par%till_scale_zb, dom%yelmo%dyn%par%till_scale_sed)
+            call calc_ydyn_cb_ref(dom%yelmo%dyn%now%cb_ref, dom%yelmo%dyn%par, dom%yelmo%bnd, &
+                                  dom%yelmo%dyn%now%cf_ref, dom%yelmo%dyn%now%z_bed_reg)
         end if
     end subroutine domain_opt_init_cb_ref
 
